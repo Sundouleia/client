@@ -1,0 +1,18 @@
+[submodule "Submodules/CkCommons"]
+	path = Submodules/CkCommons
+	url = https://github.com/CordeliaMist/CkCommons.git
+[submodule "Submodules/SundouleiaAPI"]
+	path = Submodules/SundouleiaAPI
+	url = https://github.com/Sundouleia/api.git
+[submodule "Submodules/OtterGui"]
+	path = Submodules/OtterGui
+	url = https://github.com/Ottermandias/OtterGui.git
+[submodule "Submodules/PenumbraAPI"]
+	path = Submodules/PenumbraAPI
+	url = https://github.com/Ottermandias/Penumbra.Api.git
+[submodule "Submodules/GlamourerAPI"]
+	path = Submodules/GlamourerAPI
+	url = https://github.com/Ottermandias/Glamourer.Api.git
+[submodule "Submodules/Penumbra.GameData"]
+	path = Submodules/Penumbra.GameData
+	url = https://github.com/Ottermandias/Penumbra.Gamedata.git
