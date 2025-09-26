@@ -1,2 +1,2 @@
-# client
-Open-Sourced, client-side code. A deviation of GSpeak's client code
+![Banner Image](https://raw.githubusercontent.com/Sundouleia/repo/main/Images/Banner.png)
+Wawa cat is magical.
