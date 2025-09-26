@@ -13,6 +13,3 @@
 [submodule "Submodules/GlamourerAPI"]
 	path = Submodules/GlamourerAPI
 	url = https://github.com/Ottermandias/Glamourer.Api.git
-[submodule "Submodules/Penumbra.GameData"]
-	path = Submodules/Penumbra.GameData
-	url = https://github.com/Ottermandias/Penumbra.Gamedata.git
