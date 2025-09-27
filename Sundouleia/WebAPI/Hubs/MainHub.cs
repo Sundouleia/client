@@ -1,0 +1,278 @@
+using CkCommons;
+using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
+using Sundouleia.Services;
+using Sundouleia.Services.Configs;
+using Sundouleia.Services.Mediator;
+using Sundouleia.State.Listeners;
+using Sundouleia.State.Managers;
+using Sundouleia.Utils;
+using SundouleiaAPI.Data;
+using SundouleiaAPI.Hub;
+using SundouleiaAPI.Network;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Hosting;
+using System.Reflection;
+
+namespace Sundouleia.WebAPI;
+/// <summary>
+///     Facilitates interactions with the Sundouleia Hub connection. <para />
+///     To ensure that interactions with vibe lobbies function correctly, <see cref="_hubConnection"/> will be static.
+/// </summary>
+public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubClient, IHostedService
+{
+    public const string MAIN_SERVER_NAME = "Sundouleia Main";
+    public const string MAIN_SERVER_URI = "wss://sundouleia.kinkporium.studio";
+
+    private readonly ClientAchievements _achievements;
+    private readonly HubFactory _hubFactory;
+    private readonly TokenProvider _tokenProvider;
+    private readonly ServerConfigManager _serverConfigs;
+    private readonly SundesmoManager _sundesmoManager;
+    private readonly ClientDataListener _clientDatListener;
+    private readonly SundesmoListener _sundesmoListener;
+    private readonly ConnectionSyncService _dataSync;
+
+    // Static private accessors (persistant across singleton instantiations for other static accessors.)
+    private static ServerState _serverStatus = ServerState.Offline;
+    private static Version _clientVersion = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
+    private static Version _expectedVersion = new Version(0, 0, 0, 0);
+    private static int _expectedApiVersion = 0;
+    private static bool _apiHooksInitialized = false;
+
+    private static ConnectionResponse? _connectionResponce = null;
+    private static ServerInfoResponse? _serverInfo = null;
+
+    // Private accessors (handled within the singleton instance)
+    private CancellationTokenSource _hubConnectionCTS = new();
+    private CancellationTokenSource? _hubHealthCTS = new();
+    private HubConnection? _hubConnection = null;
+    private string? _latestToken = null;
+    private bool _suppressNextNotification = false;
+
+    public MainHub(ILogger<MainHub> logger,
+        SundouleiaMediator mediator,
+        ClientAchievements achievements,
+        HubFactory hubFactory,
+        TokenProvider tokenProvider,
+        ServerConfigManager serverConfigs,
+        SundesmoManager kinksters,
+        ClientDataListener clientDatListener,
+        SundesmoListener sundesmoListener,
+        ConnectionSyncService dataSync)
+        : base(logger, mediator)
+    {
+        _achievements = achievements;
+        _hubFactory = hubFactory;
+        _tokenProvider = tokenProvider;
+        _serverConfigs = serverConfigs;
+        _sundesmoManager = kinksters;
+        _clientDatListener = clientDatListener;
+        _sundesmoListener = sundesmoListener;
+        _dataSync = dataSync;
+
+        // Subscribe to the things.
+        Mediator.Subscribe<ClosedMessage>(this, (msg) => HubInstanceOnClosed(msg.Exception));
+        Mediator.Subscribe<ReconnectedMessage>(this, (msg) => _ = HubInstanceOnReconnected());
+        Mediator.Subscribe<ReconnectingMessage>(this, (msg) => HubInstanceOnReconnecting(msg.Exception));
+
+        Svc.ClientState.Login += OnLogin;
+        Svc.ClientState.Logout += (_, _) => OnLogout();
+
+        // If already logged in, begin.
+        if (PlayerData.IsLoggedIn)
+            OnLogin();
+    }
+
+    // Public static accessors.
+    public static string ClientVerString => $"[Client: v{_clientVersion} (Api {ISundouleiaHub.ApiVersion})]";
+    public static string ExpectedVerString => $"[Server: v{_expectedVersion} (Api {_expectedApiVersion})]";
+    public static ConnectionResponse? ConnectionResponse
+    {
+        get => _connectionResponce;
+        set
+        {
+            _connectionResponce = value;
+            if (value != null)
+            {
+                _expectedVersion = _connectionResponce?.CurrentClientVersion ?? new Version(0, 0, 0, 0);
+                _expectedApiVersion = _connectionResponce?.ServerVersion ?? 0;
+            }
+        }
+    }
+
+    public static string AuthFailureMessage { get; private set; } = string.Empty;
+    public static int OnlineUsers => _serverInfo?.OnlineUsers ?? 0;
+    public static UserData OwnUserData => ConnectionResponse!.User;
+    public static string DisplayName => ConnectionResponse?.User.AliasOrUID ?? string.Empty;
+    public static string UID => ConnectionResponse?.User.UID ?? string.Empty;
+    public static UserReputation Reputation => ConnectionResponse?.Reputation ?? new();
+    public static ServerState ServerStatus
+    {
+        get => _serverStatus;
+        private set
+        {
+            if (_serverStatus != value)
+            {
+                Svc.Logger.Debug($"[Hub-Main]: New ServerState: {value}, prev ServerState: {_serverStatus}", LoggerType.ApiCore);
+                _serverStatus = value;
+            }
+        }
+    }
+
+    public static bool IsConnectionDataSynced => _serverStatus is ServerState.ConnectedDataSynced;
+    public static bool IsConnected => _serverStatus is ServerState.Connected or ServerState.ConnectedDataSynced;
+    public static bool IsServerAlive => _serverStatus is ServerState.ConnectedDataSynced or ServerState.Connected or ServerState.Unauthorized or ServerState.Disconnected;
+    public bool ClientHasConnectionPaused => _serverConfigs.ServerStorage.FullPause;
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Svc.ClientState.Login -= OnLogin;
+        Svc.ClientState.Logout -= (_, _) => OnLogout();
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("MainHub is starting.");
+        return Task.CompletedTask;
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("MainHub is stopping. Closing down SundouleiaHub-Main!", LoggerType.ApiCore);
+        _hubHealthCTS?.Cancel();
+        await Disconnect(ServerState.Disconnected).ConfigureAwait(false);
+        _hubConnectionCTS?.Cancel();
+        return;
+    }
+
+
+    private async void OnLogin()
+    {
+        Logger.LogInformation("Starting connection on login after fully loaded...");
+        await GsExtensions.WaitForPlayerLoading();
+        Logger.LogInformation("Client fully loaded in, Connecting.");
+        // Run the call to attempt a connection to the server.
+        await Connect().ConfigureAwait(false);
+    }
+
+    private async void OnLogout()
+    {
+        Logger.LogInformation("Stopping connection on logout", LoggerType.ApiCore);
+        await Disconnect(ServerState.Disconnected).ConfigureAwait(false);
+        // switch the server state to offline.
+        ServerStatus = ServerState.Offline;
+    }
+
+    private void InitializeApiHooks()
+    {
+        if (_hubConnection is null)
+            return;
+
+        Logger.LogDebug("Initializing data", LoggerType.ApiCore);
+        // [ WHEN GET SERVER CALLBACK ] --------> [PERFORM THIS FUNCTION]
+        OnServerMessage((sev, msg) => _ = Callback_ServerMessage(sev, msg));
+        OnHardReconnectMessage((sev, msg, state) => _ = Callback_HardReconnectMessage(sev, msg, state));
+        OnRadarUserFlagged(uid => _ = Callback_RadarUserFlagged(uid));
+        OnServerInfo(dto => _ = Callback_ServerInfo(dto));
+
+        OnAddPair(dto => _ = Callback_AddPair(dto));
+        OnRemovePair(dto => _ = Callback_RemovePair(dto));
+        OnAddRequest(dto => _ = Callback_AddRequest(dto));
+        OnRemoveRequest(dto => _ = Callback_RemoveRequest(dto));
+
+        OnBlocked(dto => _ = Callback_Blocked(dto));
+        OnUnblocked(dto => _ = Callback_Unblocked(dto));
+
+        OnIpcUpdateFull(dto => _ = Callback_IpcUpdateFull(dto));
+        OnIpcUpdateMods(dto => _ = Callback_IpcUpdateMods(dto));
+        OnIpcUpdateOther(dto => _ = Callback_IpcUpdateOther(dto));
+        OnIpcUpdateSingle(dto => _ = Callback_IpcUpdateSingle(dto));
+        OnSingleChangeGlobal(dto => _ = Callback_SingleChangeGlobal(dto));
+        OnBulkChangeGlobal(dto => _ = Callback_BulkChangeGlobal(dto));
+        OnSingleChangeUnique(dto => _ = Callback_SingleChangeUnique(dto));
+        OnBulkChangeUnique(dto => _ = Callback_BulkChangeUnique(dto));
+
+        OnRadarAddUpdateUser(dto => _ = Callback_RadarAddUpdateUser(dto));
+        OnRadarRemoveUser(dto => _ = Callback_RadarRemoveUser(dto));
+        OnRadarChat(dto => _ = Callback_RadarChat(dto));
+
+        OnUserOffline(dto => _ = Callback_UserOffline(dto));
+        OnUserOnline(dto => _ = Callback_UserOnline(dto));
+        OnProfileUpdated(dto => _ = Callback_ProfileUpdated(dto));
+        OnShowVerification(dto => _ = Callback_ShowVerification(dto));
+
+        // recreate a new health check token
+        _hubHealthCTS = _hubHealthCTS.SafeCancelRecreate();
+        // Start up our health check loop.
+        _ = ClientHealthCheckLoop(_hubHealthCTS!.Token);
+        // set us to initialized (yippee!!!)
+        _apiHooksInitialized = true;
+    }
+
+    public async Task<bool> HealthCheck()
+        => await _hubConnection!.InvokeAsync<bool>(nameof(HealthCheck)).ConfigureAwait(false);
+    public async Task<ConnectionResponse> GetConnectionResponse()
+        => await _hubConnection!.InvokeAsync<ConnectionResponse>(nameof(GetConnectionResponse)).ConfigureAwait(false);
+
+    public async Task<List<OnlineUser>> UserGetOnlinePairs()
+        => await _hubConnection!.InvokeAsync<List<OnlineUser>>(nameof(UserGetOnlinePairs)).ConfigureAwait(false);
+
+    public async Task<List<UserPair>> UserGetAllPairs()
+        => await _hubConnection!.InvokeAsync<List<UserPair>>(nameof(UserGetAllPairs)).ConfigureAwait(false);
+
+    public async Task<List<PendingRequest>> UserGetPendingRequests()
+        => await _hubConnection!.InvokeAsync<List<PendingRequest>>(nameof(UserGetPendingRequests)).ConfigureAwait(false);
+
+    public async Task<FullProfileData> UserGetProfileData(UserDto dto)
+        => await _hubConnection!.InvokeAsync<FullProfileData>(nameof(UserGetProfileData), dto).ConfigureAwait(false);
+
+    /// <summary>
+    ///     Loads in all our pairs from the Sundouleia server.
+    /// </summary>
+    private async Task LoadInitialSundesmos()
+    {
+        var allSundesmo = await UserGetAllPairs().ConfigureAwait(false);
+        _sundesmoManager.AddInitial(allSundesmo);
+        Logger.LogDebug($"Initial Sundesmos Loaded: [{string.Join(", ", allSundesmo.Select(x => x.User.AliasOrUID))}]", LoggerType.ApiCore);
+    }
+
+    /// <summary>
+    ///     Retrieves the OnlineUser objects from the pairs that are online.
+    /// </summary>
+    /// <returns></returns>
+    private async Task LoadOnlineSundesmos()
+    {
+        var onlineUsers = await UserGetOnlinePairs().ConfigureAwait(false);
+        foreach (var entry in onlineUsers)
+            _sundesmoManager.MarkUserOnline(entry, sendNotification: false);
+
+        Logger.LogDebug($"Online Users: [{string.Join(", ", onlineUsers.Select(x => x.User.AliasOrUID))}]", LoggerType.ApiCore);
+    }
+
+    /// <summary>
+    ///     Load in any requests that we have pending. Can be either sent or received.
+    /// </summary>
+    private async Task LoadRequests()
+    {
+        var requests = await UserGetPendingRequests().ConfigureAwait(false);
+        // Handle them in the request manager.
+    }
+
+    /// <summary>
+    ///     Awaits for the player to be present, ensuring that they are 
+    ///     logged in before this fires. <para/>
+    ///     
+    ///     There is a possibility we wont need this anymore with the new system,
+    ///     so attempt it without it once this works!
+    /// </summary>
+    private async Task WaitForWhenPlayerIsPresent(CancellationToken token)
+    {
+        while (!PlayerData.AvailableThreadSafe && !token.IsCancellationRequested)
+        {
+            Logger.LogDebug("Player not loaded in yet, waiting", LoggerType.ApiCore);
+            await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+        }
+    }
+}
