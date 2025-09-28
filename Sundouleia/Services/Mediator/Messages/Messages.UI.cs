@@ -55,13 +55,19 @@ public record ClosedMainUiMessage : MessageBase;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
 
 /// <summary> When a standalone profile UI is created. </summary>
-public record ProfileOpenStandaloneMessage(Sundesmo Pair) : MessageBase;
+public record ProfileOpenMessage(UserData UserData) : MessageBase;
 
 /// <summary> When the whitelist has a User hovered long enough and displays a profile, this is fired. </summary>
-public record ProfilePopoutToggle(UserData? PairUserData) : MessageBase;
+public record OpenProfilePopout(UserData UserData) : MessageBase;
+
+/// <summary> When the profile popout is closed or needs to be toggled. </summary>
+public record CloseProfilePopout : MessageBase;
 
 /// <summary> Removes the profile from the profile server for the defined user. </summary>
-public record ClearProfileDataMessage(UserData? UserData = null) : MessageBase;
+public record ClearProfileDataMessage(UserData UserData) : MessageBase;
+
+/// <summary> Primarily intended to be used by the toggle of our UI's 'ShowProfile' option. </summary>
+public record ClearProfileCache : MessageBase;
 
 /// <summary> This is fired whenever the discord bot wishes to send out an account verification to our client. </summary>
 public record VerificationPopupMessage(VerificationCode VerificationCode) : MessageBase;

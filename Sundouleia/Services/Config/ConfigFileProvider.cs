@@ -27,8 +27,8 @@ public class ConfigFileProvider : IConfigFileProvider
     public string CKFS_Triggers => Path.Combine(FileSysDirectory, "fs-triggers.json");
 
     // Shared Server Configs
-    public readonly string Nicknames;
-    public readonly string ServerConfig;
+    public readonly string NicknameConfig;
+    public readonly string AccountConfig;
 
     // Unique Client Configs Per Account.
     public string SundesmoGroups => Path.Combine(CurrentPlayerDirectory, "sundesmo-groups.json"); // coiuld merge this with favorites or something idk.

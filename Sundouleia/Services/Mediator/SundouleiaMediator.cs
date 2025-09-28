@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using System.Reflection;
 
 namespace Sundouleia.Services.Mediator;
+#pragma warning disable S3011 // We do a little bit of rule bending here >:3
 
 public sealed class SundouleiaMediator : IHostedService
 {
@@ -47,7 +48,9 @@ public sealed class SundouleiaMediator : IHostedService
     }
 
     /// <summary>
-    /// Allows publishing a message of type T. If the message indicates it should keep the thread context, it's executed immediately; otherwise, it's enqueued for later processing.
+    ///     Allows publishing a message of type T. <para />
+    ///     If the message indicates it should keep the thread context, it's executed immediately.
+    ///     Otherwise, it's enqueued for later processing.
     /// </summary>
     public void Publish<T>(T message) where T : MessageBase
     {
@@ -64,50 +67,44 @@ public sealed class SundouleiaMediator : IHostedService
     }
 
     /// <summary>
-    /// The required startAsync method by the mediator-base
-    /// <para>Begins processing the message queue in a loop</para>
+    ///     The required startAsync method by the mediator-base <para />
+    ///     Begins processing the message queue in a loop
     /// </summary>
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // start the loop in async
         _ = Task.Run(async () =>
         {
-            // while the cancellation token is not cancelled
             while (!_loopCts.Token.IsCancellationRequested)
             {
-                // while we should not be processing the queue, delay for 100ms then try again, and keep doing this until we should process the queue
+                // while we should not be processing the queue, delay for 100ms then try again,
+                // and keep doing this until we should process the queue
                 while (!_processQueue)
-                {
                     await Task.Delay(100, _loopCts.Token).ConfigureAwait(false);
-                }
 
                 // await 100 ms before processing the queue
                 await Task.Delay(100, _loopCts.Token).ConfigureAwait(false);
 
-                // create a hashset of processed messages
-                HashSet<MessageBase> processedMessages = [];
                 // while the message queue tries to dequeue a message, execute the message
+                HashSet<MessageBase> processedMessages = [];
                 while (_messageQueue.TryDequeue(out var message))
                 {
-                    // if the message is already processed, continue to the next message
-                    if (processedMessages.Contains(message)) { continue; }
-                    // otherwise, add the message to the processed messages hashset
-                    processedMessages.Add(message);
+                    // Skip processed messages so we dont execute them more than once.
+                    if (processedMessages.Contains(message))
+                        continue;
 
-                    // then execute the message
+                    processedMessages.Add(message);
                     ExecuteMessage(message);
                 }
             }
         });
 
         _logger.LogInformation("Started Sundouleia Mediator");
-
         return Task.CompletedTask;
     }
 
     /// <summary>
-    /// An overhead from the stopasync in the base, this is called instead,
-    /// ensuring that the messagequeue is cleared and the cancelation token is called, returning a completed task.
+    ///     Ensure the mediators message queue is cleared upon it stopping,
+    ///     and that we prevent the loop from continuing to run after plugin shutdown.
     /// </summary>
     public Task StopAsync(CancellationToken cancellationToken)
     {
@@ -117,14 +114,10 @@ public sealed class SundouleiaMediator : IHostedService
     }
 
     /// <summary>
-    /// Method to subscribe to a message of type T. 
-    /// Subscribed messages listen for the message and execute the action.
+    ///     Subscribe an <paramref name="action"/> to the <paramref name="mediator"/> for a <seealso cref="MessageBase"/>.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="subscriber"></param>
-    /// <param name="action"></param>
     /// <exception cref="InvalidOperationException"></exception>
-    public void Subscribe<T>(IMediatorSubscriber subscriber, Action<T> action) where T : MessageBase
+    public void Subscribe<T>(IMediatorSubscriber mediator, Action<T> action) where T : MessageBase
     {
         // lock the add remove lock so it becomes thread safe
         lock (_addRemoveLock)
@@ -134,9 +127,7 @@ public sealed class SundouleiaMediator : IHostedService
 
             // if we are already subscribed to this message, throw an exception
             if (!_subscriberDict[typeof(T)].Add(new(subscriber, action)))
-            {
                 throw new InvalidOperationException("Already subscribed");
-            }
 
             // otherwise, we would have sucessfully added it to the dictionary, logging its sucess afterward
             _logger.LogDebug("Subscriber added for message "+typeof(T).Name+": "+subscriber.GetType().Name, LoggerType.Mediator);
@@ -144,11 +135,9 @@ public sealed class SundouleiaMediator : IHostedService
     }
 
     /// <summary>
-    /// Method for unsubsribing from a message of type T. 
-    /// This stops listening for the mediator publish actions and removes it from the subscriber dictionary.
+    ///     Unsubscribe from a subscribed mediator message in 
+    ///     <paramref name="subscriber"/> matching <see cref="Type"/>
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="subscriber"></param>
     public void Unsubscribe<T>(IMediatorSubscriber subscriber) where T : MessageBase
     {
         // lock the add remove lock so it becomes thread safe
@@ -164,10 +153,9 @@ public sealed class SundouleiaMediator : IHostedService
     }
 
     /// <summary>
-    /// Method to unsubscribe from all messages at once (for a specific subscriber).
+    ///     Unsubscribe all subscribed MediatorMessages for the <paramref name="mediatorSubscriber"/>'s
     /// </summary>
-    /// <param name="subscriber"></param>
-    internal void UnsubscribeAll(IMediatorSubscriber subscriber)
+    internal void UnsubscribeAll(IMediatorSubscriber mediatorSubscriber)
     {
         // lock the add remove lock so it becomes thread safe
         lock (_addRemoveLock)
@@ -175,59 +163,47 @@ public sealed class SundouleiaMediator : IHostedService
             // for each key value pair in the subscriber dictionary, remove the subscriber from the dictionary
             foreach (Type kvp in _subscriberDict.Select(k => k.Key))
             {
-                // remove the subscriber from the dictionary
-                int unSubbed = _subscriberDict[kvp]?.RemoveWhere(p => p.Subscriber == subscriber) ?? 0;
-                // if the subscriber was removed, log the sucess
+                int unSubbed = _subscriberDict[kvp]?.RemoveWhere(p => p.Subscriber == mediatorSubscriber) ?? 0;
                 if (unSubbed > 0)
-                {
-                    _logger.LogDebug(subscriber.GetType().Name+" unsubscribed from "+kvp.Name, LoggerType.Mediator);
-                }
+                    _logger.LogDebug(mediatorSubscriber.GetType().Name+" unsubscribed from "+kvp.Name, LoggerType.Mediator);
             }
         }
     }
 
     /// <summary>
-    /// Method that executes a message, calling the action for the respective message
+    ///     Executes a Mediator subscribed message passed in via reflection and action.
     /// </summary>
-    /// <param name="message"></param>
     private void ExecuteMessage(MessageBase message)
     {
         // if the subscriber dictionary does not contain the type of the message, return
-        if (!_subscriberDict.TryGetValue(message.GetType(), out HashSet<SubscriberAction>? subscribers) || subscribers == null || !subscribers.Any()) return;
+        if (!_subscriberDict.TryGetValue(message.GetType(), out HashSet<SubscriberAction>? subscribers) || subscribers == null || !subscribers.Any()) 
+            return;
 
         // otherwise, get the subscribers and create a copy of the subscribers
         List<SubscriberAction> subscribersCopy = [];
 
-        // lock the add remove lock so it becomes thread safe
+        // lock the add remove when making the copy to ensure thread safety.
         lock (_addRemoveLock)
-        {
-            // create a copy of the subscribers
             subscribersCopy = subscribers?.Where(s => s.Subscriber != null).ToList() ?? [];
-        }
 
-#pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
-        // get the type of the message
+        // Use reflection to collect the information necessary so we can invoke the subscribed action.
         var msgType = message.GetType();
-        // if the generic execute methods does not contain the message type, get the method info for the message type
         if (!_genericExecuteMethods.TryGetValue(msgType, out var methodInfo))
         {
             // get the method info for the message type
             _genericExecuteMethods[msgType] = methodInfo = GetType()
-                 .GetMethod(nameof(ExecuteReflected), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+                 .GetMethod(nameof(ExecuteReflected), BindingFlags.NonPublic | BindingFlags.Instance)?
                  .MakeGenericMethod(msgType);
         }
 
         // now that we have it, we can invoke the subscribers actions
         methodInfo!.Invoke(this, [subscribersCopy, message]);
-#pragma warning restore S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
     }
 
     /// <summary>
-    /// Uses reflection to invoke subscriber actions with the correct message type. This method is called by ExecuteMessage().
+    ///     Uses reflection to invoke subscriber actions with the correct message type.
+    ///     This method is called by ExecuteMessage().
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="subscribers"></param>
-    /// <param name="message"></param>
     private void ExecuteReflected<T>(List<SubscriberAction> subscribers, T message) where T : MessageBase
     {
         foreach (SubscriberAction subscriber in subscribers)
@@ -249,7 +225,7 @@ public sealed class SundouleiaMediator : IHostedService
     }
 
     /// <summary>
-    /// Starts the message queue processing.
+    ///     Starts the message queue processing.
     /// </summary>
     public void StartQueueProcessing()
     {
@@ -258,11 +234,11 @@ public sealed class SundouleiaMediator : IHostedService
     }
 
     /// <summary>
-    /// A sealed class that stores the Mediator subscriber, caching the action to be executed when the message is published.
+    ///     A sealed class that stores the Mediator subscriber, caching the action 
+    ///     to be executed when the message is published.
     /// </summary>
     private sealed class SubscriberAction
     {
-        // takes in a subscriber and an action
         public SubscriberAction(IMediatorSubscriber subscriber, object action)
         {
             // and stores it to the variables
@@ -275,3 +251,5 @@ public sealed class SundouleiaMediator : IHostedService
         public IMediatorSubscriber Subscriber { get; }
     }
 }
+#pragma warning restore S3011 
+

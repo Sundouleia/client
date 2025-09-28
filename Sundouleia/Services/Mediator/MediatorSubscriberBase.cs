@@ -1,7 +1,7 @@
 namespace Sundouleia.Services.Mediator;
 
 /// <summary>
-/// The subscriber base, including a tracelog, and a unsubscribe all method.
+///     The subscriber base, including a trace-log, and a unsubscribe all method.
 /// </summary>
 public abstract class MediatorSubscriberBase : IMediatorSubscriber
 {

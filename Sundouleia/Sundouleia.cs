@@ -10,7 +10,7 @@ using Sundouleia.Gui.Components;
 using Sundouleia.Gui.Handlers;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Modules.Puppeteer;
-using Sundouleia.Gui.Profile;
+using Sundouleia.Gui.Profiles;
 using Sundouleia.Gui.Publications;
 using Sundouleia.Gui.Remote;
 using Sundouleia.Gui.Toybox;
@@ -138,7 +138,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<CosmeticService>()
         .AddSingleton<TutorialService>()
         .AddSingleton<UiFontService>()
-        .AddSingleton<ConnectionSyncService>()
+        .AddSingleton<AccountService>()
         .AddSingleton<DistributorService>()
         .AddSingleton<UserSyncService>()
         .AddSingleton<DtrBarService>()
@@ -182,8 +182,8 @@ public static class SundouleiaServiceExtensions
     => services
         .AddSingleton<ConfigFileProvider>()
         .AddSingleton<MainConfig>()
-        .AddSingleton<ServerConfigService>()
-        .AddSingleton<NicknamesConfigService>()
+        .AddSingleton<AccountConfig>()
+        .AddSingleton<NickConfig>()
         .AddSingleton<ServerConfigManager>()
         .AddSingleton<HybridSaveService>();
 
@@ -288,7 +288,7 @@ public static class SundouleiaServiceExtensions
         // Scoped Profiles
         .AddScoped<WindowMediatorSubscriberBase, ProfilePreviewUI>()
         .AddScoped<WindowMediatorSubscriberBase, PopoutProfileUi>()
-        .AddScoped<WindowMediatorSubscriberBase, ProfilePictureEditor>()
+        .AddScoped<WindowMediatorSubscriberBase, ProfileAvatarEditor>()
         .AddScoped<WindowMediatorSubscriberBase, ProfileEditorUI>()
         .AddScoped<ProfileLight>()
 

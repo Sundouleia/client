@@ -1,10 +1,60 @@
 using CkCommons.HybridSaver;
+using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 
 namespace Sundouleia.PlayerClient;
 
+public class ConfigStorage
+{
+    public Version? LastRunVersion { get; set; } = null;
+    public string LastUidLoggedIn { get; set; } = ""; // This eventually wont madder once we index via keys instead of UID's
+
+    // used for detecting if in first install.
+    public bool AcknowledgementUnderstood { get; set; } = false;
+    public bool ButtonUsed { get; set; } = false;
+
+    // File Info
+    public string CacheFolder { get; set; } = string.Empty;
+    // Ideally we can remove this if our cleanup function works properly.
+    // Which it should, because if we are using radars it better be lol.
+    public string MaxCacheInGiB { get; set; } = "20";
+    public string CacheScanComplete { get; set; } = string.Empty;
+    public int MaxParallelDownloads { get; set; } = 10;
+    // could add variables for the transfer bars but Idk if I really want to bother
+    // with this, or if we even can detect it with our system we are developing.
+
+    // DTR bar preferences
+    public bool RadarDtr { get; set; } = true;
+    /* can add more here overtime */
+
+    // pair listing preferences. This will have a long overhaul, as preferences
+    // will mean very little once we can make custom group containers.
+    public bool PreferNicknamesOverNames { get; set; } = false;
+    public bool ShowVisibleUsersSeparately { get; set; } = true;
+    public bool ShowOfflineUsersSeparately { get; set; } = true;
+    public bool ShowContextMenus { get; set; } = true;
+    public bool FocusTargetOverTarget { get; set; } = false;
+
+    // UI Preferences.
+    public bool OpenUiOnStartup { get; set; } = true;
+    public bool ShowProfiles { get; set; } = true;
+    public float ProfileDelay { get; set; } = 1.5f;
+
+    // Notification preferences
+    public bool NotifyForServerConnections { get; set; } = true;
+    public bool NotifyForOnlinePairs { get; set; } = true;
+    public bool NotifyLimitToNickedPairs { get; set; } = false;
+    public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Both;
+    public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
+    public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
+
+    // For Thumbnail Folder Browsing
+    public float FileIconScale { get; set; } = 1.0f; // File Icon Scale
+}
+
 public class MainConfig : IHybridSavable
 {
+    private readonly ILogger<MainConfig> _logger;
     private readonly HybridSaveService _saver;
     [JsonIgnore] public DateTime LastWriteTimeUTC { get; private set; } = DateTime.MinValue;
     [JsonIgnore] public HybridSaveType SaveType => HybridSaveType.Json;
@@ -18,12 +68,13 @@ public class MainConfig : IHybridSavable
             ["Version"] = ConfigVersion,
             ["Config"] = JObject.FromObject(Current),
             ["LogLevel"] = LogLevel.ToString(),
-            ["LoggerFilters"] = JToken.FromObject(LoggerFilters)
+            ["Filters"] = JToken.FromObject(LoggerFilters)
         }.ToString(Formatting.Indented);
     }
 
-    public MainConfig(HybridSaveService saver)
+    public MainConfig(ILogger<MainConfig> logger, HybridSaveService saver)
     {
+        _logger = logger;
         _saver = saver;
         Load();
     }
@@ -32,7 +83,7 @@ public class MainConfig : IHybridSavable
     public void Load()
     {
         var file = _saver.FileNames.MainConfig;
-        Svc.Logger.Information("Loading in Config for file: " + file);
+        _logger.LogInformation("Loading in Config for file: " + file);
         var jsonText = "";
         JObject jObject = new();
         try
@@ -45,7 +96,7 @@ public class MainConfig : IHybridSavable
             }
             else
             {
-                Svc.Logger.Warning("Config file not found Attempting to find old config.");
+                _logger.LogWarning("Config file not found Attempting to find old config.");
                 var backupFile = file.Insert(file.Length - 5, "-testing");
                 if (File.Exists(backupFile))
                 {
@@ -57,7 +108,7 @@ public class MainConfig : IHybridSavable
                 }
                 else
                 {
-                    Svc.Logger.Warning("No Config file found for: " + backupFile);
+                    _logger.LogWarning("No Config file found for: " + backupFile);
                     return;
                 }
             }
@@ -65,16 +116,13 @@ public class MainConfig : IHybridSavable
             var version = jObject["Version"]?.Value<int>() ?? 0;
 
             // Load instance configuration
-            Current = jObject["Config"]?.ToObject<SundouleiaConfig>() ?? new SundouleiaConfig();
+            Current = jObject["Config"]?.ToObject<ConfigStorage>() ?? new ConfigStorage();
 
             // Load static fields safely
-            if (Enum.TryParse(jObject["LogLevel"]?.Value<string>(), out LogLevel logLevel))
-                LogLevel = logLevel;
-            else
-                LogLevel = LogLevel.Trace;  // Default fallback
+            LogLevel = Enum.TryParse(jObject["LogLevel"]?.Value<string>(), out LogLevel lvl) ? lvl : LogLevel.Trace;
 
-            // Handle outdated hashset format, and new format for log filters.
-            var token = jObject["LoggerFilters"];
+            // Handle outdated hash set format, and new format for log filters.
+            var token = jObject["Filters"];
             if(token is JArray array)
             {
                 var list = array.ToObject<List<LoggerType>>() ?? new List<LoggerType>();
@@ -85,13 +133,13 @@ public class MainConfig : IHybridSavable
                 LoggerFilters = token?.ToObject<LoggerType>() ?? LoggerType.Recommended;
             }
 
-            Svc.Logger.Information("Config loaded.");
+            _logger.LogInformation("Config loaded.");
             Save();
         }
-        catch (Bagagwa ex) { Svc.Logger.Error("Failed to load config." + ex); }
+        catch (Bagagwa ex) { _logger.LogError("Failed to load config." + ex); }
     }
 
-    public SundouleiaConfig Current { get; private set; } = new();
+    public ConfigStorage Current { get; private set; } = new();
     public static LogLevel LogLevel = LogLevel.Trace;
     public static LoggerType LoggerFilters = LoggerType.Recommended;
 }

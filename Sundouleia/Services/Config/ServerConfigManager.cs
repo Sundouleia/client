@@ -6,17 +6,19 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.Services.Configs;
 
-/// <summary> This configuration manager helps manage the various interactions with all config files related to server-end activity </summary>
-/// <remarks> It provides a comprehensive interface for configuring servers, managing tags and nicknames, and handling authentication keys. </remarks>
+/// <summary> 
+///     Config Management for all Server related configs in one, including
+///     helper methods to make interfacing with config data easier.
+/// </summary>
 public class ServerConfigManager
 {
     private readonly ILogger<ServerConfigManager> _logger;
     private readonly SundouleiaMediator _mediator;
-    private readonly ServerConfigService _serverConfig;
-    private readonly NicknamesConfigService _nicknameConfig;
+    private readonly AccountConfig _serverConfig;
+    private readonly NickConfig _nicknameConfig;
 
     public ServerConfigManager(ILogger<ServerConfigManager> logger, SundouleiaMediator mediator,
-        ServerConfigService serverConfig, NicknamesConfigService nicksConfig)
+        AccountConfig serverConfig, NickConfig nicksConfig)
     {
         _logger = logger;
         _mediator = mediator;
@@ -27,14 +29,15 @@ public class ServerConfigManager
         _nicknameConfig.Load();
     }
 
-    /// <summary> The current API URL for the server </summary>
-    public string CurrentApiUrl => _serverConfig.Storage.ServiceUri;
+    /// <summary>
+    ///     The current server we are connected to, taken from the ServerStorage class
+    /// </summary>
+    public AccountStorage ServerStorage => _serverConfig.Current;
+    public NicknamesStorage NickStorage => _nickConfig.Current;
 
-    /// <summary> The current server we are connected to, taken from the ServerStorage class </summary>
-    public ServerStorage ServerStorage => _serverConfig.Storage;
-    public ServerNicknamesStorage NickStorage => _nicknameConfig.Storage;
-
-    /// <summary> Returns the authentication for the current player. </summary>
+    /// <summary>
+    ///     Returns the authentication for the current player.
+    /// </summary>
     /// <returns> Returns true if found, false if not. Outputs Authentication if true. </returns>
     public bool TryGetAuthForCharacter([NotNullWhen(true)] out Authentication auth)
     {
@@ -56,19 +59,16 @@ public class ServerConfigManager
     }
 
 
-    /// <summary> Retrieves the key for the currently logged in character. Returns null if none found. </summary>
-    /// <returns> The Secret Key </returns>
+    /// <summary>
+    ///     Retrieves the SecretKey for the currently logged in character.
+    /// </summary>
     public string? GetSecretKeyForCharacter()
     {
         if(TryGetAuthForCharacter(out var auth))
-        {
             return auth.SecretKey.Key;
-        }
-        else
-        {
-            _logger.LogDebug("No authentication found for the current character.");
-            return null;
-        }
+
+        _logger.LogDebug("No authentication found for the current character.");
+        return null;
     }
 
     public void UpdateAuthForNameAndWorldChange(ulong localContentId)
@@ -165,13 +165,7 @@ public class ServerConfigManager
         }
         Save();
     }
-
-    /// <summary> Gets the server API Url </summary>
-    public string GetServerApiUrl() => ServerStorage.ServiceUri;
-
-    /// <summary> Gets the server name </summary>
-    public string GetServerName() => ServerStorage.ServerName;
-
+ 
     /// <summary> Checks if the configuration is valid </summary>
     /// <returns> True if the current server storage object is not null </returns>
     public bool HasValidConfig() => ServerStorage != null;

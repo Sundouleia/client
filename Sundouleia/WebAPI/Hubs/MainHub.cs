@@ -31,7 +31,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private readonly SundesmoManager _sundesmoManager;
     private readonly ClientDataListener _clientDatListener;
     private readonly SundesmoListener _sundesmoListener;
-    private readonly ConnectionSyncService _dataSync;
+    private readonly AccountService _dataSync;
 
     // Static private accessors (persistant across singleton instantiations for other static accessors.)
     private static ServerState _serverStatus = ServerState.Offline;
@@ -59,7 +59,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         SundesmoManager kinksters,
         ClientDataListener clientDatListener,
         SundesmoListener sundesmoListener,
-        ConnectionSyncService dataSync)
+        AccountService dataSync)
         : base(logger, mediator)
     {
         _achievements = achievements;

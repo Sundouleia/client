@@ -3,6 +3,7 @@ using Dalamud.Interface.ImGuiNotification;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
+using SundouleiaAPI.Hub;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Reflection;
@@ -123,7 +124,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                     // var auth = secretKey.GetHash256(); // leaving out this because i took out double encryption to just single for now
 
                     // Set the token URI to the appropriate endpoint for secret key authentication
-                    tokenUri = SundouleiaAuth.AuthFullPath(new Uri(_serverManager.CurrentApiUrl
+                    tokenUri = AuthRoutes.AuthFullPath(new Uri(MainHub.MAIN_SERVER_URI
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                         .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
 
@@ -142,7 +143,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                     var localContentID = localContentIDIdentifier.LocalContentID;
 
                     // Set the token URI to the appropriate endpoint for local content ID authentication
-                    tokenUri = SundouleiaAuth.TempTokenFullPath(new Uri(_serverManager.CurrentApiUrl
+                    tokenUri = AuthRoutes.TempTokenFullPath(new Uri(MainHub.MAIN_SERVER_URI
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                         .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
 
@@ -165,7 +166,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                 // set the token URI to SundouleiaAuth's full path, with the base URI being the
                 // server's current API URL, with https:// replaced with wss://
                 // (calling RenewTokenFullPath is different from AuthFullPath
-                tokenUri = SundouleiaAuth.RenewTokenFullPath(new Uri(_serverManager.CurrentApiUrl
+                tokenUri = AuthRoutes.RenewTokenFullPath(new Uri(MainHub.MAIN_SERVER_URI
                     .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                     .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
 
@@ -260,7 +261,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
             }
 
             // get the remaining attributes.
-            var apiUrl = _serverManager.CurrentApiUrl;
+            var apiUrl = MainHub.MAIN_SERVER_URI;
             var charaHash = _frameworkUtil.GetPlayerNameHashedAsync().GetAwaiter().GetResult();
             // Example logic to decide which identifier to use.
             if (!string.IsNullOrEmpty(secretKey))
