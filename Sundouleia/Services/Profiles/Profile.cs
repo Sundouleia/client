@@ -83,7 +83,7 @@ public class Profile : DisposableMediatorSubscriberBase
             return _storedProfileImage;
 
         Logger.LogTrace("Loading profile image data to wrap.");
-        Generic.Safe(() => _storedProfileImage = TextureManagerEx.GetProfilePicture(_imageData.Value));
+        Generic.Safe(() => _storedProfileImage = Svc.Texture.CreateFromImageAsync(_imageData.Value).Result);
         return CosmeticService.CoreTextures.Cache[CoreTexture.Icon256Bg];
     }
 

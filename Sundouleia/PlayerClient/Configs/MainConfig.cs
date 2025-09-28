@@ -23,9 +23,12 @@ public class ConfigStorage
     // could add variables for the transfer bars but Idk if I really want to bother
     // with this, or if we even can detect it with our system we are developing.
 
-    // DTR bar preferences
-    public bool RadarDtr { get; set; } = true;
-    /* can add more here overtime */
+    // Radar Preferences
+    public bool RadarSendPings { get; set; } = false; // If others can send you requests vis context menus.
+    public bool RadarNearbyDtr { get; set; } = true;
+    public bool RadarChatUnreadDtr { get; set; } = false;
+    public bool RadarJoinChats { get; set; } = true;
+    public bool RadarShowUnreadBubble { get; set; } = true;
 
     // pair listing preferences. This will have a long overhaul, as preferences
     // will mean very little once we can make custom group containers.
@@ -47,9 +50,6 @@ public class ConfigStorage
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
-
-    // For Thumbnail Folder Browsing
-    public float FileIconScale { get; set; } = 1.0f; // File Icon Scale
 }
 
 public class MainConfig : IHybridSavable

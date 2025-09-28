@@ -1,18 +1,14 @@
 using CkCommons.Gui;
 using CkCommons.Gui.Utility;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using Sundouleia.PlayerClient;
+using Microsoft.IdentityModel.Tokens;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Services.Textures;
 using Sundouleia.Services.Tutorial;
-using Sundouleia.WebAPI;
-using SundouleiaAPI.Data;
-using Dalamud.Bindings.ImGui;
-using Microsoft.IdentityModel.Tokens;
-using OtterGui.Text;
 using Sundouleia.Utils;
+using Sundouleia.WebAPI;
 
 namespace Sundouleia.Gui.Profiles;
 
@@ -63,14 +59,14 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
         // grab our profile.
         var profile = _service.GetProfile(MainHub.OwnUserData);
         var pos = new Vector2(ImGui.GetCursorScreenPos().X + contentRegion.X - 242, ImGui.GetCursorScreenPos().Y);
-        
+
         var publicRef = profile.Info.IsPublic;
         if (ImGui.Checkbox("Public", ref publicRef))
             profile.Info.IsPublic = publicRef;
         CkGui.AttachToolTip("Makes your profile visible to anyone in radar interactions or radar chats. " +
             "--NL--Otherwise, only your pairs will see your profile.");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfilePublicity, ImGui.GetWindowPos(), ImGui.GetWindowSize());
-        
+
         ImGui.SameLine();
         var isNsfw = profile.Info.IsNSFW;
         if (ImGui.Checkbox("Is NSFW", ref isNsfw))
@@ -155,11 +151,6 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
         if (CkGui.IconTextButton(FAI.Expand, "Preview Profile", ImGui.GetContentRegionAvail().X))
             Mediator.Publish(new ProfileOpenMessage(MainHub.OwnUserData));
         CkGui.AttachToolTip("Preview your profile in a separate window!");
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfilePreview, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () =>
-        {
-            // close profile, open avatar editor
-            Mediator.Publish(new UiToggleMessage(typeof(ProfilePreviewUI), ToggleType.Hide));
-            Mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor)));
-        }); 
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfilePreview, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => Mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor))));
     }
 }

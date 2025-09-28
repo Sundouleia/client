@@ -1,11 +1,12 @@
 using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
-using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
-using Sundouleia.Services.Mediator;
 using OtterGui.Classes;
 using OtterGui.Extensions;
 using OtterGui.Text;
+using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
+using Sundouleia.Services.Mediator;
+using Sundouleia.Utils;
 
 namespace Sundouleia.CustomCombos.Editor;
 
@@ -115,7 +116,7 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
     {
         var kinkster = Items[globalIdx];
 
-        if(Icons.DrawFavoriteStar(_favorites, kinkster.UserData.UID, false) && CurrentSelectionIdx == globalIdx)
+        if(SundouleiaEx.DrawFavoriteStar(_favorites, kinkster.UserData.UID, false) && CurrentSelectionIdx == globalIdx)
         {
             CurrentSelectionIdx = -1;
             Current = default;

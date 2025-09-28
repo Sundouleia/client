@@ -146,7 +146,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
             // get the required service for the online player manager (and notification service if we add it)
             _runtimeServiceScope.ServiceProvider.GetRequiredService<DistributorService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<UserSyncService>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<ConnectionSyncService>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<AccountService>();
 
             _runtimeServiceScope.ServiceProvider.GetRequiredService<StaticDetours>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<MovementDetours>();

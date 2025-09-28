@@ -17,9 +17,9 @@ public enum ToggleType
 }
 
 /// <summary>
-///     Fires once we wish to open the popout permissions menu for a User pair.
+///     Toggle open / close / between sundesmos?
 /// </summary>
-public record UserInteractionUiChangeMessage(Sundesmo User, InteractionsTab Type) : MessageBase;
+public record ToggleInteractionsUI(Sundesmo Sundesmo) : MessageBase;
 
 /// <summary> 
 ///     To refresh the immutable list of draw pairs in the whitelist. <para />
@@ -71,7 +71,3 @@ public record ClearProfileCache : MessageBase;
 
 /// <summary> This is fired whenever the discord bot wishes to send out an account verification to our client. </summary>
 public record VerificationPopupMessage(VerificationCode VerificationCode) : MessageBase;
-
-// Could maybe use these down the line if we want to make sure icons for sundesmo group folders but otherwise remove.
-public record ReScanThumbnailFolder : MessageBase;
-public record ThumbnailImageSelected(Guid SourceId, Vector2 ImgSize, string FileName) : MessageBase;

@@ -86,6 +86,18 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRemovePair), dto).ConfigureAwait(false);
     }
 
+    public async Task<HubResponse> UserBlock(UserDto dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserBlock), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserUnblock(UserDto dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserUnblock), dto).ConfigureAwait(false);
+    }
+
 
     // -- Permission Changes ---
     public async Task<HubResponse> ChangeGlobalPerm(string propName, bool newValue)

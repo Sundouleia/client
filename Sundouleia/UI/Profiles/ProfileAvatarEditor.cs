@@ -13,7 +13,6 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
-using SundouleiaAPI.Data;
 
 namespace Sundouleia.Gui.Profiles;
 
@@ -95,7 +94,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
         // we need here to draw the group for content.
         using (ImRaii.Group())
         {
-            CkGui.FontText("Current Image", UiFontService.SundouleiaTitleFont);
+            CkGui.FontText("Current Image", UiFontService.UidFont);
             ImGui.Separator();
             CkGui.ColorText("Square Image Preview:", ImGuiColors.ParsedGold);
             CkGui.TextWrapped("Meant to display the original display of the stored image data.");
@@ -117,7 +116,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
                 _croppedImageData = null!;
                 _croppedImageToShow = null;
                 _useCompressedImage = false;
-                _ = _hub.UserSetProfilePicture(new ProfileImage(new UserData(MainHub.UID), string.Empty));
+                UiService.SetUITask(async () => await _hub.UserUpdateProfilePicture(new(string.Empty)));
             }
             CkGui.AttachToolTip("Clear your currently uploaded profile picture--SEP--Must be holding SHIFT to clear.");
 
@@ -137,7 +136,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
 
     private void HandleFileDialog()
     {
-        _dialogService.OpenSingleFilePicker("Select new Profile picture", ".png", (success, file) =>
+        _fileDialog.OpenSingleFilePicker("Select new Profile picture", ".png", (success, file) =>
         {
             if (!success)
             {
@@ -205,7 +204,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
         });
     }
 
-    private void DrawNewProfileDisplay(Services.Profile profile)
+    private void DrawNewProfileDisplay(Profile profile)
     {
         var spacing = ImGui.GetStyle().ItemSpacing.X;
         if (_uploadedImageData != null)
@@ -230,7 +229,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
         ImGuiHelpers.ScaledRelativeSameLine(256, spacing);
         using (ImRaii.Group())
         {
-            CkGui.FontText("Image Editor", UiFontService.SundouleiaTitleFont);
+            CkGui.FontText("Image Editor", UiFontService.UidFont);
             ImGui.Separator();
             if (_croppedImageData != null)
             {
@@ -279,11 +278,11 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
             ImGui.SameLine();
 
             if (CkGui.IconTextButton(FAI.Upload, "Upload to Server", disabled: _croppedImageData is null))
-                _ = UploadToServer(profile);
+                UploadToServer(profile);
         }
     }
 
-    private async Task UploadToServer(Services.Profile profile)
+    private void UploadToServer(Profile profile)
     {
         // grab the _croppedImageData and upload it to the server.
         if (_croppedImageData is null)
@@ -311,7 +310,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
         }
         try
         {
-            await _hub.UserSetProfilePicture(new(MainHub.OwnUserData, Convert.ToBase64String(_croppedImageData))).ConfigureAwait(false);
+            UiService.SetUITask(async () => await _hub.UserUpdateProfilePicture(new(Convert.ToBase64String(_croppedImageData))));
             _logger.LogInformation("Image Sent to server successfully.");
         }
         catch (Bagagwa ex)
@@ -417,7 +416,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
                 _croppedImageData = ms.ToArray();
 
                 // Load the cropped image for preview
-                _croppedImageToShow = TextureManagerEx.GetProfilePicture(_croppedImageData);
+                _croppedImageToShow = Svc.Texture.CreateFromImageAsync(_croppedImageData).Result;
                 CroppedFileSize = $"{_croppedImageData.Length / 1024.0:F2} KB";
                 // _logger.LogInformation($"Cropped image to {cropRectangle}");
             }

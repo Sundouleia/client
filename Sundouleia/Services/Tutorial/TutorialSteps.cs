@@ -14,6 +14,7 @@ public enum StepsMainUi
     Whitelist, // Overview whitelist.
     AddingUsers, // How to Add Pairs, Select dropdown button.
     AttachingMessages, // optional message attachment to requests, close menu on next, and move to account page.
+    Requests, // where to see any sent / received requests.
     Radar, // overview of Radar, and what it is.
     RadarUsers, // How they are displayed, if they allow requests (could maybe add if they are in chat but idk)
     RadarChat, // overview of global chat, how it works, log clearing ext.

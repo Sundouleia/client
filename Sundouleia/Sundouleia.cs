@@ -80,7 +80,6 @@ public sealed class Sundouleia : IDalamudPlugin
             .AddSingleton(new WindowSystem("Sundouleia"))
             .AddSingleton<FileDialogManager>()
             .AddSingleton<UiFileDialogService>()
-            .AddSingleton<UiThumbnailService>()
             .AddSingleton(new Dalamud.Localization("Sundouleia.Localization.", "", useEmbedded: true))
             // add the generic services for Sundouleia
             .AddSundouleiaGeneric()
@@ -117,14 +116,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<EventAggregator>()
         .AddSingleton<SundouleiaLoc>()
 
-        // Game Internals
-        .AddSingleton<StaticDetours>()
-        .AddSingleton<MovementDetours>()
-        .AddSingleton<ResourceDetours>()
-
-        // Player Client
-        .AddSingleton<FavoritesManager>()
-
         // Player User
         .AddSingleton<UserGameObjFactory>()
         .AddSingleton<SundesmoFactory>()
@@ -155,9 +146,8 @@ public static class SundouleiaServiceExtensions
         // UI (Probably mostly in Scoped)
         .AddSingleton<IdDisplayHandler>()
         .AddSingleton<AccountInfoExchanger>()
-        .AddSingleton<GlobalChatLog>()
-        .AddSingleton<PopoutGlobalChatlog>()
-        .AddSingleton<VibeRoomChatlog>()
+        .AddSingleton<RadarChatLog>()
+        .AddSingleton<PopoutRadarChatlog>()
         .AddSingleton<MainMenuTabs>()
 
         // WebAPI (Server stuff)
@@ -192,15 +182,8 @@ public static class SundouleiaServiceExtensions
     => services
         // Scoped Components
         .AddScoped<DrawUserRequests>()
-        .AddScoped<EquipmentDrawer>()
-        .AddScoped<AttributeDrawer>()
-        .AddScoped<ModPresetDrawer>()
-        .AddScoped<MoodleDrawer>()
-        .AddScoped<ActiveItemsDrawer>()
-        .AddScoped<AliasItemDrawer>()
-        .AddScoped<ListItemDrawer>()
-        .AddScoped<TriggerDrawer>()
         .AddScoped<ImageImportTool>()
+        // .AddScoped<ProfileHelper>() <-- Dont think we need, but might?
 
         // Scoped Factories
         .AddScoped<DrawEntityFactory>()
@@ -218,9 +201,9 @@ public static class SundouleiaServiceExtensions
         .AddScoped<WindowMediatorSubscriberBase, MainUI>()
         .AddScoped<HomepageTab>()
         .AddScoped<WhitelistTab>()
-        .AddScoped<PatternHubTab>()
-        .AddScoped<MoodleHubTab>()
-        .AddScoped<GlobalChatTab>()
+        .AddScoped<RadarTab>()
+        .AddScoped<RequestsTab>()
+        .AddScoped<RadarChatTab>()
         .AddScoped<AccountTab>()
 
         // Scoped UI (Wardrobe)
@@ -258,7 +241,7 @@ public static class SundouleiaServiceExtensions
         .AddScoped<TriggersPanel>()
 
         // Scoped UI (Mod Presets)
-        .AddScoped<WindowMediatorSubscriberBase, ModPresetsUI>()
+        .AddScoped<WindowMediatorSubscriberBase, GroupManagementUI>()
         .AddScoped<ModPresetsPanel>()
 
         // Scoped UI (Trait Allowances Presets)
@@ -286,11 +269,9 @@ public static class SundouleiaServiceExtensions
         .AddScoped<WindowMediatorSubscriberBase, MigrationsUI>()
 
         // Scoped Profiles
-        .AddScoped<WindowMediatorSubscriberBase, ProfilePreviewUI>()
         .AddScoped<WindowMediatorSubscriberBase, PopoutProfileUi>()
         .AddScoped<WindowMediatorSubscriberBase, ProfileAvatarEditor>()
         .AddScoped<WindowMediatorSubscriberBase, ProfileEditorUI>()
-        .AddScoped<ProfileLight>()
 
         // Scoped Remotes
         .AddScoped<WindowMediatorSubscriberBase, BuzzToyRemoteUI>()
@@ -304,7 +285,7 @@ public static class SundouleiaServiceExtensions
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
         .AddScoped<WindowMediatorSubscriberBase, DtrVisibleWindow>()
         .AddScoped<WindowMediatorSubscriberBase, ChangelogUI>()
-        .AddScoped<WindowMediatorSubscriberBase, GlobalChatPopoutUI>()
+        .AddScoped<WindowMediatorSubscriberBase, RadarChatPopoutUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugStorageUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugPersonalDataUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugActiveStateUI>()

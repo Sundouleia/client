@@ -15,7 +15,6 @@ public class ConfigFileProvider : IConfigFileProvider
     public static string SundouleiaDirectory    => Svc.PluginInterface.ConfigDirectory.FullName;
     public static string EventDirectory     { get; private set; } = string.Empty;
     public static string FileSysDirectory   { get; private set; } = string.Empty;
-    public static string ThumbnailDirectory { get; private set; } = string.Empty;
     
     // Shared Client Configs
     public readonly string MainConfig;
@@ -31,7 +30,7 @@ public class ConfigFileProvider : IConfigFileProvider
     public readonly string AccountConfig;
 
     // Unique Client Configs Per Account.
-    public string SundesmoGroups => Path.Combine(CurrentPlayerDirectory, "sundesmo-groups.json"); // coiuld merge this with favorites or something idk.
+    public string SundesmoGroups => Path.Combine(CurrentPlayerDirectory, "sundesmo-groups.json"); // could merge this with favorites or something idk.
 
     public string CurrentPlayerDirectory => Path.Combine(SundouleiaDirectory, CurrentUserUID ?? "InvalidFiles");
     public string? CurrentUserUID { get; private set; } = null;
@@ -42,15 +41,14 @@ public class ConfigFileProvider : IConfigFileProvider
     {
         EventDirectory = Path.Combine(SundouleiaDirectory, "eventlog");
         FileSysDirectory = Path.Combine(SundouleiaDirectory, "filesystem");
-        ThumbnailDirectory = Path.Combine(SundouleiaDirectory, "thumbnails");
 
         MainConfig = Path.Combine(SundouleiaDirectory, "config.json");
         RecentChatLog = Path.Combine(SundouleiaDirectory, "chat-recent.json");
         Favorites = Path.Combine(SundouleiaDirectory, "favorites.json");
         LoadedResources = Path.Combine(SundouleiaDirectory, "loaded-resources.json");
 
-        Nicknames = Path.Combine(SundouleiaDirectory, "nicknames.json");
-        ServerConfig = Path.Combine(SundouleiaDirectory, "server.json");
+        NicknameConfig = Path.Combine(SundouleiaDirectory, "nicknames.json");
+        AccountConfig = Path.Combine(SundouleiaDirectory, "account.json");
 
         // attempt to load in the UID if the config.json exists.
         if (File.Exists(MainConfig))

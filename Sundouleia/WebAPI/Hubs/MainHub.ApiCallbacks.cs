@@ -2,6 +2,7 @@ using CkCommons;
 using Dalamud.Interface.ImGuiNotification;
 using Microsoft.AspNetCore.SignalR.Client;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Utils;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.WebAPI;
@@ -261,8 +262,12 @@ public partial class MainHub
 
     public Task Callback_RadarChat(RadarChatMessage dto)
     {
+        // If for some ungodly reason we get this message from a different world / territory, ignore it.
+        if (dto.WorldId != RadarChatLog.WorldLoc || dto.TerritoryId != RadarChatLog.TerritoryLoc)
+            return Task.CompletedTask;
+
         Logger.LogDebug($"Callback_RadarChat Message Received", LoggerType.Callbacks);
-        // Handle radar chat message.
+        Mediator.Publish(new NewRadarChatMessage(dto, dto.Sender == OwnUserData));
         return Task.CompletedTask;
     }
     #endregion Radar Callbacks

@@ -151,7 +151,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private async void OnLogin()
     {
         Logger.LogInformation("Starting connection on login after fully loaded...");
-        await GsExtensions.WaitForPlayerLoading();
+        await Extensions.WaitForPlayerLoading();
         Logger.LogInformation("Client fully loaded in, Connecting.");
         // Run the call to attempt a connection to the server.
         await Connect().ConfigureAwait(false);

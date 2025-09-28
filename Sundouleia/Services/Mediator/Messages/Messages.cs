@@ -3,10 +3,11 @@ using Sundouleia.GameInternals;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Events;
 using SundouleiaAPI.Data;
+using SundouleiaAPI.Network;
 
 namespace Sundouleia.Services.Mediator;
 
-public enum GlobalChatMsgSource
+public enum RadarChatMsgSource
 {
     MainUi,
     Popout,
@@ -37,4 +38,4 @@ public record ClosedMessage(Exception? Exception) : SameThreadMessage;
 public record ConnectedMessage : MessageBase;
 
 /// <summary> For sending Radar Chats. Can be possibly moved out of mediator. </summary>
-public record RadarChatMessage(UserData User, string Message) : MessageBase;
+public record NewRadarChatMessage(RadarChatMessage Message, bool FromSelf) : MessageBase;
