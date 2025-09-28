@@ -13,18 +13,18 @@ namespace Sundouleia.CustomCombos.Editor;
 // A special combo for pairs, that must maintain its distinctness and update accordingly based on changes.
 public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscriber, IDisposable
 {
-    private readonly FavoritesManager _favorites;
+    private readonly FavoritesConfig _favorites;
 
     private Sundesmo? _currentUser;
     private bool _needsRefresh = false;
-    public PairCombo(ILogger log, SundouleiaMediator mediator, MainConfig config, SundesmoManager pairs, FavoritesManager favorites)
+    public PairCombo(ILogger log, SundouleiaMediator mediator, MainConfig config, SundesmoManager pairs, FavoritesConfig favorites)
         : base(() => [
             ..pairs.DirectPairs
-                .OrderByDescending(p => favorites._favoriteUsers.Contains(p.UserData.UID))
+                .OrderByDescending(p => favorites.SundesmoUids.Contains(p.UserData.UID))
                 .ThenByDescending(u => u.IsVisible)
                 .ThenByDescending(u => u.IsOnline)
-                .ThenBy(pair => !pair.PlayerName.IsNullOrEmpty()
-                    ? (config.Current.PreferNicknamesOverNames ? pair.GetNickAliasOrUid() : pair.PlayerName)
+                .ThenBy(pair => !pair.Name.IsNullOrEmpty()
+                    ? (config.Current.PreferNicknamesOverNames ? pair.GetNickAliasOrUid() : pair.Name)
                     : pair.GetNickAliasOrUid(), StringComparer.OrdinalIgnoreCase)
         ], log)
     {
@@ -77,7 +77,7 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
     protected override bool IsVisible(int globalIndex, LowerString filter)
         => Items[globalIndex].UserData.AliasOrUID.Contains(filter, StringComparison.OrdinalIgnoreCase)
         || (Items[globalIndex].GetNickname()?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false)
-        || (Items[globalIndex].PlayerName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
+        || (Items[globalIndex].Name?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
 
     protected override string ToString(Sundesmo obj)
         => obj.GetNickAliasOrUid();

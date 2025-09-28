@@ -1,13 +1,12 @@
 using Dalamud.Game;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using Sundouleia.State.Models;
-using Sundouleia.Utils;
-using OtterGui.Log;
+using Lumina.Excel.Sheets;
+using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 
 namespace Sundouleia;
 
@@ -26,7 +25,7 @@ public class Svc
     [PluginService] public static IAddonEventManager AddonEventManager { get; private set; }
     [PluginService] public static IAetheryteList AetheryteList { get; private set; }
     //[PluginService] public static ITitleScreenMenu TitleScreenMenu { get; private set; } = null!;
-    //[PluginService] public static IBuddyList Buddies { get; private set; } = null!;
+    [PluginService] public static IBuddyList Buddies { get; private set; } = null!;
     [PluginService] public static IChatGui Chat { get; set; } = null!;
     [PluginService] public static IClientState ClientState { get; set; } = null!;
     [PluginService] public static ICommandManager Commands { get; private set; }
@@ -55,3 +54,63 @@ public class Svc
     [PluginService] public static IToastGui Toasts { get; private set; } = null!;
     [PluginService] public static ITextureSubstitutionProvider TextureSubstitution { get; private set; } = null!;
 }
+
+// For the data that is only really initialized once based on the current client language.
+public static class GameDataSvc
+{
+    public static FrozenDictionary<uint, string> JobData { get; private set; } = null!;
+    public static FrozenDictionary<ushort, string> WorldData { get; private set; } = null!;
+    public static FrozenDictionary<uint, string> TerritoryData { get; private set; } = null!;
+
+    public static bool IsZoning => Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51];
+
+
+    public static bool _isInitialized = false;
+
+    public static void Init(IDalamudPluginInterface pi)
+    {
+        if (_isInitialized)
+            return;
+
+        JobData = Svc.Data.GetExcelSheet<ClassJob>(Svc.ClientState.ClientLanguage)!
+            .ToDictionary(k => k.RowId, k => k.NameEnglish.ToString())
+            .ToFrozenDictionary();
+
+        WorldData = Svc.Data.GetExcelSheet<World>(Svc.ClientState.ClientLanguage)!
+            .Where(w => !w.Name.IsEmpty && w.DataCenter.RowId != 0 && (w.IsPublic || char.IsUpper(w.Name.ToString()[0])))
+            .ToDictionary(w => (ushort)w.RowId, w => w.Name.ToString())
+            .ToFrozenDictionary();
+
+        TerritoryData = Svc.Data.GetExcelSheet<TerritoryType>(Svc.ClientState.ClientLanguage)!
+            .Where(w => w.RowId != 0)
+            .ToDictionary(w => w.RowId, w =>
+            {
+                StringBuilder sb = new();
+                sb.Append(w.PlaceNameRegion.Value.Name);
+                if (w.PlaceName.ValueNullable != null)
+                {
+                    sb.Append(" - ");
+                    sb.Append(w.PlaceName.Value.Name);
+                }
+                return sb.ToString();
+            })
+            .ToFrozenDictionary();
+
+        // Init other data we want here later.
+
+        _isInitialized = true;
+    }
+
+    public static void Dispose()
+    {
+        if (_isInitialized)
+            return;
+
+        JobData = null!;
+        WorldData = null!;
+        TerritoryData = null!;
+        _isInitialized = false;
+    }
+}
+
+

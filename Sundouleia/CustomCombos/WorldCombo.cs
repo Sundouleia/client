@@ -3,16 +3,16 @@ using Dalamud.Bindings.ImGui;
 namespace Sundouleia.CustomCombos;
 
 /// <summary> A combo for selecting worlds WITHOUT the Any World entry. Used for Lifestream IPC. </summary>
-public sealed class WorldCombo : CkFilterComboCache<KeyValuePair<WorldId, string>>
+public sealed class WorldCombo : CkFilterComboCache<KeyValuePair<ushort, string>>
 {
     private ushort _current;
-    public WorldCombo(ILogger log) : base(ItemSvc.WorldData.OrderBy(kvp => kvp.Value), log)
+    public WorldCombo(ILogger log) : base(GameDataSvc.WorldData.OrderBy(kvp => kvp.Value), log)
     {
-        Current = new KeyValuePair<WorldId, string>(WorldId.AnyWorld, "Select World..");
+        Current = new KeyValuePair<ushort, string>(ushort.MaxValue, "Select World..");
         CurrentSelectionIdx = 0;
     }
 
-    protected override string ToString(KeyValuePair<WorldId, string> obj)
+    protected override string ToString(KeyValuePair<ushort, string> obj)
         => obj.Value;
 
     /// <summary> Simple draw invoke. </summary>

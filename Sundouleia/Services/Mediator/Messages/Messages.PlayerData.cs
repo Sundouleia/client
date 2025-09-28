@@ -14,5 +14,8 @@ public record TargetPairMessage(Sundesmo Pair) : MessageBase; // called when pub
 public record UserGameObjCreatedMessage(UserGameObj UserGameObj) : MessageBase;
 public record UserGameObjDestroyedMessage(UserGameObj UserGameObj) : MessageBase;
 
+public record OwnedObjectCreated(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
+public record OwnedObjectDestroyed(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
+
 
 

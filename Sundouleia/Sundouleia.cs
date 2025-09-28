@@ -4,18 +4,11 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Sundouleia.GameInternals.Detours;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
 using Sundouleia.Gui.Handlers;
 using Sundouleia.Gui.MainWindow;
-using Sundouleia.Gui.Modules.Puppeteer;
 using Sundouleia.Gui.Profiles;
-using Sundouleia.Gui.Publications;
-using Sundouleia.Gui.Remote;
-using Sundouleia.Gui.Toybox;
-using Sundouleia.Gui.UiToybox;
-using Sundouleia.Gui.Wardrobe;
 using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Factories;
@@ -37,6 +30,8 @@ public sealed class Sundouleia : IDalamudPlugin
     public Sundouleia(IDalamudPluginInterface pi)
     {
         pi.Create<Svc>();
+        // init GameData storages for the client language.
+        GameDataSvc.Init(pi);
         // init the CkCommons.
         CkCommonsHost.Init(pi, this, CkLogFilter.None);
         // create the host builder for the plugin
@@ -99,6 +94,8 @@ public sealed class Sundouleia : IDalamudPlugin
         _host.StopAsync().GetAwaiter().GetResult();
         // Dispose of CkCommons.
         CkCommonsHost.Dispose();
+        // Dispose cleanup of GameDataSvc.
+        GameDataSvc.Dispose();
         // Dispose the Host.
         _host.Dispose();
 
@@ -134,7 +131,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<UserSyncService>()
         .AddSingleton<DtrBarService>()
         .AddSingleton<EmoteService>()
-        .AddSingleton<InteractionsService>()
         .AddSingleton<NotificationService>()
         .AddSingleton<OnFrameworkService>()
 
@@ -145,7 +141,6 @@ public static class SundouleiaServiceExtensions
 
         // UI (Probably mostly in Scoped)
         .AddSingleton<IdDisplayHandler>()
-        .AddSingleton<AccountInfoExchanger>()
         .AddSingleton<RadarChatLog>()
         .AddSingleton<PopoutRadarChatlog>()
         .AddSingleton<MainMenuTabs>()
@@ -182,7 +177,6 @@ public static class SundouleiaServiceExtensions
     => services
         // Scoped Components
         .AddScoped<DrawUserRequests>()
-        .AddScoped<ImageImportTool>()
         // .AddScoped<ProfileHelper>() <-- Dont think we need, but might?
 
         // Scoped Factories
@@ -190,10 +184,8 @@ public static class SundouleiaServiceExtensions
         .AddScoped<UiFactory>()
 
         // Scoped Handlers
-        .AddScoped<WindowMediatorSubscriberBase, ThumbnailUI>()
         .AddScoped<WindowMediatorSubscriberBase, PopupHandler>()
         .AddScoped<IPopupHandler, VerificationPopupHandler>()
-        .AddScoped<IPopupHandler, SavePatternPopupHandler>()
         .AddScoped<IPopupHandler, ReportPopupHandler>()
 
         // Scoped MainUI (Home)
@@ -206,75 +198,14 @@ public static class SundouleiaServiceExtensions
         .AddScoped<RadarChatTab>()
         .AddScoped<AccountTab>()
 
-        // Scoped UI (Wardrobe)
-        .AddScoped<WindowMediatorSubscriberBase, WardrobeUI>()
-        .AddScoped<RestraintsPanel>()
-        .AddScoped<RestraintEditorInfo>()
-        .AddScoped<RestraintEditorEquipment>()
-        .AddScoped<RestraintEditorLayers>()
-        .AddScoped<RestraintEditorModsMoodles>()
-        .AddScoped<RestrictionsPanel>()
-        .AddScoped<GagRestrictionsPanel>()
-        .AddScoped<CollarPanel>()
-        .AddScoped<CollarOverviewTab>()
-        .AddScoped<CollarRequestsIncomingTab>()
-        .AddScoped<CollarRequestsOutgoingTab>()
-
-        // Scoped UI (Cursed Loot)
-        .AddScoped<WindowMediatorSubscriberBase, CursedLootUI>()
-        .AddScoped<LootItemsTab>()
-        .AddScoped<LootPoolTab>()
-        .AddScoped<LootAppliedTab>()
-
-        // Scoped UI (Puppeteer)
-        .AddScoped<WindowMediatorSubscriberBase, PuppeteerUI>()
-        .AddScoped<PuppetVictimGlobalPanel>()
-        .AddScoped<PuppetVictimUniquePanel>()
-        .AddScoped<ControllerUniquePanel>()
-
-        // Scoped UI (Toybox)
-        .AddScoped<WindowMediatorSubscriberBase, ToyboxUI>()
-        .AddScoped<ToysPanel>()
-        .AddScoped<VibeLobbiesPanel>()
-        .AddScoped<PatternsPanel>()
-        .AddScoped<AlarmsPanel>()
-        .AddScoped<TriggersPanel>()
-
-        // Scoped UI (Mod Presets)
-        .AddScoped<WindowMediatorSubscriberBase, GroupManagementUI>()
-        .AddScoped<ModPresetsPanel>()
-
-        // Scoped UI (Trait Allowances Presets)
-        .AddScoped<WindowMediatorSubscriberBase, TraitAllowanceUI>()
-        .AddScoped<TraitAllowanceSelector>()
-        .AddScoped<TraitAllowancePanel>()
-
-        // Scoped UI (Publications)
-        .AddScoped<WindowMediatorSubscriberBase, PublicationsUI>()
-        .AddScoped<PublicationsManager>()
 
         // Scoped UI (Achievements)
-        .AddScoped<WindowMediatorSubscriberBase, AchievementsUI>()
         .AddScoped<AchievementTabs>()
-
-        // StickyWindow
-        .AddScoped<WindowMediatorSubscriberBase, UserInteractionsUI>()
-        .AddScoped<PresetLogicDrawer>()
-        .AddScoped<ClientPermsForUser>()
-        .AddScoped<UserPermsForClient>()
-        .AddScoped<UserHardcore>()
-        .AddScoped<UserShockCollar>()
-
-        // Scoped Migrations
-        .AddScoped<WindowMediatorSubscriberBase, MigrationsUI>()
 
         // Scoped Profiles
         .AddScoped<WindowMediatorSubscriberBase, PopoutProfileUi>()
         .AddScoped<WindowMediatorSubscriberBase, ProfileAvatarEditor>()
         .AddScoped<WindowMediatorSubscriberBase, ProfileEditorUI>()
-
-        // Scoped Remotes
-        .AddScoped<WindowMediatorSubscriberBase, BuzzToyRemoteUI>()
 
         // Scoped Settings
         .AddScoped<WindowMediatorSubscriberBase, SettingsUi>()
@@ -283,7 +214,6 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Misc
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
-        .AddScoped<WindowMediatorSubscriberBase, DtrVisibleWindow>()
         .AddScoped<WindowMediatorSubscriberBase, ChangelogUI>()
         .AddScoped<WindowMediatorSubscriberBase, RadarChatPopoutUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugStorageUI>()
@@ -313,7 +243,7 @@ public static class SundouleiaServiceExtensions
         .AddHostedService(p => p.GetRequiredService<UiFontService>())       // Provides all fonts necessary for the plugin.
         .AddHostedService(p => p.GetRequiredService<EmoteService>())        // Provides all emotes necessary for the plugin.
 
-        .AddHostedService(p => p.GetRequiredService<SundouleiaLoc>())       // Inits Localization with the current language.
+        .AddHostedService(p => p.GetRequiredService<SundouleiaLoc>())       // Initializes Localization with the current language.
         .AddHostedService(p => p.GetRequiredService<EventAggregator>())     // Forcibly calls the constructor, subscribing to the monitors.
         .AddHostedService(p => p.GetRequiredService<IpcProvider>())         // Required for IPC calls to work properly.
 
