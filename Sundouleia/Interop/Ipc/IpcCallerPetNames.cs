@@ -15,7 +15,7 @@ public sealed class IpcCallerPetNames : IIpcCaller
     // API Events
     private readonly ICallGateSubscriber<object> OnReady;
     private readonly ICallGateSubscriber<object> OnDisposed;
-    private readonly ICallGateSubscriber<string, object> OnNicknamesChanged;
+    public readonly ICallGateSubscriber<string, object> OnNicknamesChanged;
     // API Getters
     private readonly ICallGateSubscriber<bool> GetIsEnabled;
     private readonly ICallGateSubscriber<string> GetNicknameData;

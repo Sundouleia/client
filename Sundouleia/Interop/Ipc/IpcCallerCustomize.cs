@@ -1,8 +1,6 @@
-using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Ipc;
 using Sundouleia.Pairs.Handlers;
-using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Interop;
 
@@ -24,12 +22,10 @@ public sealed class IpcCallerCustomize : IIpcCaller
     private readonly ICallGateSubscriber<ushort, int>                   RevertUser; // revert via object index.
 
     private readonly ILogger<IpcCallerCustomize> _logger;
-    private readonly SundouleiaMediator _mediator;
 
-    public IpcCallerCustomize(ILogger<IpcCallerCustomize> logger, SundouleiaMediator mediator)
+    public IpcCallerCustomize(ILogger<IpcCallerCustomize> logger)
     {
         _logger = logger;
-        _mediator = mediator;
         // API Version Check
         ApiVersion = Svc.PluginInterface.GetIpcSubscriber<(int, int)>("CustomizePlus.General.GetApiVersion");
         // API Events
@@ -42,26 +38,14 @@ public sealed class IpcCallerCustomize : IIpcCaller
         DelTempProfile = Svc.PluginInterface.GetIpcSubscriber<Guid, int>("CustomizePlus.Profile.DeleteTemporaryProfileByUniqueId");
         RevertUser = Svc.PluginInterface.GetIpcSubscriber<ushort, int>("CustomizePlus.Profile.DeleteTemporaryProfileOnCharacter");
 
-        OnProfileUpdate.Subscribe(ProfileUpdated);
         CheckAPI();
     }
 
-    public static bool APIAvailable { get; private set; } = false;
-
     public void Dispose()
-        => OnProfileUpdate.Unsubscribe(ProfileUpdated);
-    
-    private void ProfileUpdated(ushort objIdx, Guid id)
-    {
-        // This can be safely accessed. It is called in the framework thread.
-        var obj = Svc.Objects[objIdx];
-        // we dont care if it is not a player owned object.
-        if (obj is null || obj.ObjectKind != ObjectKind.Player)
-            return;
-        // publish the address and the new profile ID.
-        _mediator.Publish(new CustomizeProfileChange(obj.Address, id));
-    }
+    { }
 
+    public static bool APIAvailable { get; private set; } = false;
+    
     public void CheckAPI()
     {
         try

@@ -8,7 +8,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
 {
     private readonly ICallGateSubscriber<int> ApiVersion;
 
-    private readonly ICallGateSubscriber<IPlayerCharacter, object> OnStatusModified;
+    public readonly ICallGateSubscriber<IPlayerCharacter, object> OnStatusModified;
 
     // API Getters
     private readonly ICallGateSubscriber<string>       GetOwnStatus;
@@ -38,8 +38,6 @@ public sealed class IpcCallerMoodles : IIpcCaller
         OnStatusModified = Svc.PluginInterface.GetIpcSubscriber<IPlayerCharacter, object>("Moodles.StatusManagerModified");
 
         CheckAPI();
-
-        OnStatusModified.Subscribe(StatusManagerModified);
     }
 
     public static bool APIAvailable { get; private set; } = false;
@@ -71,10 +69,10 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// <summary> 
     ///     Gets the ClientPlayer's StatusManager string.
     /// </summary>
-    public async Task<string?> GetOwn()
+    public async Task<string> GetOwn()
     {
-        if (!APIAvailable) return null;
-        return await Svc.Framework.RunOnFrameworkThread(GetOwnStatus.InvokeFunc).ConfigureAwait(false);
+        if (!APIAvailable) return string.Empty;
+        return await Svc.Framework.RunOnFrameworkThread(() => GetOwnStatus.InvokeFunc() ?? string.Empty).ConfigureAwait(false);
     }
 
     /// <summary> 

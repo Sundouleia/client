@@ -54,15 +54,6 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         RevertUserByName = new RevertStateName(Svc.PluginInterface);
 
         CheckAPI();
-
-        OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, ActorStateChanged);
-        OnStateChanged.Enable();
-    }
-
-    public void Dispose()
-    {
-        OnStateChanged?.Disable();
-        OnStateChanged?.Dispose();
     }
 
     public static bool APIAvailable { get; private set; } = false;
@@ -102,9 +93,9 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     /// <summary>
     ///     Obtains the Base64String of the client's current Actor State
     /// </summary>
-    public async Task<string> GetBase64StateByPtr(IntPtr charaAddr)
+    public async Task<string?> GetBase64StateByPtr(IntPtr charaAddr)
     {
-        if (!APIAvailable) return string.Empty;
+        if (!APIAvailable) return null;
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
             if (Svc.Objects.CreateObjectReference(charaAddr) is { } obj && obj is ICharacter c)

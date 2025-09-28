@@ -18,7 +18,7 @@ namespace Sundouleia.Services;
 ///     This allows us to cache an address that we can guarantee will always be the current 
 ///     valid state without checking every tick. <para />
 /// </summary>
-internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
+public unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
 {
     // Private Getters that function outside the framework thread.
     private BattleChara* _playerChara => CharacterManager.Instance()->BattleCharas[0].Value;
@@ -59,6 +59,7 @@ internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
     }
 
     // Public, Accessible, Managed pointer address to Owned Object addresses
+    public ConcurrentDictionary<nint, OwnedObject> WatchedTypes { get; private set; } = new();
     public HashSet<nint> WatchedAddresses { get; private set; } = new();
     public nint WatchedPlayerAddr { get; private set; } = IntPtr.Zero;
     public nint WatchedMinionMountAddr { get; private set; } = IntPtr.Zero;
@@ -74,6 +75,16 @@ internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
         OnCompanionInitializeHook?.Dispose();
         OnCompanionTerminateHook?.Dispose();
     }
+
+    public nint FromOwned(OwnedObject kind)
+        => kind switch
+        {
+            OwnedObject.Player       => WatchedPlayerAddr,
+            OwnedObject.MinionOrMount=> WatchedMinionMountAddr,
+            OwnedObject.Pet          => WatchedPetAddr,
+            OwnedObject.Companion    => WatchedCompanionAddr,
+            _                        => IntPtr.Zero,
+        };
 
     private void CollectInitialData()
     {
@@ -98,8 +109,9 @@ internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
         // If the address matches the PlayerObject from the GameObjectManager, set that.
         if ((nint)chara == _playerAddress)
         {
-            WatchedPlayerAddr = (nint)chara;
+            WatchedTypes.AddOrUpdate((nint)chara, OwnedObject.Player, (_, __) => OwnedObject.Player);
             WatchedAddresses.Add((nint)chara);
+            WatchedPlayerAddr = (nint)chara;
             Mediator.Publish(new OwnedObjectCreated(OwnedObject.Player, (nint)chara));
             return;
         }
@@ -108,20 +120,21 @@ internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
         if (_playerAddress == IntPtr.Zero)
             return;
 
-
         // If the character is a mount object, only set if the owner is the player object.
         if ((nint)chara == _minionOrMountAddress && _minionOrMountChara->OwnerId == _playerObject->EntityId)
         {
-            WatchedMinionMountAddr = (nint)chara;
+            WatchedTypes.AddOrUpdate((nint)chara, OwnedObject.MinionOrMount, (_, __) => OwnedObject.MinionOrMount);
             WatchedAddresses.Add((nint)chara);
+            WatchedMinionMountAddr = (nint)chara;
             Mediator.Publish(new OwnedObjectCreated(OwnedObject.MinionOrMount, (nint)chara));
             return;
         }
         // If the character is a pet object, only set if the owner is the player object.
         else if ((nint)chara == _petAddress && chara->OwnerId == _playerObject->EntityId)
         {
-            WatchedPetAddr = (nint)chara;
+            WatchedTypes.AddOrUpdate((nint)chara, OwnedObject.Pet, (_, __) => OwnedObject.Pet);
             WatchedAddresses.Add((nint)chara);
+            WatchedPetAddr = (nint)chara;
             Mediator.Publish(new OwnedObjectCreated(OwnedObject.Pet, (nint)chara));
             return;
         }
@@ -132,8 +145,9 @@ internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
         // If the address matches the PlayerObject from the GameObjectManager, clear that.
         if ((nint)chara == WatchedPlayerAddr)
         {
-            WatchedPlayerAddr = IntPtr.Zero;
+            WatchedTypes.TryRemove((nint)chara, out _);
             WatchedAddresses.Remove((nint)chara);
+            WatchedPlayerAddr = IntPtr.Zero; 
             Mediator.Publish(new OwnedObjectDestroyed(OwnedObject.Player, (nint)chara));
             return;
         }
@@ -145,16 +159,18 @@ internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
         // If the character is a mount object, only clear if the owner is the player object.
         else if ((nint)chara == WatchedMinionMountAddr)
         {
-            WatchedMinionMountAddr = IntPtr.Zero;
+            WatchedTypes.TryRemove((nint)chara, out _);
             WatchedAddresses.Remove((nint)chara);
+            WatchedMinionMountAddr = IntPtr.Zero;
             Mediator.Publish(new OwnedObjectDestroyed(OwnedObject.MinionOrMount, (nint)chara));
             return;
         }
         // If the character is a pet object, only clear if the owner is the player object.
         else if ((nint)chara == WatchedPetAddr)
         {
-            WatchedPetAddr = IntPtr.Zero;
+            WatchedTypes.TryRemove((nint)chara, out _);
             WatchedAddresses.Remove((nint)chara);
+            WatchedPetAddr = IntPtr.Zero;
             Mediator.Publish(new OwnedObjectDestroyed(OwnedObject.Pet, (nint)chara));
             return;
         }
@@ -167,8 +183,9 @@ internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
         // Only set if the CompanionOwnerID == PlayerObject.EntityID
         if (companion->CompanionOwnerId == _playerObject->EntityId)
         {
-            WatchedCompanionAddr = (nint)companion;
+            WatchedTypes.AddOrUpdate((nint)companion, OwnedObject.Companion, (_, __) => OwnedObject.Companion);
             WatchedAddresses.Add((nint)companion);
+            WatchedCompanionAddr = (nint)companion;
             Mediator.Publish(new OwnedObjectCreated(OwnedObject.Companion, (nint)companion));
             return;
         }
@@ -179,8 +196,9 @@ internal unsafe class OwnedObjectService : DisposableMediatorSubscriberBase
 
         if ((nint)companion == WatchedCompanionAddr)
         {
-            WatchedCompanionAddr = IntPtr.Zero;
+            WatchedTypes.TryRemove((nint)companion, out _);
             WatchedAddresses.Remove((nint)companion);
+            WatchedCompanionAddr = IntPtr.Zero;
             Mediator.Publish(new OwnedObjectDestroyed(OwnedObject.Companion, (nint)companion));
             return;
         }

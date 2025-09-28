@@ -12,7 +12,7 @@ public sealed class IpcCallerHonorific : IIpcCaller
     // API Events
     private readonly ICallGateSubscriber<object> Ready;
     private readonly ICallGateSubscriber<object> Disposing;
-    private readonly ICallGateSubscriber<string, object> OnTitleChange; // When the client changed their honorific title.
+    public readonly ICallGateSubscriber<string, object> OnTitleChange; // When the client changed their honorific title.
     // API Getters
     private readonly ICallGateSubscriber<string> GetClientTitle;
     // API Enactors
@@ -38,7 +38,6 @@ public sealed class IpcCallerHonorific : IIpcCaller
         SetUserTitle = Svc.PluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         ClearUserTitle = Svc.PluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
 
-        OnTitleChange.Subscribe(OnTitleChanged);
         Ready.Subscribe(OnHonorificReady);
         Disposing.Subscribe(OnHonorificDisposing);
 
