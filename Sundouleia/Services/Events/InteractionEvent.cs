@@ -28,7 +28,7 @@ public record DataEvent
     public DataEvent(string uid, DataEventType type, string summary)
         : this(uid, uid, type, summary) { }
 
-    public DataEvent(string labelName, string uid, DataEventType type, string summary)
+    public DataEvent(string labelName, string uid, DataEventType type, string summary = "")
     {
         EventTime = DateTime.Now;
         NickAliasOrUID = labelName;

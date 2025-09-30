@@ -9,6 +9,7 @@ using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace Sundouleia;
 

@@ -3,6 +3,7 @@ using Dalamud.Interface.ImGuiNotification;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
+using Sundouleia.WebAPI.Utils;
 using SundouleiaAPI.Hub;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
@@ -131,7 +132,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                     Logger.LogTrace("Token URI: "+tokenUri, LoggerType.JwtTokens);
                     result = await _httpClient.PostAsync(tokenUri, new FormUrlEncodedContent(new[]
                     {
-                        new KeyValuePair<string, string>("charaIdent", await _frameworkUtil.GetPlayerNameHashedAsync().ConfigureAwait(false)),
+                        new KeyValuePair<string, string>("charaIdent", await SundouleiaSecurity.GetClientIdentHash().ConfigureAwait(false)),
                         new KeyValuePair<string, string>("authKey", secretKey),
                         new KeyValuePair<string, string>("forceMain", forceMain),
                     }), token).ConfigureAwait(false);
@@ -150,7 +151,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                     Logger.LogTrace("Token URI: "+tokenUri, LoggerType.JwtTokens);
                     result = await _httpClient.PostAsync(tokenUri, new FormUrlEncodedContent(new[]
                     {
-                        new KeyValuePair<string, string>("charaIdent", await _frameworkUtil.GetPlayerNameHashedAsync().ConfigureAwait(false)),
+                        new KeyValuePair<string, string>("charaIdent", await SundouleiaSecurity.GetClientIdentHash().ConfigureAwait(false)),
                         new KeyValuePair<string, string>("localContentID", localContentID),
                     }), token).ConfigureAwait(false);
                 }
@@ -262,7 +263,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
 
             // get the remaining attributes.
             var apiUrl = MainHub.MAIN_SERVER_URI;
-            var charaHash = _frameworkUtil.GetPlayerNameHashedAsync().GetAwaiter().GetResult();
+            var charaHash = SundouleiaSecurity.GetClientIdentHash().GetAwaiter().GetResult();
             // Example logic to decide which identifier to use.
             if (!string.IsNullOrEmpty(secretKey))
             {

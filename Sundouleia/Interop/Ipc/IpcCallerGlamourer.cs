@@ -1,9 +1,11 @@
 using CkCommons;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.ImGuiNotification;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Glamourer.Api.Enums;
 using Glamourer.Api.Helpers;
 using Glamourer.Api.IpcSubscribers;
+using Sundouleia.Pairs;
 using Sundouleia.Pairs.Handlers;
 using Sundouleia.Services.Mediator;
 
@@ -31,7 +33,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     private readonly UnlockState     UnlockUser;       // Unlocks a User's glamour state for modification.
     private readonly UnlockStateName UnlockUserByName; // Unlock a User's glamour state by name. (try to avoid?)
     private readonly RevertState     RevertUser;       // Revert a User to their game state.
-    private readonly RevertStateName RevertUserByName; // Revert a kinkster to their game state by their name. (try to avoid?)
+    private readonly RevertStateName RevertUserByName; // Revert a sundesmo to their game state by their name. (try to avoid?)
 
     private readonly ILogger<IpcCallerGlamourer> _logger;
     private readonly SundouleiaMediator _mediator;
@@ -148,17 +150,18 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         await Svc.Framework.RunOnFrameworkThread(() => ApplyState.Invoke(actorData, objectIdx, SUNDOULEIA_LOCK)).ConfigureAwait(false);
     }
 
-    public async Task ReleaseSundesmo(SundesmoHandler sundesmo)
+    // Require handler to enforce being called by the SundesmoHandler.
+    public async Task ReleaseActor(SundesmoHandler handler, GameObject actorState)
     {
-        if (!APIAvailable || PlayerData.IsZoning || sundesmo.PairObject is null)
+        if (!APIAvailable || PlayerData.IsZoning || handler.Address == IntPtr.Zero)
             return;
         
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            _logger.LogDebug($"Reverting {sundesmo.PlayerName}'s Glamourer data!", LoggerType.IpcGlamourer);
-            RevertUser.Invoke(sundesmo.PairObject.ObjectIndex, SUNDOULEIA_LOCK);
-            _logger.LogDebug($"Unlocking {sundesmo.PlayerName}'s Glamourer data!", LoggerType.IpcGlamourer);
-            UnlockUser.Invoke(sundesmo.PairObject.ObjectIndex, SUNDOULEIA_LOCK);
+            _logger.LogDebug($"Reverting {handler.PlayerName}'s data [Actor: {actorState.NameString}]!", LoggerType.IpcGlamourer);
+            RevertUser.Invoke(actorState.ObjectIndex, SUNDOULEIA_LOCK);
+            _logger.LogDebug($"Unlocking {handler.PlayerName}'s data [Actor: {actorState.NameString}]!", LoggerType.IpcGlamourer);
+            UnlockUser.Invoke(actorState.ObjectIndex, SUNDOULEIA_LOCK);
         }).ConfigureAwait(false);
     }
 

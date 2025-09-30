@@ -14,6 +14,24 @@
         "resolved": "1.2.25",
         "contentHash": "xCXiw7BCxHJ8pF6wPepRUddlh2dlQlbr81gXA72hdk4FLHkKXas7EH/n+fk5UCA/YfMqG1Z6XaPiUjDbUNBUzg=="
       },
+      "Downloader": {
+        "type": "Direct",
+        "requested": "[3.3.4, )",
+        "resolved": "3.3.4",
+        "contentHash": "/M/c80e1L0WW1XrLSSiQhgFxk8rrfbpWiWDn2CeBg1tPD393Neo+v184yG/ThyhE9rrNp36yCrugiCmEbRf+VQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.1"
+        }
+      },
+      "K4os.Compression.LZ4.Legacy": {
+        "type": "Direct",
+        "requested": "[1.3.8, )",
+        "resolved": "1.3.8",
+        "contentHash": "+82CK5zXbGjMnVLm2JJpsSAz3+4CRcMmxUDOmehUh1bDjrmpnc5VHxB14hiV1lXtqe53lNI+O76BQvgWhgI66g==",
+        "dependencies": {
+          "K4os.Compression.LZ4": "1.3.8"
+        }
+      },
       "Microsoft.AspNetCore.SignalR.Client": {
         "type": "Direct",
         "requested": "[8.0.11, )",
@@ -64,12 +82,6 @@
           "Microsoft.Extensions.Options": "8.0.2"
         }
       },
-      "SixLabors.ImageSharp": {
-        "type": "Direct",
-        "requested": "[3.1.11, )",
-        "resolved": "3.1.11",
-        "contentHash": "JfPLyigLthuE50yi6tMt7Amrenr/fA31t2CvJyhy/kQmfulIBAqo5T/YFUSRHtuYPXRSaUHygFeh6Qd933EoSw=="
-      },
       "System.IdentityModel.Tokens.Jwt": {
         "type": "Direct",
         "requested": "[7.5.2, )",
@@ -84,6 +96,11 @@
         "type": "Transitive",
         "resolved": "2024.3.0",
         "contentHash": "ox5pkeLQXjvJdyAB4b2sBYAlqZGLh3PjSnP1bQNVx72ONuTJ9+34/+Rq91Fc0dG29XG9RgZur9+NcP4riihTug=="
+      },
+      "K4os.Compression.LZ4": {
+        "type": "Transitive",
+        "resolved": "1.3.8",
+        "contentHash": "LhwlPa7c1zs1OV2XadMtAWdImjLIsqFJPoRcIWAadSRn0Ri1DepK65UbWLPmt4riLqx2d40xjXRk0ogpqNtK7g=="
       },
       "MessagePack": {
         "type": "Transitive",
@@ -521,6 +538,11 @@
           "Microsoft.Win32.Registry": "4.7.0",
           "NAudio.Core": "2.2.1"
         }
+      },
+      "SixLabors.ImageSharp": {
+        "type": "Transitive",
+        "resolved": "3.1.11",
+        "contentHash": "JfPLyigLthuE50yi6tMt7Amrenr/fA31t2CvJyhy/kQmfulIBAqo5T/YFUSRHtuYPXRSaUHygFeh6Qd933EoSw=="
       },
       "System.Diagnostics.EventLog": {
         "type": "Transitive",

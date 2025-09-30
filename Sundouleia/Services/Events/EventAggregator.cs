@@ -12,7 +12,6 @@ namespace Sundouleia.Services.Events;
 /// </summary>
 public class EventAggregator : MediatorSubscriberBase, IHostedService
 {
-    private readonly ILogger<EventAggregator> _logger;
     private readonly SundesmoManager _pairs;
 
     private readonly RollingList<DataEvent> _events = new(500);
@@ -23,7 +22,6 @@ public class EventAggregator : MediatorSubscriberBase, IHostedService
     public EventAggregator(ILogger<EventAggregator> logger, SundouleiaMediator mediator, SundesmoManager pairs) 
         : base(logger, mediator)
     {
-        _logger = logger;
         _pairs = pairs;
         // Create a new event list
         EventList = CreateEventLazy();
@@ -35,18 +33,7 @@ public class EventAggregator : MediatorSubscriberBase, IHostedService
             _lock.Wait();
             try
             {
-                // see if the interaction events nick is string.Empty; if so, attempt to fetch it from the pairs.
-                if (string.IsNullOrEmpty(msg.Event.NickAliasOrUID))
-                {
-                    if (msg.Event.UserUID == MainHub.UID)
-                        msg.Event.NickAliasOrUID = "Client";
-                    else if (_pairs.TryGetNickAliasOrUid(msg.Event.UserUID, out var nick))
-                        msg.Event.NickAliasOrUID = nick;
-                    else
-                        msg.Event.NickAliasOrUID = "UNK PAIR";
-                }
-
-                Logger.LogTrace("Received Event: " + msg.Event.ToString(), LoggerType.Events);
+                Logger.LogTrace("Received Event: " + msg.Event.ToString(), LoggerType.PairDataTransfer);
                 _events.Add(msg.Event);
                 WriteToFile(msg.Event);
             }
@@ -112,7 +99,7 @@ public class EventAggregator : MediatorSubscriberBase, IHostedService
             }
             catch (Bagagwa ex)
             {
-                _logger.LogWarning(ex, "Could not delete last events");
+                Logger.LogWarning(ex, "Could not delete last events");
             }
         }
 
@@ -124,7 +111,7 @@ public class EventAggregator : MediatorSubscriberBase, IHostedService
         }
         catch (Bagagwa ex)
         {
-            _logger.LogWarning(ex, $"Could not write to event file {eventLogFile}");
+            Logger.LogWarning(ex, $"Could not write to event file {eventLogFile}");
         }
     }
 

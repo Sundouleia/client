@@ -22,25 +22,25 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     private readonly MainHub _hub;
     private readonly IpcManager _ipc;
     private readonly SundesmoManager _sundesmos;
-    private readonly OwnedObjectService _ownedObjects;
+    private readonly CharaObjectWatcher _objectWatcher;
 
     private Task? _updateTask;
     private CancellationTokenSource _updateCTS = new();
 
-    private ClientIpcData LastSentData = new();
+    private VisualDataUpdate LastSentData = new();
 
     // Which pending updates we have. (rework later probably)
     private Dictionary<OwnedObject, IpcKind> _pendingUpdates = new();
     private IpcKind _allPendingUpdates = IpcKind.None;
 
     public ClientUpdateService(ILogger<ClientUpdateService> logger, SundouleiaMediator mediator,
-        MainHub hub, IpcManager ipc, SundesmoManager pairs, OwnedObjectService ownedObjects)
+        MainHub hub, IpcManager ipc, SundesmoManager pairs, CharaObjectWatcher ownedObjects)
         : base(logger, mediator)
     {
         _hub = hub;
         _ipc = ipc;
         _sundesmos = pairs;
-        _ownedObjects = ownedObjects;
+        _objectWatcher = ownedObjects;
 
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
         _ipc.Glamourer.OnStateChanged.Enable();
@@ -49,7 +49,6 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _ipc.Moodles.OnStatusModified.Subscribe(OnMoodlesUpdate);
         _ipc.Honorific.OnTitleChange.Subscribe(OnHonorificUpdate);
         _ipc.PetNames.OnNicknamesChanged.Subscribe(OnPetNamesUpdate);
-        _ownedObjects = ownedObjects;
 
         Svc.Framework.Update += OnFrameworkTick;
     }
@@ -105,7 +104,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
             // await for the processed debounce time, or until cancelled.
             await Task.Delay(GetDebounceTime(), _updateCTS.Token).ConfigureAwait(false);
             // after the delay retrieve the current visible users to send the update to.
-            var usersToSendTo = _sundesmos.GetVisibleConnectedUsers();
+            var usersToSendTo = _sundesmos.GetVisibleConnected();
             if (usersToSendTo.Count is 0)
             {
                 ClearPendingUpdates(); return;
@@ -140,8 +139,8 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         string? newData = type switch
         {
             IpcKind.ModManips => _ipc.Penumbra.GetMetaManipulationsString(),
-            IpcKind.Glamourer => await _ipc.Glamourer.GetBase64StateByPtr(_ownedObjects.FromOwned(obj)).ConfigureAwait(false),
-            IpcKind.CPlus => await _ipc.CustomizePlus.GetActiveProfileByPtr(_ownedObjects.FromOwned(obj)).ConfigureAwait(false),
+            IpcKind.Glamourer => await _ipc.Glamourer.GetBase64StateByPtr(_objectWatcher.FromOwned(obj)).ConfigureAwait(false),
+            IpcKind.CPlus => await _ipc.CustomizePlus.GetActiveProfileByPtr(_objectWatcher.FromOwned(obj)).ConfigureAwait(false),
             IpcKind.Heels => await _ipc.Heels.GetClientOffset().ConfigureAwait(false),
             IpcKind.Moodles => await _ipc.Moodles.GetOwn().ConfigureAwait(false),
             IpcKind.Honorific => await _ipc.Honorific.GetTitle().ConfigureAwait(false),
@@ -168,24 +167,24 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         var nonPlayerTasks = objects.Where(obj => obj != OwnedObject.Player).Select(Obj => (Obj, Task: CompileNonPlayerDataChanges(Obj))).ToList();
 
         // Run all calculations in parallel.
-        var playerData = await playerTask.ConfigureAwait(false);
-        var nonPlayerResults = await Task.WhenAll(nonPlayerTasks.Select(x => x.Task)).ConfigureAwait(false);
+        var playerRes = await playerTask.ConfigureAwait(false);
+        var otherRes = await Task.WhenAll(nonPlayerTasks.Select(x => x.Task)).ConfigureAwait(false);
 
         // Create the ret object.
-        var toSend = new ClientIpcData();
-        if (playerData is not null && LastSentData.Player.IsDifferent(playerData))
+        var toSend = new VisualDataUpdate();
+        if (playerRes is not null && LastSentData.Player.IsDifferent(playerRes))
         {
-            Logger.LogDebug($"PlayerData had new changes! {playerData.Updates}");
-            toSend.Player = playerData;
+            Logger.LogDebug($"PlayerData had new changes! {playerRes.Updates}");
+            toSend.Player = playerRes;
         }
 
         // For each non-player result, if it had changes, and was different, apply it.
-        for (int i = 0; i < nonPlayerResults.Length; i++)
+        for (int i = 0; i < otherRes.Length; i++)
         {
-            if (nonPlayerResults[i] != null && LastSentData.NonPlayers[nonPlayerTasks[i]!.Obj].IsDifferent(nonPlayerResults[i]!))
+            if (otherRes[i] != null && LastSentData.NonPlayers[nonPlayerTasks[i]!.Obj].IsDifferent(otherRes[i]!))
             {
-                Logger.LogDebug($"NonPlayerData had new changes! {nonPlayerTasks[i]!.Obj} - {nonPlayerResults[i]!.Updates}");
-                toSend.NonPlayers[nonPlayerTasks[i]!.Obj] = nonPlayerResults[i]!;
+                Logger.LogDebug($"NonPlayerData had new changes! {nonPlayerTasks[i]!.Obj} - {otherRes[i]!.Updates}");
+                toSend.NonPlayers[nonPlayerTasks[i]!.Obj] = otherRes[i]!;
             }
         }
 
@@ -196,7 +195,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
             return;
         }
 
-        Logger.LogInformation($"Sending Other Ipc Update to {toUpdate.Count} Kinksters");
+        Logger.LogInformation($"Sending Other Ipc Update to {toUpdate.Count} Sundesmos");
         LastSentData.UpdateFrom(toSend);
         await _hub.UserPushIpcOther(new(toUpdate, toSend)).ConfigureAwait(false);
     }
@@ -208,8 +207,8 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         // Create tasks to run in parallel with default returns if not pending.
         var manips = pending.HasAny(IpcKind.ModManips) ? _ipc.Penumbra.GetMetaManipulationsString() : null;
         var petNames = pending.HasAny(IpcKind.PetNames) ? _ipc.PetNames.GetPetNicknames() : null;
-        var glamTask = pending.HasAny(IpcKind.Glamourer) ? _ipc.Glamourer.GetBase64StateByPtr(_ownedObjects.WatchedPlayerAddr) : Task.FromResult<string?>(null);
-        var cPlusTask = pending.HasAny(IpcKind.CPlus) ? _ipc.CustomizePlus.GetActiveProfileByPtr(_ownedObjects.WatchedPlayerAddr) : Task.FromResult<string?>(null);
+        var glamTask = pending.HasAny(IpcKind.Glamourer) ? _ipc.Glamourer.GetBase64StateByPtr(_objectWatcher.WatchedPlayerAddr) : Task.FromResult<string?>(null);
+        var cPlusTask = pending.HasAny(IpcKind.CPlus) ? _ipc.CustomizePlus.GetActiveProfileByPtr(_objectWatcher.WatchedPlayerAddr) : Task.FromResult<string?>(null);
         var heelsTask = pending.HasAny(IpcKind.Heels) ? _ipc.Heels.GetClientOffset() : Task.FromResult(string.Empty);
         var moodlesTask = pending.HasAny(IpcKind.Moodles) ? _ipc.Moodles.GetOwn() : Task.FromResult(string.Empty);
         var honorificTask = pending.HasAny(IpcKind.Honorific) ? _ipc.Honorific.GetTitle() : Task.FromResult(string.Empty);
@@ -234,8 +233,8 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     {
         var pending = _pendingUpdates.GetValueOrDefault(obj, IpcKind.None);
         // Create tasks to run in parallel with default returns if not pending.
-        var glamTask = pending.HasAny(IpcKind.Glamourer) ? _ipc.Glamourer.GetBase64StateByPtr(_ownedObjects.FromOwned(obj)) : Task.FromResult<string?>(null);
-        var cPlusTask = pending.HasAny(IpcKind.CPlus) ? _ipc.CustomizePlus.GetActiveProfileByPtr(_ownedObjects.FromOwned(obj)) : Task.FromResult<string?>(null);
+        var glamTask = pending.HasAny(IpcKind.Glamourer) ? _ipc.Glamourer.GetBase64StateByPtr(_objectWatcher.FromOwned(obj)) : Task.FromResult<string?>(null);
+        var cPlusTask = pending.HasAny(IpcKind.CPlus) ? _ipc.CustomizePlus.GetActiveProfileByPtr(_objectWatcher.FromOwned(obj)) : Task.FromResult<string?>(null);
         // Run all in parallel.
         var results = await Task.WhenAll(glamTask, cPlusTask).ConfigureAwait(false);
 
@@ -264,7 +263,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     // Fired within the framework thread.
     private void OnGlamourerUpdate(IntPtr address, StateChangeType _)
     {
-        if (!_ownedObjects.WatchedTypes.TryGetValue(address, out OwnedObject type)) return;
+        if (!_objectWatcher.WatchedTypes.TryGetValue(address, out OwnedObject type)) return;
         // Otherwise it is valid, so recreate the CTS and add a delay time.
         AddPendingUpdate(type, IpcKind.Glamourer);
     }
@@ -273,31 +272,31 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     private void OnCPlusProfileUpdate(ushort objIdx, Guid id)
     {
         var address = Svc.Objects[objIdx]?.Address ?? IntPtr.Zero;
-        if (!_ownedObjects.WatchedTypes.TryGetValue(address, out var type)) return;
+        if (!_objectWatcher.WatchedTypes.TryGetValue(address, out var type)) return;
         AddPendingUpdate(type, IpcKind.CPlus);
     }
 
     private void OnHeelsOffsetUpdate(string newOffset)
     {
-        if (_ownedObjects.WatchedPlayerAddr == IntPtr.Zero) return;
+        if (_objectWatcher.WatchedPlayerAddr == IntPtr.Zero) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.Heels);
     }
 
     private void OnMoodlesUpdate(IPlayerCharacter player)
     {
-        if (player.Address != _ownedObjects.WatchedPlayerAddr) return;
+        if (player.Address != _objectWatcher.WatchedPlayerAddr) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.Moodles);
     }
 
     private void OnHonorificUpdate(string newTitle)
     {
-        if (_ownedObjects.WatchedPlayerAddr == IntPtr.Zero) return;
+        if (_objectWatcher.WatchedPlayerAddr == IntPtr.Zero) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.Honorific);
     }
 
     private void OnPetNamesUpdate(string data)
     {
-        if (_ownedObjects.WatchedPlayerAddr == IntPtr.Zero) return;
+        if (_objectWatcher.WatchedPlayerAddr == IntPtr.Zero) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.PetNames);
     }
 

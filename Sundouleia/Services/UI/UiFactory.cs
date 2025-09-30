@@ -20,12 +20,12 @@ public class UiFactory
     private readonly ProfileService _profiles;
 
     public UiFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
-        MainConfig config, ImageImportTool imageImport, SundesmoManager kinksters,
+        MainConfig config, ImageImportTool imageImport, SundesmoManager sundesmos,
         CosmeticService cosmetics, ProfileLight lightPlate, ProfileService profiles, TutorialService guides)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;
-        _sundesmoManager = kinksters;
+        _sundesmoManager = sundesmos;
         _cosmetics = cosmetics;
         _profileLight = lightPlate;
         _profiles = profiles;

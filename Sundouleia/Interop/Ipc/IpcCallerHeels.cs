@@ -1,4 +1,5 @@
 using Dalamud.Plugin.Ipc;
+using Sundouleia.Pairs;
 using Sundouleia.Pairs.Handlers;
 using Sundouleia.Services.Mediator;
 
@@ -77,8 +78,8 @@ public sealed class IpcCallerHeels : IIpcCaller
     /// </summary>
     public async Task RestoreUserOffset(SundesmoHandler sundesmo)
     {
-        if (!APIAvailable || sundesmo.PairObject is not { } obj) return;
-        await Svc.Framework.RunOnFrameworkThread(() => UnregisterPlayer.InvokeAction(obj.ObjectIndex)).ConfigureAwait(false);
+        if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
+        await Svc.Framework.RunOnFrameworkThread(() => UnregisterPlayer.InvokeAction(sundesmo.ObjIndex)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -86,7 +87,7 @@ public sealed class IpcCallerHeels : IIpcCaller
     /// </summary>
     public async Task SetUserOffset(SundesmoHandler sundesmo, string data)
     {
-        if (!APIAvailable || sundesmo.PairObject is not { } obj) return;
-        await Svc.Framework.RunOnFrameworkThread(() => RegisterPlayer.InvokeAction(obj.ObjectIndex, data)).ConfigureAwait(false);
+        if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
+        await Svc.Framework.RunOnFrameworkThread(() => RegisterPlayer.InvokeAction(sundesmo.ObjIndex, data)).ConfigureAwait(false);
     }
 }

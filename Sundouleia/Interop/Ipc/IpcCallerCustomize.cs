@@ -1,5 +1,7 @@
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Ipc;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using Sundouleia.Pairs;
 using Sundouleia.Pairs.Handlers;
 
 namespace Sundouleia.Interop;
@@ -63,13 +65,13 @@ public sealed class IpcCallerCustomize : IIpcCaller
     ///     Obtains the active profile data of an actor by it's pointer.
     /// </summary>
     /// <returns> The string in base64 containing the c+ profile data. </returns>
-    public async Task<string?> GetActiveProfileByPtr(nint kinksterPtr)
+    public async Task<string?> GetActiveProfileByPtr(nint sundesmoPtr)
     {
         if (!APIAvailable) return null;
         var profileStr = await Svc.Framework.RunOnFrameworkThread(() =>
         {
             // Only accept requests to obtain profiles for players.
-            if (Svc.Objects.CreateObjectReference(kinksterPtr) is { } obj && obj is ICharacter)
+            if (Svc.Objects.CreateObjectReference(sundesmoPtr) is { } obj && obj is ICharacter)
             {
                 var res = GetActiveProfile.InvokeFunc(obj.ObjectIndex);
                 _logger.LogTrace($"GetActiveProfile for [{obj.Name}] returned with EC: [{res.Item1}]", LoggerType.IpcCustomize);
@@ -93,24 +95,25 @@ public sealed class IpcCallerCustomize : IIpcCaller
     ///     Sets the temporary profile for the given sundesmo. <para />
     /// </summary>
     /// <returns> The GUID applied if successful. </returns>
-    public async Task<Guid?> ApplyTempProfile(SundesmoHandler sundesmo, string profileData)
+    public async Task<Guid?> ApplyTempProfile(SundesmoHandler handler, GameObject actorState, string profileData)
     {
-        if (!APIAvailable || sundesmo.PairObject is not { } visibleObj) return null;
+        if (!APIAvailable || handler.Address == IntPtr.Zero) return null;
 
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
             var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(profileData));
-            _logger.LogTrace($"Applying Profile to {visibleObj.Name}");
+            _logger.LogDebug($"TempProfile applied to {handler.PlayerName} (Actor: {actorState.NameString})", LoggerType.IpcGlamourer);
+
             // revert the character if the new data to set was empty.
             if (string.IsNullOrEmpty(profileData))
             {
-                RevertUser.InvokeFunc(visibleObj.ObjectIndex);
+                RevertUser.InvokeFunc(actorState.ObjectIndex);
                 return null;
             }
             // Otherwise set the new profile data.
             else
             {
-                return SetTempProfile.InvokeFunc(visibleObj.ObjectIndex, decodedScale).Item2;
+                return SetTempProfile.InvokeFunc(actorState.ObjectIndex, decodedScale).Item2;
             }
         }).ConfigureAwait(false);
     }

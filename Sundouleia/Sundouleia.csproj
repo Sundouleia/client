@@ -37,18 +37,17 @@
         <ProjectReference Include="..\Submodules\PenumbraAPI\Penumbra.Api.csproj" />
 	   <ProjectReference Include="..\Submodules\SundouleiaAPI\SundouleiaAPI.csproj" />
 
-	    <!--For JWT token handling, helpful for server connectivity processing-->
+	   <!--Additional Package References for File Handling-->
+	   <PackageReference Include="Downloader" Version="3.3.4" />
+	   <PackageReference Include="K4os.Compression.LZ4.Legacy" Version="1.3.8" />
+	    
+	   <!--For JWT token handling, helpful for server connectivity processing-->
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.2" />
         
         <!--For SignalR server connectivity, helpful for server connectivity processing-->
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="8.0.11" />
-        
-        <!--Handles our own plugin hosting methods for dependency injection and service management-->
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
-        
-        <!--For image processing and manipulation beyond dalamuds textureprovider capabilities..-->
-        <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     </ItemGroup>
     
     <!-- If i could use Sundouleia.json i would, but sadly dalamud prevents this lol.-->

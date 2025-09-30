@@ -19,13 +19,13 @@ public enum ToggleType
 /// <summary>
 ///     Toggle open / close / between sundesmos?
 /// </summary>
-public record ToggleInteractionsUI(Sundesmo Sundesmo) : MessageBase;
+public record TogglePermissionWindow(Sundesmo Sundesmo) : MessageBase;
 
 /// <summary> 
 ///     To refresh the immutable list of draw pairs in the whitelist. <para />
 ///     If possible to avoid this, find a way!
 /// </summary>
-public record RefreshUiUsersMessage : MessageBase;
+public record RefreshUiMessage : MessageBase;
 
 /// <summary>
 ///     Fires whenever we need to refresh the created DrawRequests. <para />

@@ -15,6 +15,7 @@ public class ConfigStorage
 
     // File Info
     public string CacheFolder { get; set; } = string.Empty;
+    public bool CompactCache { get; set; } = true;
     // Ideally we can remove this if our cleanup function works properly.
     // Which it should, because if we are using radars it better be lol.
     public string MaxCacheInGiB { get; set; } = "20";

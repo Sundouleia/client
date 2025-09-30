@@ -3,10 +3,12 @@ using Dalamud.Interface.ImGuiNotification;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
 using Penumbra.Api.IpcSubscribers;
+using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using System.Diagnostics.CodeAnalysis;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Interop;
 
@@ -19,6 +21,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     private const int RequiredFeatureVersion = 12;
 
     private const string SUNDOULEIA_ID = "Sundouleia";
+    private const string SUNDOULEIA_MOD_PREFIX = "Sundesmo_ModFiles";
     private const string SUNDOULEIA_META_MANIP_NAME = "Sundouleia_Meta";
 
     private bool _shownPenumbraUnavailable = false; // safety net to prevent notification spam.
@@ -257,19 +260,38 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     }
 
     /// <summary>
+    ///     In an ideal world we could efficiency and and remove changed items from a temporary mod, but penumbra's API does
+    ///     not currently allow this. As a result we must reapply everything in bulk. Which sucks, and means we must manage
+    ///     the replacements internally with its own cache until they add support for this.
+    /// </summary>
+    public async Task ReapplySundesmoMods(Guid collection, Dictionary<string, string> modPaths)
+    {
+        if (!APIAvailable) return;
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            // Likely do not log this here, log it somewhere else, if this sends the full list every time this will get very spammy.
+            foreach (var mod in modPaths)
+                Logger.LogTrace($"[SundesmoTempMods] Change: {mod.Key} => {mod.Value}");
+
+            // remove the existing temporary mod
+            var retRemove = RemoveTempMod.Invoke(SUNDOULEIA_MOD_PREFIX, collection, 0);
+            Logger.LogTrace($"Removed Existing Temp Mod for Collection: {collection}, Success: [{retRemove}]");
+            // add the new temporary mod with the new paths.
+            var retAdded = AddTempMod.Invoke(SUNDOULEIA_MOD_PREFIX, collection, modPaths, string.Empty, 0);
+            Logger.LogTrace($"Added Temp Mod for Collection: {collection}, Success: [{retAdded}]");
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
     ///     Removes a Sundesmo's Temporary Collection via its GUID. <para />
     ///     It should be a given that they do not need to be visible for this to execute successfully.
     /// </summary>
-    public async Task RemoveSundesmoCollection(Guid id)
+    public void RemoveSundesmoCollection(Guid id)
     {
         if (!APIAvailable) return;
-
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            Logger.LogTrace($"Removing Sundesmo Collection {{{id}}}");
-            var ret = DeleteTempCollection.Invoke(id);
-            Logger.LogTrace($"Sundesmo Collection {{{id}}} deleted. [RetCode: {ret}]");
-        }).ConfigureAwait(false);
+        Logger.LogTrace($"Removing Sundesmo Collection {{{id}}}");
+        var ret = DeleteTempCollection.Invoke(id);
+        Logger.LogTrace($"Sundesmo Collection {{{id}}} deleted. [RetCode: {ret}]");
     }
 
     /// <summary>
@@ -286,25 +308,6 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         {
             var retAdded = AddTempMod.Invoke(SUNDOULEIA_META_MANIP_NAME, collection, [], manipulationDataString, 0);
             Logger.LogTrace($"Manipulation Data updated for Sundesmo Collection {{{collection}}} [RetCode: {retAdded}]");
-        }).ConfigureAwait(false);
-    }
-    
-    // where we would create a mod defined by the mod paths within our cache directory stored.
-    public async Task AssignUserMods(Guid collection, Dictionary<string, string> modPaths)
-    {
-        if (!APIAvailable) return;
-
-        Logger.LogTrace($"Assigning Temporary Mod to Collection [{collection}] using ({modPaths.Count}) mod path replacements.");
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            foreach (var mod in modPaths)
-                Logger.LogTrace($"[TempModCreation] Change: {mod.Key} => {mod.Value}");
-            // remove the existing temporary mod (seems incredibly inefficient but maybe we can optimize later?)
-            var retRemove = RemoveTempMod.Invoke("GS_User_ModFiles", collection, 0);
-            Logger.LogTrace($"Removed Existing Temp Mod for Collection: {collection}, Success: [{retRemove}]");
-            // add the new temporary mod with the new paths.
-            var retAdded = AddTempMod.Invoke("GS_User_ModFiles", collection, modPaths, string.Empty, 0);
-            Logger.LogTrace($"Added Temp Mod for Collection: {collection}, Success: [{retAdded}]");
         }).ConfigureAwait(false);
     }
 }

@@ -56,7 +56,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         HubFactory hubFactory,
         TokenProvider tokenProvider,
         ServerConfigManager serverConfigs,
-        SundesmoManager kinksters,
+        SundesmoManager sundesmos,
         ClientDataListener clientDatListener,
         SundesmoListener sundesmoListener,
         AccountService dataSync)
@@ -66,7 +66,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         _hubFactory = hubFactory;
         _tokenProvider = tokenProvider;
         _serverConfigs = serverConfigs;
-        _sundesmoManager = kinksters;
+        _sundesmoManager = sundesmos;
         _clientDatListener = clientDatListener;
         _sundesmoListener = sundesmoListener;
         _dataSync = dataSync;

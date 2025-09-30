@@ -23,8 +23,8 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
                 .OrderByDescending(p => favorites.SundesmoUids.Contains(p.UserData.UID))
                 .ThenByDescending(u => u.IsVisible)
                 .ThenByDescending(u => u.IsOnline)
-                .ThenBy(pair => !pair.Name.IsNullOrEmpty()
-                    ? (config.Current.PreferNicknamesOverNames ? pair.GetNickAliasOrUid() : pair.Name)
+                .ThenBy(pair => !pair.SundesmoName.IsNullOrEmpty()
+                    ? (config.Current.PreferNicknamesOverNames ? pair.GetNickAliasOrUid() : pair.SundesmoName)
                     : pair.GetNickAliasOrUid(), StringComparer.OrdinalIgnoreCase)
         ], log)
     {
@@ -32,7 +32,7 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
         _favorites = favorites;
         SearchByParts = true;
 
-        Mediator.Subscribe<RefreshUiUsersMessage>(this, _ => _needsRefresh = true);
+        Mediator.Subscribe<RefreshUiMessage>(this, _ => _needsRefresh = true);
     }
 
     public SundouleiaMediator Mediator { get; }
@@ -77,7 +77,7 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
     protected override bool IsVisible(int globalIndex, LowerString filter)
         => Items[globalIndex].UserData.AliasOrUID.Contains(filter, StringComparison.OrdinalIgnoreCase)
         || (Items[globalIndex].GetNickname()?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false)
-        || (Items[globalIndex].Name?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
+        || (Items[globalIndex].SundesmoName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
 
     protected override string ToString(Sundesmo obj)
         => obj.GetNickAliasOrUid();
@@ -114,16 +114,16 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
 
     protected override bool DrawSelectable(int globalIdx, bool selected)
     {
-        var kinkster = Items[globalIdx];
+        var sundesmo = Items[globalIdx];
 
-        if(SundouleiaEx.DrawFavoriteStar(_favorites, kinkster.UserData.UID, false) && CurrentSelectionIdx == globalIdx)
+        if(SundouleiaEx.DrawFavoriteStar(_favorites, sundesmo.UserData.UID, false) && CurrentSelectionIdx == globalIdx)
         {
             CurrentSelectionIdx = -1;
             Current = default;
         }
 
         ImUtf8.SameLineInner();
-        var ret = ImGui.Selectable(ToString(kinkster), selected);
+        var ret = ImGui.Selectable(ToString(sundesmo), selected);
         return ret;
     }
 

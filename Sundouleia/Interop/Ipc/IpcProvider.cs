@@ -1,8 +1,6 @@
 using Dalamud.Plugin.Ipc;
-using Sundouleia.Pairs;
-using Sundouleia.Pairs.Handlers;
-using Sundouleia.Services.Mediator;
 using Microsoft.Extensions.Hosting;
+using Sundouleia.Pairs;
 
 namespace Sundouleia.Interop;
 

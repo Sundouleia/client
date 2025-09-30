@@ -1,3 +1,4 @@
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Handlers;
 using SundouleiaAPI.Data;
@@ -10,11 +11,16 @@ public record PairHandlerVisibleMessage(SundesmoHandler Player) : MessageBase; /
 public record PairWasRemovedMessage(UserData UserData) : MessageBase; // a message indicating a pair has been removed.
 public record TargetPairMessage(Sundesmo Pair) : MessageBase; // called when publishing a targeted pair connection (see UI)
 
-// Should modify this to go into a player pointer manager or something since it is a fundamental and frequently checked thing.
-public record UserGameObjCreatedMessage(UserGameObj UserGameObj) : MessageBase;
-public record UserGameObjDestroyedMessage(UserGameObj UserGameObj) : MessageBase;
 
-public record OwnedObjectCreated(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
+public record FileUploading(SundesmoHandler Player) : MessageBase;
+public record FileUploaded(SundesmoHandler Player) : MessageBase;
+public record FileDownloadReady(Guid requestId) : MessageBase; // Maybe remove this.
+public record FileDownloadStarted(SundesmoHandler Player, Dictionary<string, string> Status) : MessageBase;
+public record FileDownloadComplete(SundesmoHandler Player) : MessageBase;
+
+public record CharacterObjectCreated(IntPtr Address) : SameThreadMessage;
+public record CharacterObjectDestroyed(IntPtr Address) : SameThreadMessage;
+public record OwnedCharaCreated(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
 public record OwnedObjectDestroyed(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
 
 

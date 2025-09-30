@@ -1,5 +1,6 @@
 using CkCommons;
 using Dalamud.Plugin.Ipc;
+using Sundouleia.Pairs;
 using Sundouleia.Pairs.Handlers;
 using Sundouleia.Services.Mediator;
 
@@ -102,7 +103,7 @@ public sealed class IpcCallerHonorific : IIpcCaller
     /// </summary>
     public async Task SetTitleAsync(SundesmoHandler sundesmo, string titleDataBase64)
     {
-        if (!APIAvailable || sundesmo.PairObject is null) return;
+        if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
 
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
@@ -110,9 +111,9 @@ public sealed class IpcCallerHonorific : IIpcCaller
             string titleData = string.IsNullOrEmpty(titleDataBase64) ? string.Empty : Encoding.UTF8.GetString(Convert.FromBase64String(titleDataBase64));
             // Clear if empty, set if not.
             if (string.IsNullOrEmpty(titleData))
-                ClearUserTitle.InvokeAction(sundesmo.PairObject.ObjectIndex);
+                ClearUserTitle.InvokeAction(sundesmo.ObjIndex);
             else
-                SetUserTitle.InvokeAction(sundesmo.PairObject.ObjectIndex, titleData);
+                SetUserTitle.InvokeAction(sundesmo.ObjIndex, titleData);
         }).ConfigureAwait(false);
     }
 
@@ -121,12 +122,12 @@ public sealed class IpcCallerHonorific : IIpcCaller
     /// </summary>
     public async Task ClearTitleAsync(SundesmoHandler sundesmo)
     {
-        if (!APIAvailable || sundesmo.PairObject is null) return;
+        if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
 
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
             _logger.LogTrace($"Removing title for {sundesmo.PlayerName}");
-            ClearUserTitle.InvokeAction(sundesmo.PairObject.ObjectIndex);
+            ClearUserTitle.InvokeAction(sundesmo.ObjIndex);
         }).ConfigureAwait(false);
     }
 }

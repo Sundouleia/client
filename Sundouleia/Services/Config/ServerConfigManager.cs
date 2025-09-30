@@ -15,7 +15,7 @@ public class ServerConfigManager
     private readonly ILogger<ServerConfigManager> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly AccountConfig _serverConfig;
-    private readonly NickConfig _nicknameConfig;
+    private readonly NickConfig _nickConfig;
 
     public ServerConfigManager(ILogger<ServerConfigManager> logger, SundouleiaMediator mediator,
         AccountConfig serverConfig, NickConfig nicksConfig)
@@ -23,17 +23,17 @@ public class ServerConfigManager
         _logger = logger;
         _mediator = mediator;
         _serverConfig = serverConfig;
-        _nicknameConfig = nicksConfig;
+        _nickConfig = nicksConfig;
 
         _serverConfig.Load();
-        _nicknameConfig.Load();
+        _nickConfig.Load();
     }
 
     /// <summary>
     ///     The current server we are connected to, taken from the ServerStorage class
     /// </summary>
     public AccountStorage ServerStorage => _serverConfig.Current;
-    public NicknamesStorage NickStorage => _nickConfig.Current;
+    public NickStorage NickStorage => _nickConfig.Current;
 
     /// <summary>
     ///     Returns the authentication for the current player.
@@ -179,7 +179,7 @@ public class ServerConfigManager
     }
 
     /// <summary> Saves the nicknames config </summary>
-    internal void SaveNicknames() => _nicknameConfig.Save();
+    internal void SaveNicknames() => _nickConfig.Save();
 
     /// <summary>Retrieves the nickname associated with a given UID (User Identifier).</summary>
     /// <returns>Returns the nickname as a string if found; otherwise, returns null.</returns>
@@ -205,6 +205,6 @@ public class ServerConfigManager
             return;
 
         NickStorage.Nicknames[uid] = nickname;
-        _nicknameConfig.Save();
+        _nickConfig.Save();
     }
 }

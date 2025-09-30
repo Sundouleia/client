@@ -3,6 +3,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Sundouleia.PlayerClient;
 using Sundouleia.WebAPI;
+using System.Text.Json;
 
 namespace Sundouleia;
 public static class SundouleiaEx
@@ -34,6 +35,9 @@ public static class SundouleiaEx
         return false;
     }
 
+    public static bool IsSingleFlagSet(byte value)
+        => value != 0 && (value & (value - 1)) == 0;
+
     // May want to move to a 'toName' file or something.
     public static string ToName(this InteractionFilter filterKind)
         => filterKind switch
@@ -44,6 +48,9 @@ public static class SundouleiaEx
             InteractionFilter.Content => "Content Details",
             _ => "UNK"
         };
+
+    public static T DeepClone<T>(this T obj)
+        => System.Text.Json.JsonSerializer.Deserialize<T>(System.Text.Json.JsonSerializer.Serialize(obj))!;
 
     /// <summary> Linearly interpolates between two values based on a factor t. </summary>
     /// <remarks> Think, “What number is 35% between 56 and 132?" </remarks>
