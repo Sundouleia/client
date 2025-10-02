@@ -2,7 +2,6 @@ using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Utils;
-using Sundouleia.WebAPI;
 using Sundouleia.Services.Configs;
 
 namespace Sundouleia.Services.Events;

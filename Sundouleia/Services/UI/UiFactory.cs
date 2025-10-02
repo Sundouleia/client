@@ -1,46 +1,31 @@
-using Sundouleia.Gui.Components;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Services.Textures;
-using Sundouleia.Services.Tutorial;
 using SundouleiaAPI.Data;
 
 namespace Sundouleia.Services;
 
 public class UiFactory
 {
-    // Generic Classes
     private readonly ILoggerFactory _loggerFactory;
     private readonly SundouleiaMediator _mediator;
-    private readonly SundesmoManager _sundesmoManager;
-    private readonly CosmeticService _cosmetics;
-    private readonly ProfileLight _profileLight;
+    private readonly ProfileHelper _profileHelper;
+    private readonly SundesmoManager _sundesmos;
     private readonly ProfileService _profiles;
 
     public UiFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
-        MainConfig config, ImageImportTool imageImport, SundesmoManager sundesmos,
-        CosmeticService cosmetics, ProfileLight lightPlate, ProfileService profiles, TutorialService guides)
+        ProfileHelper profileHelper, SundesmoManager sundesmos, ProfileService service)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;
-        _sundesmoManager = sundesmos;
-        _cosmetics = cosmetics;
-        _profileLight = lightPlate;
-        _profiles = profiles;
-        _textures = textures;
+        _profileHelper = profileHelper;
+        _sundesmos = sundesmos;
+        _profiles = service;
     }
 
-    public ProfileUI CreateStandaloneProfileUi(Sundesmo pair)
+    public ProfileUI CreateStandaloneProfileUi(UserData userData)
     {
-        return new ProfileUI(_loggerFactory.CreateLogger<ProfileUI>(), _mediator,
-            _sundesmoManager, _profiles, _cosmetics, _textures, pair);
-    }
-
-    public ProfileLightUI CreateStandaloneProfileLightUi(UserData pairUserData)
-    {
-        return new ProfileLightUI(_loggerFactory.CreateLogger<ProfileLightUI>(), _mediator,
-            _profileLight, _profiles, _sundesmoManager, pairUserData);
+        return new ProfileUI(_loggerFactory.CreateLogger<ProfileUI>(), _mediator, _profileHelper,
+            _sundesmos, _profiles, userData);
     }
 }

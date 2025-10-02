@@ -1,18 +1,15 @@
 using CkCommons;
 using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.State.Listeners;
-using Sundouleia.State.Managers;
-using Sundouleia.Utils;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
+using SundouleiaAPI.Data.Permissions;
 
 namespace Sundouleia.WebAPI;
 /// <summary>
@@ -24,13 +21,10 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public const string MAIN_SERVER_NAME = "Sundouleia Main";
     public const string MAIN_SERVER_URI = "wss://sundouleia.kinkporium.studio";
 
-    private readonly ClientAchievements _achievements;
     private readonly HubFactory _hubFactory;
     private readonly TokenProvider _tokenProvider;
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoManager _sundesmoManager;
-    private readonly ClientDataListener _clientDatListener;
-    private readonly SundesmoListener _sundesmoListener;
     private readonly AccountService _dataSync;
 
     // Static private accessors (persistant across singleton instantiations for other static accessors.)
@@ -52,23 +46,17 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
 
     public MainHub(ILogger<MainHub> logger,
         SundouleiaMediator mediator,
-        ClientAchievements achievements,
         HubFactory hubFactory,
         TokenProvider tokenProvider,
         ServerConfigManager serverConfigs,
         SundesmoManager sundesmos,
-        ClientDataListener clientDatListener,
-        SundesmoListener sundesmoListener,
         AccountService dataSync)
         : base(logger, mediator)
     {
-        _achievements = achievements;
         _hubFactory = hubFactory;
         _tokenProvider = tokenProvider;
         _serverConfigs = serverConfigs;
         _sundesmoManager = sundesmos;
-        _clientDatListener = clientDatListener;
-        _sundesmoListener = sundesmoListener;
         _dataSync = dataSync;
 
         // Subscribe to the things.
@@ -106,6 +94,8 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public static UserData OwnUserData => ConnectionResponse!.User;
     public static string DisplayName => ConnectionResponse?.User.AliasOrUID ?? string.Empty;
     public static string UID => ConnectionResponse?.User.UID ?? string.Empty;
+    // See how to update this later.
+    public static GlobalPerms GlobalPerms => ConnectionResponse?.GlobalPerms ?? new();
     public static UserReputation Reputation => ConnectionResponse?.Reputation ?? new();
     public static ServerState ServerStatus
     {
@@ -123,7 +113,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public static bool IsConnectionDataSynced => _serverStatus is ServerState.ConnectedDataSynced;
     public static bool IsConnected => _serverStatus is ServerState.Connected or ServerState.ConnectedDataSynced;
     public static bool IsServerAlive => _serverStatus is ServerState.ConnectedDataSynced or ServerState.Connected or ServerState.Unauthorized or ServerState.Disconnected;
-    public bool ClientHasConnectionPaused => _serverConfigs.ServerStorage.FullPause;
+    public bool ClientHasConnectionPaused => _serverConfigs.AccountStorage.FullPause;
 
     protected override void Dispose(bool disposing)
     {
@@ -151,7 +141,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private async void OnLogin()
     {
         Logger.LogInformation("Starting connection on login after fully loaded...");
-        await Extensions.WaitForPlayerLoading();
+        await SundouleiaEx.WaitForPlayerLoading();
         Logger.LogInformation("Client fully loaded in, Connecting.");
         // Run the call to attempt a connection to the server.
         await Connect().ConfigureAwait(false);
@@ -225,8 +215,8 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public async Task<List<PendingRequest>> UserGetPendingRequests()
         => await _hubConnection!.InvokeAsync<List<PendingRequest>>(nameof(UserGetPendingRequests)).ConfigureAwait(false);
 
-    public async Task<FullProfileData> UserGetProfileData(UserDto dto)
-        => await _hubConnection!.InvokeAsync<FullProfileData>(nameof(UserGetProfileData), dto).ConfigureAwait(false);
+    public async Task<FullProfileData> UserGetProfileData(UserDto dto, bool allowNsfw)
+        => await _hubConnection!.InvokeAsync<FullProfileData>(nameof(UserGetProfileData), dto, allowNsfw).ConfigureAwait(false);
 
     /// <summary>
     ///     Loads in all our pairs from the Sundouleia server.
@@ -234,7 +224,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private async Task LoadInitialSundesmos()
     {
         var allSundesmo = await UserGetAllPairs().ConfigureAwait(false);
-        _sundesmoManager.AddInitial(allSundesmo);
+        _sundesmoManager.AddSundesmos(allSundesmo);
         Logger.LogDebug($"Initial Sundesmos Loaded: [{string.Join(", ", allSundesmo.Select(x => x.User.AliasOrUID))}]", LoggerType.ApiCore);
     }
 
@@ -246,7 +236,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     {
         var onlineUsers = await UserGetOnlinePairs().ConfigureAwait(false);
         foreach (var entry in onlineUsers)
-            _sundesmoManager.MarkUserOnline(entry, sendNotification: false);
+            _sundesmoManager.MarkSundesmoOnline(entry, false);
 
         Logger.LogDebug($"Online Users: [{string.Join(", ", onlineUsers.Select(x => x.User.AliasOrUID))}]", LoggerType.ApiCore);
     }

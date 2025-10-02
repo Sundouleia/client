@@ -19,7 +19,6 @@ using Sundouleia.Services.Events;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.Services.Tutorial;
-using Sundouleia.State.Managers;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 
@@ -114,7 +113,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaLoc>()
 
         // Player User
-        .AddSingleton<UserGameObjFactory>()
         .AddSingleton<SundesmoFactory>()
         .AddSingleton<SundesmoHandlerFactory>()
         .AddSingleton<SundesmoManager>()
@@ -128,16 +126,9 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<UiFontService>()
         .AddSingleton<AccountService>()
         .AddSingleton<DistributorService>()
-        .AddSingleton<UserSyncService>()
         .AddSingleton<DtrBarService>()
-        .AddSingleton<EmoteService>()
         .AddSingleton<NotificationService>()
-        .AddSingleton<OnFrameworkService>()
-
-        // Spatial Audio
-        .AddSingleton<VfxSpawnManager>()
-
-        .AddSingleton<VfxSpawnManager>()
+        .AddSingleton<OnTickService>()
 
         // UI (Probably mostly in Scoped)
         .AddSingleton<IdDisplayHandler>()
@@ -236,12 +227,11 @@ public static class SundouleiaServiceExtensions
         .AddHostedService(p => p.GetRequiredService<CosmeticService>())     // Initializes our required textures so methods can work.
         .AddHostedService(p => p.GetRequiredService<SundouleiaMediator>())  // Runs the task for monitoring mediator events.
         .AddHostedService(p => p.GetRequiredService<NotificationService>()) // Important Background Monitor.
-        .AddHostedService(p => p.GetRequiredService<OnFrameworkService>())  // Starts & monitors the framework update cycle.
+        .AddHostedService(p => p.GetRequiredService<OnTickService>())       // Starts & monitors the framework update cycle.
 
         // Cached Data That MUST be initialized before anything else for validity.
         .AddHostedService(p => p.GetRequiredService<CosmeticService>())     // Provides all Textures necessary for the plugin.
         .AddHostedService(p => p.GetRequiredService<UiFontService>())       // Provides all fonts necessary for the plugin.
-        .AddHostedService(p => p.GetRequiredService<EmoteService>())        // Provides all emotes necessary for the plugin.
 
         .AddHostedService(p => p.GetRequiredService<SundouleiaLoc>())       // Initializes Localization with the current language.
         .AddHostedService(p => p.GetRequiredService<EventAggregator>())     // Forcibly calls the constructor, subscribing to the monitors.

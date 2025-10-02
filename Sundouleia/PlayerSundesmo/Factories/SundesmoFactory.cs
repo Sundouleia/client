@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Hosting;
-using Sundouleia.Pairs.Handlers;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Network;
@@ -13,28 +11,18 @@ public class SundesmoFactory
 {
     private readonly ILoggerFactory _loggerFactory;
     private readonly SundouleiaMediator _mediator;
-    private readonly SundesmoHandlerFactory _cachedPlayerFactory;
+    private readonly SundesmoHandlerFactory _innerFactory;
     private readonly ServerConfigManager _serverConfigs;
 
     public SundesmoFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
-        SundesmoHandlerFactory cachedPlayerFactory, ServerConfigManager serverConfigs)
+        SundesmoHandlerFactory factory, ServerConfigManager configs)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;
-        _cachedPlayerFactory = cachedPlayerFactory;
-        _serverConfigs = serverConfigs;
+        _innerFactory = factory;
+        _serverConfigs = configs;
     }
 
-    /// <summary> Creates a new Pair object from the UserPair</summary>
-    /// <param name="UserPair"> The data transfer object of a user pair</param>
-    /// <returns> A new Pair object </returns>
     public Sundesmo Create(UserPair sundesmoInfo)
-        => new(sundesmoInfo, _loggerFactory.CreateLogger<Sundesmo>(), _mediator, _cachedPlayerFactory, _serverConfigs);
-
-    public SundesmoHandler Create(Sundesmo sundesmo)
-    {
-        return new SundesmoHandler(sundesmo, _loggerFactory.CreateLogger<SundesmoHandler>(), _mediator,
-            _gameObjectHandlerFactory, _ipc, _frameworkUtils, _hostApplicationLifetime);
-    }
-
+        => new(sundesmoInfo, _loggerFactory.CreateLogger<Sundesmo>(), _mediator, _innerFactory, _serverConfigs);
 }

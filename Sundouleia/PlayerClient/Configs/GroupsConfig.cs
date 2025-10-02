@@ -5,6 +5,8 @@ namespace Sundouleia.PlayerClient;
 
 public class GroupsStorage
 {
+    public HashSet<string> OpenedDefaultFolders { get; set; } = new(StringComparer.Ordinal);
+    public HashSet<string> OpenedGroupFolders { get; set; } = new(StringComparer.Ordinal);
     public List<SundesmoGroup> Groups { get; set; } = new();
 }
 

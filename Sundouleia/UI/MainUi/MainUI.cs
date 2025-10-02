@@ -195,7 +195,7 @@ public class MainUI : WindowMediatorSubscriberBase
         ImUtf8.SameLineInner();
 
         // Disable the add button if they are already added or nothing is in the field. (might need to also account for alias here)
-        var allowSend = !string.IsNullOrEmpty(_uidToSentTo) && !_sundesmos.ContainsUser(_uidToSentTo);
+        var allowSend = !string.IsNullOrEmpty(_uidToSentTo) && !_sundesmos.ContainsSundesmo(_uidToSentTo);
         if (CkGui.IconTextButton(FAI.Upload, "Send", buttonSize, false, !allowSend))
         {
             UiService.SetUITask(async () =>
@@ -321,13 +321,13 @@ public class MainUI : WindowMediatorSubscriberBase
                     if (MainHub.IsConnected)
                     {
                         // If we are connected, we want to disconnect.
-                        _serverConfigs.ServerStorage.FullPause = true;
+                        _serverConfigs.AccountStorage.FullPause = true;
                         _serverConfigs.Save();
                         _ = _hub.Disconnect(ServerState.Disconnected);
                     }
                     else if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                     {
-                        _serverConfigs.ServerStorage.FullPause = false;
+                        _serverConfigs.AccountStorage.FullPause = false;
                         _serverConfigs.Save();
                         _ = _hub.Connect();
                     }

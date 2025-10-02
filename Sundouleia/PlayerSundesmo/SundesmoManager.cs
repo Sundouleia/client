@@ -1,17 +1,13 @@
-using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Interface.ImGuiNotification;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI.Utils;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Network;
 using System.Diagnostics.CodeAnalysis;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Pairs;
 
@@ -27,12 +23,11 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoFactory _pairFactory;
     
-    private Lazy<List<Sundesmo>> _directPairsInternal;                          // the internal direct pairs lazy list for optimization
-    public List<Sundesmo> DirectPairs => _directPairsInternal.Value;            // the direct pairs the client has with other users.
+    private Lazy<List<Sundesmo>> _directPairsInternal;  // the internal direct pairs lazy list for optimization
+    public List<Sundesmo> DirectPairs => _directPairsInternal.Value; // the direct pairs the client has with other users.
 
     public SundesmoManager(ILogger<SundesmoManager> logger, SundouleiaMediator mediator,
-        SundesmoFactory factory, MainConfig config, ServerConfigManager serverConfigs) 
-        : base(logger, mediator)
+        SundesmoFactory factory, MainConfig config, ServerConfigManager serverConfigs) : base(logger, mediator)
     {
         _allSundesmos = new(UserDataComparer.Instance);
         _pairFactory = factory;
@@ -40,12 +35,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         _serverConfigs = serverConfigs;
 
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearSundesmos());
-        // See why we need to worry about this later.
-        Mediator.Subscribe<CutsceneEndMessage>(this, (_) =>
-        {
-            foreach (var pair in _allSundesmos.Select(k => k.Value))
-                pair.ReapplyLatestData();
-        });
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => ReapplyAlterations());
 
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
         Svc.ContextMenu.OnMenuOpened += OnOpenContextMenu;
@@ -53,19 +43,31 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
 
     private void OnOpenContextMenu(IMenuOpenedArgs args)
     {
-        Logger.LogInformation("Opening Pair Context Menu of type "+args.MenuType, LoggerType.DtrBar);
+        Logger.LogInformation("Opening Pair Context Menu of type "+args.MenuType, LoggerType.PairManagement);
         if (args.MenuType is ContextMenuType.Inventory) return;
         if (!_mainConfig.Current.ShowContextMenus) return;
-        // otherwise, locate the pair and add the context menu args to the visible pairs.
-        foreach (var pair in _allSundesmos.Where((p => p.Value.IsVisible)))
-            pair.Value.AddContextMenu(args);
+        if (args.Target is not MenuTargetDefault target || target.TargetObjectId == 0) return;
+        // Find the sundesmo that matches this and display the results.
+        if (DirectPairs.FirstOrDefault(p => p.PlayerObjectId == target.TargetObjectId && !p.IsPaused) is not { } match)
+            return;
+
+        Logger.LogDebug($"Found matching pair for context menu: {match.GetNickAliasOrUid()}", LoggerType.PairManagement);
+        // This only works when you create it prior to adding it to the args,
+        // otherwise the += has trouble calling. (it would fall out of scope)
+        var subMenu = new MenuItem();
+        subMenu.IsSubmenu = true;
+        subMenu.Name = "Sundouleia";
+        subMenu.PrefixChar = 'S';
+        subMenu.PrefixColor = 708;
+        subMenu.OnClicked += match.OpenSundouleiaSubMenu;
+        args.AddMenuItem(subMenu);
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         Svc.ContextMenu.OnMenuOpened -= OnOpenContextMenu;
-        DisposePairs();
+        DisposeSundesmos();
     }
 
     public void AddSundesmo(UserPair dto)
@@ -74,7 +76,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         var msg = $"User ({dto.User.UID}) {(exists ? "found, applying latest!" : "not found. Creating!")}.";
         Logger.LogDebug(msg, LoggerType.PairManagement);
         if (exists) 
-            _allSundesmos[dto.User].ReapplyLatestData();
+            _allSundesmos[dto.User].ReapplyAlterations();
         else
             _allSundesmos[dto.User] = _pairFactory.Create(dto);
         RecreateLazy();
@@ -92,7 +94,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
             }
             else
             {
-                _allSundesmos[dto.User].ReapplyLatestData();
+                _allSundesmos[dto.User].ReapplyAlterations();
                 refreshed.Add(dto.User.UID);
             }
         RecreateLazy();
@@ -115,7 +117,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     public void ClearSundesmos()
     {
         Logger.LogDebug("Clearing all Pairs", LoggerType.PairManagement);
-        DisposePairs();
+        DisposeSundesmos();
         _allSundesmos.Clear();
         RecreateLazy();
     }
@@ -163,9 +165,6 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         }
 
         sundesmo.MarkOnline(dto);
-        // If the sundesmo is not yet rendered, run a check against the watched objects.
-        if (!sundesmo.IsRendered)
-            sundesmo.CheckForCharacter();
         Mediator.Publish(new PairWentOnlineMessage(dto.User));
         RecreateLazy();
     }
@@ -185,31 +184,11 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
-    /// <summary>
-    ///     Called by the CharaObjectWatcher, and is what indicates when we become visible or not. <para />
-    ///     Triggers reapplication of existing sent data, and marks them as visible for us to send data to.
-    /// </summary>
-    public unsafe void CharaEnteredRenderRange(Character* chara)
+    private void ReapplyAlterations()
     {
-        // Grab the hashed ident from the Character to indicate the potential OnlineUserIdent.
-        var hash = SundouleiaSecurity.GetIdentHashByCharacterPtr((nint)chara);
-        // Now we should iterate through all of our sundesmos. If one of them is online with this ident, pass it in.
-        if (_allSundesmos.Values.FirstOrDefault(s => s.Ident == hash) is { } match)
-            match.PlayerEnteredRender(chara);
-
+        foreach (var pair in _allSundesmos.Values)
+            pair.ReapplyAlterations();
     }
-
-    /// <summary>
-    ///     Called by the CharaObjectWatcher, and sends the player into a timeout state. <para />
-    ///     In Timeout state, we know the sundesmo is still online, but just not visible. <para />
-    ///     As such we can continue to send any data in transit, and track when they last left render. <para />
-    ///     Upon re-entering render range, only send the data if the timeout awaiter elapsed.
-    /// </summary>
-    public unsafe void CharaLeftRenderRange(Character* chara)
-    {
-
-    }
-
 
     private void RecreateLazy()
     {
@@ -221,34 +200,29 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     /// <summary>
     ///     Sundesmos that we have an OnlineUser DTO of, implying they are connected.
     /// </summary>
-    public List<Sundesmo> GetOnlineSundesmos() => _allSundesmos.Where(p => !string.IsNullOrEmpty(p.Value.GetPlayerNameHash())).Select(p => p.Value).ToList();
+    public List<Sundesmo> GetOnlineSundesmos() => _allSundesmos.Where(p => !string.IsNullOrEmpty(p.Value.Ident)).Select(p => p.Value).ToList();
 
     /// <summary>
     ///     Sundesmos that we have an OnlineUser DTO of, implying they are connected.
     /// </summary>
-    public List<UserData> GetOnlineUserDatas() => _allSundesmos.Where(p => !string.IsNullOrEmpty(p.Value.GetPlayerNameHash())).Select(p => p.Key).ToList();
+    public List<UserData> GetOnlineUserDatas() => _allSundesmos.Where(p => !string.IsNullOrEmpty(p.Value.Ident)).Select(p => p.Key).ToList();
 
     /// <summary>
     ///     The number of sundesmos that are in our render range. <para />
     ///     NOTE: This does not mean that they have applied data!
     /// </summary>
-    public int GetVisibleCount() => _allSundesmos.Count(p => p.Value.IsVisible);
+    public int GetVisibleCount() => _allSundesmos.Count(p => p.Value.PlayerRendered);
 
     /// <summary>
     ///     Get the <see cref="UserData"/> for all rendered sundesmos. <para />
     ///     <b>NOTE: It is possible for a visible sundesmos to be offline!</b>
     /// </summary>
-    public List<UserData> GetVisible() => _allSundesmos.Where(p => p.Value.IsVisible).Select(p => p.Key).ToList();
+    public List<UserData> GetVisible() => _allSundesmos.Where(p => p.Value.PlayerRendered).Select(p => p.Key).ToList();
 
     /// <summary>
     ///     Get the <see cref="UserData"/> for all rendered sundesmos that are connected.
     /// </summary>
-    public List<UserData> GetVisibleConnected() => _allSundesmos.Where(p => p.Value.IsVisible && p.Value.IsOnline).Select(p => p.Key).ToList();
-
-    /// <summary>
-    ///     (Maybe restructure this later) Fetch all visible pair game objects. (Try and remove if possible, i hate this)
-    /// </summary>
-    public List<IGameObject> GetVisibleGameObjects() => _allSundesmos.Select(p => p.Value.VisiblePairGameObject).Where(gameObject => gameObject != null).ToList()!;
+    public List<UserData> GetVisibleConnected() => _allSundesmos.Where(p => p.Value.PlayerRendered && p.Value.IsOnline).Select(p => p.Key).ToList();
 
     /// <summary>
     ///     If a Sundesmo exists given their UID.

@@ -1,8 +1,6 @@
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Ipc;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.Pairs;
-using Sundouleia.Pairs.Handlers;
 
 namespace Sundouleia.Interop;
 
@@ -91,29 +89,46 @@ public sealed class IpcCallerCustomize : IIpcCaller
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(profileStr));
     }
 
-    /// <summary>
-    ///     Sets the temporary profile for the given sundesmo. <para />
-    /// </summary>
-    /// <returns> The GUID applied if successful. </returns>
-    public async Task<Guid?> ApplyTempProfile(SundesmoHandler handler, GameObject actorState, string profileData)
+    public async Task<Guid> ApplyTempProfile(PlayerHandler handler, string profileData)
     {
-        if (!APIAvailable || handler.Address == IntPtr.Zero) return null;
+        if (!APIAvailable || handler.Address == IntPtr.Zero) return Guid.Empty;
 
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
             var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(profileData));
-            _logger.LogDebug($"TempProfile applied to {handler.PlayerName} (Actor: {actorState.NameString})", LoggerType.IpcGlamourer);
-
-            // revert the character if the new data to set was empty.
+            _logger.LogDebug($"TempProfile applied to {handler.PlayerName})", LoggerType.IpcGlamourer);
             if (string.IsNullOrEmpty(profileData))
             {
-                RevertUser.InvokeFunc(actorState.ObjectIndex);
-                return null;
+                RevertUser.InvokeFunc(handler.ObjIndex);
+                return Guid.Empty;
             }
-            // Otherwise set the new profile data.
             else
             {
-                return SetTempProfile.InvokeFunc(actorState.ObjectIndex, decodedScale).Item2;
+                return SetTempProfile.InvokeFunc(handler.ObjIndex, decodedScale).Item2 ?? Guid.Empty;
+            }
+        }).ConfigureAwait(false);
+    }
+
+
+    /// <summary>
+    ///     Sets the temporary profile for the given sundesmo. <para />
+    /// </summary>
+    public async Task<Guid> ApplyTempProfile(PlayerOwnedHandler handler, string profileData)
+    {
+        if (!APIAvailable || handler.Address == IntPtr.Zero) return Guid.Empty;
+
+        return await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(profileData));
+            _logger.LogDebug($"TempProfile applied to {handler.ObjectName})", LoggerType.IpcGlamourer);
+            if (string.IsNullOrEmpty(profileData))
+            {
+                RevertUser.InvokeFunc(handler.ObjIndex);
+                return Guid.Empty;
+            }
+            else
+            {
+                return SetTempProfile.InvokeFunc(handler.ObjIndex, decodedScale).Item2 ?? Guid.Empty;
             }
         }).ConfigureAwait(false);
     }

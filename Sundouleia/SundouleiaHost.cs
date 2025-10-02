@@ -1,31 +1,27 @@
 using CkCommons;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Sundouleia.GameInternals.Detours;
 using Sundouleia.Gui;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Utils;
 using System.Reflection;
-using System.Runtime.InteropServices;
 
 namespace Sundouleia;
 
-/// <summary> The main class for the Sundouleia plugin. </summary>
 public class SundouleiaHost : MediatorSubscriberBase, IHostedService
 {
-    private readonly MainConfig _mainConfig;
-    private readonly ServerConfigManager _serverConfigs;
+    private readonly MainConfig _config;
+    private readonly AccountConfig _accountConfig;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private IServiceScope? _runtimeServiceScope;
     private Task? _launchTask;
     public SundouleiaHost(ILogger<SundouleiaHost> logger, SundouleiaMediator mediator, MainConfig mainConfig,
-        ServerConfigManager serverConfigs, IServiceScopeFactory scopeFactory) : base(logger, mediator)
+        AccountConfig accounts, IServiceScopeFactory scopeFactory) : base(logger, mediator)
     {
-        _mainConfig = mainConfig;
-        _serverConfigs = serverConfigs;
+        _config = mainConfig;
+        _accountConfig = accounts;
         _serviceScopeFactory = scopeFactory;
     }
     /// <summary> 
@@ -46,7 +42,8 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
         // subscribe to the main UI message window for making the primary UI be the main UI interface.
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (msg) =>
         {
-            if (_launchTask == null || _launchTask.IsCompleted) _launchTask = Task.Run(WaitForPlayerAndLaunchCharacterManager);
+            if (_launchTask is null || _launchTask.IsCompleted) 
+                _launchTask = Task.Run(WaitForPlayerAndLaunchCharacterManager);
         });
 
         // start processing the mediator queue.
@@ -117,42 +114,31 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
             _runtimeServiceScope.ServiceProvider.GetRequiredService<UiService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<CommandManager>();
 
-            // Initialize the audio manager for our configured audio devices.
-            // AudioSystem.InitializeOutputDevice(_mainConfig.Current.AudioOutputType, _mainConfig.GetDefaultAudioDevice());
-
             // display changelog if we should.
-            if (_mainConfig.Current.LastRunVersion != Assembly.GetExecutingAssembly().GetName().Version!)
+            if (_config.Current.LastRunVersion != Assembly.GetExecutingAssembly().GetName().Version!)
             {
                 // update the version and toggle the UI.
                 Logger?.LogInformation("Version was different, displaying UI");
-                _mainConfig.Current.LastRunVersion = Assembly.GetExecutingAssembly().GetName().Version!;
-                _mainConfig.Save();
+                _config.Current.LastRunVersion = Assembly.GetExecutingAssembly().GetName().Version!;
+                _config.Save();
                 Mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
             }
 
             // if the client does not have a valid setup or config, switch to the intro ui
-            if (!_mainConfig.Current.HasValidSetup() || !_serverConfigs.ServerStorage.HasValidSetup())
+            if (!_config.HasValidSetup() || !_accountConfig.HasValidSetup())
             {
-                Logger?.LogDebug("Has Valid Setup: {setup} Has Valid Config: {config}", _mainConfig.Current.HasValidSetup(), _serverConfigs.HasValidConfig());
+                Logger?.LogDebug("Has Valid Setup: {setup} Has Valid Config: {config}", _config.HasValidSetup(), _accountConfig.HasValidSetup());
                 // publish the switch to intro ui message to the mediator
-                _mainConfig.Current.ButtonUsed = false;
+                _config.Current.ButtonUsed = false;
 
                 Mediator.Publish(new SwitchToIntroUiMessage());
             }
 
             // Services that require an initial constructor call during bootup.
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<EmoteService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<UiFontService>();
-
             // get the required service for the online player manager (and notification service if we add it)
             _runtimeServiceScope.ServiceProvider.GetRequiredService<DistributorService>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<UserSyncService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<AccountService>();
-
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<StaticDetours>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<MovementDetours>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<ResourceDetours>();
-
             // stuff that should probably be a hosted service but isn't yet.
             _runtimeServiceScope.ServiceProvider.GetRequiredService<DtrBarService>();
         }

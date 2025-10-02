@@ -14,22 +14,31 @@ public class ConfigStorage
     public bool ButtonUsed { get; set; } = false;
 
     // File Info
+    public bool InitialScanComplete { get; set; } = false;
     public string CacheFolder { get; set; } = string.Empty;
     public bool CompactCache { get; set; } = true;
     // Ideally we can remove this if our cleanup function works properly.
     // Which it should, because if we are using radars it better be lol.
-    public string MaxCacheInGiB { get; set; } = "20";
+    public int MaxCacheInGiB { get; set; } = 20;
     public string CacheScanComplete { get; set; } = string.Empty;
     public int MaxParallelDownloads { get; set; } = 10;
+    public int DownloadLimitBytes { get; set; } = 0;
+    public DownloadSpeeds DownloadSpeedType { get; set; } = DownloadSpeeds.MBps;
     // could add variables for the transfer bars but Idk if I really want to bother
     // with this, or if we even can detect it with our system we are developing.
 
     // Radar Preferences
     public bool RadarSendPings { get; set; } = false; // If others can send you requests vis context menus.
     public bool RadarNearbyDtr { get; set; } = true;
-    public bool RadarChatUnreadDtr { get; set; } = false;
     public bool RadarJoinChats { get; set; } = true;
+    public bool RadarChatUnreadDtr { get; set; } = false;
     public bool RadarShowUnreadBubble { get; set; } = true;
+
+    // UI Options
+    public bool OpenUiOnStartup { get; set; } = true;
+    public bool ShowProfiles { get; set; } = true;
+    public bool AllowNSFW { get; set; } = false;
+    public float ProfileDelay { get; set; } = 1.5f;
 
     // pair listing preferences. This will have a long overhaul, as preferences
     // will mean very little once we can make custom group containers.
@@ -39,13 +48,8 @@ public class ConfigStorage
     public bool ShowContextMenus { get; set; } = true;
     public bool FocusTargetOverTarget { get; set; } = false;
 
-    // UI Preferences.
-    public bool OpenUiOnStartup { get; set; } = true;
-    public bool ShowProfiles { get; set; } = true;
-    public float ProfileDelay { get; set; } = 1.5f;
-
     // Notification preferences
-    public bool NotifyForServerConnections { get; set; } = true;
+    public bool NotifyForConnections { get; set; } = true;
     public bool NotifyForOnlinePairs { get; set; } = true;
     public bool NotifyLimitToNickedPairs { get; set; } = false;
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Both;
@@ -85,59 +89,36 @@ public class MainConfig : IHybridSavable
     {
         var file = _saver.FileNames.MainConfig;
         _logger.LogInformation("Loading in Config for file: " + file);
-        var jsonText = "";
-        JObject jObject = new();
-        try
+        if (!File.Exists(file))
         {
-            // if the main file does not exist, attempt to load the text from the backup.
-            if (File.Exists(file))
-            {
-                jsonText = File.ReadAllText(file);
-                jObject = JObject.Parse(jsonText);
-            }
-            else
-            {
-                _logger.LogWarning("Config file not found Attempting to find old config.");
-                var backupFile = file.Insert(file.Length - 5, "-testing");
-                if (File.Exists(backupFile))
-                {
-                    jsonText = File.ReadAllText(backupFile);
-                    jObject = JObject.Parse(jsonText);
-                    jObject = ConfigMigrator.MigrateMainConfig(jObject, _saver.FileNames);
-                    // remove the old file.
-                    // File.Delete(backupFile);
-                }
-                else
-                {
-                    _logger.LogWarning("No Config file found for: " + backupFile);
-                    return;
-                }
-            }
-            // Read the json from the file.
-            var version = jObject["Version"]?.Value<int>() ?? 0;
+            _logger.LogWarning("Config file not found for: " + file);
+            return;
+        }
+
+        var jsonText = File.ReadAllText(file);
+        var jObject = JObject.Parse(jsonText);
+        var version = jObject["Version"]?.Value<int>() ?? 0;
 
             // Load instance configuration
-            Current = jObject["Config"]?.ToObject<ConfigStorage>() ?? new ConfigStorage();
+        Current = jObject["Config"]?.ToObject<ConfigStorage>() ?? new ConfigStorage();
 
-            // Load static fields safely
-            LogLevel = Enum.TryParse(jObject["LogLevel"]?.Value<string>(), out LogLevel lvl) ? lvl : LogLevel.Trace;
+        // Load static fields safely
+        LogLevel = Enum.TryParse(jObject["LogLevel"]?.Value<string>(), out LogLevel lvl) ? lvl : LogLevel.Trace;
 
-            // Handle outdated hash set format, and new format for log filters.
-            var token = jObject["Filters"];
-            if(token is JArray array)
-            {
-                var list = array.ToObject<List<LoggerType>>() ?? new List<LoggerType>();
-                LoggerFilters = list.Aggregate(LoggerType.None, (acc, val) => acc | val);
-            }
-            else
-            {
-                LoggerFilters = token?.ToObject<LoggerType>() ?? LoggerType.Recommended;
-            }
-
-            _logger.LogInformation("Config loaded.");
-            Save();
+        // Handle outdated hash set format, and new format for log filters.
+        var token = jObject["Filters"];
+        if(token is JArray array)
+        {
+            var list = array.ToObject<List<LoggerType>>() ?? new List<LoggerType>();
+            LoggerFilters = list.Aggregate(LoggerType.None, (acc, val) => acc | val);
         }
-        catch (Bagagwa ex) { _logger.LogError("Failed to load config." + ex); }
+        else
+        {
+            LoggerFilters = token?.ToObject<LoggerType>() ?? LoggerType.Recommended;
+        }
+
+        _logger.LogInformation("Config loaded.");
+        Save();
     }
 
     public ConfigStorage Current { get; private set; } = new();

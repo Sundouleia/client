@@ -8,7 +8,7 @@ using OtterGui.Text;
 using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.Components;
-public class DrawUserRequests : IRequestsFolder
+public class DrawUserRequests
 {
     private IEnumerable<DrawUserRequest> _outgoingItems;
     private IEnumerable<DrawUserRequest> _incomingItems;

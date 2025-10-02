@@ -1,6 +1,5 @@
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
-using Sundouleia.State.Models;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 

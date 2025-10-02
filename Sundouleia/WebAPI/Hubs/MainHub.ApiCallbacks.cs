@@ -25,9 +25,9 @@ public partial class MainHub
 
         var (title, type) = messageSeverity switch
         {
-            MessageSeverity.Error => ($"Error from {_serverConfigs.ServerStorage.ServerName}", NotificationType.Error),
-            MessageSeverity.Warning => ($"Warning from {_serverConfigs.ServerStorage.ServerName}", NotificationType.Warning),
-            _ => ($"Info from {_serverConfigs.ServerStorage.ServerName}", NotificationType.Info),
+            MessageSeverity.Error => ($"Error from {MAIN_SERVER_NAME}", NotificationType.Error),
+            MessageSeverity.Warning => ($"Warning from {MAIN_SERVER_NAME}", NotificationType.Warning),
+            _ => ($"Info from {MAIN_SERVER_NAME}", NotificationType.Info),
         };
 
         Mediator.Publish(new NotificationMessage(title, message, type, TimeSpan.FromSeconds(7.5)));
@@ -45,9 +45,9 @@ public partial class MainHub
         {
             var (title, type, duration) = messageSeverity switch
             {
-                MessageSeverity.Error => ($"Error from {_serverConfigs.ServerStorage.ServerName}", NotificationType.Error, 7.5),
-                MessageSeverity.Warning => ($"Warning from {_serverConfigs.ServerStorage.ServerName}", NotificationType.Warning, 7.5),
-                _ => ($"Info from {_serverConfigs.ServerStorage.ServerName}", NotificationType.Info, 5.0),
+                MessageSeverity.Error => ($"Error from {MAIN_SERVER_NAME}", NotificationType.Error, 7.5),
+                MessageSeverity.Warning => ($"Warning from {MAIN_SERVER_NAME}", NotificationType.Warning, 7.5),
+                _ => ($"Info from {MAIN_SERVER_NAME}", NotificationType.Info, 5.0),
             };
             Mediator.Publish(new NotificationMessage(title, message, type, TimeSpan.FromSeconds(duration)));
         }
@@ -57,7 +57,7 @@ public partial class MainHub
             _ = Task.Run(async () =>
             {
                 // pause the server state
-                _serverConfigs.ServerStorage.FullPause = true;
+                _serverConfigs.AccountStorage.FullPause = true;
                 _serverConfigs.Save();
                 _suppressNextNotification = true;
                 // create a new connection to force the disconnect.
@@ -65,7 +65,7 @@ public partial class MainHub
                 // because this is a forced reconnection, clear our token cache between, incase we were banned.
                 _tokenProvider.ResetTokenCache();
                 // after it stops, switch the connection pause back to false and create a new connection.
-                _serverConfigs.ServerStorage.FullPause = false;
+                _serverConfigs.AccountStorage.FullPause = false;
                 _serverConfigs.Save();
                 _suppressNextNotification = true;
                 await Connect().ConfigureAwait(false);
@@ -101,7 +101,7 @@ public partial class MainHub
     public Task Callback_AddPair(UserPair dto)
     {
         Logger.LogDebug($"Callback_AddPair: {dto}", LoggerType.Callbacks);
-        //Generic.Safe(() => _sundesmoManager.AddNewUserPair(dto));
+        Generic.Safe(() => _sundesmoManager.AddSundesmo(dto));
         return Task.CompletedTask;
     }
 
@@ -111,7 +111,7 @@ public partial class MainHub
     public Task Callback_RemovePair(UserDto dto)
     {
         Logger.LogDebug($"Callback_RemovePair: {dto}", LoggerType.Callbacks);
-        //Generic.Safe(() => _sundesmoManager.RemoveSundesmo(dto));
+        Generic.Safe(() => _sundesmoManager.RemoveSundesmo(dto));
         return Task.CompletedTask;
     }
 
@@ -124,6 +124,7 @@ public partial class MainHub
     public Task Callback_AddRequest(PendingRequest dto)
     {
         Logger.LogDebug($"Callback_AddPairRequest: {dto}", LoggerType.Callbacks);
+        // do something here with the new request.
         return Task.CompletedTask;
     }
 
@@ -134,6 +135,7 @@ public partial class MainHub
     public Task Callback_RemoveRequest(PendingRequest dto)
     {
         Logger.LogDebug($"Callback_RemoveRequest: {dto}", LoggerType.Callbacks);
+        // do something here with the removed request.
         return Task.CompletedTask;
     }
     #endregion Pair/Request Callbacks
@@ -163,7 +165,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateFull(IpcUpdateFull dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateFull: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        // Handle management better.
+        _sundesmoManager.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData);
         return Task.CompletedTask;
     }
 
@@ -174,7 +176,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateMods(IpcUpdateMods dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateMods: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        // Handle management better.
+        _sundesmoManager.ReceiveIpcUpdateMods(dto.User, dto.ModData);
         return Task.CompletedTask;
     }
 
@@ -186,7 +188,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateOther(IpcUpdateOther dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateOther: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        // Handle management better.
+        _sundesmoManager.ReceiveIpcUpdateOther(dto.User, dto.IpcData);
         return Task.CompletedTask;
     }
 
@@ -197,7 +199,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateSingle(IpcUpdateSingle dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateSingle: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        // Handle management better.
+        _sundesmoManager.ReceiveIpcUpdateSingle(dto.User, dto.ObjType, dto.Type, dto.NewData);
         return Task.CompletedTask;
     }
 
@@ -207,7 +209,7 @@ public partial class MainHub
     public Task Callback_SingleChangeGlobal(SingleChangeGlobal dto)
     {
         Logger.LogDebug($"Callback_SingleChangeGlobal: {dto}", LoggerType.Callbacks);
-        // Handle better or something idk.
+        // handle permissions later.
         return Task.CompletedTask;
     }
 
@@ -279,7 +281,7 @@ public partial class MainHub
     public Task Callback_UserOffline(UserDto dto)
     {
         Logger.LogDebug($"Callback_SendOffline: [{dto}]", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmoManager.MarkUserOffline(dto.User)) ;
+        Generic.Safe(() => _sundesmoManager.MarkSundesmoOffline(dto.User)) ;
         return Task.CompletedTask;
     }
 
@@ -289,7 +291,7 @@ public partial class MainHub
     public Task Callback_UserOnline(OnlineUser dto)
     {
         Logger.LogDebug("Callback_SendOnline: " + dto, LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmoManager.MarkUserOnline(dto));
+        Generic.Safe(() => _sundesmoManager.MarkSundesmoOnline(dto));
         return Task.CompletedTask;
     }
 
@@ -306,7 +308,7 @@ public partial class MainHub
     }
 
     /// <summary>
-    ///     When verifying your account via the discord both, this will pass in
+    ///     When verifying your account via the discord bot, this will pass in
     ///     the verification code that should display in game for you to respond to 
     ///     the bot with.
     /// </summary>

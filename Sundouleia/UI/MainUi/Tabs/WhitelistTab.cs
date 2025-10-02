@@ -19,14 +19,14 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     private List<IDrawFolder> _drawFolders;
     private string _filter = string.Empty;
     public WhitelistTab(ILogger<WhitelistTab> logger, SundouleiaMediator mediator,
-        MainConfig config, SundesmoManager kinksters, DrawEntityFactory factory)
+        MainConfig config, SundesmoManager sundesmos, DrawEntityFactory factory)
         : base(logger, mediator)
     {
         _config = config;
-        _sundesmoManager = kinksters;
+        _sundesmoManager = sundesmos;
         _factory = factory;
 
-        Mediator.Subscribe<RefreshUiUsersMessage>(this, _ => _drawFolders = GetDrawFolders());
+        Mediator.Subscribe<RefreshUiMessage>(this, _ => _drawFolders = GetDrawFolders());
         _drawFolders = GetDrawFolders();
     }
 
@@ -80,13 +80,13 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
                 // return a user if the filter matches their alias or ID, playerChara name, or the nickname we set.
                 return p.UserData.AliasOrUID.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
                        (p.GetNickname()?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                       (p.Name?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false);
+                       (p.PlayerName?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false);
             });
 
         // the alphabetical sort function of the pairs.
         string? AlphabeticalSort(Sundesmo u)
-            => !string.IsNullOrEmpty(u.Name)
-                    ? (_config.Current.PreferNicknamesOverNames ? u.GetNickname() ?? u.UserData.AliasOrUID : u.Name)
+            => !string.IsNullOrEmpty(u.PlayerName)
+                    ? (_config.Current.PreferNicknamesOverNames ? u.GetNickname() ?? u.UserData.AliasOrUID : u.PlayerName)
                     : u.GetNickname() ?? u.UserData.AliasOrUID;
         // filter based on who is online (or paused but that shouldnt exist yet unless i decide to add it later here)
         bool FilterOnlineOrPausedSelf(Sundesmo u)
@@ -98,7 +98,7 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
             => !u.IsOnline || u.UserPair.OwnPerms.PauseVisuals;
         // collect the sorted list
         List<Sundesmo> BasicSortedList(IEnumerable<Sundesmo> u)
-            => u.OrderByDescending(u => u.IsVisible)
+            => u.OrderByDescending(u => u.PlayerRendered)
                 .ThenByDescending(u => u.IsOnline)
                 .ThenBy(AlphabeticalSort, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -108,8 +108,8 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         // if we wish to display our visible users separately, then do so.
         if (_config.Current.ShowVisibleUsersSeparately)
         {
-            var allVisiblePairs = ImmutablePairList(allPairs.Where(u => u.IsVisible));
-            var filteredVisiblePairs = BasicSortedList(filteredPairs.Where(u => u.IsVisible));
+            var allVisiblePairs = ImmutablePairList(allPairs.Where(u => u.PlayerRendered));
+            var filteredVisiblePairs = BasicSortedList(filteredPairs.Where(u => u.PlayerRendered));
             drawFolders.Add(_factory.CreateDrawTagFolder(Constants.CustomVisibleTag, filteredVisiblePairs, allVisiblePairs));
         }
 

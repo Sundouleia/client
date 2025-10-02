@@ -1,6 +1,8 @@
 using CkCommons;
+using Sundouleia.Gui.Components;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
+using Sundouleia.WebAPI;
 using SundouleiaAPI.Network;
 using System.Diagnostics.CodeAnalysis;
 
@@ -14,47 +16,44 @@ public class ServerConfigManager
 {
     private readonly ILogger<ServerConfigManager> _logger;
     private readonly SundouleiaMediator _mediator;
-    private readonly AccountConfig _serverConfig;
+    private readonly GroupsConfig _groupConfig;
     private readonly NickConfig _nickConfig;
+    private readonly AccountConfig _accountConfig;
 
+    // Migrate group config later.
     public ServerConfigManager(ILogger<ServerConfigManager> logger, SundouleiaMediator mediator,
-        AccountConfig serverConfig, NickConfig nicksConfig)
+        GroupsConfig groupConfig, AccountConfig accountConfig, NickConfig nicksConfig)
     {
         _logger = logger;
         _mediator = mediator;
-        _serverConfig = serverConfig;
+        _accountConfig = accountConfig;
         _nickConfig = nicksConfig;
 
-        _serverConfig.Load();
+        _accountConfig.Load();
         _nickConfig.Load();
     }
 
-    /// <summary>
-    ///     The current server we are connected to, taken from the ServerStorage class
-    /// </summary>
-    public AccountStorage ServerStorage => _serverConfig.Current;
-    public NickStorage NickStorage => _nickConfig.Current;
+    public GroupsStorage Groups => _groupConfig.Current;
+    public NickStorage NicknameStorage => _nickConfig.Current;
+    public AccountStorage AccountStorage => _accountConfig.Current;
 
     /// <summary>
-    ///     Returns the authentication for the current player.
+    ///     Returns the CharaAuthentication for the current player.
     /// </summary>
-    /// <returns> Returns true if found, false if not. Outputs Authentication if true. </returns>
-    public bool TryGetAuthForCharacter([NotNullWhen(true)] out Authentication auth)
+    public bool TryGetAuthForPlayer([NotNullWhen(true)] out CharaAuthentication auth)
     {
-        // fetch the players local content ID (matches regardless of name or world change) and the name & worldId.
-        var LocalContentID = Svc.Framework.RunOnFrameworkThread(() => PlayerData.ContentId).Result;
-        // Once we have obtained the information, check to see if the currently logged in character has a matching authentication with the same local content ID.
-        auth = ServerStorage.Authentications.FirstOrDefault(f => f.CharacterPlayerContentId == LocalContentID)!;
-        if (auth is null)
+        // fetch the cid of our current player.
+        var cid = Svc.Framework.RunOnFrameworkThread(() => PlayerData.ContentId).Result;
+        // if we cannot find any authentications with this data, it means that none exist.
+        if (AccountStorage.LoginAuths.Find(la => la.ContentId == cid) is not { } match)
         {
             _logger.LogDebug("No authentication found for the current character.");
+            auth = null!;
             return false;
         }
-
-        // update the auth for name and world change
-        UpdateAuthForNameAndWorldChange(LocalContentID);
-
-        // Return value authentication.
+        // a match was found, so mark it, but update name and world before returning.
+        auth = match;
+        UpdateAuthForNameAndWorldChange(cid);
         return true;
     }
 
@@ -62,130 +61,138 @@ public class ServerConfigManager
     /// <summary>
     ///     Retrieves the SecretKey for the currently logged in character.
     /// </summary>
-    public string? GetSecretKeyForCharacter()
+    public AccountProfile? GetProfileForCharacter()
     {
-        if(TryGetAuthForCharacter(out var auth))
-            return auth.SecretKey.Key;
+        if (!TryGetAuthForPlayer(out var auth))
+            return null;
+        // There was an account, so get the key index.
+        var profileIdx = auth.ProfileIdx;
 
-        _logger.LogDebug("No authentication found for the current character.");
-        return null;
+        // Now obtain the secret key using the profile index.
+        if (!AccountStorage.Profiles.TryGetValue(profileIdx, out var profile))
+            return null;
+        // Return the key as it exists.
+        return profile;
     }
 
-    public void UpdateAuthForNameAndWorldChange(ulong localContentId)
+    public void UpdateAuthForNameAndWorldChange(ulong cid)
     {
         // locate the auth with the matching local content ID, and update the name and world if they do not match.
-        var auth = ServerStorage.Authentications.Find(f => f.CharacterPlayerContentId == localContentId);
-        if (auth == null) return;
-
-        // fetch the players name and world ID.
-        var charaName = PlayerData.NameInstanced;
-        var worldId = PlayerData.HomeWorldIdInstanced;
-
+        if (AccountStorage.LoginAuths.Find(la => la.ContentId == cid) is not { } auth)
+            return;
+        // Id was valid, compare against current.
+        var currentName = PlayerData.NameInstanced;
+        var currentWorld = PlayerData.HomeWorldIdInstanced;
         // update the name if it has changed.
-        if (auth.CharacterName != charaName)
-            auth.CharacterName = charaName;
-
+        if (auth.PlayerName != currentName) auth.PlayerName = currentName;
         // update the world ID if it has changed.
-        if (auth.WorldId != worldId)
-            auth.WorldId = worldId;
+        if (auth.WorldId != currentWorld) auth.WorldId = currentWorld;
     }
 
-    public int AuthCount() => ServerStorage.Authentications.Count;
-
-    public bool HasAnyAltAuths() => ServerStorage.Authentications.Any(a => !a.IsPrimary);
-
-    public bool CharacterHasSecretKey()
+    public bool CharaHasLoginAuth() => AccountStorage.LoginAuths.Any(a => a.ContentId == PlayerData.ContentId);
+    public bool CharaHasValidLoginAuth()
     {
-        return ServerStorage.Authentications.Any(a => a.CharacterPlayerContentId == PlayerData.ContentId && !string.IsNullOrEmpty(a.SecretKey.Key));
-    }
-
-    public bool AuthExistsForCurrentLocalContentId()
-    {
-        return ServerStorage.Authentications.Any(a => a.CharacterPlayerContentId == PlayerData.ContentId);
+        if (AccountStorage.LoginAuths.Find(a => a.ContentId == PlayerData.ContentId && a.ProfileIdx != -1) is not { } auth)
+            return false;
+        if (AccountStorage.Profiles.TryGetValue(auth.ProfileIdx, out var profile))
+            return !string.IsNullOrEmpty(profile.Key);
+        return false;
     }
 
     public void GenerateAuthForCurrentCharacter()
     {
         _logger.LogDebug("Generating new auth for current character");
-        // generates a new auth object for the list of authentications with no secret key.
-        var auth = new Authentication
+        var autoSelectedKey = AccountStorage.Profiles.Keys.DefaultIfEmpty(-1).First();
+        AccountStorage.LoginAuths.Add(new CharaAuthentication
         {
-            CharacterPlayerContentId = PlayerData.ContendIdInstanced,
-            CharacterName = PlayerData.NameInstanced,
+            PlayerName = PlayerData.NameInstanced,
             WorldId = PlayerData.HomeWorldIdInstanced,
-            IsPrimary = !ServerStorage.Authentications.Any(),
-            SecretKey = new SecretKey()
-        };
-
-        // add the new authentication to the list of authentications.
-        ServerStorage.Authentications.Add(auth);
+            ContentId = PlayerData.ContendIdInstanced,
+            ProfileIdx = autoSelectedKey
+        });
         Save();
     }
 
-    public void SetSecretKeyForCharacter(ulong localContentID, SecretKey keyToAdd)
+    public int AddProfileToAccount(AccountProfile profile)
     {
-        // Check if the currently logged-in character has a matching authentication with the same local content ID.
-        var auth = ServerStorage.Authentications.Find(f => f.CharacterPlayerContentId == localContentID);
-
-        // If the authentication is null, throw an exception.
-        if (auth == null) throw new Exception("No authentication found for the current character.");
-
-        // Update the existing authentication with the new secret key.
-        auth.SecretKey = keyToAdd;
-        // Save the updated configuration.
-        Save();
-    }
-
-    /// <summary> Updates the authentication after successful connection to set the linked UID or flag good connection. </summary>
-    /// <remarks> This will also remove any listed accounts that have the 1.3 format and whose UID is not in the connection list. </remarks>
-    public void UpdateAuthentication(string secretKey, ConnectionResponse connectedInfo)
-    {
-        // Firstly, make sure that we have a valid authentication that just connected.
-        var auth = ServerStorage.Authentications.Find(f => f.SecretKey.Key == secretKey);
-        if (auth is null)
-            return;
-
-        // If valid, take this auth and update it with its respective information.
-        auth.SecretKey.HasHadSuccessfulConnection = true;
-        auth.SecretKey.LinkedProfileUID = connectedInfo.User.UID;
-        _logger.LogDebug($"Updating authentication for {auth.CharacterName} with UID {connectedInfo.User.UID}");
-
-        // Now, we should iterate through each of our authentications.
-        foreach (var authentication in ServerStorage.Authentications)
+        // throw an exception if any existing profiles have a matching key.
+        if (AccountStorage.Profiles.Values.Any(p => p.Key == profile.Key))
+            throw new Exception("A profile with the same key already exists.");
+        // Append this to the dictionary, increasing its idx by 1 from the last.
+        var idx = AccountStorage.Profiles.Any() ? AccountStorage.Profiles.Max(p => p.Key) + 1 : 0;
+        if (AccountStorage.Profiles.TryAdd(idx, profile))
         {
-            // If the LinkedProfileUID is has a UID listed, but it's not in the list of auth UID's, remove the authentication.
-            if (!string.IsNullOrWhiteSpace(authentication.SecretKey.LinkedProfileUID))
+            _logger.LogInformation($"Added new profile: {profile.ProfileLabel}");
+            return idx;
+        }
+        return -1;
+    }
+
+    public void SetProfileForLoginAuth(ulong cid, int profileIdx)
+    {
+        if (!AccountStorage.Profiles.ContainsKey(profileIdx))
+            throw new Exception("The specified profile index does not exist.");
+
+        if (AccountStorage.LoginAuths.Find(la => la.ContentId == cid) is not { } auth)
+            throw new Exception("No authentication found for the current character.");
+
+        auth.ProfileIdx = profileIdx;
+        Save();
+    }
+
+    /// <summary> 
+    ///     Updates the authentication.
+    /// </summary>
+    public void UpdateAuthentication(string secretKey, ConnectionResponse response)
+    {
+        // Locate the profile that we just connected with.
+        if (AccountStorage.Profiles.Values.FirstOrDefault(p => p.Key == secretKey) is not { } match)
+        {
+            Svc.Logger.Error("SHOULD NEVER SEE THIS.");
+            return;
+        }
+
+        // Mark that it had a valid connection and update the userUID.
+        if (string.IsNullOrEmpty(match.ProfileLabel))
+            match.ProfileLabel = $"Auto-Profile Label [{DateTime.Now:yyyy-MM-dd}]";
+        match.UserUID = response.User.UID;
+        match.HadValidConnection = true;
+
+        // now we should iterate through the rest of our profiles, and check the UID's.
+        // if there is a UID that is listed inside that does not match any UIDS in the connected accounts,
+        // they are outdated.
+        var accountUids = new HashSet<string>(response.ActiveAccountUidList) { response.User.UID };
+        foreach (var (idx, profile) in AccountStorage.Profiles.ToArray())
+        {
+            if (string.IsNullOrWhiteSpace(profile.UserUID))
+                continue;
+            // If the account Uid list does not contain this profile's UID,
+            // it was deleted via discord, or a cleanup service.
+            if (!accountUids.Contains(profile.UserUID))
             {
-                if (!connectedInfo.ActiveAccountUidList.Contains(authentication.SecretKey.LinkedProfileUID))
-                {
-                    ServerStorage.Authentications.Remove(authentication);
-                    continue;
-                }
+                _logger.LogWarning($"Removing outdated profile {profile.ProfileLabel} with UID {profile.UserUID}");
+                AccountStorage.Profiles.Remove(idx);
             }
         }
-        Save();
     }
  
     /// <summary> Checks if the configuration is valid </summary>
     /// <returns> True if the current server storage object is not null </returns>
-    public bool HasValidConfig() => ServerStorage != null;
+    public bool HasValidAccount() => AccountStorage.Profiles.Count is not 0;
 
     /// <summary> Requests to save the configuration service file to the clients computer. </summary>
     public void Save()
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         _logger.LogDebug("{caller} Calling config save", caller);
-        _serverConfig.Save();
+        _accountConfig.Save();
     }
-
-    /// <summary> Saves the nicknames config </summary>
-    internal void SaveNicknames() => _nickConfig.Save();
 
     /// <summary>Retrieves the nickname associated with a given UID (User Identifier).</summary>
     /// <returns>Returns the nickname as a string if found; otherwise, returns null.</returns>
     internal string? GetNicknameForUid(string uid)
     {
-        if (NickStorage.Nicknames.TryGetValue(uid, out var nickname))
+        if (NicknameStorage.Nicknames.TryGetValue(uid, out var nickname))
         {
             if (string.IsNullOrEmpty(nickname))
                 return null;
@@ -204,7 +211,14 @@ public class ServerConfigManager
         if (string.IsNullOrEmpty(uid))
             return;
 
-        NickStorage.Nicknames[uid] = nickname;
+        NicknameStorage.Nicknames[uid] = nickname;
         _nickConfig.Save();
+    }
+
+    // Updates the opened default public folders in the groups config.
+    public void ToggleWhitelistFolderState(string folder)
+    {
+        _groupConfig.Current.OpenedDefaultFolders.SymmetricExceptWith(new[] { folder });
+        _groupConfig.Save();
     }
 }

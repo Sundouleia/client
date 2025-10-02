@@ -1,19 +1,13 @@
-using CkCommons;
 using CkCommons.Gui;
-using CkCommons.Gui.Utility;
 using CkCommons.Helpers;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
-using Microsoft.VisualBasic.ApplicationServices;
-using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
-using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Util;
@@ -30,7 +24,7 @@ public class InteractionsUI : WindowMediatorSubscriberBase
         Flags = WFlags.NoCollapse | WFlags.NoTitleBar | WFlags.NoResize | WFlags.NoScrollbar;
         IsOpen = false;
 
-        Mediator.Subscribe<ToggleInteractionsUI>(this, msg =>
+        Mediator.Subscribe<TogglePermissionWindow>(this, msg =>
         {
             _sundesmo = msg.Sundesmo;
             IsOpen = _sundesmo is null;
@@ -85,10 +79,10 @@ public class InteractionsUI : WindowMediatorSubscriberBase
             UiService.SetUITask(async () => await ChangeOwnUnique(nameof(PairPerms.PauseVisuals), !isPaused));
         CkGui.AttachToolTip(!isPaused ? "Pause" : "Resume" + $"pairing with {_dispName}.");
 
-        if (_sundesmo.IsVisible)
+        if (_sundesmo.PlayerRendered)
         {
             if (CkGui.IconTextButton(FAI.Sync, "Reload Appearance data", width, true))
-                _sundesmo.ReapplyLatestData();
+                _sundesmo.ReapplyAlterations();
             CkGui.AttachToolTip("This reapplies the latest data from Customize+ and Moodles");
         }
 

@@ -186,6 +186,7 @@ namespace Sundouleia.Localization
         // Outline the tabs for each settings section and the sub-classes of their translations.
         public readonly string TabGeneral = Loc.Localize("Settings_TabsGeneral", "General");
         public readonly string TabPreferences = Loc.Localize("Settings_TabsPreferences", "Preferences");
+        public readonly string TabAccounts = Loc.Localize("Settings_TabsAccounts", "My Account");
         public readonly string TabStorage = Loc.Localize("Settings_TabsStorage", "Storage");
         public readonly string TabLogging = Loc.Localize("Settings_TabsLogging", "Logging"); // no sub-class needed.
 
@@ -196,21 +197,27 @@ namespace Sundouleia.Localization
 
     public class MainOptions
     {
-        public readonly string HeaderDefaults = Loc.Localize("MainOptions_HeaderDefaults", "Default Preferences");
+        public readonly string HeaderRadar = Loc.Localize("MainOptions_HeaderRadar", "Radar Preferences");
+        public readonly string HeaderUi = Loc.Localize("MainOptions_HeaderUi", "UI Options");
 
         // Player synchronization options here and stuff.
+
+        public readonly string ShowMainUiOnStartLabel = Loc.Localize("Preferences_ShowMainUiOnStartLabel", "Open the Main Window UI upon plugin startup.");
+        public readonly string ShowMainUiOnStartTT = Loc.Localize("Preferences_ShowMainUiOnStartTT", "Determines if the Main UI will open upon plugin startup or not.");
+
+        public readonly string ShowProfilesLabel = Loc.Localize("Preferences_ShowProfilesLabel", "Show Sundouleia profiles on hover");
+        public readonly string ShowProfilesTT = Loc.Localize("Preferences_ShowProfilesTT", "Displays the configured user profile after hovering over the player.");
+
+        public readonly string ProfileDelayLabel = Loc.Localize("Preferences_ProfileDelayLabel", "Hover Delay");
+        public readonly string ProfileDelayTT = Loc.Localize("Preferences_ProfileDelayTT", "Sets the delay before a profile is displayed on hover.");
+
     }
 
     public class Preferences
     {
         // UI Preferences Section
-        public readonly string HeaderUiPrefs = Loc.Localize("Preferences_HeaderUiPrefs", "User Interface");
-
-        public readonly string ShowMainUiOnStartLabel = Loc.Localize("Preferences_ShowMainUiOnStartLabel", "Open the Main Window UI upon plugin startup.");
-        public readonly string ShowMainUiOnStartTT = Loc.Localize("Preferences_ShowMainUiOnStartTT", "Determines if the Main UI will open upon plugin startup or not.");
-
-        public readonly string RadarDtrLabel = Loc.Localize("Preferences_RadarDtrEntryLabel", "Display DTR Entry for Radar Info.");
-        public readonly string RadarDtrTT = Loc.Localize("Preferences_RadarDtrEntryTT", "Display DTR Entry of how many Sundouleia Users are present in your current territory!");
+        public readonly string HeaderPairPref = Loc.Localize("Preferences_HeaderPairPref", "Pair Preferences");
+        public readonly string HeaderNotifyPref = Loc.Localize("Preferences_HeaderNotifyPref", "Notifications");
 
         public readonly string ShowVisibleSeparateLabel = Loc.Localize("Preferences_ShowVisibleSeparateLabel", "Show separate Visible group");
         public readonly string ShowVisibleSeparateTT = Loc.Localize("Preferences_ShowVisibleSeparateTT", "Lists paired players within render range in a separate group.");
@@ -221,15 +228,13 @@ namespace Sundouleia.Localization
         public readonly string PreferNicknamesLabel = Loc.Localize("Preferences_PreferNicknamesLabel", "Prefer nicknames for visible pairs");
         public readonly string PreferNicknamesTT = Loc.Localize("Preferences_PreferNicknamesTT", "Displays nicknames instead of character names for paired players within render range.");
 
-        public readonly string ShowProfilesLabel = Loc.Localize("Preferences_ShowProfilesLabel", "Show Sundouleia profiles on hover");
-        public readonly string ShowProfilesTT = Loc.Localize("Preferences_ShowProfilesTT", "Displays the configured user profile after hovering over the player.");
-
-        public readonly string ProfileDelayLabel = Loc.Localize("Preferences_ProfileDelayLabel", "Hover Delay");
-        public readonly string ProfileDelayTT = Loc.Localize("Preferences_ProfileDelayTT", "Sets the delay before a profile is displayed on hover.");
-
         public readonly string ContextMenusLabel = Loc.Localize("Preferences_ShowContextMenusLabel", "Enable right-click context menu for visible pairs");
         public readonly string ContextMenusTT = Loc.Localize("Preferences_ShowContextMenusTT", "Displays a context menu when right-clicking on a targeted pair." +
             "--SEP--The context menu provides quick access to pair actions or to view a Profile.");
+
+        public readonly string FocusTargetLabel = Loc.Localize("Preferences_FocusTargetLabel", "Use FocusTarget over Target");
+        public readonly string FocusTargetTT = Loc.Localize("Preferences_FocusTargetTT", "Uses the FocusTarget instead of the Target for identifying pairs." +
+            "--SEP--Used when clicking the eye icon in the whitelist.");
 
         // Notifications Section
         public readonly string HeaderNotifications = Loc.Localize("Preferences_HeaderNotifications", "Notifications");
@@ -247,6 +252,15 @@ namespace Sundouleia.Localization
 
     public class Accounts
     {
-        // various strings detailing account management.
+        public readonly string CharaNameLabel = Loc.Localize("Accounts_CharaNameLabel", "Account Character's Name");
+        public readonly string CharaWorldLabel = Loc.Localize("Accounts_CharaWorldLabel", "Account Character's World");
+        public readonly string CharaKeyLabel = Loc.Localize("Accounts_CharaKeyLabel", "Account Secret Key");
+
+        public readonly string DeleteButtonLabel = Loc.Localize("Accounts_DeleteButtonLabel", "Delete Account");
+        public readonly string DeleteButtonDisabledTT = Loc.Localize("Accounts_DeleteButtonDisabledTT", "Cannot delete this account as it is not yet registered.");
+        public readonly string DeleteButtonTT = Loc.Localize("Accounts_DeleteButtonTT", "Permanently deleting this account from GagSpeak servers." +
+            "--SEP--WARNING: Once an account is deleted, the associated secret key will become unusable." +
+            "--SEP--If you wish to create a new account for the currently logged in character, you will need to obtain a new secret key." +
+            "--SEP--(A confirmation dialog will open upon clicking this button)");
     }
 }

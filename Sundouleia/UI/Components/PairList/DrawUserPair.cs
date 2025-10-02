@@ -79,12 +79,12 @@ public class DrawUserPair
             CkGui.IconText(FAI.User);
             userPairText = $"{_pair.GetNickAliasOrUid()} is offline";
         }
-        else if (_pair.IsVisible)
+        else if (_pair.PlayerRendered)
         {
             CkGui.IconText(FAI.Eye, ImGuiColors.ParsedGreen);
             userPairText = $"{_pair.GetNickAliasOrUid()} is visible ({_pair.PlayerName})--SEP--Click to target this player";
             if (ImGui.IsItemClicked())
-                _mediator.Publish(new TargetPairMessage(_pair));
+                _mediator.Publish(new TargetSundesmoMessage(_pair));
         }
         else
         {
@@ -111,20 +111,11 @@ public class DrawUserPair
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         if (CkGui.IconButton(FAI.EllipsisV))
-            _mediator.Publish(new UserInteractionUiChangeMessage(_pair, InteractionsTab.Interactions));
+            _mediator.Publish(new TogglePermissionWindow(_pair));
 
-        currentRightSide -= permissionsButtonSize.X + spacingX;
-        ImGui.SameLine(currentRightSide);
-        if (CkGui.IconButton(FAI.Cog))
-            _mediator.Publish(new UserInteractionUiChangeMessage(_pair, InteractionsTab.PermsForUser));
-        CkGui.AttachToolTip($"Set your Permissions for {_pair.UserData.AliasOrUID}");
-
-        currentRightSide -= permissionsButtonSize.X + spacingX;
-        ImGui.SameLine(currentRightSide);
-        if (CkGui.IconButton(FAI.Search))
-            _mediator.Publish(new UserInteractionUiChangeMessage(_pair, InteractionsTab.UsersPerms));
-        CkGui.AttachToolTip($"Inspect {_pair.UserData.AliasOrUID}'s permissions");
-
+        // currentRightSide -= permissionsButtonSize.X + spacingX;
+        // could draw here if they are a favorite or something idk
+        // ImGui.SameLine(currentRightSide);
         return currentRightSide;
     }
 }

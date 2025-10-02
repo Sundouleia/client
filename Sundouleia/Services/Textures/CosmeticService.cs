@@ -1,7 +1,6 @@
 using CkCommons.RichText;
 using CkCommons.Textures;
 using Dalamud.Interface.Textures.TextureWraps;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
 using Microsoft.Extensions.Hosting;

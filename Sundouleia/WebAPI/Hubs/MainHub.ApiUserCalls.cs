@@ -2,7 +2,6 @@ using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace Sundouleia.WebAPI;

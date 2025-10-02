@@ -5,14 +5,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Client.Game;
-using Sundouleia.Gui.Modules.Puppeteer;
 using Sundouleia.Gui.Profiles;
-using Sundouleia.Gui.Publications;
-using Sundouleia.Gui.Remote;
-using Sundouleia.Gui.Toybox;
-using Sundouleia.Gui.Wardrobe;
-using Sundouleia.Interop;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 
@@ -37,8 +30,8 @@ public class HomepageTab
         {
             // Make this editor a better UI in the future.
             ("Profile Customizer", FAI.ObjectGroup, () => _mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI)))),
-            ("Group Management", FAI.PeopleGroup, () => _mediator.Publish(new UiToggleMessage(typeof(GroupManagementUI)))),
-            ("Achievements", FAI.Trophy, () => _mediator.Publish(new UiToggleMessage(typeof(AchievementsUI))))
+            // ("Group Management", FAI.PeopleGroup, () => _mediator.Publish(new UiToggleMessage(typeof(GroupManagementUI)))),
+            // ("Achievements", FAI.Trophy, () => _mediator.Publish(new UiToggleMessage(typeof(AchievementsUI))))
         };
     }
 

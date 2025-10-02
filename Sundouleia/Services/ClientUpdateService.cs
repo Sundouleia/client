@@ -8,7 +8,6 @@ using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Services;
 
@@ -22,11 +21,17 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     private readonly MainHub _hub;
     private readonly IpcManager _ipc;
     private readonly SundesmoManager _sundesmos;
-    private readonly CharaObjectWatcher _objectWatcher;
+    private readonly CharaObjectWatcher _watcher;
+
+    // Remember to check for visible users that become visible but recovered from a timeout,
+    // as they already have our latest data and we should not update to them.
 
     private Task? _updateTask;
     private CancellationTokenSource _updateCTS = new();
 
+    // Should cache latest mod files here, or in some other ModFileService,
+    // along with a file uploader likely, or something.
+    private ModDataUpdate LastSendModUpdate = new(); // will not be our current mod files..
     private VisualDataUpdate LastSentData = new();
 
     // Which pending updates we have. (rework later probably)
@@ -40,7 +45,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _hub = hub;
         _ipc = ipc;
         _sundesmos = pairs;
-        _objectWatcher = ownedObjects;
+        _watcher = ownedObjects;
 
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
         _ipc.Glamourer.OnStateChanged.Enable();
@@ -117,8 +122,8 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
             {
                 var updateTask = (modUpdate, isSingle) switch
                 {
-                    (true, false) => SendFullIpcUpdate(usersToSendTo),
-                    (true, true) => SendModIpcUpdate(usersToSendTo),
+                    (true, false) => SendOtherIpcUpdate(usersToSendTo, _pendingUpdates.Keys),
+                    (true, true) => Task.CompletedTask,
                     (false, false) => SendOtherIpcUpdate(usersToSendTo, _pendingUpdates.Keys),
                     (false, true) => SendSingleIpcUpdate(usersToSendTo, _pendingUpdates.Keys.First(), _allPendingUpdates),
                 };
@@ -139,8 +144,8 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         string? newData = type switch
         {
             IpcKind.ModManips => _ipc.Penumbra.GetMetaManipulationsString(),
-            IpcKind.Glamourer => await _ipc.Glamourer.GetBase64StateByPtr(_objectWatcher.FromOwned(obj)).ConfigureAwait(false),
-            IpcKind.CPlus => await _ipc.CustomizePlus.GetActiveProfileByPtr(_objectWatcher.FromOwned(obj)).ConfigureAwait(false),
+            IpcKind.Glamourer => await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false),
+            IpcKind.CPlus => await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false),
             IpcKind.Heels => await _ipc.Heels.GetClientOffset().ConfigureAwait(false),
             IpcKind.Moodles => await _ipc.Moodles.GetOwn().ConfigureAwait(false),
             IpcKind.Honorific => await _ipc.Honorific.GetTitle().ConfigureAwait(false),
@@ -159,92 +164,54 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         await _hub.UserPushIpcSingle(new(toUpdate, obj, type, newData)).ConfigureAwait(false);
     }
 
-    // Can maybe lighten up on the parallelism inside of the compile changes functions if we run all objects at once lol. But I went a lil wild. XD
+    // Can maybe lighten up on the parallelism inside of the compile changes functions
+    // if we run all objects at once lol. But I went a lil wild. XD
+    // Will need to update the way we transfer things later so that we can simplify this process.
     private async Task SendOtherIpcUpdate(List<UserData> toUpdate, IEnumerable<OwnedObject> objects)
     {
-        // Start compile tasks in parallel
-        var playerTask = objects.Contains(OwnedObject.Player) ? CompilePlayerDataChanges() : Task.FromResult<PlayerIpcData?>(null);
-        var nonPlayerTasks = objects.Where(obj => obj != OwnedObject.Player).Select(Obj => (Obj, Task: CompileNonPlayerDataChanges(Obj))).ToList();
-
-        // Run all calculations in parallel.
-        var playerRes = await playerTask.ConfigureAwait(false);
-        var otherRes = await Task.WhenAll(nonPlayerTasks.Select(x => x.Task)).ConfigureAwait(false);
-
-        // Create the ret object.
         var toSend = new VisualDataUpdate();
-        if (playerRes is not null && LastSentData.Player.IsDifferent(playerRes))
-        {
-            Logger.LogDebug($"PlayerData had new changes! {playerRes.Updates}");
-            toSend.Player = playerRes;
-        }
-
-        // For each non-player result, if it had changes, and was different, apply it.
-        for (int i = 0; i < otherRes.Length; i++)
-        {
-            if (otherRes[i] != null && LastSentData.NonPlayers[nonPlayerTasks[i]!.Obj].IsDifferent(otherRes[i]!))
-            {
-                Logger.LogDebug($"NonPlayerData had new changes! {nonPlayerTasks[i]!.Obj} - {otherRes[i]!.Updates}");
-                toSend.NonPlayers[nonPlayerTasks[i]!.Obj] = otherRes[i]!;
-            }
-        }
-
-        // If the object is empty, nothing changed, so do not update.
-        if (toSend.Player.Updates is 0 && toSend.NonPlayers.Count is 0)
-        {
-            Logger.LogDebug($"Aborting SendOtherIpcUpdate, no changes detected for {string.Join(", ", objects)}");
-            return;
-        }
+        var compileTasks = new List<Task<ObjectIpcData>>();
+        // Compile tasks for parallel execution.
+        foreach (var (kind, updates) in _pendingUpdates)
+            compileTasks.Add(CompileAppearanceData(kind, updates));
+        // Grab all IPC data from all client owned objects in parallel.
+        var results = await Task.WhenAll(compileTasks).ConfigureAwait(false);
 
         Logger.LogInformation($"Sending Other Ipc Update to {toUpdate.Count} Sundesmos");
-        LastSentData.UpdateFrom(toSend);
+        //LastSentData.UpdateFrom(toSend);
         await _hub.UserPushIpcOther(new(toUpdate, toSend)).ConfigureAwait(false);
     }
 
     // Helpers. 
-    private async Task<PlayerIpcData?> CompilePlayerDataChanges()
+    private async Task<ObjectIpcData> CompileAppearanceData(OwnedObject obj, IpcKind updates)
     {
-        var pending = _pendingUpdates.GetValueOrDefault(OwnedObject.Player, IpcKind.None);
-        // Create tasks to run in parallel with default returns if not pending.
-        var manips = pending.HasAny(IpcKind.ModManips) ? _ipc.Penumbra.GetMetaManipulationsString() : null;
-        var petNames = pending.HasAny(IpcKind.PetNames) ? _ipc.PetNames.GetPetNicknames() : null;
-        var glamTask = pending.HasAny(IpcKind.Glamourer) ? _ipc.Glamourer.GetBase64StateByPtr(_objectWatcher.WatchedPlayerAddr) : Task.FromResult<string?>(null);
-        var cPlusTask = pending.HasAny(IpcKind.CPlus) ? _ipc.CustomizePlus.GetActiveProfileByPtr(_objectWatcher.WatchedPlayerAddr) : Task.FromResult<string?>(null);
-        var heelsTask = pending.HasAny(IpcKind.Heels) ? _ipc.Heels.GetClientOffset() : Task.FromResult(string.Empty);
-        var moodlesTask = pending.HasAny(IpcKind.Moodles) ? _ipc.Moodles.GetOwn() : Task.FromResult(string.Empty);
-        var honorificTask = pending.HasAny(IpcKind.Honorific) ? _ipc.Honorific.GetTitle() : Task.FromResult(string.Empty);
-        // Run all in parallel.
-        var results = await Task.WhenAll(glamTask!, cPlusTask!, heelsTask, moodlesTask!, honorificTask!).ConfigureAwait(false);
-        // Get Object to return.
-        var toReturn = new PlayerIpcData()
-        {
-            Updates = pending,
-            GlamourerState = results[0] ?? string.Empty,
-            CPlusData = results[1] ?? string.Empty,
-            HeelsOffset = results[2] ?? string.Empty,
-            Moodles = results[3] ?? string.Empty,
-            HonorificTitle = results[4] ?? string.Empty,
-            ModManips = manips ?? string.Empty,
-            PetNicknames = petNames ?? string.Empty,
-        };
-        return LastSentData.Player.IsDifferent(toReturn) ? toReturn : null;
-    }
+        var ret = new ObjectIpcData();
 
-    private async Task<NonPlayerIpcData?> CompileNonPlayerDataChanges(OwnedObject obj)
-    {
-        var pending = _pendingUpdates.GetValueOrDefault(obj, IpcKind.None);
-        // Create tasks to run in parallel with default returns if not pending.
-        var glamTask = pending.HasAny(IpcKind.Glamourer) ? _ipc.Glamourer.GetBase64StateByPtr(_objectWatcher.FromOwned(obj)) : Task.FromResult<string?>(null);
-        var cPlusTask = pending.HasAny(IpcKind.CPlus) ? _ipc.CustomizePlus.GetActiveProfileByPtr(_objectWatcher.FromOwned(obj)) : Task.FromResult<string?>(null);
-        // Run all in parallel.
-        var results = await Task.WhenAll(glamTask, cPlusTask).ConfigureAwait(false);
+        if (updates is IpcKind.None) 
+            return ret;
 
-        var toReturn = new NonPlayerIpcData()
+        // it is ok to not run these in parallel, as we are already running all objects in parallel.
+        if (updates.HasAny(IpcKind.Glamourer))
+            ret.Data[IpcKind.Glamourer] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
+        if (updates.HasAny(IpcKind.CPlus))
+            ret.Data[IpcKind.CPlus] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
+
+        // Handle other updates for player.
+        if (obj is OwnedObject.Player)
         {
-            Updates = pending,
-            GlamourerState = results[0] ?? string.Empty,
-            CPlusData = results[1] ?? string.Empty,
-        };
-        return toReturn.Updates > 0 ? toReturn : null;
+            if (updates.HasAny(IpcKind.Heels))
+                ret.Data[IpcKind.Heels] = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
+            if (updates.HasAny(IpcKind.Honorific))
+                ret.Data[IpcKind.Honorific] = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
+            if (updates.HasAny(IpcKind.Moodles))
+                ret.Data[IpcKind.Moodles] = await _ipc.Moodles.GetOwn().ConfigureAwait(false) ?? string.Empty;
+            if (updates.HasAny(IpcKind.ModManips))
+                ret.Data[IpcKind.ModManips] = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
+            if (updates.HasAny(IpcKind.PetNames))
+                ret.Data[IpcKind.PetNames] = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
+        }
+
+        return ret;
     }
 
     private void AddPendingUpdate(OwnedObject type, IpcKind kind)
@@ -263,7 +230,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     // Fired within the framework thread.
     private void OnGlamourerUpdate(IntPtr address, StateChangeType _)
     {
-        if (!_objectWatcher.WatchedTypes.TryGetValue(address, out OwnedObject type)) return;
+        if (!_watcher.WatchedTypes.TryGetValue(address, out OwnedObject type)) return;
         // Otherwise it is valid, so recreate the CTS and add a delay time.
         AddPendingUpdate(type, IpcKind.Glamourer);
     }
@@ -272,31 +239,31 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     private void OnCPlusProfileUpdate(ushort objIdx, Guid id)
     {
         var address = Svc.Objects[objIdx]?.Address ?? IntPtr.Zero;
-        if (!_objectWatcher.WatchedTypes.TryGetValue(address, out var type)) return;
+        if (!_watcher.WatchedTypes.TryGetValue(address, out var type)) return;
         AddPendingUpdate(type, IpcKind.CPlus);
     }
 
     private void OnHeelsOffsetUpdate(string newOffset)
     {
-        if (_objectWatcher.WatchedPlayerAddr == IntPtr.Zero) return;
+        if (_watcher.WatchedPlayerAddr == IntPtr.Zero) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.Heels);
     }
 
     private void OnMoodlesUpdate(IPlayerCharacter player)
     {
-        if (player.Address != _objectWatcher.WatchedPlayerAddr) return;
+        if (player.Address != _watcher.WatchedPlayerAddr) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.Moodles);
     }
 
     private void OnHonorificUpdate(string newTitle)
     {
-        if (_objectWatcher.WatchedPlayerAddr == IntPtr.Zero) return;
+        if (_watcher.WatchedPlayerAddr == IntPtr.Zero) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.Honorific);
     }
 
     private void OnPetNamesUpdate(string data)
     {
-        if (_objectWatcher.WatchedPlayerAddr == IntPtr.Zero) return;
+        if (_watcher.WatchedPlayerAddr == IntPtr.Zero) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.PetNames);
     }
 

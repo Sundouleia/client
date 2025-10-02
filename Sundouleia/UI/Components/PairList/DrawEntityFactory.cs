@@ -5,7 +5,6 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
 using System.Collections.Immutable;
 using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.Gui;
@@ -29,8 +28,8 @@ public class DrawEntityFactory
     public DrawFolderTag CreateDrawTagFolder(string tag, List<Sundesmo> filteredPairs, IImmutableList<Sundesmo> allPairs)
         => new DrawFolderTag(tag, filteredPairs.Select(u => CreateDrawPair(tag, u)).ToImmutableList(), allPairs, _configs);
 
-    public DrawUserPair CreateDrawPair(string id, Sundesmo kinkster)
-        => new DrawUserPair(id + kinkster.UserData.UID, kinkster, _mediator, _hub, _nameDisplay);
+    public DrawUserPair CreateDrawPair(string id, Sundesmo sundesmo)
+        => new DrawUserPair(id + sundesmo.UserData.UID, sundesmo, _mediator, _hub, _nameDisplay);
 
     public DrawUserRequest CreateDrawPairRequest(string id, PendingRequest request)
         => new DrawUserRequest(id, request, _hub);

@@ -114,10 +114,10 @@ public sealed class SundouleiaMediator : IHostedService
     }
 
     /// <summary>
-    ///     Subscribe an <paramref name="action"/> to the <paramref name="mediator"/> for a <seealso cref="MessageBase"/>.
+    ///     Subscribe an <paramref name="action"/> to the <paramref name="subscriber"/> for a <seealso cref="MessageBase"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException"></exception>
-    public void Subscribe<T>(IMediatorSubscriber mediator, Action<T> action) where T : MessageBase
+    public void Subscribe<T>(IMediatorSubscriber subscriber, Action<T> action) where T : MessageBase
     {
         // lock the add remove lock so it becomes thread safe
         lock (_addRemoveLock)

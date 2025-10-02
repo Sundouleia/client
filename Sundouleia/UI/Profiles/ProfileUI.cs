@@ -11,7 +11,7 @@ using SundouleiaAPI.Data;
 
 namespace Sundouleia.Gui.Profiles;
 
-public class ProfileLightUI : WindowMediatorSubscriberBase
+public class ProfileUI : WindowMediatorSubscriberBase
 {
     private bool ThemePushed = false;
 
@@ -23,7 +23,7 @@ public class ProfileLightUI : WindowMediatorSubscriberBase
     private bool HoveringCloseButton = false;
     private bool HoveringReportButton = false;
 
-    public ProfileLightUI(ILogger<ProfileLightUI> logger, SundouleiaMediator mediator,
+    public ProfileUI(ILogger<ProfileUI> logger, SundouleiaMediator mediator,
         ProfileHelper helper, SundesmoManager pairs, ProfileService service, UserData user) 
         : base(logger, mediator, $"###Profile-{user.UID}")
     {

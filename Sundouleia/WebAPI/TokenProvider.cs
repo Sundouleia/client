@@ -14,18 +14,16 @@ namespace Sundouleia.WebAPI;
 public sealed class TokenProvider : DisposableMediatorSubscriberBase
 {
     private readonly HttpClient _httpClient;
-    private readonly OnFrameworkService _frameworkUtil;
-    private readonly ServerConfigManager _serverManager;
+    private readonly ServerConfigManager _serverConfigs;
     private readonly ConcurrentDictionary<JwtIdentifier, string> _tokenCache;
 
     private JwtIdentifier? _lastJwtIdentifier;
 
-    public TokenProvider(ILogger<TokenProvider> logger, SundouleiaMediator mediator,
-        ServerConfigManager serverManager, OnFrameworkService frameworkUtils) 
+    public TokenProvider(ILogger<TokenProvider> logger, SundouleiaMediator mediator, ServerConfigManager configs) 
         : base(logger, mediator)
     {
-        _serverManager = serverManager;
-        _frameworkUtil = frameworkUtils;
+        _serverConfigs = configs;
+
         _httpClient = new HttpClient();
         _tokenCache = new ConcurrentDictionary<JwtIdentifier, string>();
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
@@ -255,10 +253,10 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
             var secretKey = string.Empty;
             var expectingPrimary = false;
             // Attempt to get the secret key and isPrimary attributes as well.
-            if (_serverManager.TryGetAuthForCharacter(out var auth))
+            if (_serverConfigs.GetProfileForCharacter() is { } profile)
             {
-                secretKey = auth.SecretKey.Key;
-                expectingPrimary = auth.IsPrimary;
+                secretKey = profile.Key;
+                expectingPrimary = profile.IsPrimary;
             }
 
             // get the remaining attributes.
@@ -317,6 +315,23 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
             }
         }
     }
+
+    /// <summary>
+    ///     Grabs the currently authenticated token, if one exists. Throws if invalid.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"></exception>
+    public string? GetToken()
+    {
+        JwtIdentifier? jwtIdentifier = GetIdentifier();
+        if (jwtIdentifier is null) 
+            return null;
+
+        if (_tokenCache.TryGetValue(jwtIdentifier, out var token))
+            return token;
+        // If not present, throw.
+        throw new InvalidOperationException("No token present");
+    }
+
 
 
     /// <summary> Unlike the <c>GetToken()</c> method, this both gets and updates the token</summary>

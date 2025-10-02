@@ -2,17 +2,12 @@ using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using Sundouleia.Gui.Components;
 using Sundouleia.Gui.Profiles;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
-using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 
 namespace Sundouleia.Gui.MainWindow;

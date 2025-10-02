@@ -2,7 +2,6 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.ImGuiNotification;
 using Sundouleia.Services.Mediator;
 using Microsoft.Extensions.Hosting;
-using Sundouleia.State.Managers;
 using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Services;

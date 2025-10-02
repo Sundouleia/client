@@ -1,7 +1,5 @@
-using CkCommons;
 using Dalamud.Plugin.Ipc;
 using Sundouleia.Pairs;
-using Sundouleia.Pairs.Handlers;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Interop;
@@ -101,7 +99,7 @@ public sealed class IpcCallerHonorific : IIpcCaller
     ///     Applies the titleJson string to the provided <paramref name="sundesmo"/>. <para />
     ///     Expects <paramref name="titleDataBase64"/> to be a base64 encoded string of the titleJson.
     /// </summary>
-    public async Task SetTitleAsync(SundesmoHandler sundesmo, string titleDataBase64)
+    public async Task SetTitleAsync(PlayerHandler sundesmo, string titleDataBase64)
     {
         if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
 
@@ -120,7 +118,7 @@ public sealed class IpcCallerHonorific : IIpcCaller
     /// <summary>
     ///     Clears off the title from the provided <paramref name="sundesmo"/>.
     /// </summary>
-    public async Task ClearTitleAsync(SundesmoHandler sundesmo)
+    public async Task ClearTitleAsync(PlayerHandler sundesmo)
     {
         if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
 

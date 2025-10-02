@@ -123,7 +123,7 @@ public class Tutorial
         var windowSize = ImGui.GetContentRegionAvail();
 
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - 5f);
-        CkGui.FontText(step.Name, UiFontService.SundouleiaLabelFont);
+        CkGui.FontText(step.Name, UiFontService.Default150Percent);
         int? nextValue = null;
 
         ImGui.Separator();

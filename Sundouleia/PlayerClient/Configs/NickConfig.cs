@@ -25,8 +25,9 @@ public class NickConfig : IHybridSavable
             ["Nicknames"] = JObject.FromObject(Current),
         }.ToString(Formatting.Indented);
     }
-    public NickConfig(HybridSaveService saver)
+    public NickConfig(ILogger<NickConfig> logger, HybridSaveService saver)
     {
+        _logger = logger;
         _saver = saver;
         Load();
     }

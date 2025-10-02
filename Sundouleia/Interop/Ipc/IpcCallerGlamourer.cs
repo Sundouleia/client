@@ -1,12 +1,10 @@
 using CkCommons;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.ImGuiNotification;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Glamourer.Api.Enums;
 using Glamourer.Api.Helpers;
 using Glamourer.Api.IpcSubscribers;
 using Sundouleia.Pairs;
-using Sundouleia.Pairs.Handlers;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Interop;
@@ -58,6 +56,9 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         CheckAPI();
     }
 
+    public void Dispose()
+    { }
+
     public static bool APIAvailable { get; private set; } = false;
     public void CheckAPI()
     {
@@ -75,15 +76,6 @@ public sealed class IpcCallerGlamourer : IIpcCaller
             _shownGlamourerUnavailable = true;
             _mediator.Publish(new NotificationMessage("Glamourer inactive", "Features Using Glamourer will not function.", NotificationType.Error));
         }
-    }
-
-    // Run a comparison against our player-owned addresses to check if it is relevant. If not discard.
-    private void ActorStateChanged(nint address, StateChangeType changeType)
-    {
-        if (address != PlayerData.ObjectAddress) return;
-        // (We could also move this method into the IPC Monitor if we want as well to
-        // efficiently capture changes without the small mediator delay but that is a minor optimization)
-        _mediator.Publish(new GlamourerChanged(address));
     }
 
     public async Task<string> GetClientBase64State()
@@ -151,17 +143,32 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     }
 
     // Require handler to enforce being called by the SundesmoHandler.
-    public async Task ReleaseActor(SundesmoHandler handler, GameObject actorState)
+    public async Task ReleaseActor(PlayerHandler handler)
     {
         if (!APIAvailable || PlayerData.IsZoning || handler.Address == IntPtr.Zero)
             return;
         
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            _logger.LogDebug($"Reverting {handler.PlayerName}'s data [Actor: {actorState.NameString}]!", LoggerType.IpcGlamourer);
-            RevertUser.Invoke(actorState.ObjectIndex, SUNDOULEIA_LOCK);
-            _logger.LogDebug($"Unlocking {handler.PlayerName}'s data [Actor: {actorState.NameString}]!", LoggerType.IpcGlamourer);
-            UnlockUser.Invoke(actorState.ObjectIndex, SUNDOULEIA_LOCK);
+            _logger.LogDebug($"Reverting {handler.PlayerName}'s data!", LoggerType.IpcGlamourer);
+            RevertUser.Invoke(handler.ObjIndex, SUNDOULEIA_LOCK);
+            _logger.LogDebug($"Unlocking {handler.PlayerName}'s data!", LoggerType.IpcGlamourer);
+            UnlockUser.Invoke(handler.ObjIndex, SUNDOULEIA_LOCK);
+        }).ConfigureAwait(false);
+    }
+
+    // Require handler to enforce being called by the SundesmoHandler.
+    public async Task ReleaseActor(PlayerOwnedHandler handler)
+    {
+        if (!APIAvailable || PlayerData.IsZoning || handler.Address == IntPtr.Zero)
+            return;
+
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            _logger.LogDebug($"Reverting {handler.ObjectName}'s data!", LoggerType.IpcGlamourer);
+            RevertUser.Invoke(handler.ObjIndex, SUNDOULEIA_LOCK);
+            _logger.LogDebug($"Unlocking {handler.ObjectName}'s data!", LoggerType.IpcGlamourer);
+            UnlockUser.Invoke(handler.ObjIndex, SUNDOULEIA_LOCK);
         }).ConfigureAwait(false);
     }
 

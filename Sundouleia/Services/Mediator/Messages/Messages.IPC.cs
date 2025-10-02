@@ -5,7 +5,8 @@ namespace Sundouleia.Services.Mediator;
 // Useful for IPC-Updates, but may also become irrelevant once we get proper watchers / services / listeners hooked up for changes.
 public record PenumbraInitialized : MessageBase;
 public record PenumbraDirectoryChanged(string? NewDirectory) : MessageBase;
-public record PenumbraSettingsChanged : MessageBase;
+public record PenumbraSettingsChanged : SameThreadMessage;
+public record PenumbraResourceLoaded(IntPtr Address, string GamePath, string ReplacePath) : SameThreadMessage;
 public record PenumbraDisposed : MessageBase;
 
 public record HaltFileScan(string Source) : MessageBase;

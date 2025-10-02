@@ -43,7 +43,7 @@ public abstract class DrawFolderBase : IDrawFolder
         var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
         using (CkRaii.Child("folder__" + _id, size, _wasHovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0, 0f))
         {
-            var icon = _serverConfigs.NickStorage.OpenPairListFolders.Contains(_id) ? FAI.CaretDown : FAI.CaretRight;
+            var icon = _serverConfigs.Groups.OpenedDefaultFolders.Contains(_id) ? FAI.CaretDown : FAI.CaretRight;
 
             CkGui.FramedIconText(icon);
 
@@ -59,15 +59,12 @@ public abstract class DrawFolderBase : IDrawFolder
         }
         _wasHovered = ImGui.IsItemHovered();
         if (ImGui.IsItemClicked())
-        {
-            _serverConfigs.NickStorage.OpenPairListFolders.SymmetricExceptWith(new[] { _id });
-            _serverConfigs.SaveNicknames();
-        }
+            _serverConfigs.ToggleWhitelistFolderState(_id);
 
         ImGui.Separator();
 
         // if opened draw content
-        if (_serverConfigs.NickStorage.OpenPairListFolders.Contains(_id))
+        if (_serverConfigs.Groups.OpenedDefaultFolders.Contains(_id))
         {
             using var indent = ImRaii.PushIndent(CkGui.IconSize(FAI.EllipsisV).X + ImGui.GetStyle().ItemSpacing.X, false);
             foreach (var item in DrawPairs)

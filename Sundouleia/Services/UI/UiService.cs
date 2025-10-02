@@ -3,10 +3,8 @@ using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Profiles;
-using Sundouleia.Gui.Remote;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Utils;
 
 namespace Sundouleia.Services;
 
@@ -52,7 +50,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<DisconnectedMessage>(this, (msg) =>
         {
-            var openedInteractions = _createdWindows.OfType<UserInteractionsUI>().ToList();
+            var openedInteractions = _createdWindows.OfType<InteractionsUI>().ToList();
             foreach (var window in openedInteractions)
             {
                 Logger.LogTrace("Closing UserInteractions window.", LoggerType.UIManagement);
@@ -78,11 +76,11 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         /* ---------- The following subscribers are for factory made windows, meant to be unique to each pair ---------- */
         Mediator.Subscribe<ProfileOpenMessage>(this, (msg) =>
         {
-            if (_createdWindows.FirstOrDefault(p => p is ProfileLightUI ui && ui.User == msg.UserData) is { } match)
+            if (_createdWindows.FirstOrDefault(p => p is ProfileUI ui && ui.User == msg.UserData) is { } match)
                 match.Toggle();
             else
             {
-                var window = _uiFactory.CreateStandaloneProfileLightUi(msg.UserData);
+                var window = _uiFactory.CreateStandaloneProfileUi(msg.UserData);
                 _createdWindows.Add(window);
                 _windowSystem.AddWindow(window);
             }
@@ -139,9 +137,6 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         Svc.Logger.Verbose("Assigned new UI blocking task.", LoggerType.UIManagement);
         return await taskToRun.ConfigureAwait(false);
     }
-
-    public static bool IsRemoteUIOpen() => _createdWindows.OfType<BuzzToyRemoteUI>().FirstOrDefault() is { } m && m.IsOpen;
-
 
     /// <summary> 
     ///     Sanity check to validate if the Client has a registered account yet or not.

@@ -1,8 +1,7 @@
 using CkCommons;
-using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Ipc;
-using Sundouleia.Pairs.Handlers;
+using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Interop;
@@ -127,6 +126,24 @@ public sealed class IpcCallerPetNames : IIpcCaller
         });
     }
 
+    public async Task SetNamesByIdx(PlayerHandler handler, string nicknameData)
+    {
+        if (!APIAvailable || handler.Address == IntPtr.Zero) return;
+
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            if (!string.IsNullOrEmpty(nicknameData))
+            {
+                _logger.LogTrace($"Applying updates {handler.PlayerName}'s Pets!");
+                SetNicknameData.InvokeAction(nicknameData);
+                return;
+            }
+            // Otherwise clear the nicknames.
+            _logger.LogTrace($"Clearing Nicknames from {handler.PlayerName}'s pets!");
+            ClearNicknameData.InvokeAction(handler.ObjIndex);
+        }).ConfigureAwait(false);
+    }
+
     public async Task ClearPetNamesByPtr(nint charaAddr)
     {
         if (!APIAvailable) return;
@@ -141,5 +158,15 @@ public sealed class IpcCallerPetNames : IIpcCaller
                 ClearNicknameData.InvokeAction(o.ObjectIndex);
             }).ConfigureAwait(false);
         });
+    }
+
+    public async Task ClearPetNamesByIdx(PlayerHandler handler)
+    {
+        if (!APIAvailable || handler.Address == IntPtr.Zero) return;
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            _logger.LogTrace($"Clearing Nicknames from {handler.PlayerName}'s pets!");
+            ClearNicknameData.InvokeAction(handler.ObjIndex);
+        }).ConfigureAwait(false);
     }
 }

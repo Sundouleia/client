@@ -14,7 +14,7 @@ public sealed partial class SundesmoManager
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod and appearance data!", LoggerType.Callbacks);
-        sundesmo.ApplyAllVisuals(modData, ipcData);
+        sundesmo.ApplyFullData(modData, ipcData);
     }
 
     // Happens whenever mods should be added or removed.
@@ -24,7 +24,7 @@ public sealed partial class SundesmoManager
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod data!", LoggerType.Callbacks);
-        sundesmo.ApplyModVisuals(modData);
+        sundesmo.ApplyModData(modData);
     }
 
     // Happens whenever non-mod visuals are updated.
@@ -34,7 +34,7 @@ public sealed partial class SundesmoManager
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s appearance data updated!", LoggerType.Callbacks);
-        sundesmo.ApplyIpcVisuals(ipcData);
+        sundesmo.ApplyIpcData(ipcData);
     }
 
     // Happens whenever a single non-mod appearance item is updated.
@@ -44,7 +44,7 @@ public sealed partial class SundesmoManager
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s [{relatedObject}] updated its [{type}] data!", LoggerType.Callbacks);
-        sundesmo.ApplySingleIpcVisual(relatedObject, type, newData);
+        sundesmo.ApplyIpcSingle(relatedObject, type, newData);
     }
 
     // A pair updated one of their global permissions, so handle the change properly.
@@ -59,7 +59,7 @@ public sealed partial class SundesmoManager
 
         // Log change and lazily recreate the pairlist.
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s GlobalPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
-        RecreateLazy(false);
+        RecreateLazy();
     }
 
     public void PermChangeGlobal(UserData target, GlobalPerms newGlobals)
@@ -73,7 +73,7 @@ public sealed partial class SundesmoManager
 
         // Log change and recreate the pair list.
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s GlobalPerms updated in bulk]", LoggerType.PairDataTransfer);
-        RecreateLazy(false);
+        RecreateLazy();
     }
 
     public void PermChangeUnique(UserData target, string permName, object newValue)
@@ -90,7 +90,7 @@ public sealed partial class SundesmoManager
 
         // Log change and recreate the pair list.
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s OwnPairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
-        RecreateLazy(false);
+        RecreateLazy();
 
         // Clear profile is pause toggled.
         if (prevPause != sundesmo.OwnPerms.PauseVisuals)
@@ -109,7 +109,7 @@ public sealed partial class SundesmoManager
             throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
 
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s PairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
-        RecreateLazy(false);
+        RecreateLazy();
 
         // Toggle pausing if pausing changed.
         if (prevPause != sundesmo.PairPerms.PauseVisuals)
@@ -127,7 +127,7 @@ public sealed partial class SundesmoManager
 
         // Log and recreate the pair list.
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s OwnPerms updated in bulk.]", LoggerType.PairDataTransfer);
-        RecreateLazy(false);
+        RecreateLazy();
 
         // Clear profile if pausing changed.
         if (prevPerms.PauseVisuals != newPerms.PauseVisuals)

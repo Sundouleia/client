@@ -1,7 +1,5 @@
 using Dalamud.Plugin.Ipc;
 using Sundouleia.Pairs;
-using Sundouleia.Pairs.Handlers;
-using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Interop;
 
@@ -20,10 +18,11 @@ public sealed class IpcCallerHeels : IIpcCaller
     public readonly ICallGateSubscriber<int, string, object?> RegisterPlayer;
     public readonly ICallGateSubscriber<int, object?>         UnregisterPlayer;
 
-    private readonly SundouleiaMediator _mediator;
-    public IpcCallerHeels(SundouleiaMediator mediator)
+
+    private readonly ILogger<IpcCallerHeels> _logger;
+    public IpcCallerHeels(ILogger<IpcCallerHeels> logger)
     {
-        _mediator = mediator;
+        _logger = logger;
         ApiVersion = Svc.PluginInterface.GetIpcSubscriber<(int, int)>("SimpleHeels.ApiVersion");
 
         // API Getter
@@ -37,9 +36,6 @@ public sealed class IpcCallerHeels : IIpcCaller
         OnOffsetUpdate = Svc.PluginInterface.GetIpcSubscriber<string, object?>("SimpleHeels.LocalChanged");
 
         CheckAPI();
-
-        // Subscribe to events.
-        OnOffsetUpdate.Subscribe(ClientOffsetChanged);
     }
 
     public static bool APIAvailable { get; private set; } = false;
@@ -57,12 +53,7 @@ public sealed class IpcCallerHeels : IIpcCaller
     }
 
     public void Dispose()
-    {
-        OnOffsetUpdate.Unsubscribe(ClientOffsetChanged);
-    }
-
-    private void ClientOffsetChanged(string newOffset)
-        => _mediator.Publish(new HeelsOffsetChanged());
+    { }
 
     /// <returns>
     ///     Gets the heels offset of the client.
@@ -74,20 +65,28 @@ public sealed class IpcCallerHeels : IIpcCaller
     }
 
     /// <summary>
-    ///     Resets the Heels offset of the provided <paramref name="sundesmo"/>.
+    ///     Updates the heels offset of the provided <paramref name="sundesmo"/>.
     /// </summary>
-    public async Task RestoreUserOffset(SundesmoHandler sundesmo)
+    public async Task SetUserOffset(PlayerHandler sundesmo, string data)
     {
-        if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
-        await Svc.Framework.RunOnFrameworkThread(() => UnregisterPlayer.InvokeAction(sundesmo.ObjIndex)).ConfigureAwait(false);
+        if (!APIAvailable) return;
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            _logger.LogDebug($"Setting heels offset for {sundesmo.PlayerName} to {data}");
+            RegisterPlayer.InvokeAction(sundesmo.ObjIndex, data);
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
-    ///     Updates the heels offset of the provided <paramref name="sundesmo"/>.
+    ///     Resets the Heels offset of the provided <paramref name="sundesmo"/>.
     /// </summary>
-    public async Task SetUserOffset(SundesmoHandler sundesmo, string data)
+    public async Task RestoreUserOffset(PlayerHandler sundesmo)
     {
         if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
-        await Svc.Framework.RunOnFrameworkThread(() => RegisterPlayer.InvokeAction(sundesmo.ObjIndex, data)).ConfigureAwait(false);
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            _logger.LogDebug($"Restoring heels offset for {sundesmo.PlayerName}");
+            UnregisterPlayer.InvokeAction(sundesmo.ObjIndex);
+        }).ConfigureAwait(false);
     }
 }

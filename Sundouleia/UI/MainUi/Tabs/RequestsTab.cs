@@ -1,24 +1,10 @@
-using CkCommons;
 using CkCommons.Gui;
-using CkCommons.Gui.Utility;
-using CkCommons.Helpers;
 using CkCommons.Raii;
-using CkCommons.Textures;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
-using OtterGui;
-using OtterGui.Text;
-using Sundouleia.CustomCombos.Editor;
-using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Services.Tutorial;
-using Sundouleia.Utils;
-using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -33,14 +19,14 @@ public class RequestsTab : DisposableMediatorSubscriberBase
     // incoming and outgoing. Can modify this later, for right now we dont need to worry about
     // it too much since we have the code for request entries already.
     public RequestsTab(ILogger<RequestsTab> logger, SundouleiaMediator mediator,
-        MainConfig config, SundesmoManager kinksters, DrawEntityFactory factory)
+        MainConfig config, SundesmoManager sundesmos, DrawEntityFactory factory)
         : base(logger, mediator)
     {
         _config = config;
-        _sundesmoManager = kinksters;
+        _sundesmoManager = sundesmos;
         _factory = factory;
 
-        //Mediator.Subscribe<RefreshUiUsersMessage>(this, _ => _drawFolders = GetDrawFolders());
+        //Mediator.Subscribe<RefreshUiMessage>(this, _ => _drawFolders = GetDrawFolders());
         //_drawFolders = GetDrawFolders();
     }
 

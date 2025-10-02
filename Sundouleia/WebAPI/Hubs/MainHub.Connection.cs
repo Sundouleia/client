@@ -1,6 +1,5 @@
 using CkCommons;
 using Dalamud.Interface.ImGuiNotification;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Hub;
 using Microsoft.AspNetCore.SignalR;
@@ -26,7 +25,7 @@ public partial class MainHub
             return;
         }
 
-        Logger.LogInformation($"Connection Approved, Creating with [{_serverConfigs.ServerStorage.ServerName}]", LoggerType.ApiCore);
+        Logger.LogInformation($"Connection Approved, Creating with [{MAIN_SERVER_NAME}]", LoggerType.ApiCore);
         // if the current state was offline, change it to disconnected.
         if (ServerStatus is ServerState.Offline)
             ServerStatus = ServerState.Disconnected;
@@ -86,7 +85,7 @@ public partial class MainHub
                 await LoadOnlineSundesmos().ConfigureAwait(false);
                 await LoadRequests().ConfigureAwait(false);
                 // Load in all local data for the current profile.
-                await _dataSync.SetClientDataForProfile().ConfigureAwait(false);
+                _dataSync.SetDataForAccountProfile();
                 // once data is synchronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;
                 Mediator.Publish(new ConnectedMessage());
@@ -151,21 +150,6 @@ public partial class MainHub
     /// </summary>
     public async Task Disconnect(ServerState disconnectionReason, bool saveAchievements = true)
     {
-        // If our current state was Connected, be sure to fire, or at least attempt to fire, a final achievement save prior to disconnection.
-        if (IsConnected && saveAchievements)
-        {
-            // only perform the following if SaveData is in a valid state for uploading on Disconnect.
-            if(ClientAchievements.HasValidData && !ClientAchievements.HadUnhandledDC)
-            {
-                Logger.LogDebug("Sending Final Achievement SaveData Update before Hub Instance Disposal.", LoggerType.Achievements);
-                await UserUpdateAchievementData(new(OwnUserData, _achievements.SerializeData()));
-            }
-            else
-            {
-                Logger.LogWarning("CanUploadSaveData was false during disconnect. Skipping final save on disconnect.", LoggerType.Achievements);
-            }
-        }
-
         // Set new state to Disconnecting.
         ServerStatus = ServerState.Disconnecting;
         Logger.LogInformation("Disposing of SundouleiaHub-Main's Hub Instance", LoggerType.ApiCore);
@@ -178,7 +162,7 @@ public partial class MainHub
         if (_hubConnection is not null)
         {
             Logger.LogInformation("Instance disposed of in '_hubFactory', but still exists in MainHub.cs, " +
-                "clearing all other variables for [" + _serverConfigs.ServerStorage.ServerName + "]", LoggerType.ApiCore);
+                $"clearing all other variables for [{MAIN_SERVER_NAME}]", LoggerType.ApiCore);
             // Clear the Health check so we stop pinging the server, set Initialized to false, publish a disconnect.
             _apiHooksInitialized = false;
             _hubHealthCTS?.Cancel();
@@ -275,17 +259,18 @@ public partial class MainHub
         }
 
         // if we have not yet made an account, abort this connection.
-        if (_serverConfigs.AuthCount() <= 0)
+        if (_serverConfigs.AccountStorage.LoginAuths.Count <= 0)
         {
             Logger.LogDebug("No Authentications created. No Primary Account or Alt Account to connect with. Aborting!", LoggerType.ApiCore);
             return false;
         }
 
-        // ensure we have a proper template for the active character.
-        if (_serverConfigs.CharacterHasSecretKey() is false && _serverConfigs.AuthExistsForCurrentLocalContentId() is false)
+        // If we do not have an auth made for this character, make one, but still reject.
+        if (!_serverConfigs.CharaHasLoginAuth())
         {
-            // Generate a new auth entry for the current character if the primary one has already been made (this is for an alt basically)
             _serverConfigs.GenerateAuthForCurrentCharacter();
+            Logger.LogDebug("New LoginAuth made for character, but no key is connected!", LoggerType.ApiCore);
+            return false;
         }
 
         // If the client wishes to not be connected to the server, return.
@@ -296,25 +281,24 @@ public partial class MainHub
         }
 
         // Obtain stored ServerKey for the current Character we are logged into.
-        fetchedSecretKey = _serverConfigs.GetSecretKeyForCharacter() ?? string.Empty;
-        if (fetchedSecretKey.IsNullOrEmpty())
+        var profileForChara = _serverConfigs.GetProfileForCharacter();
+        fetchedSecretKey = profileForChara?.Key ?? string.Empty;
+        if (string.IsNullOrEmpty(fetchedSecretKey))
         {
             // log a warning that no secret key is set for the current character
             Logger.LogWarning("No secret key set for current character, aborting Connection with [NoSecretKey]", LoggerType.ApiCore);
 
             // If for WHATEVER reason the ConnectionResponse is not null here, log it.
             if (ConnectionResponse is not null)
-                Logger.LogWarning("Connection DTO is somehow not null, but no secret key is set for the" +
-                    " current character. This is a problem.", LoggerType.ApiCore);
-
-            ConnectionResponse = null; // This shouldnt even not be null?
+                Logger.LogWarning("Connection somehow not null, but no secret key is set for character. This a problem!", LoggerType.ApiCore);
+            ConnectionResponse = null;
 
             // Set our new ServerState to NoSecretKey and reject connection.
             ServerStatus = ServerState.NoSecretKey;
-            _hubConnectionCTS?.Cancel();
+            _hubConnectionCTS.SafeCancel();
             return false;
         }
-        else // Log the successful fetch.
+        else
         {
             Logger.LogInformation("Secret Key fetched for current character", LoggerType.ApiCore);
             return true;
@@ -421,7 +405,7 @@ public partial class MainHub
                 // (we don't need to know the return value, as long as its a valid call we keep our connection maintained)
                 if (_hubConnection is not null)
                 {
-                    await CheckMainClientHealth().ConfigureAwait(false);
+                    await HealthCheck().ConfigureAwait(false);
                 }
                 else
                 {
@@ -438,7 +422,7 @@ public partial class MainHub
             catch (Bagagwa ex)
             {
                 // Log any other exceptions
-                Logger.LogError($"Exception in ClientHealthCheckLoop: {ex}", LoggerType.Health);
+                Logger.LogError($"Exception in HealthCheck: {ex}", LoggerType.Health);
             }
         }
     }
@@ -467,10 +451,10 @@ public partial class MainHub
         if (arg is WebSocketException webException)
         {
             Logger.LogInformation("System closed unexpectedly, flagging Achievement Manager to not set data on reconnection.");
-            _achievements.HadUnhandledDisconnect(webException);
+            // _achievements.HadUnhandledDisconnect(webException);
         }
 
-        Logger.LogWarning("Connection to " + _serverConfigs.ServerStorage.ServerName + " Closed... Reconnecting. (Reason: " + arg);
+        Logger.LogWarning($"Connection to [{MAIN_SERVER_NAME}] Closed... Reconnecting. (Reason: {arg}");
     }
 
     private async Task HubInstanceOnReconnected()
@@ -485,9 +469,9 @@ public partial class MainHub
             if (await ConnectionResponseAndVersionIsValid())
             {
                 ServerStatus = ServerState.Connected;
-                await LoadInitialUsers().ConfigureAwait(false);
-                await LoadOnlineUsers().ConfigureAwait(false);
-                await _dataSync.SetClientDataForProfile().ConfigureAwait(false);
+                await LoadInitialSundesmos().ConfigureAwait(false);
+                await LoadOnlineSundesmos().ConfigureAwait(false);
+                _dataSync.SetDataForAccountProfile();
                 // once data is syncronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;
                 Mediator.Publish(new ConnectedMessage());

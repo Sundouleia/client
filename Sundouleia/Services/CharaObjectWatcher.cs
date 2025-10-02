@@ -2,13 +2,9 @@ using CkCommons;
 using Dalamud.Hooking;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI;
+using Sundouleia.WebAPI.Utils;
 
 namespace Sundouleia.Services;
 
@@ -20,19 +16,15 @@ namespace Sundouleia.Services;
 /// </summary>
 public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
 {
-    private readonly SundesmoManager _sundesmos;
-
     internal Hook<Character.Delegates.OnInitialize> OnCharaInitializeHook;
     internal Hook<Character.Delegates.Dtor> OnCharaDestroyHook;
     internal Hook<Character.Delegates.Terminate> OnCharaTerminateHook;
     internal Hook<Companion.Delegates.OnInitialize> OnCompanionInitializeHook;
     internal Hook<Companion.Delegates.Terminate> OnCompanionTerminateHook;
 
-    public CharaObjectWatcher(ILogger<CharaObjectWatcher> logger, SundouleiaMediator mediator, SundesmoManager sundesmos)
+    public CharaObjectWatcher(ILogger<CharaObjectWatcher> logger, SundouleiaMediator mediator)
         : base(logger, mediator)
     {
-        _sundesmos = sundesmos;
-
         OnCharaInitializeHook = Svc.Hook.HookFromAddress<Character.Delegates.OnInitialize>((nint)Character.StaticVirtualTablePointer->OnInitialize, InitializeCharacter);
         OnCharaTerminateHook = Svc.Hook.HookFromAddress<Character.Delegates.Terminate>((nint)Character.StaticVirtualTablePointer->Terminate, TerminateCharacter);
         OnCharaDestroyHook = Svc.Hook.HookFromAddress<Character.Delegates.Dtor>((nint)Character.StaticVirtualTablePointer->Dtor, DestroyCharacter);
@@ -50,7 +42,8 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     }
 
     // A persistent static cache holding all rendered Character pointers.
-    public static HashSet<Character> RenderedCharas { get; private set; } = new();
+    public static HashSet<nint> RenderedCharas { get; private set; } = new();
+    public static HashSet<nint> RenderedCompanions { get; private set; } = new();
 
     // Public, Accessible, Managed pointer address to Owned Object addresses
     public ConcurrentDictionary<nint, OwnedObject> WatchedTypes { get; private set; } = new();
@@ -70,7 +63,42 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         OnCompanionTerminateHook?.Dispose();
 
         RenderedCharas.Clear();
+        RenderedCompanions.Clear();
         WatchedTypes.Clear();
+    }
+
+    /// <summary>
+    ///     Checks against <see cref="RenderedCharas"/> to see if the character is rendered.
+    ///     If so, enacts the handler to create the object.
+    /// </summary>
+    public void CheckForExisting(PlayerHandler handler)
+    {
+        var sundesmoIdent = handler.Sundesmo.Ident;
+        foreach (var addr in RenderedCharas)
+        {
+            var ident = SundouleiaSecurity.GetIdentHashByCharacterPtr(addr);
+            if (ident != sundesmoIdent)
+                continue;
+
+            handler.ObjectRendered((Character*)addr);
+            break;
+        }
+    }
+
+    public void CheckForExisting(PlayerOwnedHandler handler)
+    {
+        var addresses = handler.ObjectType is OwnedObject.Companion 
+            ? RenderedCompanions : RenderedCharas;
+        // check all for parent relation
+        var parentId = handler.Sundesmo.PlayerEntityId;
+        foreach (var addr in addresses)
+        {
+            if (((GameObject*)addr)->OwnerId != parentId)
+                continue;
+
+            handler.ObjectRendered((GameObject*)addr);
+            break;
+        }
     }
 
     public nint FromOwned(OwnedObject kind)
@@ -103,28 +131,25 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     private void NewCharacterRendered(Character* chara)
     {
         var address = (nint)chara;
-        // Check for ClientOwned object creation.
         if (address == OwnedObjects.PlayerAddress)
         {
             AddOwnedCharacter(OwnedObject.Player, address);
             WatchedPlayerAddr = address;
-            return;
         }
-        else if (address == OwnedObjects.MinionOrMountAddress && chara->OwnerId == OwnedObjects.PlayerObject->EntityId) 
+        else if (address == OwnedObjects.MinionOrMountAddress && chara->OwnerId == OwnedObjects.PlayerObject->EntityId)
         {
             AddOwnedCharacter(OwnedObject.MinionOrMount, address);
             WatchedMinionMountAddr = address;
-            return;
         }
         else if (address == OwnedObjects.PetAddress && chara->OwnerId == OwnedObjects.PlayerObject->EntityId)
         {
             AddOwnedCharacter(OwnedObject.Pet, address);
             WatchedPetAddr = address;
-            return;
         }
-        // If non-owned object, check our sundesmoManager to see if it matches any created sundesmo.
-        RenderedCharas.Add(*chara);
-        _sundesmos.CharaEnteredRenderRange(chara);
+        else
+        {
+            RenderedCharas.Add(address);
+        }
     }
 
     private void CharacterRemoved(Character* chara)
@@ -134,42 +159,46 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         {
             RemoveOwnedCharacter(OwnedObject.Player, address);
             WatchedPlayerAddr = IntPtr.Zero;
-            return;
         }
         else if (address == WatchedMinionMountAddr)
         {
             RemoveOwnedCharacter(OwnedObject.MinionOrMount, address);
             WatchedMinionMountAddr = IntPtr.Zero;
-            return;
         }
         else if (address == WatchedPetAddr)
         {
             RemoveOwnedCharacter(OwnedObject.Pet, address);
             WatchedPetAddr = IntPtr.Zero;
-            return;
         }
-        // Otherwise notify sundesmo manager of unrendered chara.
-        RenderedCharas.Remove(*chara);
-        _sundesmos.CharaLeftRenderRange(chara);
+        else
+        {
+            RenderedCharas.Remove(address);
+        }
     }
 
     private void SetCompanionData(Companion* companion)
     {
-        if (OwnedObjects.PlayerAddress == IntPtr.Zero) return;
-        if (companion->CompanionOwnerId == OwnedObjects.PlayerObject->EntityId)
+        if (OwnedObjects.PlayerAddress == IntPtr.Zero)
+            return;
+        var address = (nint)companion;
+        if (companion->CompanionOwnerId != OwnedObjects.PlayerObject->EntityId)
+            RenderedCompanions.Add(address);
+        else
         {
-            WatchedTypes.AddOrUpdate((nint)companion, OwnedObject.Companion, (_, __) => OwnedObject.Companion);
-            CurrentOwned.Add((nint)companion);
-            WatchedCompanionAddr = (nint)companion;
+            AddOwnedCharacter(OwnedObject.Companion, address);
+            WatchedCompanionAddr = address;
         }
     }
     private void ClearCompanionData(Companion* companion)
     {
-        if (OwnedObjects.PlayerAddress == IntPtr.Zero) return;
-        if ((nint)companion == WatchedCompanionAddr)
+        if (OwnedObjects.PlayerAddress == IntPtr.Zero)
+            return;
+        var address = (nint)companion;
+        if (address != WatchedCompanionAddr)
+            RenderedCompanions.Remove(address);
+        else
         {
-            WatchedTypes.TryRemove((nint)companion, out _);
-            CurrentOwned.Remove((nint)companion);
+            RemoveOwnedCharacter(OwnedObject.Companion, address);
             WatchedCompanionAddr = IntPtr.Zero;
         }
     }
@@ -178,14 +207,14 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     {
         WatchedTypes.AddOrUpdate(address, kind, (_, __) => kind);
         CurrentOwned.Add(address);
-        Mediator.Publish(new OwnedCharaCreated(kind, address));
+        Mediator.Publish(new WatchedObjectCreated(kind, address));
     }
 
     private void RemoveOwnedCharacter(OwnedObject kind, nint address)
     {
         WatchedTypes.TryRemove(address, out _);
         CurrentOwned.Remove(address);
-        Mediator.Publish(new OwnedObjectDestroyed(kind, address));
+        Mediator.Publish(new WatchedObjectDestroyed(kind, address));
     }
 
     // Init with original first, than handle so it is present in our other lookups.

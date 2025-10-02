@@ -1,8 +1,8 @@
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Comparer;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.Services;
 
@@ -12,15 +12,18 @@ namespace Sundouleia.Services;
 /// </summary>
 public class ProfileService : MediatorSubscriberBase
 {
+    private readonly MainConfig _config;
     private readonly MainHub _hub;
     private readonly ProfileFactory _factory;
 
     // Make thread safe yes yes. Also use a UserDataComparer for fast access.
     private static ConcurrentDictionary<UserData, Profile> _profiles= new(UserDataComparer.Instance);
 
-    public ProfileService(ILogger<ProfileService> logger, SundouleiaMediator mediator, MainHub hub,
-        ProfileFactory factory) : base(logger, mediator)
+    public ProfileService(ILogger<ProfileService> logger, SundouleiaMediator mediator, 
+        MainConfig config, MainHub hub, ProfileFactory factory) 
+        : base(logger, mediator)
     {
+        _config = config;
         _hub = hub;
         _factory = factory;
 
@@ -94,7 +97,7 @@ public class ProfileService : MediatorSubscriberBase
         {
             Logger.LogTrace("Fetching profile for "+data.UID, LoggerType.Profiles);
             // Fetch userData profile info from server
-            var profile = await _hub.UserGetProfileData(new(data)).ConfigureAwait(false);
+            var profile = await _hub.UserGetProfileData(new(data), _config.Current.AllowNSFW).ConfigureAwait(false);
 
             // apply the retrieved profile data to the profile object.
             _profiles[data].Info = profile.Info;

@@ -1,12 +1,10 @@
 using Microsoft.Extensions.Hosting;
-using Sundouleia.FileCache;
+using Sundouleia.ModFiles;
 using Sundouleia.Interop;
-using Sundouleia.Pairs.Handlers;
-using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI.Files;
-using SundouleiaAPI.Network;
+using Sundouleia.Services;
 
 namespace Sundouleia.Pairs.Factories;
 
@@ -15,29 +13,39 @@ public class SundesmoHandlerFactory
     private readonly ILoggerFactory _loggerFactory;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly SundouleiaMediator _mediator;
+    private readonly FileDownloader _downloader;
     private readonly FileCacheManager _fileCache;
-    private readonly FileDownloadManager _personalDownloader;
     private readonly IpcManager _ipc;
     private readonly ServerConfigManager _configs;
+    private readonly CharaObjectWatcher _watcher;
 
     public SundesmoHandlerFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
-        IHostApplicationLifetime lifetime, FileCacheManager fileCache, FileDownloadManager downloads,
-        IpcManager ipc, ServerConfigManager configs)
+        IHostApplicationLifetime lifetime, FileCacheManager fileCache, FileDownloader downloads,
+        IpcManager ipc, ServerConfigManager configs, CharaObjectWatcher watcher)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;
         _lifetime = lifetime;
         _fileCache = fileCache;
-        _personalDownloader = downloads;
+        _downloader = downloads;
         _ipc = ipc;
         _configs = configs;
+        _watcher = watcher;
     }
 
-    /// <summary> This create method in the pair handler factory will create a new pair handler object.</summary>
-    /// <returns> A new PairHandler object </returns>
-    public SundesmoHandler Create(Sundesmo sundesmo)
+    /// <summary>
+    ///     This create method in the pair handler factory will create a new pair handler object.
+    /// </summary>
+    public PlayerHandler Create(Sundesmo sundesmo)
     {
-        return new SundesmoHandler(_loggerFactory.CreateLogger<SundesmoHandler>(), _mediator, sundesmo,
-            _lifetime, _fileCache, _personalDownloader, _ipc, _configs);
+        return new PlayerHandler(sundesmo, _loggerFactory.CreateLogger<PlayerHandler>(), _mediator,
+            _lifetime, _fileCache, _downloader, _ipc, _watcher);
     }
+
+    /// <summary>
+    ///     This create method in the pair handler factory will create a new owned object handler.
+    /// </summary>
+    public PlayerOwnedHandler Create(OwnedObject type, Sundesmo sundesmo)
+        => new(type, sundesmo, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _lifetime,
+            _ipc, _watcher);
 }

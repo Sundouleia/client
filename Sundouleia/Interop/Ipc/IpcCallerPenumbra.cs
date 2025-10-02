@@ -3,12 +3,8 @@ using Dalamud.Interface.ImGuiNotification;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
 using Penumbra.Api.IpcSubscribers;
-using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using System.Diagnostics.CodeAnalysis;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Interop;
 
@@ -64,9 +60,13 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     // and reapply the actor.
     // -> This way by the time it is done uploading everything our other items should have had time to build and can upload in unison.
 
-    public IpcCallerPenumbra(ILogger<IpcCallerPenumbra> logger, SundouleiaMediator mediator, OnFrameworkService frameworkUtils)
-        : base(logger, mediator)
+    private readonly CharaObjectWatcher _watcher;
+
+    public IpcCallerPenumbra(ILogger<IpcCallerPenumbra> logger, SundouleiaMediator mediator,
+        CharaObjectWatcher watcher) : base(logger, mediator)
     {
+        _watcher = watcher;
+
         OnInitialized = Initialized.Subscriber(Svc.PluginInterface, () =>
         {
             APIAvailable = true;
@@ -170,15 +170,14 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     /// <summary>
     ///     An event firing every time an objects resource path is resolved. <para />
     ///     This occurs a LOT. And should be handled with care!. <para />
-    ///     We use this to fetch the changes in data that <see cref="GetUserModData"/> fails to obtain. <para />
+    ///     We use this to fetch the changes in data that <see cref="GetCharacterResourcePathData(ushort)"/> fails to obtain. <para />
     /// </summary>
     private unsafe void GameObjectResourceLoaded(IntPtr address, string gamePath, string resolvedPath)
     {
-        // Need to replace with the OwnedObjectService later.
-        if (((IntPtr)PlayerData.ObjectThreadSafe) != address)
+        // If the address is not from any of our watched addresses, immidiately ignore it.
+        if (!_watcher.CurrentOwned.Contains(address))
             return;
-        // Logger.LogTrace($"ResourcePathLoaded: [GamePath: {gamePath}] [ResolvedPath: {resolvedPath}]");
-        // Dont do anything with this at the moment, use it for tracking, and debugging.
+        Mediator.Publish(new PenumbraResourceLoaded(address, gamePath, resolvedPath));
     }
 
     private void ObjectRedrawn(IntPtr objectAddress, int objectTableIndex)
