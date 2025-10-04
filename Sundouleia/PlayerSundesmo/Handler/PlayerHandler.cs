@@ -46,7 +46,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _ipc = ipc;
 
         // If penumbra is already initialized create the temp collection here.
-        _tempCollection = _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
+        if (IpcCallerPenumbra.APIAvailable && _tempCollection == Guid.Empty)
+            _tempCollection = _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
 
         // Maybe do something on zone switch? but not really sure lol. I would personally continue
         // any existing downloads we have.
@@ -439,6 +440,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             if (!string.IsNullOrEmpty(name))
                 Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Disposed")));
 
+            // Remove of the collection, or at least try to.
+            if (IpcCallerPenumbra.APIAvailable && _tempCollection != Guid.Empty)
+            {
+                Logger.LogTrace($"Removing temp collection for {name}. ({Sundesmo.UserData.AliasOrUID})", LoggerType.PairHandler);
+                _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection);
+            }
+
             // If the lifetime host is stopping, log it is and return.
             if (_lifetime.ApplicationStopping.IsCancellationRequested)
             {
@@ -450,8 +458,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // Otherwise begin cleanup if valid to do so.
             if (!PlayerData.IsZoning && !PlayerData.InCutscene && !string.IsNullOrEmpty(name))
             {
-                Logger.LogTrace($"Removing temp collection for {name}. ({Sundesmo.UserData.AliasOrUID})", LoggerType.PairHandler);
-                _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection);
                 // If they are no longer visible, revert states by their name.
                 if (!IsRendered)
                 {
@@ -477,7 +483,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Error upon disposal of {name}: {ex.Message}", LoggerType.PairHandler);
+            Logger.LogWarning($"Error upon disposal of {name}: {ex}", LoggerType.PairHandler);
         }
         finally
         {

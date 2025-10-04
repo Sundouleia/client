@@ -118,6 +118,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         var created = new List<string>();
         var refreshed = new List<string>();
         foreach (var dto in list)
+        {
             if (!_allSundesmos.ContainsKey(dto.User))
             {
                 _allSundesmos[dto.User] = _pairFactory.Create(dto);
@@ -125,9 +126,9 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
             }
             else
             {
-                _allSundesmos[dto.User].ReapplyAlterations();
                 refreshed.Add(dto.User.UID);
             }
+        }
         RecreateLazy();
         if (created.Count > 0) Logger.LogDebug($"Created: {string.Join(", ", created)}", LoggerType.PairManagement);
         if (refreshed.Count > 0) Logger.LogDebug($"Refreshed: {string.Join(", ", refreshed)}", LoggerType.PairManagement);
