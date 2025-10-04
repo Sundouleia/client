@@ -54,7 +54,7 @@ public class AccountConfig : IHybridSavable
                 _logger.LogError("Invalid Version!");
                 return;
         }
-        Svc.Logger.Information("Config loaded.");
+        _logger.LogInformation("Config loaded.");
         Save();
     }
 

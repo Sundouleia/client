@@ -1,5 +1,8 @@
+using CkCommons;
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Interface.ImGuiNotification;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
@@ -36,6 +39,21 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearSundesmos());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => ReapplyAlterations());
+
+        Mediator.Subscribe<TargetSundesmoMessage>(this, (msg) =>
+        {
+            // Fail in pvp or when not rendered.
+            if (PlayerData.IsInPvP || !msg.Sundesmo.PlayerRendered)
+                return;
+            unsafe
+            {
+                if (config.Current.FocusTargetOverTarget)
+                    TargetSystem.Instance()->FocusTarget = (GameObject*)msg.Sundesmo.GetAddress(OwnedObject.Player);
+                else
+                    TargetSystem.Instance()->SetHardTarget((GameObject*)msg.Sundesmo.GetAddress(OwnedObject.Player));
+            }
+        });
+
 
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
         Svc.ContextMenu.OnMenuOpened += OnOpenContextMenu;
@@ -165,7 +183,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         }
 
         sundesmo.MarkOnline(dto);
-        Mediator.Publish(new PairWentOnlineMessage(dto.User));
+        Mediator.Publish(new SundesmoOnline(sundesmo));
         RecreateLazy();
     }
 

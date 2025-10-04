@@ -72,10 +72,26 @@ public class DrawSundesmoRequest
     {
         var acceptButtonSize = CkGui.IconTextButtonSize(FAI.PersonCircleCheck, "Accept");
         var rejectButtonSize = CkGui.IconTextButtonSize(FAI.PersonCircleXmark, "Reject");
-        var spacingX = ImGui.GetStyle().ItemSpacing.X;
+        var spacingX = ImGui.GetStyle().ItemInnerSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
         var currentRightSide = windowEndX - acceptButtonSize;
 
+        ImGui.SameLine(currentRightSide);
+        ImGui.AlignTextToFramePadding();
+        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
+        {
+            if (CkGui.IconTextButton(FAI.PersonCircleXmark, "Reject", null, true, UiService.DisableUI))
+            {
+                UiService.SetUITask(async () =>
+                {
+                    if (await _hub.UserRejectRequest(new(_entry.User)) is { } res && res.ErrorCode is SundouleiaApiEc.Success)
+                        _manager.RemoveRequest(_entry);
+                });
+            }
+        }
+        CkGui.AttachToolTip("Reject the Request");
+
+        currentRightSide -= acceptButtonSize + spacingX;
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen))
@@ -84,7 +100,7 @@ public class DrawSundesmoRequest
             {
                 UiService.SetUITask(async () =>
                 {
-                    var res = await _hub.UserAcceptRequest(new(_entry.User));
+                    var res = await _hub.UserAcceptRequest(new(_entry.User)).ConfigureAwait(false);
                     if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
                         _manager.RemoveRequest(_entry);
                     else if (res.ErrorCode is SundouleiaApiEc.Success)
@@ -98,22 +114,6 @@ public class DrawSundesmoRequest
             }
         }
         CkGui.AttachToolTip("Accept the Request");
-
-        currentRightSide -= acceptButtonSize + spacingX;
-        ImGui.SameLine(currentRightSide);
-        ImGui.AlignTextToFramePadding();
-        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
-        {
-            if (CkGui.IconTextButton(FAI.PersonCircleXmark, "Reject", null, true, UiService.DisableUI))
-            {
-                UiService.SetUITask(async () => 
-                {
-                    if (await _hub.UserRejectRequest(new(_entry.User)) is { } res && res.ErrorCode is SundouleiaApiEc.Success)
-                        _manager.RemoveRequest(_entry);
-                });
-            }
-        }
-        CkGui.AttachToolTip("Reject the Request");
     }
 
     private void DrawPendingCancel()

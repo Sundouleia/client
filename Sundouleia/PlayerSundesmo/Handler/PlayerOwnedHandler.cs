@@ -35,7 +35,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     private Task? _timeoutTask = null;
 
     public PlayerOwnedHandler(OwnedObject kind, Sundesmo sundesmo, ILogger<PlayerOwnedHandler> logger,
-        SundouleiaMediator mediator, IHostApplicationLifetime lifetime, IpcManager ipc, CharaObjectWatcher watcher) 
+        SundouleiaMediator mediator, IHostApplicationLifetime lifetime, IpcManager ipc) 
         : base(logger, mediator)
     {
         ObjectType = kind;
@@ -43,11 +43,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
         _lifetime = lifetime;
         _ipc = ipc;
-
-        // It is possible that our sundesmo was made after they were rendered.
-        // If this is the case, we should iterate our watched objects to check for any
-        // of their already rendered characters / companions and initialize them.
-        watcher.CheckForExisting(this);
 
         unsafe
         {

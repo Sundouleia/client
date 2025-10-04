@@ -26,11 +26,9 @@ public class ServerConfigManager
     {
         _logger = logger;
         _mediator = mediator;
+        _groupConfig = groupConfig;
         _accountConfig = accountConfig;
         _nickConfig = nicksConfig;
-
-        _accountConfig.Load();
-        _nickConfig.Load();
     }
 
     public GroupsStorage Groups => _groupConfig.Current;

@@ -25,7 +25,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private readonly FileCacheManager _fileCache;
     private readonly FileDownloader _downloader;
     private readonly IpcManager _ipc;
-    private readonly CharaObjectWatcher _watcher;
 
     // Internal data to be handled. (still looking into the dowload / mod stuff)
     private CancellationTokenSource _downloadCTS = new();
@@ -37,7 +36,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
         IHostApplicationLifetime lifetime, FileCacheManager fileCache, FileDownloader downloads,
-        IpcManager ipc, CharaObjectWatcher watcher) : base(logger, mediator)
+        IpcManager ipc) : base(logger, mediator)
     {
         Sundesmo = sundesmo;
 
@@ -45,7 +44,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _fileCache = fileCache;
         _downloader = downloads;
         _ipc = ipc;
-        _watcher = watcher;
 
         // If penumbra is already initialized create the temp collection here.
         _tempCollection = _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
@@ -58,11 +56,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // Old subscriber here for class/job change?
         // Old subscribers here for combat/performance start/stop. Reapplies should fix this but yeah can probably just do redraw.
-
-        // It is possible that our sundesmo was made after they were rendered.
-        // If this is the case, we should iterate our watched objects to check for any
-        // of their already rendered characters / companions and initialize them.
-        watcher.CheckForExisting(this);
 
         unsafe
         {
@@ -112,12 +105,14 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Set name and log render.
         PlayerName = chara->NameString;
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] rendered!", LoggerType.PairHandler);
+        Mediator.Publish(new SundesmoPlayerRendered(this));
     }
 
     public unsafe void ClearRenderedPlayer(OwnedObject type)
     {
         _player = null;
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {type} unrendered!", LoggerType.PairHandler);
+        Mediator.Publish(new SundesmoPlayerUnrendered(this));
         _timeoutCTS = _timeoutCTS.SafeCancelRecreate();
         _timeoutTask = ObjectedDespawnedTask();
     }
@@ -164,6 +159,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         PlayerName = string.Empty;
         // Notify the owner that we went poofy or whatever if we need to here.
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s data reverted due to timeout.", LoggerType.PairHandler);
+        Mediator.Publish(new SundesmoTimedOut(this));
     }
 
     public void ReapplyAlterations()

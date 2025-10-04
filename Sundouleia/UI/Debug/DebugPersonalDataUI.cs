@@ -102,6 +102,23 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
         using var node = ImRaii.TreeNode($"{nick}'s Pair Info");
         if (!node) return;
 
+        ImGui.Text($"Player Name: {pair.PlayerName}");
+        ImGui.Text($"Player Rendered: {pair.PlayerRendered}");
+        if (pair.PlayerRendered)
+        {
+            ImGui.Text($"Player EntityId: {pair.PlayerEntityId}");
+            ImGui.Text($"Player ObjectId: {pair.PlayerObjectId}");
+        }
+        ImGui.Text($"Mount/Minion Rendered: {pair.MountMinionRendered}");
+        ImGui.Text($"Pet Rendered: {pair.PetRendered}");
+        ImGui.Text($"Companion Rendered: {pair.CompanionRendered}");
+        ImGui.Text($"Is Online: {pair.IsOnline}");
+        ImGui.Text($"Is Temporary: {pair.IsTemporary}");
+        ImGui.Text($"Is Paused: {pair.IsPaused}");
+        ImGui.Text($"Identifier: {pair.Ident}");
+        ImGui.Text($"UID: {pair.UserData.UID}");
+        ImGui.Text($"Alias: {pair.UserData.Alias}");
+
         DrawPairPerms(nick, pair);
         DrawGlobalPermissions(pair.UserData.UID + "'s Global Perms", pair.PairGlobals);
         ImGui.Separator();

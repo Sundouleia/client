@@ -97,7 +97,7 @@ public class RequestsTab : DisposableMediatorSubscriberBase
             ImGui.SameLine();
             CkGui.FramedIconText(FAI.Inbox);
             using (ImRaii.PushFont(UiBuilder.MonoFont))
-                CkGui.TextFrameAlignedInline($"{OUTGOING_ID} ({_requests.TotalIncoming})");
+                CkGui.TextFrameAlignedInline($"{OUTGOING_ID} ({_requests.TotalOutgoing})");
         }
         _hoveringOutgoing = ImGui.IsItemHovered();
         if (ImGui.IsItemClicked())
@@ -116,7 +116,7 @@ public class RequestsTab : DisposableMediatorSubscriberBase
 
     private void RecreateRequests()
     {
-        _incoming = _requests.Incoming.Select(r => new DrawSundesmoRequest("Incoming Requests", r, _hub, _requests, _sundesmos)).ToImmutableList();
-        _outgoing = _requests.Outgoing.Select(r => new DrawSundesmoRequest("Sent Requests", r, _hub, _requests, _sundesmos)).ToImmutableList();
+        _incoming = _requests.Incoming.Select(r => new DrawSundesmoRequest(INCOMING_ID + r.User.UID + r.Target.UID, r, _hub, _requests, _sundesmos)).ToImmutableList();
+        _outgoing = _requests.Outgoing.Select(r => new DrawSundesmoRequest(OUTGOING_ID + r.User.UID + r.Target.UID, r, _hub, _requests, _sundesmos)).ToImmutableList();
     }
 }

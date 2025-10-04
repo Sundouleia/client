@@ -48,6 +48,7 @@ public class FavoritesConfig : IHybridSavable
         {
             _logger.LogError(e, "Failed to load favorites.");
         }
+        _logger.LogInformation("Favorites Config loaded.");
     }
 
     public bool TryAddUser(string sundesmo)

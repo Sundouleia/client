@@ -37,15 +37,11 @@ public class SundesmoHandlerFactory
     ///     This create method in the pair handler factory will create a new pair handler object.
     /// </summary>
     public PlayerHandler Create(Sundesmo sundesmo)
-    {
-        return new PlayerHandler(sundesmo, _loggerFactory.CreateLogger<PlayerHandler>(), _mediator,
-            _lifetime, _fileCache, _downloader, _ipc, _watcher);
-    }
+        => new(sundesmo, _loggerFactory.CreateLogger<PlayerHandler>(), _mediator, _lifetime, _fileCache, _downloader, _ipc);
 
     /// <summary>
     ///     This create method in the pair handler factory will create a new owned object handler.
     /// </summary>
     public PlayerOwnedHandler Create(OwnedObject type, Sundesmo sundesmo)
-        => new(type, sundesmo, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _lifetime,
-            _ipc, _watcher);
+        => new(type, sundesmo, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _lifetime, _ipc);
 }

@@ -10,7 +10,6 @@ public record SundesmoPlayerRendered(PlayerHandler Handler) : SameThreadMessage;
 public record SundesmoPlayerUnrendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming invisible"
 public record SundesmoTimedOut(PlayerHandler Handler) : MessageBase; // Whenever unrendered long enough to be considered invalid.
 
-public record PairWentOnlineMessage(UserData UserData) : MessageBase; // a message indicating a pair has gone online.
 public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // called when publishing a targeted pair connection (see UI)
 
 

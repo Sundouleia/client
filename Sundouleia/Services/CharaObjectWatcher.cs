@@ -74,11 +74,13 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     public void CheckForExisting(PlayerHandler handler)
     {
         var sundesmoIdent = handler.Sundesmo.Ident;
+        Logger.LogDebug($"Checking against Ident: {sundesmoIdent}");
         foreach (var addr in RenderedCharas)
         {
             var ident = SundouleiaSecurity.GetIdentHashByCharacterPtr(addr);
             if (ident != sundesmoIdent)
                 continue;
+            Logger.LogDebug($"ContentIdHash Match: {ident} - {((Character*)addr)->NameString}");
 
             handler.ObjectRendered((Character*)addr);
             break;
@@ -87,6 +89,10 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
 
     public void CheckForExisting(PlayerOwnedHandler handler)
     {
+        // if the owner is not rendered there is no point in checking.
+        if (!handler.Sundesmo.PlayerRendered)
+            return;
+
         var addresses = handler.ObjectType is OwnedObject.Companion 
             ? RenderedCompanions : RenderedCharas;
         // check all for parent relation
@@ -130,6 +136,7 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     /// </summary>
     private void NewCharacterRendered(Character* chara)
     {
+        Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->NameString}");
         var address = (nint)chara;
         if (address == OwnedObjects.PlayerAddress)
         {

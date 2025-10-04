@@ -131,8 +131,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             // bomb the other data such as new users and limbo users.
             InLimbo.Clear();
             NewVisible.Clear();
-            await _hub.UserPushIpcFull(new(_sundesmos.GetVisibleConnected(), modData, appearance)).ConfigureAwait(false);
-            Logger.LogInformation("Initial Ipc Cache sent to visible users after reconnection.");
+            var visible = _sundesmos.GetVisibleConnected();
+            await _hub.UserPushIpcFull(new(visible, modData, appearance)).ConfigureAwait(false);
+            Logger.LogInformation($"Sent initial Ipc Cache to {visible.Count} users after reconnection. 0 Files needed uploading.");
         }, _distributeDataCTS.Token);
     }
 

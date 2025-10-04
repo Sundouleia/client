@@ -1,6 +1,7 @@
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
 using Sundouleia.Pairs.Factories;
+using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
@@ -18,29 +19,48 @@ public class Sundesmo : IComparable<Sundesmo>
     private readonly ILogger<Sundesmo> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly ServerConfigManager _nickConfig;
+    private readonly SundesmoHandlerFactory _factory;
+    private readonly CharaObjectWatcher _watcher;
 
-    // Associated Player Data
+    // Associated Player Data (Created once online).
+    private OnlineUser? OnlineUser;
     private PlayerHandler _player;
     private PlayerOwnedHandler _mountMinion;
     private PlayerOwnedHandler _pet;
     private PlayerOwnedHandler _companion;
 
     public Sundesmo(UserPair userPairInfo, ILogger<Sundesmo> logger, SundouleiaMediator mediator,
-        SundesmoHandlerFactory factory, ServerConfigManager nicks)
+        SundesmoHandlerFactory factory, ServerConfigManager nicks, CharaObjectWatcher watcher)
     {
         _logger = logger;
         _mediator = mediator;
         _nickConfig = nicks;
+        _watcher = watcher;
 
         UserPair = userPairInfo;
+        // Create handlers for each of the objects.
         _player = factory.Create(this);
         _mountMinion = factory.Create(OwnedObject.MinionOrMount, this);
         _pet = factory.Create(OwnedObject.Pet, this);
         _companion = factory.Create(OwnedObject.Companion, this);
     }
 
+    public bool PlayerNull => _player == null;
+    public bool MountMinionNull => _mountMinion == null;
+    public bool PetNull => _pet == null;
+    public bool CompanionNull => _companion == null;
+
+    public string DebugNullHandlers()
+    {
+        var nulls = new List<string>();
+        if (PlayerNull) nulls.Add("Player");
+        if (MountMinionNull) nulls.Add("MountMinion");
+        if (PetNull) nulls.Add("Pet");
+        if (CompanionNull) nulls.Add("Companion");
+        return string.Join(", ", nulls);
+    }
+
     // Associated ServerData.
-    private OnlineUser? OnlineUser; // Dictates if the sundesmo is online (connected).
     public UserPair UserPair { get; init; }
     public UserData UserData => UserPair.User;
     public PairPerms OwnPerms => UserPair.OwnPerms;
@@ -70,10 +90,10 @@ public class Sundesmo : IComparable<Sundesmo>
     public IntPtr GetAddress(OwnedObject obj)
         => obj switch
         {
-            OwnedObject.Player => _player.Address,
-            OwnedObject.MinionOrMount => _mountMinion.Address,
-            OwnedObject.Pet => _pet.Address,
-            OwnedObject.Companion => _companion.Address,
+            OwnedObject.Player => _player?.Address ?? IntPtr.Zero,
+            OwnedObject.MinionOrMount => _mountMinion?.Address ?? IntPtr.Zero,
+            OwnedObject.Pet => _pet?.Address ?? IntPtr.Zero,
+            OwnedObject.Companion => _companion?.Address ?? IntPtr.Zero,
             _ => IntPtr.Zero,
         };
 
@@ -100,22 +120,26 @@ public class Sundesmo : IComparable<Sundesmo>
     public void ReapplyAlterations()
     {
         if (PlayerRendered)
-            _player.ReapplyAlterations();
+            _player!.ReapplyAlterations();
         if (MountMinionRendered)
-            _mountMinion.ReapplyAlterations();
+            _mountMinion!.ReapplyAlterations();
         if (PetRendered)
-            _pet.ReapplyAlterations();
+            _pet!.ReapplyAlterations();
         if (CompanionRendered)
-            _companion.ReapplyAlterations();
+            _companion!.ReapplyAlterations();
     }
 
     // Tinker with async / no async later.
     public async void ApplyFullData(RecievedModUpdate newModData, VisualUpdate newIpc)
     {
-        if (newIpc.PlayerChanges != null) _player.UpdateAndApplyFullData(newModData, newIpc.PlayerChanges);
-        if (newIpc.MinionMountChanges != null) await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
-        if (newIpc.PetChanges != null) await _pet.ApplyIpcData(newIpc.PetChanges);
-        if (newIpc.CompanionChanges != null) await _companion.ApplyIpcData(newIpc.CompanionChanges);
+        if (newIpc.PlayerChanges != null)
+            _player.UpdateAndApplyFullData(newModData, newIpc.PlayerChanges);
+        if (newIpc.MinionMountChanges != null)
+            await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
+        if (newIpc.PetChanges != null)
+            await _pet.ApplyIpcData(newIpc.PetChanges);
+        if (newIpc.CompanionChanges != null)
+            await _companion.ApplyIpcData(newIpc.CompanionChanges);
     }
 
     public async void ApplyModData(RecievedModUpdate newModData)
@@ -123,10 +147,17 @@ public class Sundesmo : IComparable<Sundesmo>
 
     public async void ApplyIpcData(VisualUpdate newIpc)
     {
-        if (newIpc.PlayerChanges != null) await _player.ApplyIpcData(newIpc.PlayerChanges);
-        if (newIpc.MinionMountChanges != null) await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
-        if (newIpc.PetChanges != null) await _pet.ApplyIpcData(newIpc.PetChanges);
-        if (newIpc.CompanionChanges != null) await _companion.ApplyIpcData(newIpc.CompanionChanges);
+        if (newIpc.PlayerChanges != null)
+            await _player.ApplyIpcData(newIpc.PlayerChanges);
+
+        if (newIpc.MinionMountChanges != null)
+            await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
+
+        if (newIpc.PetChanges != null)
+            await _pet.ApplyIpcData(newIpc.PetChanges);
+
+        if (newIpc.CompanionChanges != null)
+            await _companion.ApplyIpcData(newIpc.CompanionChanges);
     }
 
     public async void ApplyIpcSingle(OwnedObject obj, IpcKind kind, string newData)
@@ -145,12 +176,25 @@ public class Sundesmo : IComparable<Sundesmo>
     /// <summary>
     ///     Marks the sundesmo as online, providing us with their UID and CharaIdent.
     /// </summary>
-    public void MarkOnline(OnlineUser dto) => OnlineUser = dto;
+    public void MarkOnline(OnlineUser dto)
+    {
+        OnlineUser = dto;
+        // Now that we have the ident we should run a check against all of the handlers.
+        _watcher.CheckForExisting(_player);
+        _watcher.CheckForExisting(_mountMinion);
+        _watcher.CheckForExisting(_pet);
+        _watcher.CheckForExisting(_companion);
+        _mediator.Publish(new SundesmoOnline(this));
+    }
 
     /// <summary>
     ///     Marks the pair as offline.
     /// </summary>
-    public void MarkOffline() => OnlineUser = null;
+    public void MarkOffline()
+    {
+        OnlineUser = null;
+        _mediator.Publish(new SundesmoOffline(this));
+    }
 
     /// <summary>
     ///     Removes all applied appearance data for the sundesmo if rendered, 

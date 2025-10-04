@@ -67,10 +67,10 @@ public class DrawFolderTag : DrawFolderBase
     {
         ImUtf8.TextFrameAligned(_id switch
         {
-            Constants.CustomOnlineTag => "Sundouleia Online Users",
-            Constants.CustomOfflineTag => "Sundouleia Offline Users",
+            Constants.CustomOnlineTag => "Online",
+            Constants.CustomOfflineTag => "Offline",
             Constants.CustomVisibleTag => "Visible",
-            Constants.CustomAllTag => "Users",
+            Constants.CustomAllTag => "Sundesmos",
             _ => _id
         });
     }

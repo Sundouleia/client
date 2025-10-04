@@ -1,3 +1,4 @@
+using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Network;
@@ -13,16 +14,18 @@ public class SundesmoFactory
     private readonly SundouleiaMediator _mediator;
     private readonly SundesmoHandlerFactory _innerFactory;
     private readonly ServerConfigManager _serverConfigs;
+    private readonly CharaObjectWatcher _watcher;
 
     public SundesmoFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
-        SundesmoHandlerFactory factory, ServerConfigManager configs)
+        SundesmoHandlerFactory factory, ServerConfigManager configs, CharaObjectWatcher watcher)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;
         _innerFactory = factory;
         _serverConfigs = configs;
+        _watcher = watcher;
     }
 
     public Sundesmo Create(UserPair sundesmoInfo)
-        => new(sundesmoInfo, _loggerFactory.CreateLogger<Sundesmo>(), _mediator, _innerFactory, _serverConfigs);
+        => new(sundesmoInfo, _loggerFactory.CreateLogger<Sundesmo>(), _mediator, _innerFactory, _serverConfigs, _watcher);
 }
