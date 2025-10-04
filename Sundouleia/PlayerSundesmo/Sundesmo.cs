@@ -110,24 +110,23 @@ public class Sundesmo : IComparable<Sundesmo>
     }
 
     // Tinker with async / no async later.
-    public async void ApplyFullData(ModDataUpdate modData, VisualDataUpdate ipcData)
+    public async void ApplyFullData(RecievedModUpdate newModData, VisualUpdate newIpc)
     {
-        _player.UpdateAndApplyFullData(modData, ipcData.Player);
-        await _mountMinion.ApplyIpcData(ipcData.MinionMount);
-        await _pet.ApplyIpcData(ipcData.Pet);
-        await _companion.ApplyIpcData(ipcData.Companion);
+        if (newIpc.PlayerChanges != null) _player.UpdateAndApplyFullData(newModData, newIpc.PlayerChanges);
+        if (newIpc.MinionMountChanges != null) await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
+        if (newIpc.PetChanges != null) await _pet.ApplyIpcData(newIpc.PetChanges);
+        if (newIpc.CompanionChanges != null) await _companion.ApplyIpcData(newIpc.CompanionChanges);
     }
 
-    public async void ApplyModData(ModDataUpdate modData)
-        => await _player.UpdateAndApplyModData(modData);
+    public async void ApplyModData(RecievedModUpdate newModData)
+        => await _player.UpdateAndApplyModData(newModData);
 
-    public async void ApplyIpcData(VisualDataUpdate ipcData)
+    public async void ApplyIpcData(VisualUpdate newIpc)
     {
-        // update all (maybe in parallel if we want increased efficiency yes yes.
-        await _player.ApplyIpcData(ipcData.Player);
-        await _mountMinion.ApplyIpcData(ipcData.MinionMount);
-        await _pet.ApplyIpcData(ipcData.Pet);
-        await _companion.ApplyIpcData(ipcData.Companion);
+        if (newIpc.PlayerChanges != null) await _player.ApplyIpcData(newIpc.PlayerChanges);
+        if (newIpc.MinionMountChanges != null) await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
+        if (newIpc.PetChanges != null) await _pet.ApplyIpcData(newIpc.PetChanges);
+        if (newIpc.CompanionChanges != null) await _companion.ApplyIpcData(newIpc.CompanionChanges);
     }
 
     public async void ApplyIpcSingle(OwnedObject obj, IpcKind kind, string newData)

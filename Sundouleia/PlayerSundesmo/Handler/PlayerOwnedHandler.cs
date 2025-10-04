@@ -76,7 +76,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
     // Cached Data for appearance.
     private Guid _tempProfile = Guid.Empty;
-    private ObjectIpcData? _appearanceData = new();
+    private IpcDataCache? _appearanceData = new();
 
     // Public accessors.
     public GameObject DataState { get { unsafe { return *_gameObject; } } }
@@ -145,13 +145,13 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     }
 
     // Thankfully only ever need to worry about cplus and glamourer here!.
-    public async Task ApplyIpcData(ObjectIpcData ipcData)
+    public async Task ApplyIpcData(IpcDataUpdate newIpc)
     {
         // 0) Set initial data if none present.
         _appearanceData ??= new();
 
         // 1) See what updates are applied, if any.
-        var changes = _appearanceData.ApplyChanged(ipcData);
+        var changes = _appearanceData.UpdateCache(newIpc);
 
         // 2) If nothing changed, or not present, return.
         if (changes == IpcKind.None || Address == IntPtr.Zero)
@@ -174,7 +174,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         _appearanceData ??= new();
 
         // 1) Update the changes, return if not rendered or nothing changed.
-        if (!_appearanceData.TryApplyChanged(kind, newData) || Address == IntPtr.Zero)
+        if (!_appearanceData.UpdateCacheSingle(kind, newData) || Address == IntPtr.Zero)
             return;
 
         // 3) Apply change based on the type.

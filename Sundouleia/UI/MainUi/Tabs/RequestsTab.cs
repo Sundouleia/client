@@ -1,51 +1,128 @@
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
+using OtterGui.Text;
+using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
+using Sundouleia.WebAPI;
+using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.MainWindow;
 
-// this can easily become the "contact list" tab of the "main UI" window.
+// This is a placeholder UI structure for the sake of getting testing
+// functional, and will be restructured later.
 public class RequestsTab : DisposableMediatorSubscriberBase
 {
-    private readonly MainConfig _config;
-    private readonly SundesmoManager _sundesmoManager;
-    private readonly DrawEntityFactory _factory;
+    private const string INCOMING_ID = "Incoming Requests";
+    private const string OUTGOING_ID = "Sent Requests";
 
-    // Dont think we will need to worry about using folders since we are only drawing 2 request areas,
-    // incoming and outgoing. Can modify this later, for right now we dont need to worry about
-    // it too much since we have the code for request entries already.
+    private readonly MainHub _hub;
+    private readonly SundesmoManager _sundesmos;
+    private readonly RequestsManager _requests;
+
+    private bool _hoveringIncoming = false;
+    private bool _hoveringOutgoing = false;
+    private bool _incomingExpanded = false;
+    private bool _outgoingExpanded = false;
+    private ImmutableList<DrawSundesmoRequest> _incoming;
+    private ImmutableList<DrawSundesmoRequest> _outgoing;
+
     public RequestsTab(ILogger<RequestsTab> logger, SundouleiaMediator mediator,
-        MainConfig config, SundesmoManager sundesmos, DrawEntityFactory factory)
+        MainHub hub, SundesmoManager sundesmos, RequestsManager requests) 
         : base(logger, mediator)
     {
-        _config = config;
-        _sundesmoManager = sundesmos;
-        _factory = factory;
+        _hub = hub;
+        _sundesmos = sundesmos;
+        _requests = requests;
 
-        //Mediator.Subscribe<RefreshUiMessage>(this, _ => _drawFolders = GetDrawFolders());
-        //_drawFolders = GetDrawFolders();
+        RecreateRequests();
+
+        Mediator.Subscribe<RefreshRequestsMessage>(this, _ => RecreateRequests());
     }
 
     public void DrawRequestsSection()
     {
-        // Will probably look very amateur compared to GSpeak's UI.
-        DrawTypeSelector();
-        ImGui.Separator();
-
         using var _ = CkRaii.Child("content", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-        CkGui.ColorTextCentered("TODO: Add Requests Here!", ImGuiColors.DalamudYellow);
+        
+        DrawIncoming();
+        DrawOutgoing();
     }
 
     // Picks between incoming and outgoing requests, so we know what to draw and such.
-    private void DrawTypeSelector()
+    private void DrawIncoming()
     {
+        if (_incoming.Count is 0)
+            return;
 
+        using var id = ImRaii.PushId("folder_" + INCOMING_ID);
+        var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
+
+        using (CkRaii.Child($"folder__{INCOMING_ID}", childSize, _hoveringIncoming ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0, 0f))
+        {
+            CkGui.InlineSpacingInner();
+            CkGui.FramedIconText(_incomingExpanded ? FAI.CaretDown : FAI.CaretRight);
+
+            ImGui.SameLine();
+            CkGui.FramedIconText(FAI.Inbox);
+            using (ImRaii.PushFont(UiBuilder.MonoFont))
+                CkGui.TextFrameAlignedInline($"{INCOMING_ID} ({_requests.TotalIncoming})");
+        }
+        _hoveringIncoming = ImGui.IsItemHovered();
+        if (ImGui.IsItemClicked())
+            _incomingExpanded = !_incomingExpanded;
+
+        ImGui.Separator();
+        if (!_incomingExpanded) 
+            return;
+
+        using var indent = ImRaii.PushIndent(CkGui.IconSize(FAI.EllipsisV).X + ImGui.GetStyle().ItemSpacing.X, false);
+        foreach (var entry in _incoming)
+            entry.DrawRequestEntry(false);
+
+        ImGui.Separator();
     }
 
-    // Could make a very easy generator if we just kept a static hash set of
-    // pending requests in the MainHub with the connection response and then synced the list here.
+    private void DrawOutgoing()
+    {
+        if (_outgoing.Count is 0)
+            return;
+
+        using var id = ImRaii.PushId("folder_" + OUTGOING_ID);
+        var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
+
+        using (CkRaii.Child($"folder__{OUTGOING_ID}", childSize, _hoveringOutgoing ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0, 0f))
+        {
+            CkGui.InlineSpacingInner();
+            CkGui.FramedIconText(_outgoingExpanded ? FAI.CaretDown : FAI.CaretRight);
+
+            ImGui.SameLine();
+            CkGui.FramedIconText(FAI.Inbox);
+            using (ImRaii.PushFont(UiBuilder.MonoFont))
+                CkGui.TextFrameAlignedInline($"{INCOMING_ID} ({_requests.TotalIncoming})");
+        }
+        _hoveringIncoming = ImGui.IsItemHovered();
+        if (ImGui.IsItemClicked())
+            _outgoingExpanded = !_outgoingExpanded;
+
+        ImGui.Separator();
+        if (!_outgoingExpanded)
+            return;
+
+        using var indent = ImRaii.PushIndent(CkGui.IconSize(FAI.EllipsisV).X + ImGui.GetStyle().ItemSpacing.X, false);
+        foreach (var entry in _incoming)
+            entry.DrawRequestEntry(true);
+
+        ImGui.Separator();
+    }
+
+    private void RecreateRequests()
+    {
+        _incoming = _requests.Incoming.Select(r => new DrawSundesmoRequest("Incoming Requests", r, _hub, _requests, _sundesmos)).ToImmutableList();
+        _outgoing = _requests.Outgoing.Select(r => new DrawSundesmoRequest("Sent Requests", r, _hub, _requests, _sundesmos)).ToImmutableList();
+    }
 }

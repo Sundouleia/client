@@ -8,7 +8,7 @@ using OtterGui.Text;
 
 namespace Sundouleia.Gui.Components;
 
-/// <summary> The inherited class of the draw folder which determines what folders should draw what components. </summary>
+// Will be reworked later as we introduce groups and things.
 public class DrawFolderTag : DrawFolderBase
 {
     public DrawFolderTag(string id, IImmutableList<DrawUserPair> drawPairs, IImmutableList<Sundesmo> allPairs,

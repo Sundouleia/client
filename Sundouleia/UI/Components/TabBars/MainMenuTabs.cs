@@ -18,8 +18,8 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
     public enum SelectedTab
     {
         Homepage,
-        Whitelist,
         Requests,
+        Whitelist,
         Radar,
         RadarChat,
         Account,
@@ -35,11 +35,11 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         AddDrawButton(FontAwesomeIcon.Home, SelectedTab.Homepage, "Homepage",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Homepage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.Whitelist));
 
+        AddDrawButton(FontAwesomeIcon.Inbox, SelectedTab.Requests, "Incoming / Outgoing Requests",
+            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
+
         AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.Whitelist, "User Whitelist", 
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Whitelist, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
-
-        AddDrawButton(FontAwesomeIcon.Inbox, SelectedTab.Requests, "Incoming / Outgoing Requests", 
-            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
 
         AddDrawButton(FontAwesomeIcon.BroadcastTower, SelectedTab.Radar, "Connect easily with others!",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Radar, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.RadarChat));

@@ -12,6 +12,7 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Hub;
 using System.Globalization;
 using System.Reflection;
 
@@ -26,11 +27,12 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly ServerConfigManager _serverConfigs;
     private readonly MainHub _hub;
     private readonly MainMenuTabs _tabMenu;
+    private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly TutorialService _guides;
     private readonly HomepageTab _homepage;
     private readonly WhitelistTab _whitelist;
-    private readonly RequestsTab _requests;
+    private readonly RequestsTab _requestsTab;
     private readonly RadarTab _radar;
     private readonly RadarChatTab _radarChat;
     private readonly AccountTab _account;
@@ -41,20 +43,22 @@ public class MainUI : WindowMediatorSubscriberBase
     public string _requestMessage   = string.Empty;
 
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
-        ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, SundesmoManager pairs,
-        TutorialService guides, HomepageTab home, WhitelistTab whitelist, RequestsTab requests,
-        RadarTab radar, RadarChatTab chat, AccountTab account) : base(logger, mediator, "###MainUI")
+        ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
+        SundesmoManager pairs, TutorialService guides, HomepageTab home, WhitelistTab whitelist, 
+        RequestsTab requestsTab, RadarTab radar, RadarChatTab chat, AccountTab account) 
+        : base(logger, mediator, "###MainUI")
     {
         _config = config;
         _serverConfigs = serverConfigs;
         _hub = hub;
         _tabMenu = tabMenu;
+        _requests = requests;
         _sundesmos = pairs;
         _guides = guides;
 
         _homepage = home;
+        _requestsTab = requestsTab;
         _whitelist = whitelist;
-        _requests = requests;
         _radar = radar;
         _radarChat = chat;
         _account = account;
@@ -168,11 +172,11 @@ public class MainUI : WindowMediatorSubscriberBase
             case MainMenuTabs.SelectedTab.Homepage:
                 _homepage.DrawHomepageSection();
                 break;
+            case MainMenuTabs.SelectedTab.Requests:
+                _requestsTab.DrawRequestsSection();
+                break;
             case MainMenuTabs.SelectedTab.Whitelist:
                 _whitelist.DrawWhitelistSection();
-                break;
-            case MainMenuTabs.SelectedTab.Requests:
-                _requests.DrawRequestsSection();
                 break;
             case MainMenuTabs.SelectedTab.Radar:
                 _radar.DrawRadarSection();
@@ -200,10 +204,13 @@ public class MainUI : WindowMediatorSubscriberBase
         {
             UiService.SetUITask(async () =>
             {
-                await _hub.UserSendRequest(new(new(_uidToSentTo), false, _requestMessage));
+                var res = await _hub.UserSendRequest(new(new(_uidToSentTo), false, _requestMessage));
                 _uidToSentTo = string.Empty;
                 _requestMessage = string.Empty;
                 _creatingRequest = false;
+                // Add the request if it was successful!
+                if (res.ErrorCode is SundouleiaApiEc.Success)
+                    _requests.AddRequest(res.Value!);
             });
         }
         if (!string.IsNullOrEmpty(_uidToSentTo))

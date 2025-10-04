@@ -13,7 +13,7 @@ namespace Sundouleia.Gui.MainWindow;
 public class WhitelistTab : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
-    private readonly SundesmoManager _sundesmoManager;
+    private readonly SundesmoManager _sundesmos;
     private readonly DrawEntityFactory _factory;
 
     private List<IDrawFolder> _drawFolders;
@@ -23,10 +23,10 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         : base(logger, mediator)
     {
         _config = config;
-        _sundesmoManager = sundesmos;
+        _sundesmos = sundesmos;
         _factory = factory;
 
-        Mediator.Subscribe<RefreshUiMessage>(this, _ => _drawFolders = GetDrawFolders());
+        Mediator.Subscribe<RefreshWhitelistMessage>(this, _ => _drawFolders = GetDrawFolders());
         _drawFolders = GetDrawFolders();
     }
 
@@ -70,7 +70,7 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     {
         List<IDrawFolder> drawFolders = [];
         // the list of all direct pairs.
-        var allPairs = _sundesmoManager.DirectPairs;
+        var allPairs = _sundesmos.DirectPairs;
         // the filters list of pairs will be the pairs that match the filter.
         var filteredPairs = allPairs
             .Where(p =>

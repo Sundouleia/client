@@ -30,7 +30,4 @@ public class DrawEntityFactory
 
     public DrawUserPair CreateDrawPair(string id, Sundesmo sundesmo)
         => new DrawUserPair(id + sundesmo.UserData.UID, sundesmo, _mediator, _hub, _nameDisplay);
-
-    public DrawUserRequest CreateDrawPairRequest(string id, PendingRequest request)
-        => new DrawUserRequest(id, request, _hub);
 }

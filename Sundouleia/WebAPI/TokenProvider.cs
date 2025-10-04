@@ -110,16 +110,16 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
             if (!isRenewal)
             {
                 // if we are not renewing, we are requesting a new token
-                Logger.LogDebug("GetNewToken: Requesting new token", LoggerType.JwtTokens);
+                Logger.LogTrace("GetNewToken: Requesting new token", LoggerType.JwtTokens);
 
                 // check the identifier type.
                 if (identifier is SecretKeyJwtIdentifier secretKeyIdentifier)
                 {
-                    Logger.LogDebug("Calling the SecretKeyJwtIdentifier", LoggerType.JwtTokens);
+                    Logger.LogTrace("Calling the SecretKeyJwtIdentifier", LoggerType.JwtTokens);
                     // Use the secret key for authentication
-                    var secretKey = secretKeyIdentifier.SecretKey;
+                    var secretKey = secretKeyIdentifier.SecretKey.GetHash256();
                     var forceMain = secretKeyIdentifier.ExpectPrimary.ToString();
-                    Logger.LogDebug("GetNewToken: SecretKey {secretKey}", secretKey);
+                    // Logger.LogDebug("GetNewToken: SecretKey {secretKey}", secretKey);
                     // var auth = secretKey.GetHash256(); // leaving out this because i took out double encryption to just single for now
 
                     // Set the token URI to the appropriate endpoint for secret key authentication
@@ -127,7 +127,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                         .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
 
-                    Logger.LogTrace("Token URI: "+tokenUri, LoggerType.JwtTokens);
+                    // Logger.LogTrace("Token URI: "+tokenUri, LoggerType.JwtTokens);
                     result = await _httpClient.PostAsync(tokenUri, new FormUrlEncodedContent(new[]
                     {
                         new KeyValuePair<string, string>("charaIdent", await SundouleiaSecurity.GetClientIdentHash().ConfigureAwait(false)),
@@ -137,7 +137,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                 }
                 else if (identifier is LocalContentIDJwtIdentifier localContentIDIdentifier)
                 {
-                    Logger.LogDebug("Calling the LocalContentIDJwtIdentifier", LoggerType.JwtTokens);
+                    Logger.LogTrace("Calling the LocalContentIDJwtIdentifier", LoggerType.JwtTokens);
                     // Use the local content ID for authentication
                     var localContentID = localContentIDIdentifier.LocalContentID;
 
@@ -150,7 +150,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                     result = await _httpClient.PostAsync(tokenUri, new FormUrlEncodedContent(new[]
                     {
                         new KeyValuePair<string, string>("charaIdent", await SundouleiaSecurity.GetClientIdentHash().ConfigureAwait(false)),
-                        new KeyValuePair<string, string>("localContentID", localContentID),
+                        new KeyValuePair<string, string>("contentId", localContentID),
                     }), token).ConfigureAwait(false);
                 }
                 else
@@ -181,7 +181,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
             response = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
 
             // ensure the response was successful
-            Logger.LogDebug("GetNewToken: Response "+response);
+            Logger.LogTrace($"GetNewToken: Response {response}", LoggerType.JwtTokens);
             result.EnsureSuccessStatusCode();
             // add the response to the token cache
             _tokenCache[identifier] = response;
@@ -281,7 +281,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
             }
             else if (_lastJwtIdentifier is LocalContentIDJwtIdentifier localContentIDIdentifier)
             {
-                // Logger.LogDebug("GetIdentifier: Using last known good LocalContentID");
+                // Logger.LogDebug("GetIdentifier: Using last known good LocalContentID", LoggerType.JwtTokens);
                 // Use LocalContentIDJwtIdentifier if it's a one-time use case, e.g., after a specific event
                 // This assumes _lastJwtIdentifier is set to a LocalContentIDJwtIdentifier in such cases
                 return localContentIDIdentifier;

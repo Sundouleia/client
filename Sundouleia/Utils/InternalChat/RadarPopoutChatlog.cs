@@ -26,7 +26,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
     private static RichTextFilter AllowedTypes = RichTextFilter.Emotes;
 
     private readonly MainHub _hub;
-    private readonly SundesmoManager _sundesmoManager;
+    private readonly SundesmoManager _sundesmos;
 
     private bool _showEmotes = false;
     public PopoutRadarChatlog(SundouleiaMediator mediator, MainHub hub, SundesmoManager pairs) 
@@ -34,7 +34,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
     {
         Mediator = mediator;
         _hub = hub;
-        _sundesmoManager = pairs;
+        _sundesmos = pairs;
 
         // Load the chat log from most recent session, if any.
         LoadTerritoryChatLog();
@@ -73,7 +73,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         // 3) Adjust sender name based on special conditions.
         if (message.Sender.Tier is CkVanityTier.KinkporiumMistress)
             finalName = $"Cordy";
-        else if (_sundesmoManager.GetUserOrDefault(message.Sender) is { } sundesmo)
+        else if (_sundesmos.GetUserOrDefault(message.Sender) is { } sundesmo)
             finalName = $"{sundesmo.GetNickAliasOrUid()} ({message.Sender.UID[..4]})";
         else if (fromSelf)
             finalName = $"{message.Sender.AliasOrUID} ({message.Sender.UID[..4]})";

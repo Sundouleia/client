@@ -85,7 +85,7 @@ public partial class MainHub
                 await LoadOnlineSundesmos().ConfigureAwait(false);
                 await LoadRequests().ConfigureAwait(false);
                 // Load in all local data for the current profile.
-                _dataSync.SetDataForAccountProfile();
+                _profiles.SetDataForAccountProfile();
                 // once data is synchronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;
                 Mediator.Publish(new ConnectedMessage());
@@ -223,8 +223,8 @@ public partial class MainHub
             await _hubConnection.StartAsync(freshAccountCTS).ConfigureAwait(false);
 
             // Obtain the fresh account details.
-            Logger.LogDebug("Calling OneTimeUseAccountGeneration.", LoggerType.ApiCore);
-            var accountDetails = await _hubConnection.InvokeAsync<(string, string)>("OneTimeUseAccountGeneration");
+            Logger.LogDebug("Calling OneTimeUseAccountGen.", LoggerType.ApiCore);
+            var accountDetails = await _hubConnection.InvokeAsync<(string, string)>("OneTimeUseAccountGen");
 
             Logger.LogInformation("New Account Details Fetched.", LoggerType.ApiCore);
             return accountDetails;
@@ -471,7 +471,7 @@ public partial class MainHub
                 ServerStatus = ServerState.Connected;
                 await LoadInitialSundesmos().ConfigureAwait(false);
                 await LoadOnlineSundesmos().ConfigureAwait(false);
-                _dataSync.SetDataForAccountProfile();
+                _profiles.SetDataForAccountProfile();
                 // once data is syncronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;
                 Mediator.Publish(new ConnectedMessage());

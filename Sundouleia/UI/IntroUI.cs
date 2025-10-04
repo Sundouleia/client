@@ -98,118 +98,80 @@ public class IntroUi : WindowMediatorSubscriberBase
 
     private void DrawWelcomePage()
     {
-        CkGui.FontText("Welcome to Project Sundouleia!", UiFontService.UidFont);
+        CkGui.FontText("Welcome to Sundouleia!", UiFontService.UidFont);
 
         ImGui.Separator();
-        ImGui.TextWrapped("Project Sundouleia is a highly ambitious project that has been devloped over the course of a year in closed Beta, " +
-            "aiming to provide sundesmos with an all-in-one BDSM plugin free of charge to enjoy.");
-        ImGui.Spacing();
-        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedPink))
-            CkGui.FontText("The Plugin Contains a variety of Modules, such as:", UiFontService.UidFont);
+        ImGui.TextWrapped("Sundouleia is a plugin that revives player data syncronization in a manner that aims " +
+            "to keep its functionality for the betterment of community health and longevity.");
 
-        // if the title text is pressed, proceed.
-        if (ImGui.IsItemClicked()) _readFirstPage = true;
+        CkGui.SeparatorSpaced(ImGuiColors.ParsedGold.ToUint());
+
+        ImGui.TextWrapped("If you are even thinking about using this please know that you are going to be prone to " +
+            "errors, this is still in the process of being debugged, and file transfers do not work yet.");
+
+        CkGui.SeparatorSpaced(ImGuiColors.ParsedGold.ToUint());
+
+        CkGui.FontText("Plugin Features:", UiFontService.UidFont);
+        if (ImGui.IsItemClicked()) 
+            _readFirstPage = true;
 
         CkGui.ColorText("- Profiles", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" Customizable Sundouleia AdventurePlate to present yourself and/or predicament!");
+        CkGui.TextInline("Fully Customizable Sundouleia AdventurePlate-Like Profiles!", false);
 
-        CkGui.ColorText("- Puppeteer", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" A PuppetMaster Variant with Alias Lists, Per-Player triggers, and more!");
+        CkGui.ColorText("- Pair Grouping", ImGuiColors.ParsedGold);
+        CkGui.TextInline("Arrange your added pairs into various groups to help change others in bulk!", false);
 
-        CkGui.ColorText("- Triggers & Patterns", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" Improved FFXIV-VibePlugin Variant with *all* functionalities");
+        CkGui.ColorText("- Pair Requests", ImGuiColors.ParsedGold);
+        CkGui.TextInline("Can send requests given only one code now, and accept or decline any pending!", false);
 
-        CkGui.ColorText("- Alarms", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" Behaves just like Lovense Alarms");
+        CkGui.ColorText("- Radar System", ImGuiColors.ParsedGold);
+        CkGui.TextInline("Radars embed sundouleia in-world, allowing you to meet others in your zone!", false);
 
-        CkGui.ColorText("- Sundouleia Vibe Remotes", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" Mimiced Replica of Lovense Remote with Keybinds");
+        CkGui.ColorText("- Radar Chat", ImGuiColors.ParsedGold);
+        CkGui.TextInline("World-Zone localized chats to converse with other users in!", false);
 
-        CkGui.ColorText("- Realistic Gag Garble Speech", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" Can account for up to 3 gags!");
-
-        CkGui.ColorText("- Restriction Sets", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" Lockable Glamour's on your Character.");
-
-        CkGui.ColorText("- Cursed Loot", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" Brings Bondage Mimic Chests to FFXIV duties!");
-
-        CkGui.ColorText("- Hardcore Control", ImGuiColors.ParsedGold);
-        ImGui.SameLine();
-        ImGui.Text(" Maximize Immersion and Helplessness with others (at your own risk!)");
-
-        ImGui.Spacing();
-        ImGui.TextWrapped("Clicking The large pink text above will advance you to the acknowledgements page. " +
-            "I Hope you enjoy all the features that this plugin has to offer, and have a great time using it. ♥");
+        ImGui.TextWrapped("Clicking the big Plugin Features text above will advance you to acknowledgements.");
     }
 
     private void DrawAcknowledgement()
     {
-        using (UiFontService.UidFont.Push())
-        {
-            ImGuiUtil.Center("Acknowledgement Of Usage & Privacy");
-        }
+        CkGui.FontTextCentered("Acknowledgement Of Usage & Privacy", UiFontService.UidFont);
         ImGui.Separator();
-        using (UiFontService.UidFont.Push())
-        {
-            CkGui.ColorTextCentered("YOU WILL ONLY SEE THIS PAGE ONCE.", ImGuiColors.DalamudRed);
-            CkGui.ColorTextCentered("PLEASE READ CAREFULLY BEFORE PROCEEDING.", ImGuiColors.DalamudRed);
-        }
+        CkGui.FontTextCentered("YOU WILL ONLY SEE THIS PAGE ONCE", UiFontService.UidFont, ImGuiColors.DalamudRed);
+        CkGui.FontTextCentered("READ CAREFULLY BEFORE PROCEEDING", UiFontService.UidFont, ImGuiColors.DalamudRed);
         ImGui.Separator();
 
-        ImGui.TextWrapped("Being a Server-Side Plugin, and a plugin full of kinky individuals, we all know there will always be some of *those* people " +
-            "who will try to ruin the fun for everyone.");
+        ImGui.TextWrapped("Being a Server-Side Plugin, there are always going to be *those* people who will try to ruin the fun for everyone.");
         ImGui.Spacing();
-        CkGui.ColorTextWrapped("As Such, by joining Sundouleia, you must acknowledge & accept the following:", ImGuiColors.DalamudRed);
+        CkGui.TextWrapped("As Such, by joining Sundouleia, you must acknowledge & accept the following:");
 
         using var borderColor = ImRaii.PushColor(ImGuiCol.Border, ImGuiColors.DalamudRed);
         using var scrollbarSize = ImRaii.PushStyle(ImGuiStyleVar.ScrollbarSize, 12f);
 
-        using (ImRaii.Child("AgreementWindow", new Vector2(ImGui.GetContentRegionAvail().X, 300f), true))
+        var remainingHeight = ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing();
+        using (ImRaii.Child("AgreementWindow", new Vector2(ImGui.GetContentRegionAvail().X, remainingHeight), true))
         {
             ImGui.Spacing();
-            CkGui.ColorText("Consent:", ImGuiColors.ParsedGold);
-            ImGui.TextWrapped("BDSM, at its foundation, highly values the aspest of consent. By using Sundouleia, you understand that you must abide by boundaries " +
-                "others set for you, and the limits that they define. If you push these limits against their will or pressure them to give you more than they are comfortable with, it will not be tolerated.");
+            CkGui.ColorText("WIP:", ImGuiColors.ParsedGold);
+            ImGui.TextWrapped("This area will likely be updated in the future we the rest of the plugin is fine tuned.");
             ImGui.Spacing();
             ImGui.Spacing();
 
-
-            CkGui.ColorText("Privacy:", ImGuiColors.ParsedGold);
-            ImGui.TextWrapped("You Acknowledge that when using Sundouleia, your personal information such as Character Name and Homeworld are censored and replaced with " +
-                "an anonymous identity. If you give up this information about you and it is used against you, that is of your own fault. Be responsible about how you go about meeting up with others.");
-            ImGui.Spacing();
-            ImGui.Spacing();
-
-            CkGui.ColorText("Hardcore Control:", ImGuiColors.ParsedGold);
-            ImGui.TextWrapped("Hardcore Functionality in Sundouleia directly affects your game at a core level, such as preventing you from typing, blocking your sight, restricting you from movement, " +
-                "forcing you to perform emotes, blocking out certain actions from being used, and controling the GCD's of your actions.");
-            ImGui.Spacing();
-            ImGui.TextWrapped("While these are all safe to use, be careful who you give these permissions access to. I have granted you with a great degree of control towards others, you are expected to " +
-                "take care of these individuals if granted access over them, and to not be wreckless.");
+            CkGui.ColorText("Assume That:", ImGuiColors.ParsedGold);
+            ImGui.TextWrapped("Respect the authors descisions and judgements on what happens with your profile, " +
+                "if you are breeaching the rules or not being responsible, your account can be revoked.");
             ImGui.Spacing();
             ImGui.Spacing();
 
             CkGui.ColorText("Predatory Behavior:", ImGuiColors.DalamudRed);
-            ImGui.TextWrapped("The Main Dev of Sundouleia has endured years of manipulative predatory abuse, and as such with firsthand experience, is familiar with what kinds of reports and behaviors to " +
-                "identify as 'bait reports' or 'actual reports'. Reports are handled very carefully by our team, and taken very seriously.");
+            ImGui.TextWrapped("Reports are handled carefully by our team, and taken very seriously.");
             ImGui.Spacing();
-            ImGui.TextWrapped("If you notice any such behavior occuring, report it in detail. We have intentionally designed our flagged Users to remain unaffected on their s end, so they wont be " +
-                "able to deduce who reported them until it is too late.");
+            ImGui.TextWrapped("If you notice any such behavior occuring, report it in detail. We have designed our system such that any reported players are" +
+                "unaffected until the report is resolved, so they will not be able to witch hunt.");
             ImGui.Spacing();
         }
 
-        ImGui.Spacing();
-        CkGui.ColorTextCentered("Click this Button below once you have read and understood the above.", ImGuiColors.DalamudRed);
-        if(ImGui.Button("Proceed To Account Creation.", new Vector2(ImGui.GetContentRegionAvail().X, ImGui.GetFrameHeightWithSpacing())))
+        if(ImGui.Button("I Understand, Proceed To Account Creation.", new Vector2(ImGui.GetContentRegionAvail().X, ImGui.GetFrameHeightWithSpacing())))
         {
             _config.Current.AcknowledgementUnderstood = true;
             _config.Save();
@@ -219,21 +181,18 @@ public class IntroUi : WindowMediatorSubscriberBase
 
     private void DrawAccountSetup()
     {
-        using (UiFontService.UidFont.Push())
-        {
-            ImGuiUtil.Center("Primary Account Creation");
-        }
-        ImGui.Separator();
-        ImGui.Spacing();
+        CkGui.FontTextCentered("Primary Account Creation", UiFontService.UidFont);
+        
+        CkGui.SeparatorSpaced();
 
         CkGui.ColorText("Generating your Primary Account", ImGuiColors.ParsedGold);
         ImGui.TextWrapped("You can ONLY PRESS THE BUTTON BELOW ONCE.");
-        CkGui.ColorTextWrapped("The Primary Account IS LINKED TO YOUR CURRENTLY LOGGED IN CHARACTER.", ImGuiColors.DalamudRed);
-        ImGui.TextWrapped("If you wish have your primary account on another character, log into them first!");
+        CkGui.ColorTextWrapped("The Primary Account is linked to all other created profiles made later.", ImGuiColors.DalamudRed);
+        ImGui.TextWrapped("If you remove this profile, all other profiles will also be deleted!");
         ImGui.Spacing();
 
-        ImGui.AlignTextToFramePadding();
-        CkGui.ColorText("Generate Primary Account: ", ImGuiColors.ParsedGold);
+
+        CkGui.ColorTextFrameAligned("Generate Primary Account: ", ImGuiColors.ParsedGold);
 
         // Under the condition that we are not recovering an account, display the primary account generator:
         if (_secretKey.IsNullOrWhitespace())
@@ -247,18 +206,13 @@ public class IntroUi : WindowMediatorSubscriberBase
             }
             // while we are awaiting to fetch the details and connect display a please wait text.
             if (_fetchAccountDetailsTask != null && !_fetchAccountDetailsTask.IsCompleted)
-            {
                 CkGui.ColorTextWrapped("Fetching details, please wait...", ImGuiColors.DalamudYellow);
-            }
         }
-
-        // here we will draw out a seperator line.
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
 
         // Below this we will provide the user with a space to insert an existing UID & Key to
         // log back into a account they already have if they needed to reset for any reason.
+        CkGui.SeparatorSpaced();
+
         CkGui.FontText("Does your Character already have a Primary Account?", UiFontService.UidFont);
         CkGui.ColorText("Retreive the key from where you saved it, or the discord bot, and insert it below.", ImGuiColors.ParsedGold);
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * .85f);
@@ -266,7 +220,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
         ImGui.Spacing();
         CkGui.ColorText("ServerState (For Debug Purposes): " + MainHub.ServerStatus, ImGuiColors.DalamudGrey);
-        CkGui.ColorText("Auth Exists for character (Debug): " + _serverConfigs.CharaHasLoginAuth(), ImGuiColors.DalamudGrey);
+        CkGui.ColorText("Auth Exists for Character (Debug): " + _serverConfigs.CharaHasLoginAuth(), ImGuiColors.DalamudGrey);
         if(_secretKey.Length == 64)
         {
             CkGui.ColorText("Connect with existing Key?", ImGuiColors.ParsedGold);
@@ -302,9 +256,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         }
 
         if (_initialAccountCreationTask is not null && !_initialAccountCreationTask.IsCompleted)
-        {
             CkGui.ColorTextWrapped("Attempting to connect for First Login, please wait...", ImGuiColors.DalamudYellow);
-        }
     }
 
     private async Task PerformFirstLoginAsync()
@@ -335,6 +287,9 @@ public class IntroUi : WindowMediatorSubscriberBase
     {
         try
         {
+            if (!_serverConfigs.CharaHasLoginAuth())
+                _serverConfigs.GenerateAuthForCurrentCharacter();
+
             // Begin by fetching the account details for the player. If this fails we will throw to the catch statement and perform an early return.
             var accountDetails = await _hub.FetchFreshAccountDetails();
 
@@ -343,17 +298,16 @@ public class IntroUi : WindowMediatorSubscriberBase
 
             // However, if an auth already exists for the current content ID, and we are trying to create a new primary account, this should not be possible, so early throw.
             if (_serverConfigs.CharaHasValidLoginAuth())
-                throw new InvalidOperationException("Auth already exists for current character, cannot create new Primary auth if one already exists!");
-
-            // if the auth does not exist for the current character, we can create a new one.
-            _serverConfigs.GenerateAuthForCurrentCharacter();
+                throw new InvalidOperationException("Auth already exists, cannot create new Primary auth if one already exists!");
 
             // set the key to that newly added authentication
             var addedIdx = _serverConfigs.AddProfileToAccount(new()
             {
                 ProfileLabel = $"Main Account Key - ({DateTime.Now:yyyy-MM-dd})",
+                UserUID = accountDetails.Item1,
                 Key = accountDetails.Item2,
                 IsPrimary = true,
+                HadValidConnection = true,
             });
             // create the new secret key object to store.
             _serverConfigs.SetProfileForLoginAuth(PlayerData.ContentId, addedIdx);

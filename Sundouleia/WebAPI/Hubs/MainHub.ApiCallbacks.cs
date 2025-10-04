@@ -101,7 +101,7 @@ public partial class MainHub
     public Task Callback_AddPair(UserPair dto)
     {
         Logger.LogDebug($"Callback_AddPair: {dto}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmoManager.AddSundesmo(dto));
+        Generic.Safe(() => _sundesmos.AddSundesmo(dto));
         return Task.CompletedTask;
     }
 
@@ -111,7 +111,7 @@ public partial class MainHub
     public Task Callback_RemovePair(UserDto dto)
     {
         Logger.LogDebug($"Callback_RemovePair: {dto}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmoManager.RemoveSundesmo(dto));
+        Generic.Safe(() => _sundesmos.RemoveSundesmo(dto));
         return Task.CompletedTask;
     }
 
@@ -121,10 +121,10 @@ public partial class MainHub
     ///     is only for requests sent by others. We can safely assume all requests 
     ///     have us as the target.
     /// </summary>
-    public Task Callback_AddRequest(PendingRequest dto)
+    public Task Callback_AddRequest(SundesmoRequest dto)
     {
         Logger.LogDebug($"Callback_AddPairRequest: {dto}", LoggerType.Callbacks);
-        // do something here with the new request.
+        _requests.AddRequest(dto);
         return Task.CompletedTask;
     }
 
@@ -132,10 +132,10 @@ public partial class MainHub
     ///     Sent by server when another user canceled or rejected 
     ///     a pending request you have sent. 
     /// </summary>
-    public Task Callback_RemoveRequest(PendingRequest dto)
+    public Task Callback_RemoveRequest(SundesmoRequest dto)
     {
         Logger.LogDebug($"Callback_RemoveRequest: {dto}", LoggerType.Callbacks);
-        // do something here with the removed request.
+        _requests.RemoveRequest(dto);
         return Task.CompletedTask;
     }
     #endregion Pair/Request Callbacks
@@ -165,7 +165,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateFull(IpcUpdateFull dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateFull: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        _sundesmoManager.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData);
+        _sundesmos.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData);
         return Task.CompletedTask;
     }
 
@@ -176,7 +176,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateMods(IpcUpdateMods dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateMods: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        _sundesmoManager.ReceiveIpcUpdateMods(dto.User, dto.ModData);
+        _sundesmos.ReceiveIpcUpdateMods(dto.User, dto.ModData);
         return Task.CompletedTask;
     }
 
@@ -188,7 +188,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateOther(IpcUpdateOther dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateOther: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        _sundesmoManager.ReceiveIpcUpdateOther(dto.User, dto.IpcData);
+        _sundesmos.ReceiveIpcUpdateOther(dto.User, dto.IpcData);
         return Task.CompletedTask;
     }
 
@@ -199,7 +199,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateSingle(IpcUpdateSingle dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateSingle: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        _sundesmoManager.ReceiveIpcUpdateSingle(dto.User, dto.ObjType, dto.Type, dto.NewData);
+        _sundesmos.ReceiveIpcUpdateSingle(dto.User, dto.ObjType, dto.Type, dto.NewData);
         return Task.CompletedTask;
     }
 
@@ -281,7 +281,7 @@ public partial class MainHub
     public Task Callback_UserOffline(UserDto dto)
     {
         Logger.LogDebug($"Callback_SendOffline: [{dto}]", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmoManager.MarkSundesmoOffline(dto.User)) ;
+        Generic.Safe(() => _sundesmos.MarkSundesmoOffline(dto.User)) ;
         return Task.CompletedTask;
     }
 
@@ -291,7 +291,7 @@ public partial class MainHub
     public Task Callback_UserOnline(OnlineUser dto)
     {
         Logger.LogDebug("Callback_SendOnline: " + dto, LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmoManager.MarkSundesmoOnline(dto));
+        Generic.Safe(() => _sundesmos.MarkSundesmoOnline(dto));
         return Task.CompletedTask;
     }
 
@@ -357,13 +357,13 @@ public partial class MainHub
         _hubConnection!.On(nameof(Callback_RemovePair), act);
     }
 
-    public void OnAddRequest(Action<PendingRequest> act)
+    public void OnAddRequest(Action<SundesmoRequest> act)
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_AddRequest), act);
     }
 
-    public void OnRemoveRequest(Action<PendingRequest> act)
+    public void OnRemoveRequest(Action<SundesmoRequest> act)
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_RemoveRequest), act);

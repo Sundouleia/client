@@ -34,8 +34,9 @@ public class GroupsConfig : IHybridSavable
             ["Groups"] = JObject.FromObject(Current),
         }.ToString(Formatting.Indented);
     }
-    public GroupsConfig(HybridSaveService saver)
+    public GroupsConfig(ILogger<GroupsConfig> logger, HybridSaveService saver)
     {
+        _logger = logger;
         _saver = saver;
         Load();
     }
@@ -48,6 +49,7 @@ public class GroupsConfig : IHybridSavable
         if (!File.Exists(file))
         {
             _logger.LogWarning("Config file not found for: " + file);
+            _saver.Save(this);
             return;
         }
 

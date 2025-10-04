@@ -137,8 +137,8 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
             // Services that require an initial constructor call during bootup.
             _runtimeServiceScope.ServiceProvider.GetRequiredService<UiFontService>();
             // get the required service for the online player manager (and notification service if we add it)
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<DistributorService>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<AccountService>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<DistributionService>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<AccountManager>();
             // stuff that should probably be a hosted service but isn't yet.
             _runtimeServiceScope.ServiceProvider.GetRequiredService<DtrBarService>();
         }

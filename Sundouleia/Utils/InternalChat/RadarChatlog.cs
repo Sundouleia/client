@@ -30,7 +30,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     private readonly ILogger<RadarChatLog> _logger;
     private readonly MainHub _hub;
     private readonly MainMenuTabs _tabMenu;
-    private readonly SundesmoManager _sundesmoManager;
+    private readonly SundesmoManager _sundesmos;
     private readonly TutorialService _guides;
 
     // Private variables that are used by internal methods.
@@ -41,10 +41,11 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         MainMenuTabs tabs, SundesmoManager pairs, TutorialService guides) 
         : base(0, "Radar Chat", 1000)
     {
+        _logger = logger;
         Mediator = mediator;
         _hub = hub;
         _tabMenu = tabs;
-        _sundesmoManager = pairs;
+        _sundesmos = pairs;
         _guides = guides;
 
         // Load the chat log from most recent session, if any.
@@ -106,7 +107,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         // 4) Adjust sender name based on special conditions.
         if (message.Sender.Tier is CkVanityTier.KinkporiumMistress)
             finalName = $"Cordy";
-        else if (_sundesmoManager.GetUserOrDefault(message.Sender) is { } sundesmo)
+        else if (_sundesmos.GetUserOrDefault(message.Sender) is { } sundesmo)
             finalName = $"{sundesmo.GetNickAliasOrUid()} ({message.Sender.UID[..4]})";
         else if (fromSelf)
             finalName = $"{message.Sender.AliasOrUID} ({message.Sender.UID[..4]})";

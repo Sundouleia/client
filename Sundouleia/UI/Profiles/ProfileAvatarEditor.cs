@@ -87,7 +87,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
 
         ImGui.SameLine();
         var pos = ImGui.GetCursorScreenPos(); 
-        wdl.AddDalamudImageRounded(curAvatar, pos, pos + curAvatar.Size, 128f);
+        wdl.AddDalamudImageRounded(curAvatar, pos, curAvatar.Size, 128f);
         // SameLine() the spacing equal to the distance of the image.
         ImGuiHelpers.ScaledRelativeSameLine(256, spacing);
 

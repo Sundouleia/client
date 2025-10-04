@@ -65,7 +65,7 @@ public static class CosmeticLabels
             foreach (var styleBG in Enum.GetValues<PlateBG>())
             {
                 var key = part.ToString() + "_Background_" + styleBG.ToString();
-                var value = $"CosmeticImages\\{part}\\Background_{styleBG}.png";
+                var value = $"ProfileElements\\{part}\\Background_{styleBG}.png";
                 dict[key] = value;
             }
         }
@@ -75,7 +75,7 @@ public static class CosmeticLabels
             foreach (var styleBorder in Enum.GetValues<PlateBorder>())
             {
                 var key = part.ToString() + "_Border_" + styleBorder.ToString();
-                var value = $"CosmeticImages\\{part}\\Border_{styleBorder}.png";
+                var value = $"ProfileElements\\{part}\\Border_{styleBorder}.png";
                 dict[key] = value;
             }
         }
@@ -85,7 +85,7 @@ public static class CosmeticLabels
             foreach (var styleOverlay in Enum.GetValues<PlateOverlay>())
             {
                 var key = part.ToString() + "_Overlay_" + styleOverlay.ToString();
-                var value = $"CosmeticImages\\{part}\\Overlay_{styleOverlay}.png";
+                var value = $"ProfileElements\\{part}\\Overlay_{styleOverlay}.png";
                 dict[key] = value;
             }
         }

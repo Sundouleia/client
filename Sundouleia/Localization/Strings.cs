@@ -66,7 +66,7 @@ namespace Sundouleia.Localization
             "RIGHT-CLICK => Set a nickname for this User.\n" +
             "Triple Dots => View Interactable actions for this User.");
 
-        public readonly string Step5Title = Loc.Localize("HelpMainUi_Step5Title", "Adding Pairs");
+        public readonly string Step5Title = Loc.Localize("HelpMainUi_Step5Title", "Adding Users");
         public readonly string Step5Desc = Loc.Localize("HelpMainUi_Step5Desc", "Send out requests here.");
         public readonly string Step5DescExtended = Loc.Localize("HelpMainUi_Step5DescExtended", "Sent requests expire after " +
             "3 days if not responded to, and can also be canceled at anytime.");
@@ -76,81 +76,85 @@ namespace Sundouleia.Localization
         public readonly string Step6DescExtended = Loc.Localize("HelpMainUi_Step6DescExtended", "These can provide context for who's sending " +
             "the request, helping inform the recipient who you are!");
 
-        public readonly string Step7Title = Loc.Localize("HelpMainUi_Step7Title", "The Radar");
-        public readonly string Step7Desc = Loc.Localize("HelpMainUi_Step7Desc", "Radars allow for proximity-based easy pairing in gathered groups, and temporary pair requesting.\n" +
+        public readonly string Step7Title = Loc.Localize("HelpMainUi_Step7Title", "Requests");
+        public readonly string Step7Desc = Loc.Localize("HelpMainUi_Step7Desc", "View any incoming or outgoing requests here.");
+        public readonly string Step7DescExtended = Loc.Localize("HelpMainUi_Step7DescExtended", "You can accept, decline, or cancel requests here.");
+
+        public readonly string Step8Title = Loc.Localize("HelpMainUi_Step7Title", "The Radar");
+        public readonly string Step8Desc = Loc.Localize("HelpMainUi_Step7Desc", "Radars allow for proximity-based easy pairing in gathered groups, and temporary pair requesting.\n" +
             "Radars are made by design to be tedious as a groups size grows, which helps ease the concern of non-sundouleia users feeling left out in larger community attractions / venues.");
 
-        public readonly string Step8Title = Loc.Localize("HelpMainUi_Step8Title", "Radar Users");
-        public readonly string Step8Desc = Loc.Localize("HelpMainUi_Step8Desc", "Other Users with the Radar feature enabled will appear below when " +
+        public readonly string Step9Title = Loc.Localize("HelpMainUi_Step8Title", "Radar Users");
+        public readonly string Step9Desc = Loc.Localize("HelpMainUi_Step8Desc", "Other Users with the Radar feature enabled will appear below when " +
             "in the same world/area as you.");
-        public readonly string Step8DescExtended = Loc.Localize("HelpMainUi_Step8DescExtended", "You can send temp pairing request to them in this window.");
+        public readonly string Step9DescExtended = Loc.Localize("HelpMainUi_Step8DescExtended", "You can send temp pairing request to them in this window.");
 
-        public readonly string Step9Title = Loc.Localize("HelpMainUi_Step9Title", "Radar Chat");
-        public readonly string Step9Desc = Loc.Localize("HelpMainUi_Step9Desc", "A Chat distinct to your World/Territory location. You can chat with " +
+        public readonly string Step10Title = Loc.Localize("HelpMainUi_Step9Title", "Radar Chat");
+        public readonly string Step10Desc = Loc.Localize("HelpMainUi_Step9Desc", "A Chat distinct to your World/Territory location. You can chat with " +
             "other users here.");
 
-        public readonly string Step10Title = Loc.Localize("HelpMainUi_Step10Title", "Chat Rules");
-        public readonly string Step10Desc = Loc.Localize("HelpMainUi_Step10Desc", "As with any public online chat, there are rules. You can review them here.");
-        public readonly string Step10DescExtended = Loc.Localize("HelpMainUi_Step10DescExtended", "Misconduct in chat can be reported by any other user that sees it. " +
+        public readonly string Step11Title = Loc.Localize("HelpMainUi_Step10Title", "Chat Rules");
+        public readonly string Step11Desc = Loc.Localize("HelpMainUi_Step10Desc", "As with any public online chat, there are rules. You can review them here.");
+        public readonly string Step11DescExtended = Loc.Localize("HelpMainUi_Step10DescExtended", "Misconduct in chat can be reported by any other user that sees it. " +
             "Reports are reviewed by the Sundouleia team fairly based on context and account strike history.");
 
-        public readonly string Step11Title = Loc.Localize("HelpMainUi_Step11Title", "Chat Privacy");
-        public readonly string Step11Desc = Loc.Localize("HelpMainUi_Step11Desc", "Anything you send here displays your name anonymously. Only the last 3 characters of your UID are displayed.");
+        public readonly string Step12Title = Loc.Localize("HelpMainUi_Step11Title", "Chat Privacy");
+        public readonly string Step12Desc = Loc.Localize("HelpMainUi_Step11Desc", "Anything you send here displays your name anonymously. Only the last 3 characters of your UID are displayed.");
 
-        public readonly string Step12Title = Loc.Localize("HelpMainUi_Step12Title", "Chat Emotes");
-        public readonly string Step12Desc = Loc.Localize("HelpMainUi_Step12Desc", "View the emote menu with this button! You can click any inside it to append it to your message");
-        public readonly string Step12DescExtended = Loc.Localize("HelpMainUi_Step12DescExtended", "Emotes can also be manually added to chat messages by typing out emotes like discord emotes. :cheer:");
+        public readonly string Step13Title = Loc.Localize("HelpMainUi_Step12Title", "Chat Emotes");
+        public readonly string Step13Desc = Loc.Localize("HelpMainUi_Step12Desc", "View the emote menu with this button! You can click any inside it to append it to your message");
+        public readonly string Step13DescExtended = Loc.Localize("HelpMainUi_Step12DescExtended", "Emotes can also be manually added to chat messages by typing out emotes like discord emotes. :cheer:");
 
-        public readonly string Step13Title = Loc.Localize("HelpMainUi_Step13Title", "Chat Scroll");
-        public readonly string Step13Desc = Loc.Localize("HelpMainUi_Step13Desc", "Sets if the window will always auto-scroll to the last sent message.");
-        public readonly string Step13DescExtended = Loc.Localize("HelpMainUi_Step13DescExtended", "Turning Auto-Scroll off lets you scroll up freely.");
+        public readonly string Step14Title = Loc.Localize("HelpMainUi_Step13Title", "Chat Scroll");
+        public readonly string Step14Desc = Loc.Localize("HelpMainUi_Step13Desc", "Sets if the window will always auto-scroll to the last sent message.");
+        public readonly string Step14DescExtended = Loc.Localize("HelpMainUi_Step13DescExtended", "Turning Auto-Scroll off lets you scroll up freely.");
 
-        public readonly string Step14Title = Loc.Localize("HelpMainUi_Step14Title", "Examining Users");
-        public readonly string Step14Desc = Loc.Localize("HelpMainUi_Step14Desc", "Hovering the Anon.User-XXX of a message lets you see when it was sent. Middle-Click to view their profile!");
-        public readonly string Step14DescExtended = Loc.Localize("HelpMainUi_Step14DescExtended", "You can CTRL+SHIFT+RCLICK to block the user as well, hiding all chat and preventing requests.");
+        public readonly string Step15Title = Loc.Localize("HelpMainUi_Step14Title", "Examining Users");
+        public readonly string Step15Desc = Loc.Localize("HelpMainUi_Step14Desc", "Hovering the Anon.User-XXX of a message lets you see when it was sent. Middle-Click to view their profile!");
+        public readonly string Step15DescExtended = Loc.Localize("HelpMainUi_Step14DescExtended", "You can CTRL+SHIFT+RCLICK to block the user as well, hiding all chat and preventing requests.");
 
-        public readonly string Step15Title = Loc.Localize("HelpMainUi_Step15Title", "Account Page");
-        public readonly string Step15Desc = Loc.Localize("HelpMainUi_Step15Desc", "Manage account settings here.");
-        public readonly string Step15DescExtended = Loc.Localize("HelpMainUi_Step15DescExtended", "This page contains important information " +
+        public readonly string Step16Title = Loc.Localize("HelpMainUi_Step15Title", "Account Page");
+        public readonly string Step16Desc = Loc.Localize("HelpMainUi_Step15Desc", "Manage account settings here.");
+        public readonly string Step16DescExtended = Loc.Localize("HelpMainUi_Step15DescExtended", "This page contains important information " +
             "about you, and access to profile setup, configs, and support links!");
 
-        public readonly string Step16Title = Loc.Localize("HelpMainUi_Step16Title", "Client UID");
-        public readonly string Step16Desc = Loc.Localize("HelpMainUi_Step16Desc", "Your UID for pairing.");
-        public readonly string Step16DescExtended = Loc.Localize("HelpMainUi_Step16DescExtended", "This defines your account, " +
+        public readonly string Step17Title = Loc.Localize("HelpMainUi_Step16Title", "Client UID");
+        public readonly string Step17Desc = Loc.Localize("HelpMainUi_Step16Desc", "Your UID for pairing.");
+        public readonly string Step17DescExtended = Loc.Localize("HelpMainUi_Step16DescExtended", "This defines your account, " +
             "you shouldn't display this in global chats or profiles.");
 
-        public readonly string Step17Title = Loc.Localize("HelpMainUi_Step17Title", "Profile Editing");
-        public readonly string Step17Desc = Loc.Localize("HelpMainUi_Step17Desc", "Make Customizations to your Profile here.");
-        public readonly string Step17DescExtended = Loc.Localize("HelpMainUi_Step17DescExtended", "You can customize the display of your profile, description, and Avatar here.");
+        public readonly string Step18Title = Loc.Localize("HelpMainUi_Step17Title", "Profile Editing");
+        public readonly string Step18Desc = Loc.Localize("HelpMainUi_Step17Desc", "Make Customizations to your Profile here.");
+        public readonly string Step18DescExtended = Loc.Localize("HelpMainUi_Step17DescExtended", "You can customize the display of your profile, description, and Avatar here.");
 
-        public readonly string Step18Title = Loc.Localize("HelpMainUi_Step18Title", "Profile Publicity");
-        public readonly string Step18Desc = Loc.Localize("HelpMainUi_Step18Desc", "If a profile is public, it can be viewed in Radar Chat.");
-        public readonly string Step18DescExtended = Loc.Localize("HelpMainUi_Step18DescExtended", "Private profile can only be viewed by yourself and your User pairs.");
+        public readonly string Step19Title = Loc.Localize("HelpMainUi_Step18Title", "Profile Publicity");
+        public readonly string Step19Desc = Loc.Localize("HelpMainUi_Step18Desc", "If a profile is public, it can be viewed in Radar Chat.");
+        public readonly string Step19DescExtended = Loc.Localize("HelpMainUi_Step18DescExtended", "Private profile can only be viewed by yourself and your User pairs.");
 
-        public readonly string Step19Title = Loc.Localize("HelpMainUi_Step19Title", "Profile Titles");
-        public readonly string Step19Desc = Loc.Localize("HelpMainUi_Step19Desc", "Earned through Achievements, which are still a WIP (or may make it obtained via other means)");
+        public readonly string Step20Title = Loc.Localize("HelpMainUi_Step19Title", "Profile Titles");
+        public readonly string Step20Desc = Loc.Localize("HelpMainUi_Step19Desc", "Earned through Achievements, which are still a WIP (or may make it obtained via other means)");
 
-        public readonly string Step20Title = Loc.Localize("HelpMainUi_Step20Title", "Profile Customization");
-        public readonly string Step20Desc = Loc.Localize("HelpMainUi_Step20Desc", "Unlocked from Achievements! (WIP)");
-        public readonly string Step20DescExtended = Loc.Localize("HelpMainUi_Step20DescExtended", "Still searching for some digital artist " +
+        public readonly string Step21Title = Loc.Localize("HelpMainUi_Step20Title", "Profile Customization");
+        public readonly string Step21Desc = Loc.Localize("HelpMainUi_Step20Desc", "Unlocked from Achievements! (WIP)");
+        public readonly string Step21DescExtended = Loc.Localize("HelpMainUi_Step20DescExtended", "Still searching for some digital artist " +
             "to help with making these at some point. Until then only the default template exists.");
 
-        public readonly string Step21Title = Loc.Localize("HelpMainUi_Step21Title", "Profile Description");
-        public readonly string Step21Desc = Loc.Localize("HelpMainUi_Step21Desc", "More space than the search info provides!");
-        public readonly string Step21DescExtended = Loc.Localize("HelpMainUi_Step21DescExtended", "Results can vary based on how the description is calculated.");
+        public readonly string Step22Title = Loc.Localize("HelpMainUi_Step21Title", "Profile Description");
+        public readonly string Step22Desc = Loc.Localize("HelpMainUi_Step21Desc", "More space than the search info provides!");
+        public readonly string Step22DescExtended = Loc.Localize("HelpMainUi_Step21DescExtended", "Results can vary based on how the description is calculated.");
 
-        public readonly string Step22Title = Loc.Localize("HelpMainUi_Step22Title", "Previewing Profiles");
-        public readonly string Step22Desc = Loc.Localize("HelpMainUi_Step22Desc", "Clicking this button opens a preview of your profile.");
+        public readonly string Step23Title = Loc.Localize("HelpMainUi_Step22Title", "Previewing Profiles");
+        public readonly string Step23Desc = Loc.Localize("HelpMainUi_Step22Desc", "Clicking this button opens a preview of your profile.");
 
-        public readonly string Step23Title = Loc.Localize("HelpMainUi_Step23Title", "Adding/Editing Profile Avatar");
-        public readonly string Step23Desc = Loc.Localize("HelpMainUi_Step23Desc", "You can edit your profile image here.");
-        public readonly string Step23DescExtended = Loc.Localize("HelpMainUi_Step23DescExtended", "The editor lets you pan, resize, rotate, and zoom uploaded files of any size to the fit you like!");
+        public readonly string Step24Title = Loc.Localize("HelpMainUi_Step23Title", "Adding/Editing Profile Avatar");
+        public readonly string Step24Desc = Loc.Localize("HelpMainUi_Step23Desc", "You can edit your profile image here.");
+        public readonly string Step24DescExtended = Loc.Localize("HelpMainUi_Step23DescExtended", "The editor lets you pan, resize, rotate, and zoom uploaded files of any size to the fit you like!");
 
-        public readonly string Step24Title = Loc.Localize("HelpMainUi_Step24Title", "Saving Changes");
-        public readonly string Step24Desc = Loc.Localize("HelpMainUi_Step24Desc", "Make sure you save changes, or edits will be lost!");
+        public readonly string Step25Title = Loc.Localize("HelpMainUi_Step24Title", "Saving Changes");
+        public readonly string Step25Desc = Loc.Localize("HelpMainUi_Step24Desc", "Make sure you save changes, or edits will be lost!");
 
-        public readonly string Step25Title = Loc.Localize("HelpMainUi_Step25Title", "Settings Menu");
-        public readonly string Step25Desc = Loc.Localize("HelpMainUi_Step25Desc", "You can access the Settings window by clicking this button, or the gear on the title bar!");
+        public readonly string Step26Title = Loc.Localize("HelpMainUi_Step25Title", "Settings Menu");
+        public readonly string Step26Desc = Loc.Localize("HelpMainUi_Step25Desc", "You can access the Settings window by clicking this button, or the gear on the title bar!");
     }
 
     public class HelpGroups

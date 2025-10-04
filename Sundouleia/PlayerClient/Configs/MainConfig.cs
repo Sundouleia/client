@@ -92,6 +92,7 @@ public class MainConfig : IHybridSavable
         if (!File.Exists(file))
         {
             _logger.LogWarning("Config file not found for: " + file);
+            _saver.Save(this);
             return;
         }
 

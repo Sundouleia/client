@@ -16,7 +16,7 @@ public class ProfileUI : WindowMediatorSubscriberBase
     private bool ThemePushed = false;
 
     private readonly ProfileHelper _drawHelper;
-    private readonly SundesmoManager _sundesmoManager;
+    private readonly SundesmoManager _sundesmos;
     private readonly ProfileService _service;
 
     private bool ShowFullUID { get; init; }
@@ -28,10 +28,10 @@ public class ProfileUI : WindowMediatorSubscriberBase
         : base(logger, mediator, $"###Profile-{user.UID}")
     {
         _drawHelper = helper;
-        _sundesmoManager = pairs;
+        _sundesmos = pairs;
         _service = service;
         User = user;
-        ShowFullUID = user.UID == MainHub.UID || _sundesmoManager.DirectPairs.Any(x => x.UserData.UID == user.UID);
+        ShowFullUID = user.UID == MainHub.UID || _sundesmos.DirectPairs.Any(x => x.UserData.UID == user.UID);
 
         Flags = WFlags.NoResize | WFlags.NoScrollbar | WFlags.NoTitleBar;
         IsOpen = true;

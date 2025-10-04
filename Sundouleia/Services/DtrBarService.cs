@@ -14,7 +14,6 @@ namespace Sundouleia.Services;
 /// </summary>
 public sealed class DtrBarService : IDisposable, IHostedService
 {
-    private readonly IDtrBar _dtrBar;
     private readonly ILogger<DtrBarService> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly MainHub _hub;
@@ -29,10 +28,9 @@ public sealed class DtrBarService : IDisposable, IHostedService
     private Task _dtrTask;
 
     // Refactor this later, but not now.
-    public DtrBarService(IDtrBar dtrBar, ILogger<DtrBarService> logger, SundouleiaMediator mediator,
+    public DtrBarService(ILogger<DtrBarService> logger, SundouleiaMediator mediator,
         MainHub hub, MainConfig config, SundesmoManager sundesmos)
     {
-        _dtrBar = dtrBar;
         _logger = logger;
         _mediator = mediator;
         _hub = hub;
@@ -99,7 +97,7 @@ public sealed class DtrBarService : IDisposable, IHostedService
     private IDtrBarEntry CreateRadarEntry()
     {
         _logger.LogTrace("Creating new DTR Radar Entry");
-        var entry = _dtrBar.Get("Sundouleia Radar");
+        var entry = Svc.DtrBar.Get("Sundouleia Radar");
         entry.OnClick = _ => { /* Can do fun voodoo here! */ };
         return entry;
     }
@@ -108,7 +106,7 @@ public sealed class DtrBarService : IDisposable, IHostedService
     private IDtrBarEntry CreateChatEntry()
     {
         _logger.LogTrace("Creating new DTR Chat Entry");
-        var entry = _dtrBar.Get("Sundouleia Chat Radar");
+        var entry = Svc.DtrBar.Get("Sundouleia Chat Radar");
         entry.OnClick = _ => { /* Can do fun voodoo here! */ };
         return entry;
     }

@@ -3,10 +3,14 @@ using SundouleiaAPI.Data;
 
 namespace Sundouleia.Services.Mediator;
 
-// Sundesmo Management
+// Sundesmo Management, and visibility handling.
+public record SundesmoOnline(Sundesmo Sundesmo) : MessageBase;
+public record SundesmoOffline(Sundesmo Sundesmo) : MessageBase;
+public record SundesmoPlayerRendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming visible"
+public record SundesmoPlayerUnrendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming invisible"
+public record SundesmoTimedOut(PlayerHandler Handler) : MessageBase; // Whenever unrendered long enough to be considered invalid.
+
 public record PairWentOnlineMessage(UserData UserData) : MessageBase; // a message indicating a pair has gone online.
-public record PairHandlerVisibleMessage(PlayerHandler Player) : MessageBase; // a message indicating the visibility of a pair handler.
-public record PairWasRemovedMessage(UserData UserData) : MessageBase; // a message indicating a pair has been removed.
 public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // called when publishing a targeted pair connection (see UI)
 
 

@@ -55,10 +55,10 @@ public partial class MainHub
 
 
     // --- Pair/Request Interactions ---
-    public async Task<HubResponse<PendingRequest>> UserSendRequest(CreateRequest dto)
+    public async Task<HubResponse<SundesmoRequest>> UserSendRequest(CreateRequest dto)
     {
-        if (!IsConnected) return HubResponseBuilder.AwDangIt<PendingRequest>(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse<PendingRequest>>(nameof(UserSendRequest), dto).ConfigureAwait(false);
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<SundesmoRequest>>(nameof(UserSendRequest), dto).ConfigureAwait(false);
     }
 
     public async Task<HubResponse> UserCancelRequest(UserDto dto)

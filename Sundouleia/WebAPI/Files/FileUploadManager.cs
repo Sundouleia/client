@@ -13,21 +13,16 @@ namespace Sundouleia.WebAPI.Files;
 public sealed class FileUploadManager : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
-    private readonly ServerConfigManager _serverConfigs;
     private readonly FileCacheManager _fileDbManager;
-    private readonly FileTransferOrchestrator _orchestrator;
 
     private readonly Dictionary<string, DateTime> _verifiedUploadedHashes = new(StringComparer.Ordinal);
     private CancellationTokenSource? _uploadCTS = new();
 
     public FileUploadManager(ILogger<FileUploadManager> logger, SundouleiaMediator mediator,
-        MainConfig config, ServerConfigManager serverConfigs, FileCacheManager fileDbManager,
-        FileTransferOrchestrator orchestrator) : base(logger, mediator)
+        MainConfig config, FileCacheManager fileDbManager) : base(logger, mediator)
     {
         _config = config;
-        _serverConfigs = serverConfigs;
         _fileDbManager = fileDbManager;
-        _orchestrator = orchestrator;
 
         Mediator.Subscribe<DisconnectedMessage>(this, _ => Reset());
     }
@@ -63,19 +58,21 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         return false;
     }
 
-    // Removes all file upload links from the server.
+    // Removes all file upload links / uploaded files respective to our user from the server.
     public async Task DeleteAllFiles()
     {
         await Task.Delay(1).ConfigureAwait(false);
     }
 
-    // Uploads remaining files that had were new and had to be uploaded after pushing a ModDataUpdate.
-    // Expected to have the authorized upload links here, will return the subset of download links associated with their data hash.
-    // Structure pending soon.
-    public async Task<ModDataUpdate> UploadFiles(ModDataUpdate data)
+    // Passes in a single ModFileInfo containing the hash and replacement data.
+    // makes a request to upload said files contents.
+    // this is a WIP as we still need to restructure file transfer. The end goal is that this returns the download link, or it doesnt?
+    // point being this operation is just to upload the file conetents. If it does or doesnt return the download link changes if we use it or not when
+    // we send the remaining files to sync in post from this method.
+    public async Task<ModFileData> UploadFiles(ModFileInfo modFileInfo)
     {
         await Task.Delay(1).ConfigureAwait(false);
-        return data;
+        return new ModFileData(modFileInfo.Hash, modFileInfo.GamePaths, modFileInfo.SwappedPath, "NULL");
     }
 
     // Inner file upload. Should contain the compressed data that we are doing to upload. WIP.

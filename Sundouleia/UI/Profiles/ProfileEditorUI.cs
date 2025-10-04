@@ -75,7 +75,7 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
             "--SEP--If it is checked, you can post NSFW content just fine.");
 
         // Post the image over to the right.
-        drawList.AddDalamudImageRounded(profile.GetAvatarOrDefault(), pos, pos + Vector2.One * 232f, 116f, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)));
+        drawList.AddDalamudImageRounded(profile.GetAvatarOrDefault(), pos, new(232f), 116f, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)));
 
         using (ImRaii.Group())
         {

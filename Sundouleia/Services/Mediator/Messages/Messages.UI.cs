@@ -20,17 +20,8 @@ public enum ToggleType
 /// </summary>
 public record TogglePermissionWindow(Sundesmo Sundesmo) : MessageBase;
 
-/// <summary> 
-///     To refresh the immutable list of draw pairs in the whitelist. <para />
-///     If possible to avoid this, find a way!
-/// </summary>
-public record RefreshUiMessage : MessageBase;
-
-/// <summary>
-///     Fires whenever we need to refresh the created DrawRequests. <para />
-///     This should not be needed anymore unless we are making another tab menu specifically for it.
-/// </summary>
-public record RefreshUiRequestsMessage : MessageBase;
+public record RefreshWhitelistMessage : MessageBase;
+public record RefreshRequestsMessage : MessageBase;
 
 /// <summary> Basic UI Toggle </summary>
 public record UiToggleMessage(Type UiType, ToggleType ToggleType = ToggleType.Toggle) : MessageBase;

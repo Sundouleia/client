@@ -41,7 +41,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
         CkGui.CenterColorTextAligned("STORAGE DATA DEBUG WIP", ImGuiColors.DalamudViolet);
     }
 
-    private void DrawUserRequests(string treeLabel, IEnumerable<PendingRequest> requests)
+    private void DrawUserRequests(string treeLabel, IEnumerable<SundesmoRequest> requests)
     {
         using var node = ImRaii.TreeNode(treeLabel);
         if (!node) return;

@@ -101,6 +101,14 @@ public class ServerConfigManager
 
     public void GenerateAuthForCurrentCharacter()
     {
+        var name = PlayerData.NameInstanced;
+        var world = PlayerData.HomeWorldIdInstanced;
+        var cid = PlayerData.ContendIdInstanced;
+
+        // If we already have an auth for this character, do nothing.
+        if (AccountStorage.LoginAuths.Any(a => a.ContentId == cid))
+            return;
+
         _logger.LogDebug("Generating new auth for current character");
         var autoSelectedKey = AccountStorage.Profiles.Keys.DefaultIfEmpty(-1).First();
         AccountStorage.LoginAuths.Add(new CharaAuthentication

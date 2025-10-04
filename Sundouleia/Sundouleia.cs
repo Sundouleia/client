@@ -10,6 +10,7 @@ using Sundouleia.Gui.Handlers;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Interop;
+using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
@@ -21,6 +22,11 @@ using Sundouleia.Services.Textures;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
+using Sundouleia.WebAPI.Files;
+using System.Net.Http.Headers;
+using System.Reflection;
+using TerraFX.Interop.Windows;
+using static FFXIVClientStructs.FFXIV.Client.UI.Misc.RaptureMacroModule;
 
 namespace Sundouleia;
 public sealed class Sundouleia : IDalamudPlugin
@@ -112,20 +118,34 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<EventAggregator>()
         .AddSingleton<SundouleiaLoc>()
 
+        // Mod Files (revise)
+        .AddSingleton<FileCacheManager>()
+        .AddSingleton<FileDownloader>()
+        .AddSingleton<FileUploadManager>()
+        .AddSingleton<FileTransferOrchestrator>()
+        .AddSingleton<FileCompactor>()
+
+        // Player Client
+        .AddSingleton<AccountManager>()
+        .AddSingleton<RequestsManager>()
+
         // Player User
         .AddSingleton<SundesmoFactory>()
         .AddSingleton<SundesmoHandlerFactory>()
         .AddSingleton<SundesmoManager>()
 
         // Services
+        .AddSingleton<CharaObjectWatcher>()
         .AddSingleton<SundouleiaMediator>()
         .AddSingleton<ProfileFactory>()
+
+        .AddSingleton<ClientUpdateService>()
         .AddSingleton<ProfileService>()
         .AddSingleton<CosmeticService>()
         .AddSingleton<TutorialService>()
         .AddSingleton<UiFontService>()
-        .AddSingleton<AccountService>()
-        .AddSingleton<DistributorService>()
+
+        .AddSingleton<DistributionService>()
         .AddSingleton<DtrBarService>()
         .AddSingleton<NotificationService>()
         .AddSingleton<OnTickService>()
@@ -139,7 +159,14 @@ public static class SundouleiaServiceExtensions
         // WebAPI (Server stuff)
         .AddSingleton<MainHub>()
         .AddSingleton<HubFactory>()
-        .AddSingleton<TokenProvider>();
+        .AddSingleton<TokenProvider>()
+        .AddSingleton((s) =>
+        {
+            var httpClient = new HttpClient();
+            var ver = Assembly.GetExecutingAssembly().GetName().Version;
+            httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Sundouleia", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
+            return httpClient;
+        });
     #endregion GenericServices
 
     public static IServiceCollection AddSundouleiaIPC(this IServiceCollection services)
@@ -158,6 +185,7 @@ public static class SundouleiaServiceExtensions
     => services
         .AddSingleton<ConfigFileProvider>()
         .AddSingleton<MainConfig>()
+        .AddSingleton<GroupsConfig>()
         .AddSingleton<AccountConfig>()
         .AddSingleton<NickConfig>()
         .AddSingleton<ServerConfigManager>()
@@ -167,8 +195,7 @@ public static class SundouleiaServiceExtensions
     public static IServiceCollection AddSundouleiaScoped(this IServiceCollection services)
     => services
         // Scoped Components
-        .AddScoped<DrawUserRequests>()
-        // .AddScoped<ProfileHelper>() <-- Dont think we need, but might?
+        .AddScoped<ProfileHelper>()
 
         // Scoped Factories
         .AddScoped<DrawEntityFactory>()

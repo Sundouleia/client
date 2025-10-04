@@ -49,7 +49,7 @@ public class AccountTab
         CkGui.SetCursorXtoCenter(dispSize.X);
         var cursorPos = ImGui.GetCursorPos();
         var pos = ImGui.GetCursorScreenPos();
-        ImGui.GetWindowDrawList().AddDalamudImageRounded(avatar, pos, pos + dispSize, 90f);
+        ImGui.GetWindowDrawList().AddDalamudImageRounded(avatar, pos, dispSize, 90f);
         ImGui.SetCursorPos(new Vector2(cursorPos.X, cursorPos.Y + dispSize.Y));
 
         // draw the UID header below this.
@@ -75,18 +75,9 @@ public class AccountTab
         
         // now do one for ko-fi
         ImGui.AlignTextToFramePadding();
-        DrawAccountSettingChild(FAI.Coffee, "Support via Ko-fi", "This took a massive toll on my life as a solo dev." +
-            "--NL--If you like my work, and feel like tossing any support / tips, you can do so here ♥", () =>
+        DrawAccountSettingChild(FAI.Pray, "Support via Patreon", "-If you like my work, you can toss any support here ♥", () =>
         {
-            try { Process.Start(new ProcessStartInfo { FileName = "https://www.ko-fi.com/cordeliamist", UseShellExecute = true }); }
-            catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Ko-Fi link. {e.Message}"); }
-        });
-        
-        ImGui.AlignTextToFramePadding();
-        DrawAccountSettingChild(FAI.Pray, "Support via Patreon", "This took a massive toll on my life as a solo dev." +
-            "--NL--If you like my work, and feel like tossing any support / tips, you can do so here ♥", () =>
-        {
-            try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/CordeliaMist", UseShellExecute = true }); }
+            try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/cw/Sundouleia", UseShellExecute = true }); }
             catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Patreon link. {e.Message}"); }
         });
 

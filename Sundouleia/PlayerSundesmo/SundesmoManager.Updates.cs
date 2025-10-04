@@ -8,33 +8,33 @@ namespace Sundouleia.Pairs;
 public sealed partial class SundesmoManager
 {
     // Should happen only on initial loads.
-    public void ReceiveIpcUpdateFull(UserData target, ModDataUpdate modData, VisualDataUpdate ipcData)
+    public void ReceiveIpcUpdateFull(UserData target, RecievedModUpdate newModData, VisualUpdate newIpc)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod and appearance data!", LoggerType.Callbacks);
-        sundesmo.ApplyFullData(modData, ipcData);
+        sundesmo.ApplyFullData(newModData, newIpc);
     }
 
     // Happens whenever mods should be added or removed.
-    public void ReceiveIpcUpdateMods(UserData target, ModDataUpdate modData)
+    public void ReceiveIpcUpdateMods(UserData target, RecievedModUpdate newModData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod data!", LoggerType.Callbacks);
-        sundesmo.ApplyModData(modData);
+        sundesmo.ApplyModData(newModData);
     }
 
     // Happens whenever non-mod visuals are updated.
-    public void ReceiveIpcUpdateOther(UserData target, VisualDataUpdate ipcData)
+    public void ReceiveIpcUpdateOther(UserData target, VisualUpdate newIpc)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s appearance data updated!", LoggerType.Callbacks);
-        sundesmo.ApplyIpcData(ipcData);
+        sundesmo.ApplyIpcData(newIpc);
     }
 
     // Happens whenever a single non-mod appearance item is updated.

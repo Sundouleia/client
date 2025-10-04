@@ -5,23 +5,33 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
+using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.Gui.Components;
-public class DrawUserRequest
+
+// Will likely remove this soon but is just a temporary migration from gspeak
+public class DrawSundesmoRequest
 {
     private readonly MainHub _hub;
+    private readonly SundesmoManager _sundesmos;
+    private readonly RequestsManager _manager;
     private readonly string _id;
 
-    private PendingRequest _entry;
+    private SundesmoRequest _entry;
     private bool _hovered = false;
-    public DrawUserRequest(string id, PendingRequest requestEntry, MainHub hub)
+    public DrawSundesmoRequest(string id, SundesmoRequest requestEntry, MainHub hub, 
+        RequestsManager manager, SundesmoManager sundesmos)
     {
         _id = id;
         _entry = requestEntry;
         _hub = hub;
+        _manager = manager;
+        _sundesmos = sundesmos;
     }
 
     public void DrawRequestEntry(bool isOutgoing)
@@ -69,16 +79,40 @@ public class DrawUserRequest
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen))
+        {
             if (CkGui.IconTextButton(FAI.PersonCircleCheck, "Accept", null, true, UiService.DisableUI))
-                UiService.SetUITask(async () => await _hub.UserAcceptRequest(new(_entry.User)));
+            {
+                UiService.SetUITask(async () =>
+                {
+                    var res = await _hub.UserAcceptRequest(new(_entry.User));
+                    if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
+                        _manager.RemoveRequest(_entry);
+                    else if (res.ErrorCode is SundouleiaApiEc.Success)
+                    {
+                        _manager.RemoveRequest(_entry);
+                        _sundesmos.AddSundesmo(res.Value!.Pair);
+                        if (res.Value!.OnlineInfo is { } onlineSundesmo)
+                            _sundesmos.MarkSundesmoOnline(onlineSundesmo);
+                    }
+                });
+            }
+        }
         CkGui.AttachToolTip("Accept the Request");
 
         currentRightSide -= acceptButtonSize + spacingX;
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
+        {
             if (CkGui.IconTextButton(FAI.PersonCircleXmark, "Reject", null, true, UiService.DisableUI))
-                UiService.SetUITask(async () => await _hub.UserRejectRequest(new(_entry.User)));
+            {
+                UiService.SetUITask(async () => 
+                {
+                    if (await _hub.UserRejectRequest(new(_entry.User)) is { } res && res.ErrorCode is SundouleiaApiEc.Success)
+                        _manager.RemoveRequest(_entry);
+                });
+            }
+        }
         CkGui.AttachToolTip("Reject the Request");
     }
 
@@ -92,8 +126,17 @@ public class DrawUserRequest
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
+        {
             if (CkGui.IconTextButton(FAI.PersonCircleXmark, "Cancel Request", null, true, UiService.DisableUI))
-                UiService.SetUITask(async () => await _hub.UserCancelRequest(new(_entry.Target)));
+            {
+                UiService.SetUITask(async () =>
+                {
+                    var res = await _hub.UserCancelRequest(new(_entry.Target));
+                    if (res.ErrorCode is SundouleiaApiEc.Success)
+                        _manager.RemoveRequest(_entry);
+                });
+            }
+        }
         CkGui.AttachToolTip("Remove the pending request from both yourself and the pending Users list.");
     }
 }

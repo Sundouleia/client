@@ -12,7 +12,7 @@ public class IpcProvider : IHostedService
     private const int SundouleiaApiVersion = 1;
 
     private readonly ILogger<IpcProvider> _logger;
-    private readonly SundesmoManager _sundesmoManager;
+    private readonly SundesmoManager _sundesmos;
     private readonly List<nint> _handledPlayers = [];
 
     // Sundouleia's Personal IPC Events.
@@ -28,7 +28,7 @@ public class IpcProvider : IHostedService
     public IpcProvider(ILogger<IpcProvider> logger, SundesmoManager pairs)
     {
         _logger = logger;
-        _sundesmoManager = pairs;
+        _sundesmos = pairs;
 
         // Could add methods here for NoLongerVisible, Visible, DataAttached, DataUnattached.
     }

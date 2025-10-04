@@ -14,7 +14,7 @@ namespace Sundouleia.Gui.Components;
 internal class ReportPopupHandler : IPopupHandler
 {
     private readonly MainHub _hub;
-    private readonly SundesmoManager _sundesmoManager;
+    private readonly SundesmoManager _sundesmos;
     private readonly ProfileService _profiles;
 
     private UserData _reportedUser = new("BlankUser");
@@ -26,7 +26,7 @@ internal class ReportPopupHandler : IPopupHandler
     public ReportPopupHandler(MainHub hub, SundesmoManager pairs, ProfileService profiles)
     {
         _hub = hub;
-        _sundesmoManager = pairs;
+        _sundesmos = pairs;
         _profiles = profiles;
 
     }
@@ -184,7 +184,7 @@ internal class ReportPopupHandler : IPopupHandler
     public void Open(OpenReportUIMessage msg)
     {
         _reportedUser = msg.UserToReport;
-        _reportedDisplayName = _sundesmoManager.DirectPairs.Any(x => x.UserData.UID == _reportedUser.UID)
+        _reportedDisplayName = _sundesmos.DirectPairs.Any(x => x.UserData.UID == _reportedUser.UID)
             ? _reportedUser.AliasOrUID
             : "User-" + _reportedUser.UID.Substring(_reportedUser.UID.Length - 4);
         _reportReason = DefaultReportReason;

@@ -90,7 +90,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private Guid _tempCollection;
     private Dictionary<string, string> _replacements = []; // GamePath -> FilePath (maybe have internal manager idk)
     private Guid _tempProfile; // CPlus temp profile id.
-    private ObjectIpcData? _appearanceData = null;
+    private IpcDataPlayerCache? _appearanceData = null;
 
     // Public Accessors.
     public Character DataState { get { unsafe { return *_player; } } }
@@ -173,12 +173,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return;
         // Reapply the alterations.
         if (_appearanceData is not null)
-            ApplyIpcData(_appearanceData).ConfigureAwait(false);
+            ReapplyVisuals().ConfigureAwait(false);
         if (_tempCollection != Guid.Empty && _replacements.Count > 0)
             ApplyModData().ConfigureAwait(false);
     }
 
-    public void UpdateAndApplyFullData(ModDataUpdate modData, ObjectIpcData ipcData)
+    public void UpdateAndApplyFullData(RecievedModUpdate modData, IpcDataPlayerUpdate ipcData)
     {
         // 1) Maybe handle something with combat and performance, idk, deal with later.
 
@@ -192,7 +192,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // Determine the pending changes to apply for both.
             // TODO: (Having multiple of these errors might lead to inconsistant states to maybe have a 'pendingData' object?
             // (spesifcally an issue for mods)
-            _appearanceData = ipcData;
+            _appearanceData ??= new();
+            _appearanceData.UpdateCache(ipcData);
             return;
         }
 
@@ -202,7 +203,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Logger.LogInformation($"Applied full data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
     }
 
-    public async Task UpdateAndApplyModData(ModDataUpdate modData)
+    public async Task UpdateAndApplyModData(RecievedModUpdate modData)
     {
         if (!IpcCallerPenumbra.APIAvailable)
         {
@@ -272,16 +273,43 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _ipc.Penumbra.RedrawGameObject(ObjIndex);
     }
 
-    public async Task ApplyIpcData(ObjectIpcData ipcData)
+    public async Task ReapplyVisuals()
+    {
+        if (!IsRendered || _appearanceData is null)
+            return;
+
+        Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        var toApply = new List<Task>();
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer]))
+            toApply.Add(ApplyGlamourer());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Heels]))
+            toApply.Add(ApplyHeels());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))
+            toApply.Add(ApplyCPlus());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Honorific]))
+            toApply.Add(ApplyHonorific());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Moodles]))
+            toApply.Add(ApplyMoodles());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.ModManips]))
+            toApply.Add(ApplyModManips());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.PetNames]))
+            toApply.Add(ApplyPetNames());
+        // Run in parallel.
+        await Task.WhenAll(toApply).ConfigureAwait(false);
+        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their visual data reapplied.", LoggerType.PairHandler);
+    }
+
+    public async Task ApplyIpcData(IpcDataPlayerUpdate newData)
     {
         // 0) Init appearance data if not yet made.
         _appearanceData ??= new();
 
         // 1) Apply changes and get what changed.
-        var changes = _appearanceData.ApplyChanged(ipcData);
+        var changes = _appearanceData.UpdateCache(newData);
 
         // 2) If nothing changed, or not present, return.
-        if (changes == IpcKind.None || Address == IntPtr.Zero) return;
+        if (changes is 0 || Address == IntPtr.Zero)
+            return;
 
         // 3) Initialize task list to perform all updates in parallel.
         var tasks = new List<Task>();
@@ -304,10 +332,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _appearanceData ??= new();
 
         // 1) Attempt to apply the single change.
-        if (!_appearanceData.TryApplyChanged(kind, newData)) return;
+        if (!_appearanceData.UpdateCacheSingle(kind, newData))
+            return;
         
         // 2) Validate render state before applying.
-        if (Address == IntPtr.Zero) return;
+        if (Address == IntPtr.Zero)
+            return;
         
         // 3) Apply change.
         var task = kind switch
@@ -333,7 +363,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private async Task ApplyPetNames() => await _ipc.PetNames.SetNamesByIdx(this, _appearanceData!.Data[IpcKind.PetNames]).ConfigureAwait(false);
     private async Task ApplyCPlus()
     {
-        if (string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]) && _tempProfile != Guid.Empty)
+        if (string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.CPlus]) && _tempProfile != Guid.Empty)
         {
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;

@@ -3,20 +3,20 @@ using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
 
-namespace Sundouleia.Services;
+namespace Sundouleia.PlayerClient;
 
 /// <summary> 
 ///     Helps ensure the correct data is loaded for the current Account Profile. <para />
 ///     Is also necessary to keep the ConfigFileProvider up to date (kind of?) <para />
 ///     This is called after connection is established and before MainHubConnectedMessage is sent.
 /// </summary>
-public sealed class AccountService : DisposableMediatorSubscriberBase
+public sealed class AccountManager : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
     private readonly ServerConfigManager _serverConfigs;
     private readonly ConfigFileProvider _fileNames;
 
-    public AccountService(ILogger<AccountService> logger, SundouleiaMediator mediator,
+    public AccountManager(ILogger<AccountManager> logger, SundouleiaMediator mediator,
         MainConfig config, ServerConfigManager serverConfigs, ConfigFileProvider fileNames)
         : base(logger, mediator)
     {

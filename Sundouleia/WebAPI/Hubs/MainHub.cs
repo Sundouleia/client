@@ -1,15 +1,15 @@
 using CkCommons;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Hosting;
 using Sundouleia.Pairs;
-using Sundouleia.Services;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
+using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
-using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.Hosting;
 using System.Reflection;
-using SundouleiaAPI.Data.Permissions;
 
 namespace Sundouleia.WebAPI;
 /// <summary>
@@ -24,8 +24,9 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private readonly HubFactory _hubFactory;
     private readonly TokenProvider _tokenProvider;
     private readonly ServerConfigManager _serverConfigs;
-    private readonly SundesmoManager _sundesmoManager;
-    private readonly AccountService _dataSync;
+    private readonly AccountManager _profiles;
+    private readonly RequestsManager _requests;
+    private readonly SundesmoManager _sundesmos;
 
     // Static private accessors (persistant across singleton instantiations for other static accessors.)
     private static ServerState _serverStatus = ServerState.Offline;
@@ -49,15 +50,17 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         HubFactory hubFactory,
         TokenProvider tokenProvider,
         ServerConfigManager serverConfigs,
-        SundesmoManager sundesmos,
-        AccountService dataSync)
+        AccountManager profiles,
+        RequestsManager requests,
+        SundesmoManager sundesmos)
         : base(logger, mediator)
     {
         _hubFactory = hubFactory;
         _tokenProvider = tokenProvider;
         _serverConfigs = serverConfigs;
-        _sundesmoManager = sundesmos;
-        _dataSync = dataSync;
+        _profiles = profiles;
+        _requests = requests;
+        _sundesmos = sundesmos;
 
         // Subscribe to the things.
         Mediator.Subscribe<ClosedMessage>(this, (msg) => HubInstanceOnClosed(msg.Exception));
@@ -212,8 +215,8 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public async Task<List<UserPair>> UserGetAllPairs()
         => await _hubConnection!.InvokeAsync<List<UserPair>>(nameof(UserGetAllPairs)).ConfigureAwait(false);
 
-    public async Task<List<PendingRequest>> UserGetPendingRequests()
-        => await _hubConnection!.InvokeAsync<List<PendingRequest>>(nameof(UserGetPendingRequests)).ConfigureAwait(false);
+    public async Task<List<SundesmoRequest>> UserGetSundesmoRequests()
+        => await _hubConnection!.InvokeAsync<List<SundesmoRequest>>(nameof(UserGetSundesmoRequests)).ConfigureAwait(false);
 
     public async Task<FullProfileData> UserGetProfileData(UserDto dto, bool allowNsfw)
         => await _hubConnection!.InvokeAsync<FullProfileData>(nameof(UserGetProfileData), dto, allowNsfw).ConfigureAwait(false);
@@ -224,7 +227,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private async Task LoadInitialSundesmos()
     {
         var allSundesmo = await UserGetAllPairs().ConfigureAwait(false);
-        _sundesmoManager.AddSundesmos(allSundesmo);
+        _sundesmos.AddSundesmos(allSundesmo);
         Logger.LogDebug($"Initial Sundesmos Loaded: [{string.Join(", ", allSundesmo.Select(x => x.User.AliasOrUID))}]", LoggerType.ApiCore);
     }
 
@@ -236,7 +239,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     {
         var onlineUsers = await UserGetOnlinePairs().ConfigureAwait(false);
         foreach (var entry in onlineUsers)
-            _sundesmoManager.MarkSundesmoOnline(entry, false);
+            _sundesmos.MarkSundesmoOnline(entry, false);
 
         Logger.LogDebug($"Online Users: [{string.Join(", ", onlineUsers.Select(x => x.User.AliasOrUID))}]", LoggerType.ApiCore);
     }
@@ -246,8 +249,8 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     /// </summary>
     private async Task LoadRequests()
     {
-        var requests = await UserGetPendingRequests().ConfigureAwait(false);
-        // Handle them in the request manager.
+        var requests = await UserGetSundesmoRequests().ConfigureAwait(false);
+        _requests.LoadInitial(requests);
     }
 
     /// <summary>
