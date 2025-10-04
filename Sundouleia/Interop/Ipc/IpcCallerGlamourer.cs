@@ -137,8 +137,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
 
     public async Task ApplyBase64StateByIdx(ushort objectIdx, string? actorData)
     {
-        if (!APIAvailable || PlayerData.IsZoning || string.IsNullOrEmpty(actorData))
-            return;
+        if (!APIAvailable || PlayerData.IsZoning || string.IsNullOrEmpty(actorData)) return;
         await Svc.Framework.RunOnFrameworkThread(() => ApplyState.Invoke(actorData, objectIdx, SUNDOULEIA_LOCK)).ConfigureAwait(false);
     }
 

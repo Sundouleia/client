@@ -280,7 +280,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_UserOffline(UserDto dto)
     {
-        Logger.LogDebug($"Callback_SendOffline: [{dto}]", LoggerType.Callbacks);
+        Logger.LogDebug($"Callback_UserOffline: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.MarkSundesmoOffline(dto.User)) ;
         return Task.CompletedTask;
     }
@@ -290,7 +290,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_UserOnline(OnlineUser dto)
     {
-        Logger.LogDebug("Callback_SendOnline: " + dto, LoggerType.Callbacks);
+        Logger.LogDebug($"Callback_UserOnline: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.MarkSundesmoOnline(dto));
         return Task.CompletedTask;
     }
@@ -302,7 +302,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_ProfileUpdated(UserDto dto)
     {
-        Logger.LogDebug("Callback_UpdateProfile: " + dto, LoggerType.Callbacks);
+        Logger.LogDebug($"Callback_ProfileUpdated: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
         Mediator.Publish(new ClearProfileDataMessage(dto.User));
         return Task.CompletedTask;
     }
@@ -314,7 +314,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_ShowVerification(VerificationCode dto)
     {
-        Logger.LogDebug("Callback_ShowVerification: " + dto, LoggerType.Callbacks);
+        Logger.LogDebug("Callback_ShowVerification", LoggerType.Callbacks);
         Mediator.Publish(new VerificationPopupMessage(dto));
         return Task.CompletedTask;
     }

@@ -80,8 +80,6 @@ public class TransientCacheConfig : IHybridSavable
 
             // Load instance configuration (no version migrations needed yet)
             Current = jObject["Current"]?.ToObject<TransientCacheStorage>() ?? new TransientCacheStorage();
-
-            _logger.LogInformation("Config loaded.");
             Save();
         }
         catch (Bagagwa ex) { _logger.LogError("Failed to load config." + ex); }

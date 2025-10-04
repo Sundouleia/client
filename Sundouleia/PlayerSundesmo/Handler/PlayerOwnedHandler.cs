@@ -218,14 +218,15 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
         // store the name and address to reference removal properly.
         var name = ObjectName;
-        Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
         // Perform a safe disposal.
         try
         {
             // If they were valid before, parse out the event message for their disposal.
             if (!string.IsNullOrEmpty(name))
+            {
+                Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
                 Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Owned Object Disposed")));
-
+            }
             // If the lifetime host is stopping, log it is and return.
             if (_lifetime.ApplicationStopping.IsCancellationRequested)
             {

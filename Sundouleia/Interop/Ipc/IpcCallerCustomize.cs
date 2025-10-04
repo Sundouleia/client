@@ -96,7 +96,6 @@ public sealed class IpcCallerCustomize : IIpcCaller
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
             var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(profileData));
-            _logger.LogDebug($"TempProfile applied to {handler.PlayerName})", LoggerType.IpcGlamourer);
             if (string.IsNullOrEmpty(profileData))
             {
                 RevertUser.InvokeFunc(handler.ObjIndex);
@@ -117,19 +116,16 @@ public sealed class IpcCallerCustomize : IIpcCaller
     {
         if (!APIAvailable || handler.Address == IntPtr.Zero) return Guid.Empty;
 
+        var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(profileData));
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(profileData));
-            _logger.LogDebug($"TempProfile applied to {handler.ObjectName})", LoggerType.IpcGlamourer);
             if (string.IsNullOrEmpty(profileData))
             {
                 RevertUser.InvokeFunc(handler.ObjIndex);
                 return Guid.Empty;
             }
             else
-            {
                 return SetTempProfile.InvokeFunc(handler.ObjIndex, decodedScale).Item2 ?? Guid.Empty;
-            }
         }).ConfigureAwait(false);
     }
 

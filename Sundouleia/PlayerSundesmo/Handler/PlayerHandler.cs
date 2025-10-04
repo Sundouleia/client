@@ -125,7 +125,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             if (string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Honorific])) return;
             Logger.LogTrace($"Applying [{Sundesmo.GetNickAliasOrUid()}]'s cached Honorific title.");
-            await _ipc.Honorific.SetTitleAsync(this, _appearanceData.Data[IpcKind.Honorific]).ConfigureAwait(false);
+            await _ipc.Honorific.SetTitleAsync(ObjIndex, _appearanceData.Data[IpcKind.Honorific]).ConfigureAwait(false);
         });
         // If we have cached petnames data we should apply them when the the client downloads / enables it.
         Mediator.Subscribe<PetNamesReady>(this, async _ =>
@@ -208,26 +208,28 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return;
         }
 
-        Logger.LogDebug("Mod Data changes detected, processing comparisons.", LoggerType.PairHandler);
+        // Logger.LogDebug("Mod Data changes detected, processing comparisons.", LoggerType.PairHandler);
 
 
 
         // Check for any differenced in the modified paths to know what new data we have.
-        Logger.LogDebug("ModData update requests removing [X] files from temp collection. [Y] new files are to be added. [if any are awaiting a second send mention it here]", LoggerType.PairHandler);
+        // Logger.LogDebug("ModData update requests removing [X] files from temp collection. [Y] new files are to be added. [if any are awaiting a second send mention it here]", LoggerType.PairHandler);
 
         // By now the above method should have returned:
         // - What files we in the previous that are not in the current (backup safety net, but should never need)
         // - What hashes were in the ModData's REMOVEFROM group.
         // - What hashes were in the ModData's ADDTO group.
-        Logger.LogTrace("Removing outdated and requested removal files from collection.", LoggerType.PairHandler);
+        // Logger.LogTrace("Removing outdated and requested removal files from collection.", LoggerType.PairHandler);
+        
         // TODO: Replace this with an IPC call whenever we get the ability to add/remove changed items from a temporary mod.
         // - Remove Gamepaths from it that should be removed.
         // Log what is left to be done.
-        Logger.LogDebug("Removed [X] paths, Replaced [Y] paths, Adding [Z] paths.", LoggerType.PairHandler);
+        // Logger.LogDebug("Removed [X] paths, Replaced [Y] paths, Adding [Z] paths.", LoggerType.PairHandler);
+        
         // Determine here via checking the filecache which files we already have the replacement paths for the paths to add.
 
         // Log the fetched results. [NOTE: 'X of Y paths didnt have download links' will be removed later as they will not be provided in the callback.
-        Logger.LogDebug("Of the [X] new paths to add, [Y] were cached. Downloading remainder uncached if any.", LoggerType.PairHandler);
+        // Logger.LogDebug("Of the [X] new paths to add, [Y] were cached. Downloading remainder uncached if any.", LoggerType.PairHandler);
         var downloadLinks = 2;
         if (downloadLinks > 0)
         {
@@ -246,12 +248,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
 
         // 4) Append the new data.
-        Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairHandler);
+        // Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairHandler);
         // - Replace any existing gamepaths that have new paths.
         // - Add any new gamepaths that are not already present.
 
         // 5) Apply the new mod data if rendered.
-        Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        // Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
         await ApplyModData().ConfigureAwait(false);   
     }
 
@@ -259,7 +261,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         if (!IsRendered || _tempCollection == Guid.Empty || _replacements.Count == 0)
         {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered or has no mod data to apply, skipping mod application.", LoggerType.PairHandler);
+            // Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered or has no mod data to apply, skipping mod application.", LoggerType.PairHandler);
             return;
         }
         
@@ -307,6 +309,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (changes is 0 || Address == IntPtr.Zero)
             return;
 
+        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] has IPC changes to apply ({changes})", LoggerType.PairHandler);
+
         // 3) Initialize task list to perform all updates in parallel.
         var tasks = new List<Task>();
         if (changes.HasAny(IpcKind.Glamourer)) tasks.Add(ApplyGlamourer());
@@ -351,21 +355,48 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had a single IPC change ({kind})", LoggerType.PairHandler);
     }
 
-    private async Task ApplyGlamourer() => await _ipc.Glamourer.ApplyBase64StateByIdx(ObjIndex, _appearanceData!.Data[IpcKind.Glamourer]).ConfigureAwait(false);
-    private async Task ApplyHeels() => await _ipc.Heels.SetUserOffset(this, _appearanceData!.Data[IpcKind.Heels]).ConfigureAwait(false);
-    private async Task ApplyHonorific() => await _ipc.Honorific.SetTitleAsync(this, _appearanceData!.Data[IpcKind.Honorific]).ConfigureAwait(false);
-    private async Task ApplyMoodles() => await _ipc.Moodles.SetByPtr(Address, _appearanceData!.Data[IpcKind.Moodles]).ConfigureAwait(false);
-    private async Task ApplyModManips() => await _ipc.Penumbra.SetSundesmoManipulations(_tempCollection, _appearanceData!.Data[IpcKind.Mods]).ConfigureAwait(false);
-    private async Task ApplyPetNames() => await _ipc.PetNames.SetNamesByIdx(this, _appearanceData!.Data[IpcKind.PetNames]).ConfigureAwait(false);
+    private async Task ApplyGlamourer()
+    {
+        Logger.LogDebug($"Applying glamourer state for {PlayerName}");
+        await _ipc.Glamourer.ApplyBase64StateByIdx(ObjIndex, _appearanceData!.Data[IpcKind.Glamourer]).ConfigureAwait(false);
+    }
+    private async Task ApplyHeels()
+    {
+        Logger.LogDebug($"Setting heels offset for {PlayerName}");
+        await _ipc.Heels.SetUserOffset(ObjIndex, _appearanceData!.Data[IpcKind.Heels]).ConfigureAwait(false);
+    }
+    private async Task ApplyHonorific()
+    {
+        Logger.LogDebug($"Setting honorific title for {PlayerName}");
+        await _ipc.Honorific.SetTitleAsync(ObjIndex, _appearanceData!.Data[IpcKind.Honorific]).ConfigureAwait(false);
+    }
+    private async Task ApplyMoodles()
+    {
+        Logger.LogDebug($"Setting moodles status for {PlayerName}");
+        await _ipc.Moodles.SetByPtr(Address, _appearanceData!.Data[IpcKind.Moodles]).ConfigureAwait(false);
+    }
+    private async Task ApplyModManips()
+    {
+        Logger.LogDebug($"Setting mod manipulations for {PlayerName}");
+        await _ipc.Penumbra.SetSundesmoManipulations(_tempCollection, _appearanceData!.Data[IpcKind.ModManips]).ConfigureAwait(false);
+    }
+    private async Task ApplyPetNames()
+    {
+        var nickData = _appearanceData!.Data[IpcKind.PetNames];
+        Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {PlayerName}");
+        await _ipc.PetNames.SetNamesByIdx(ObjIndex, _appearanceData!.Data[IpcKind.PetNames]).ConfigureAwait(false);
+    }
     private async Task ApplyCPlus()
     {
         if (string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.CPlus]) && _tempProfile != Guid.Empty)
         {
+            Logger.LogDebug($"Reverting CPlus profile for {PlayerName}");
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
         else
         {
+            Logger.LogDebug($"Applying CPlus profile for {PlayerName}");
             _tempProfile = await _ipc.CustomizePlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
         }
     }

@@ -67,14 +67,10 @@ public sealed class IpcCallerHeels : IIpcCaller
     /// <summary>
     ///     Updates the heels offset of the provided <paramref name="sundesmo"/>.
     /// </summary>
-    public async Task SetUserOffset(PlayerHandler sundesmo, string data)
+    public async Task SetUserOffset(ushort objIdx, string data)
     {
         if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            _logger.LogDebug($"Setting heels offset for {sundesmo.PlayerName} to {data}");
-            RegisterPlayer.InvokeAction(sundesmo.ObjIndex, data);
-        }).ConfigureAwait(false);
+        await Svc.Framework.RunOnFrameworkThread(() => RegisterPlayer.InvokeAction(objIdx, data)).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -67,7 +67,6 @@ public class GroupsConfig : IHybridSavable
                 _logger.LogError("Invalid Version!");
                 return;
         }
-        _logger.LogInformation("Config loaded.");
         Save();
     }
 

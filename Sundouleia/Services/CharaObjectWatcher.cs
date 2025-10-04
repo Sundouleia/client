@@ -73,15 +73,15 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     /// </summary>
     public void CheckForExisting(PlayerHandler handler)
     {
+        if (handler.Address != IntPtr.Zero)
+            return;
+
         var sundesmoIdent = handler.Sundesmo.Ident;
-        Logger.LogDebug($"Checking against Ident: {sundesmoIdent}");
         foreach (var addr in RenderedCharas)
         {
             var ident = SundouleiaSecurity.GetIdentHashByCharacterPtr(addr);
             if (ident != sundesmoIdent)
                 continue;
-            Logger.LogDebug($"ContentIdHash Match: {ident} - {((Character*)addr)->NameString}");
-
             handler.ObjectRendered((Character*)addr);
             break;
         }
@@ -90,7 +90,7 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     public void CheckForExisting(PlayerOwnedHandler handler)
     {
         // if the owner is not rendered there is no point in checking.
-        if (!handler.Sundesmo.PlayerRendered)
+        if (!handler.Sundesmo.PlayerRendered || handler.Address != IntPtr.Zero)
             return;
 
         var addresses = handler.ObjectType is OwnedObject.Companion 

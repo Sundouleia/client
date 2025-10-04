@@ -1,6 +1,7 @@
 using Dalamud.Plugin.Ipc;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Interop;
 
@@ -99,19 +100,18 @@ public sealed class IpcCallerHonorific : IIpcCaller
     ///     Applies the titleJson string to the provided <paramref name="sundesmo"/>. <para />
     ///     Expects <paramref name="titleDataBase64"/> to be a base64 encoded string of the titleJson.
     /// </summary>
-    public async Task SetTitleAsync(PlayerHandler sundesmo, string titleDataBase64)
+    public async Task SetTitleAsync(ushort objIdx, string titleDataBase64)
     {
-        if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
+        if (!APIAvailable) return;
+
+        var titleData = string.IsNullOrEmpty(titleDataBase64) ? string.Empty : Encoding.UTF8.GetString(Convert.FromBase64String(titleDataBase64));
 
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            _logger.LogTrace($"Applying title to {sundesmo.PlayerName}");
-            string titleData = string.IsNullOrEmpty(titleDataBase64) ? string.Empty : Encoding.UTF8.GetString(Convert.FromBase64String(titleDataBase64));
-            // Clear if empty, set if not.
             if (string.IsNullOrEmpty(titleData))
-                ClearUserTitle.InvokeAction(sundesmo.ObjIndex);
+                ClearUserTitle.InvokeAction(objIdx);
             else
-                SetUserTitle.InvokeAction(sundesmo.ObjIndex, titleData);
+                SetUserTitle.InvokeAction(objIdx, titleData);
         }).ConfigureAwait(false);
     }
 

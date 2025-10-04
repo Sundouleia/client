@@ -50,16 +50,6 @@ public class Sundesmo : IComparable<Sundesmo>
     public bool PetNull => _pet == null;
     public bool CompanionNull => _companion == null;
 
-    public string DebugNullHandlers()
-    {
-        var nulls = new List<string>();
-        if (PlayerNull) nulls.Add("Player");
-        if (MountMinionNull) nulls.Add("MountMinion");
-        if (PetNull) nulls.Add("Pet");
-        if (CompanionNull) nulls.Add("Companion");
-        return string.Join(", ", nulls);
-    }
-
     // Associated ServerData.
     public UserPair UserPair { get; init; }
     public UserData UserData => UserPair.User;
@@ -120,13 +110,13 @@ public class Sundesmo : IComparable<Sundesmo>
     public void ReapplyAlterations()
     {
         if (PlayerRendered)
-            _player!.ReapplyAlterations();
+            _player.ReapplyAlterations();
         if (MountMinionRendered)
-            _mountMinion!.ReapplyAlterations();
+            _mountMinion.ReapplyAlterations();
         if (PetRendered)
-            _pet!.ReapplyAlterations();
+            _pet.ReapplyAlterations();
         if (CompanionRendered)
-            _companion!.ReapplyAlterations();
+            _companion.ReapplyAlterations();
     }
 
     // Tinker with async / no async later.
@@ -184,6 +174,8 @@ public class Sundesmo : IComparable<Sundesmo>
         _watcher.CheckForExisting(_mountMinion);
         _watcher.CheckForExisting(_pet);
         _watcher.CheckForExisting(_companion);
+        // if anything is rendered and has alterations, reapply them.
+        ReapplyAlterations();
         _mediator.Publish(new SundesmoOnline(this));
     }
 

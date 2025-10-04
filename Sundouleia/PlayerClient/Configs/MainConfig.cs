@@ -118,7 +118,6 @@ public class MainConfig : IHybridSavable
             LoggerFilters = token?.ToObject<LoggerType>() ?? LoggerType.Recommended;
         }
 
-        _logger.LogInformation("Config loaded.");
         Save();
     }
 

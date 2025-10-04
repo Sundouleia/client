@@ -25,7 +25,11 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     private readonly MainConfig _mainConfig;
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoFactory _pairFactory;
-    
+
+    private CancellationTokenSource _disconnectTimeoutCTS = new();
+    private Task? _disconnectTimeoutTask = null;
+
+
     private Lazy<List<Sundesmo>> _directPairsInternal;  // the internal direct pairs lazy list for optimization
     public List<Sundesmo> DirectPairs => _directPairsInternal.Value; // the direct pairs the client has with other users.
 
@@ -37,8 +41,10 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         _mainConfig = config;
         _serverConfigs = serverConfigs;
 
-        Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearSundesmos());
-        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => ReapplyAlterations());
+        Mediator.Subscribe<ConnectedMessage>(this, _ => _disconnectTimeoutCTS.SafeCancel());
+        Mediator.Subscribe<ReconnectedMessage>(this, _ => _disconnectTimeoutCTS.SafeCancel());
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => OnClientDisconnected());
+        Mediator.Subscribe<CutsceneEndMessage>(this, _ => ReapplyAlterations());
 
         Mediator.Subscribe<TargetSundesmoMessage>(this, (msg) =>
         {
@@ -66,7 +72,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         if (!_mainConfig.Current.ShowContextMenus) return;
         if (args.Target is not MenuTargetDefault target || target.TargetObjectId == 0) return;
         // Find the sundesmo that matches this and display the results.
-        if (DirectPairs.FirstOrDefault(p => p.PlayerObjectId == target.TargetObjectId && !p.IsPaused) is not { } match)
+        if (DirectPairs.FirstOrDefault(p => p.PlayerRendered && p.PlayerObjectId == target.TargetObjectId && !p.IsPaused) is not { } match)
             return;
 
         Logger.LogDebug($"Found matching pair for context menu: {match.GetNickAliasOrUid()}", LoggerType.PairManagement);
@@ -86,6 +92,13 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
         Svc.ContextMenu.OnMenuOpened -= OnOpenContextMenu;
         DisposeSundesmos();
+        _disconnectTimeoutCTS.SafeCancelDispose();
+        try
+        {
+            _disconnectTimeoutTask?.Wait();
+        }
+        catch (AggregateException ex) when (ex.InnerExceptions.All(e => e is OperationCanceledException)) { }
+        _disconnectTimeoutTask = null;
     }
 
     public void AddSundesmo(UserPair dto)
@@ -132,12 +145,36 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
-    public void ClearSundesmos()
+    /// <summary>
+    ///     Whenever the client disconnects from the server we should run this function. <para />
+    ///     This will assign a timeout task to wait for 15s before disposing of all handled data. <para />
+    ///     Should the client reconnect before timeout, cancel the await and keep all data intext. <para />
+    ///     Once the delay expires, run a disposal of all data.
+    /// </summary>
+    public void OnClientDisconnected()
     {
-        Logger.LogDebug("Clearing all Pairs", LoggerType.PairManagement);
-        DisposeSundesmos();
-        _allSundesmos.Clear();
+        Logger.LogInformation("Client disconnected, starting disconnect timeout.", LoggerType.PairManagement);
+        _disconnectTimeoutCTS = _disconnectTimeoutCTS.SafeCancelRecreate();
+        // Mark all sundesmos offline immidiately.
+        Parallel.ForEach(_allSundesmos, s => s.Value.MarkOffline());
         RecreateLazy();
+        // assign the delayed task.
+        _disconnectTimeoutTask =  Task.Run(async () =>
+        {
+            try
+            {
+                // Await 15s for timeout, ensuring that any data that would be reapplied is reapplied.
+                await Task.Delay(TimeSpan.FromSeconds(15), _disconnectTimeoutCTS.Token).ConfigureAwait(false);
+                Logger.LogInformation("ClientDC timeout elapsed, disposing all sundesmos.", LoggerType.PairManagement);
+                Parallel.ForEach(_allSundesmos, s => s.Value.DisposeData());
+                _allSundesmos.Clear();
+                RecreateLazy();
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.LogInformation("ClientDC timeout cancelled upon reconnection.", LoggerType.PairManagement);
+            }
+        }, _disconnectTimeoutCTS.Token);
     }
 
     /// <summary>
@@ -168,7 +205,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         Mediator.Publish(new ClearProfileDataMessage(dto.User));
         if (sundesmo.IsOnline)
         {
-            Logger.LogDebug($"Pair [{dto.User.AliasOrUID}] is already marked online. Recreating direct pairs.", LoggerType.PairManagement);
+            Logger.LogWarning($"Pair [{dto.User.AliasOrUID}] is already marked online. Recreating direct pairs.", LoggerType.PairManagement);
             RecreateLazy();
             return;
         }
@@ -182,6 +219,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
             Mediator.Publish(new NotificationMessage("User Online", msg, NotificationType.Info, TimeSpan.FromSeconds(2)));
         }
 
+        Logger.LogTrace($"Marked {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()}) as online", LoggerType.PairManagement);
         sundesmo.MarkOnline(dto);
         Mediator.Publish(new SundesmoOnline(sundesmo));
         RecreateLazy();
@@ -195,7 +233,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     {
         if (_allSundesmos.TryGetValue(user, out var pair))
         {
-            Logger.LogTrace($"Marked {pair.GetNickAliasOrUid()} as offline", LoggerType.PairManagement);
+            Logger.LogTrace($"Marked {pair.PlayerName}({pair.GetNickAliasOrUid()}) as offline", LoggerType.PairManagement);
             Mediator.Publish(new ClearProfileDataMessage(pair.UserData));
             pair.MarkOffline();
         }
