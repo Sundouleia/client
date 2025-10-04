@@ -56,9 +56,6 @@ public class RequestsTab : DisposableMediatorSubscriberBase
     // Picks between incoming and outgoing requests, so we know what to draw and such.
     private void DrawIncoming()
     {
-        if (_incoming.Count is 0)
-            return;
-
         using var id = ImRaii.PushId("folder_" + INCOMING_ID);
         var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
 
@@ -77,7 +74,7 @@ public class RequestsTab : DisposableMediatorSubscriberBase
             _incomingExpanded = !_incomingExpanded;
 
         ImGui.Separator();
-        if (!_incomingExpanded) 
+        if (!_incomingExpanded || _incoming.Count is 0)
             return;
 
         using var indent = ImRaii.PushIndent(CkGui.IconSize(FAI.EllipsisV).X + ImGui.GetStyle().ItemSpacing.X, false);
@@ -89,9 +86,6 @@ public class RequestsTab : DisposableMediatorSubscriberBase
 
     private void DrawOutgoing()
     {
-        if (_outgoing.Count is 0)
-            return;
-
         using var id = ImRaii.PushId("folder_" + OUTGOING_ID);
         var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
 
@@ -103,18 +97,18 @@ public class RequestsTab : DisposableMediatorSubscriberBase
             ImGui.SameLine();
             CkGui.FramedIconText(FAI.Inbox);
             using (ImRaii.PushFont(UiBuilder.MonoFont))
-                CkGui.TextFrameAlignedInline($"{INCOMING_ID} ({_requests.TotalIncoming})");
+                CkGui.TextFrameAlignedInline($"{OUTGOING_ID} ({_requests.TotalIncoming})");
         }
-        _hoveringIncoming = ImGui.IsItemHovered();
+        _hoveringOutgoing = ImGui.IsItemHovered();
         if (ImGui.IsItemClicked())
             _outgoingExpanded = !_outgoingExpanded;
 
         ImGui.Separator();
-        if (!_outgoingExpanded)
+        if (!_outgoingExpanded || _outgoing.Count is 0)
             return;
 
         using var indent = ImRaii.PushIndent(CkGui.IconSize(FAI.EllipsisV).X + ImGui.GetStyle().ItemSpacing.X, false);
-        foreach (var entry in _incoming)
+        foreach (var entry in _outgoing)
             entry.DrawRequestEntry(true);
 
         ImGui.Separator();

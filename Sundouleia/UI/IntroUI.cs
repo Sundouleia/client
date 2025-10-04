@@ -1,5 +1,6 @@
 using CkCommons;
 using CkCommons.Gui;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Sundouleia.PlayerClient;
@@ -8,8 +9,6 @@ using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.WebAPI;
-using Dalamud.Bindings.ImGui;
-using OtterGui;
 
 namespace Sundouleia.Gui;
 
