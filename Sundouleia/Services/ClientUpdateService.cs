@@ -42,8 +42,6 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _watcher = watcher;
         _distributor = distributor;
 
-        _pendingUpdates = Enum.GetValues<OwnedObject>().ToDictionary(o => o, _ => IpcKind.None);
-
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
         _ipc.Glamourer.OnStateChanged.Enable();
         _ipc.CustomizePlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
@@ -117,7 +115,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
 
             // If there is only a single thing to update, send that over.
             var modUpdate = _allPendingUpdates.HasAny(IpcKind.Mods);
-            var isSingle = SundouleiaEx.IsSingleFlagSet((byte)_allPendingUpdates);
+            var isSingle = _pendingUpdates.Count is 1 && SundouleiaEx.IsSingleFlagSet((byte)_allPendingUpdates);
             try
             {
                 switch (modUpdate, isSingle)
@@ -152,14 +150,16 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     private void AddPendingUpdate(OwnedObject type, IpcKind kind)
     {
         _debounceCTS = _debounceCTS.SafeCancelRecreate();
-        _pendingUpdates[type] |= kind;
-        _allPendingUpdates |= kind;
+        Logger.LogTrace($"Detected update for {type} ({kind})");
+        if (_pendingUpdates.ContainsKey(type))
+            _pendingUpdates[type] |= kind;
+        else
+            _pendingUpdates[type] = kind;
     }
 
     private void ClearPendingUpdates()
     {
-        foreach (var key in _pendingUpdates.Keys)
-            _pendingUpdates[key] = IpcKind.None;
+        _pendingUpdates.Clear();
         _allPendingUpdates = IpcKind.None;
     }
 

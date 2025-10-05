@@ -18,6 +18,8 @@ public sealed class HybridSaveService : HybridSaveServiceBase<ConfigFileProvider
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        // Save all attached savers.
+
         await Dispose();
     }
 }

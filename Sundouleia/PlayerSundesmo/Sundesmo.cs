@@ -109,14 +109,10 @@ public class Sundesmo : IComparable<Sundesmo>
 
     public void ReapplyAlterations()
     {
-        if (PlayerRendered)
-            _player.ReapplyAlterations();
-        if (MountMinionRendered)
-            _mountMinion.ReapplyAlterations();
-        if (PetRendered)
-            _pet.ReapplyAlterations();
-        if (CompanionRendered)
-            _companion.ReapplyAlterations();
+        _player.ReapplyAlterations();
+        _mountMinion.ReapplyAlterations();
+        _pet.ReapplyAlterations();
+        _companion.ReapplyAlterations();
     }
 
     // Tinker with async / no async later.
@@ -169,6 +165,12 @@ public class Sundesmo : IComparable<Sundesmo>
     public void MarkOnline(OnlineUser dto)
     {
         OnlineUser = dto;
+        _mediator.Publish(new SundesmoOnline(this, PlayerRendered));
+        // if they are rendered we should halt any timeouts occuring.
+        if (PlayerRendered) _player.StopTimeoutTask();
+        if (MountMinionRendered) _mountMinion.StopTimeoutTask();
+        if (PetRendered) _pet.StopTimeoutTask();
+        if (CompanionRendered) _companion.StopTimeoutTask();
         // Now that we have the ident we should run a check against all of the handlers.
         _watcher.CheckForExisting(_player);
         _watcher.CheckForExisting(_mountMinion);
@@ -176,7 +178,6 @@ public class Sundesmo : IComparable<Sundesmo>
         _watcher.CheckForExisting(_companion);
         // if anything is rendered and has alterations, reapply them.
         ReapplyAlterations();
-        _mediator.Publish(new SundesmoOnline(this));
     }
 
     /// <summary>
@@ -185,6 +186,10 @@ public class Sundesmo : IComparable<Sundesmo>
     public void MarkOffline()
     {
         OnlineUser = null;
+        _player.StartTimeoutTask();
+        _mountMinion.StartTimeoutTask();
+        _pet.StartTimeoutTask();
+        _companion.StartTimeoutTask();
         _mediator.Publish(new SundesmoOffline(this));
     }
 

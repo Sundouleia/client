@@ -222,7 +222,6 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
 
         Logger.LogTrace($"Marked {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()}) as online", LoggerType.PairManagement);
         sundesmo.MarkOnline(dto);
-        Mediator.Publish(new SundesmoOnline(sundesmo));
         RecreateLazy();
     }
 

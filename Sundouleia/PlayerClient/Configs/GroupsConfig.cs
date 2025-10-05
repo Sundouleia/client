@@ -31,7 +31,7 @@ public class GroupsConfig : IHybridSavable
         return new JObject()
         {
             ["Version"] = ConfigVersion,
-            ["Groups"] = JObject.FromObject(Current),
+            ["Config"] = JObject.FromObject(Current),
         }.ToString(Formatting.Indented);
     }
     public GroupsConfig(ILogger<GroupsConfig> logger, HybridSaveService saver)
@@ -61,7 +61,7 @@ public class GroupsConfig : IHybridSavable
         switch (version)
         {
             case 0:
-                LoadV0(jObject["PairGroups"]);
+                LoadV0(jObject["Config"]);
                 break;
             default:
                 _logger.LogError("Invalid Version!");
@@ -80,4 +80,20 @@ public class GroupsConfig : IHybridSavable
     }
 
     public GroupsStorage Current { get; set; } = new GroupsStorage();
+
+    // Helpers.
+    public bool IsDefaultExpanded(string id) => Current.OpenedDefaultFolders.Contains(id);
+    public void ToggleDefaultFolder(string id)
+    {
+        Current.OpenedDefaultFolders.SymmetricExceptWith([ id ]);
+        Save();
+    }
+    public void SetDefaultFolder(string id, bool open)
+    {
+        if (open)
+            Current.OpenedDefaultFolders.Add(id);
+        else
+            Current.OpenedDefaultFolders.Remove(id);
+        Save();
+    }
 }

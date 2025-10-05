@@ -102,29 +102,37 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         _gameObject = null;
         // do not clear the object name and other data yet, hold until timeout occurs, and then revert.
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} unrendered! Reverting in 10s unless reappearing.", LoggerType.PairHandler);
-        _timeoutCTS = _timeoutCTS.SafeCancelRecreate();
-        _timeoutTask = ObjectedDespawnedTask();
+        StartTimeoutTask();
     }
 
-    private async Task ObjectedDespawnedTask()
+    public void StartTimeoutTask()
     {
-        // Await the proper delay for data removal.
-        await Task.Delay(TimeSpan.FromSeconds(10), _timeoutCTS.Token).ConfigureAwait(false);
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} has been unrendered for 10s, reverting data.", LoggerType.PairHandler);
-        // Revert any applied data.
-        if (_tempProfile != Guid.Empty)
-        {
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-            _tempProfile = Guid.Empty;
-        }
-        if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
-            await _ipc.Glamourer.ReleaseByName(ObjectName).ConfigureAwait(false);
+        if (!IsRendered) return;
+        if (_timeoutTask is not null && !_timeoutTask.IsCompleted) return;
 
-        _appearanceData = null;
-        ObjectName = string.Empty;
-        // Notify the owner that we went poofy or whatever if we need to here.
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} data has been reverted due to timeout.", LoggerType.PairHandler);
+        _timeoutCTS = _timeoutCTS.SafeCancelRecreate();
+        _timeoutTask = Task.Run(async () =>
+        {
+            // Await the proper delay for data removal.
+            await Task.Delay(TimeSpan.FromSeconds(10), _timeoutCTS.Token).ConfigureAwait(false);
+            Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} has been unrendered for 10s, reverting data.", LoggerType.PairHandler);
+            // Revert any applied data.
+            if (_tempProfile != Guid.Empty)
+            {
+                await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+                _tempProfile = Guid.Empty;
+            }
+            if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
+                await _ipc.Glamourer.ReleaseByName(ObjectName).ConfigureAwait(false);
+
+            _appearanceData = null;
+            ObjectName = string.Empty;
+            // Notify the owner that we went poofy or whatever if we need to here.
+            Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} data has been reverted due to timeout.", LoggerType.PairHandler);
+        });
     }
+
+    public void StopTimeoutTask() => _timeoutCTS.SafeCancel();
 
     public void ReapplyAlterations()
     {
@@ -136,7 +144,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             ApplyGlamourer().ConfigureAwait(false);
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))
             ApplyCPlus().ConfigureAwait(false);
-
+        // redraw
+        _ipc.Penumbra.RedrawGameObject(ObjIndex);
         Logger.LogInformation($"Reapplied ({Sundesmo.GetNickAliasOrUid()})'s alterations.", LoggerType.PairHandler);
     }
 

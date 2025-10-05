@@ -1,4 +1,5 @@
 using CkCommons.HybridSaver;
+using Sundouleia.Gui.Components;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 
@@ -35,6 +36,7 @@ public class ConfigStorage
     public bool RadarShowUnreadBubble { get; set; } = true;
 
     // UI Options
+    public MainMenuTabs.SelectedTab MainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
     public bool OpenUiOnStartup { get; set; } = true;
     public bool ShowProfiles { get; set; } = true;
     public bool AllowNSFW { get; set; } = false;

@@ -5,6 +5,7 @@ using Sundouleia.Services.Configs;
 using Dalamud.Bindings.ImGui;
 using System.Collections.Immutable;
 using OtterGui.Text;
+using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Gui.Components;
 
@@ -12,7 +13,7 @@ namespace Sundouleia.Gui.Components;
 public class DrawFolderTag : DrawFolderBase
 {
     public DrawFolderTag(string id, IImmutableList<DrawUserPair> drawPairs, IImmutableList<Sundesmo> allPairs,
-        ServerConfigManager configs) : base(id, drawPairs, allPairs, configs)
+        GroupsConfig config) : base(id, drawPairs, allPairs, config)
     { }
 
     protected override bool RenderIfEmpty => _id switch

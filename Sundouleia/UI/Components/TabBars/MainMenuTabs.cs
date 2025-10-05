@@ -1,15 +1,16 @@
 using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Widgets;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using OtterGui.Widgets;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
-using Dalamud.Bindings.ImGui;
-using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Gui.Components;
 
@@ -25,12 +26,24 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         Account,
     }
 
+    public override SelectedTab TabSelection
+    {
+        get => base.TabSelection;
+        set
+        {
+            _config.Current.MainUiTab = value;
+            _config.Save();
+            base.TabSelection = value;
+        }
+    }
+
     private readonly MainConfig _config;
     private readonly SundouleiaMediator _mediator;
     public MainMenuTabs(SundouleiaMediator mediator, MainConfig config, TutorialService guides)
     {
         _mediator = mediator;
         _config = config;
+        TabSelection = _config.Current.MainUiTab;
 
         AddDrawButton(FontAwesomeIcon.Home, SelectedTab.Homepage, "Homepage",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Homepage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.Whitelist));

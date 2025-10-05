@@ -52,6 +52,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _sundesmos = pairs;
         _watcher = ownedObjects;
 
+        Mediator.Subscribe<SundesmoOnline>(this, msg => OnSundesmoConnected(msg.Sundesmo));
         Mediator.Subscribe<SundesmoOffline>(this, msg => OnSundesmoDisconnected(msg.Sundesmo));
         Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => OnSundesmoRendered(msg.Handler));
         Mediator.Subscribe<SundesmoPlayerUnrendered>(this, msg => OnSundesmoUnrendered(msg.Handler));
@@ -71,17 +72,30 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     public HashSet<UserData> InLimbo { get; private set; } = new();
     public bool ProcessingCacheUpdate => _latestDataUpdateTask is not null && !_latestDataUpdateTask.IsCompleted;
 
-    // can use if we have edge cases to deal with.
+
+    // When a sundesmo connects there is a chance that they are already rendered. If so we should update them here.
     private void OnSundesmoConnected(Sundesmo sundesmo)
     {
-        // if a sundesmo connects, there is a change that they reconnected but their rendered state was valid or was timed out,
-        // this edge case can be handled here if it ever comes up.
+        if (!sundesmo.PlayerRendered)
+            return;
+        Logger.LogDebug($"Sundesmo ({sundesmo.PlayerName}) connected and is already rendered. Adding to new visible.", LoggerType.PairVisibility);
+        // we only do this for when going online and are visible, it will not work the other way around though.
+        // when we connect we would only send it to the new visible users who are not part of the existing ones.
+        // (by this i mean when we dc we effectively place all visible sundesmos in limbo, so that on reconnect we only send back
+        // out to the new users not in the old users if no change was made.)
+        NewVisible.Add(sundesmo.UserData);
     }
 
     // If in limbo, then they should leave limbo upon DC.
     private void OnSundesmoDisconnected(Sundesmo sundesmo)
-        => InLimbo.Remove(sundesmo.UserData);
-
+    {
+        // If this is true it means they were in limbo due to being unrendered but still online, and went offline, satisfying both conditions.
+        if (InLimbo.Remove(sundesmo.UserData))
+            return;
+        // Otherwise they have disconnected but are not in limbo, so we should add them into limbo.
+        Logger.LogDebug($"Sundesmo ({sundesmo.PlayerName}) disconnected while visible. Adding to limbo.", LoggerType.PairVisibility);
+        InLimbo.Add(sundesmo.UserData);
+    }
     // If they were in limbo, they still have the latest data, so do nothing. Otherwise, add to new visible.
     private void OnSundesmoRendered(PlayerHandler handler)
     {
@@ -100,8 +114,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     // Remove the sundesmo from the limbo hashset, so we send them a full update next time.
     private void OnSundesmoTimedOut(PlayerHandler handler)
     {
-        InLimbo.Remove(handler.Sundesmo.UserData);
         Logger.LogDebug($"Sundesmo {handler.Sundesmo.PlayerName} timed out, removing from limbo.", LoggerType.PairVisibility);
+        InLimbo.Remove(handler.Sundesmo.UserData);
     }
 
     // Only entry point where we ignore timeout states.
@@ -129,7 +143,11 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 CompanionChanges = _lastBuddyIpc.ToUpdateApi(),
             };
             // bomb the other data such as new users and limbo users.
-            InLimbo.Clear();
+            if (InLimbo.Count is not 0)
+            {
+                Logger.LogDebug("Clearing limbo as we have a new state.");
+                InLimbo.Clear();
+            }
             NewVisible.Clear();
             var visible = _sundesmos.GetVisibleConnected();
             await _hub.UserPushIpcFull(new(visible, modData, appearance)).ConfigureAwait(false);
@@ -170,6 +188,12 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             };
             // grab the new visible sundesmos not in limbo state.
             var toSend = NewVisibleNoLimbo.ToList();
+            if (InLimbo.Count is not 0)
+            {
+                Logger.LogDebug("Clearing limbo as we have a new state.");
+                InLimbo.Clear();
+            }
+            NewVisible.Clear();
             // await the full send.
             await _hub.UserPushIpcFull(new(toSend, modData, appearance)).ConfigureAwait(false);
             Logger.LogInformation($"Full Ipc Cache sent to {toSend.Count} newly visible users. 0 Files needed uploading.");
@@ -234,7 +258,11 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             await _hub.UserPushIpcFull(new(SundesmosForUpdatePush, modChanges, visualChanges)).ConfigureAwait(false);
             Logger.LogInformation($"Ipc Cache Full Update completed.");
             // Clear the limbo list as they will need a full update next time.
-            InLimbo.Clear();
+            if (InLimbo.Count is not 0)
+            {
+                Logger.LogDebug("Clearing limbo as we have a new state.");
+                InLimbo.Clear();
+            }
         }, _latestDataUpdateCTS.Token);
     }
 
@@ -248,9 +276,13 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             var modChanges = await UpdateModCacheInternal().ConfigureAwait(false);
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
             await _hub.UserPushIpcMods(new(SundesmosForUpdatePush, modChanges)).ConfigureAwait(false);
-            // Clear the limbo list as they will need a full update next time.
-            InLimbo.Clear();
             Logger.LogInformation($"Ipc Cache Mod Update completed.");
+            // Clear the limbo list as they will need a full update next time.
+            if (InLimbo.Count is not 0)
+            {
+                Logger.LogDebug("Clearing limbo as we have a new state.");
+                InLimbo.Clear();
+            }
         }, _latestDataUpdateCTS.Token);
     }
 
@@ -264,13 +296,20 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             var visualChanges = await UpdateIpcCacheInternal(newChanges).ConfigureAwait(false);
             // If no change, do not push.
             if (!visualChanges.HasData())
+            {
+                Logger.LogInformation($"Ipc Cache Visuals Update found no changes, skipping push.");
                 return;
+            }
 
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
             await _hub.UserPushIpcOther(new(SundesmosForUpdatePush, visualChanges)).ConfigureAwait(false);
             Logger.LogInformation($"Ipc Cache Visuals Update completed.");
             // Clear the limbo list as they will need a full update next time.
-            InLimbo.Clear();
+            if (InLimbo.Count is not 0)
+            {
+                Logger.LogDebug("Clearing limbo as we have a new state.");
+                InLimbo.Clear();
+            }
         }, _latestDataUpdateCTS.Token);
     }
 
@@ -290,7 +329,11 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             await _hub.UserPushIpcSingle(new(SundesmosForUpdatePush, obj, type, data)).ConfigureAwait(false);
             Logger.LogInformation($"Ipc Cache Single Update completed for {obj} - {type}.");
             // Clear the limbo list as they will need a full update next time.
-            InLimbo.Clear();
+            if (InLimbo.Count is not 0)
+            {
+                Logger.LogDebug("Clearing limbo as we have a new state.");
+                InLimbo.Clear();
+            }
         }, _latestDataUpdateCTS.Token);
     }
 
@@ -403,6 +446,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // current cache is already updated, so return the the new data.
         if (applied != IpcKind.None)
         {
+            Logger.LogDebug($"Player Cache Update checked. Changes: {applied}");
             newData = newData with { Updates = applied };
             compiledData.PlayerChanges = newData;
         }
