@@ -314,6 +314,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             toApply.Add(ApplyPetNames());
         // Run in parallel.
         await Task.WhenAll(toApply).ConfigureAwait(false);
+        // Redraw if nessisary (Glamourer or CPlus)
+        if (_appearanceData.Data.ContainsKey(IpcKind.Glamourer) || _appearanceData.Data.ContainsKey(IpcKind.CPlus))
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their visual data reapplied.", LoggerType.PairHandler);
     }
 
@@ -343,6 +346,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // 4) Process all updates.
         await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        // Redraw if nessisary (Glamourer or CPlus)
+        if (changes.HasAny(IpcKind.Glamourer | IpcKind.CPlus))
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
+
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had IPC changes applied ({changes})", LoggerType.PairHandler);
     }
 
@@ -372,6 +380,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _ => Task.CompletedTask
         };
         await task.ConfigureAwait(false);
+
+        // Redraw if nessisary (Glamourer or CPlus)
+        if (kind is IpcKind.Glamourer or IpcKind.CPlus)
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
+
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had a single IPC change ({kind})", LoggerType.PairHandler);
     }
 
