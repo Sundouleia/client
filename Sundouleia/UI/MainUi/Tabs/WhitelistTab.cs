@@ -108,8 +108,8 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         // if we wish to display our visible users separately, then do so.
         if (_config.Current.ShowVisibleUsersSeparately)
         {
-            var allVisiblePairs = ImmutablePairList(allPairs.Where(u => u.PlayerRendered));
-            var filteredVisiblePairs = BasicSortedList(filteredPairs.Where(u => u.PlayerRendered));
+            var allVisiblePairs = ImmutablePairList(allPairs.Where(u => u.PlayerRendered && u.IsOnline));
+            var filteredVisiblePairs = BasicSortedList(filteredPairs.Where(u => u.PlayerRendered && u.IsOnline));
             drawFolders.Add(_factory.CreateDrawTagFolder(Constants.CustomVisibleTag, filteredVisiblePairs, allVisiblePairs));
         }
 
