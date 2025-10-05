@@ -233,14 +233,19 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     ///     The GUID of the created collection to use for later reference in 
     ///     assigning and manipulating the appended mods.
     /// </returns>
-    public Guid CreateTempSundesmoCollection(string pairUid)
+    public async Task<Guid> CreateTempSundesmoCollection(string pairUid)
     {
         if (!APIAvailable) return Guid.Empty;
         var name = $"Sundesmo_{pairUid}_Collection";
-        // Originally bound to the game's framework thread, but see if it can work fine outside of it.
-        var ret = CreateTempCollection.Invoke(SUNDOULEIA_ID, name, out Guid id);
-        Logger.LogTrace($"New Temp Collection on [{SUNDOULEIA_ID}] for [{name}] -> ID: {id} (RetCode: {ret})");
-        return id;
+        return await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            if (CreateTempCollection.Invoke(SUNDOULEIA_ID, name, out Guid id) is { } ret && ret is PenumbraApiEc.Success)
+            {
+                Logger.LogTrace($"TempCollection {{{name}}} -> ID: {id}");
+                return id;
+            }
+            return Guid.Empty;
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -285,11 +290,11 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     ///     Removes a Sundesmo's Temporary Collection via its GUID. <para />
     ///     It should be a given that they do not need to be visible for this to execute successfully.
     /// </summary>
-    public void RemoveSundesmoCollection(Guid id)
+    public async Task RemoveSundesmoCollection(Guid id)
     {
         if (!APIAvailable) return;
         Logger.LogTrace($"Removing Sundesmo Collection {{{id}}}");
-        var ret = DeleteTempCollection.Invoke(id);
+        var ret = await Svc.Framework.RunOnFrameworkThread(() => DeleteTempCollection.Invoke(id)).ConfigureAwait(false);
         Logger.LogTrace($"Sundesmo Collection {{{id}}} deleted. [RetCode: {ret}]");
     }
 

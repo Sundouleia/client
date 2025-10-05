@@ -142,32 +142,15 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     }
 
     // Require handler to enforce being called by the SundesmoHandler.
-    public async Task ReleaseActor(PlayerHandler handler)
+    public async Task ReleaseActor(ushort objIdx)
     {
-        if (!APIAvailable || PlayerData.IsZoning || handler.Address == IntPtr.Zero)
+        if (!APIAvailable || PlayerData.IsZoning)
             return;
         
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            _logger.LogDebug($"Reverting {handler.PlayerName}'s data!", LoggerType.IpcGlamourer);
-            RevertUser.Invoke(handler.ObjIndex, SUNDOULEIA_LOCK);
-            _logger.LogDebug($"Unlocking {handler.PlayerName}'s data!", LoggerType.IpcGlamourer);
-            UnlockUser.Invoke(handler.ObjIndex, SUNDOULEIA_LOCK);
-        }).ConfigureAwait(false);
-    }
-
-    // Require handler to enforce being called by the SundesmoHandler.
-    public async Task ReleaseActor(PlayerOwnedHandler handler)
-    {
-        if (!APIAvailable || PlayerData.IsZoning || handler.Address == IntPtr.Zero)
-            return;
-
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            _logger.LogDebug($"Reverting {handler.ObjectName}'s data!", LoggerType.IpcGlamourer);
-            RevertUser.Invoke(handler.ObjIndex, SUNDOULEIA_LOCK);
-            _logger.LogDebug($"Unlocking {handler.ObjectName}'s data!", LoggerType.IpcGlamourer);
-            UnlockUser.Invoke(handler.ObjIndex, SUNDOULEIA_LOCK);
+            RevertUser.Invoke(objIdx, SUNDOULEIA_LOCK);
+            UnlockUser.Invoke(objIdx, SUNDOULEIA_LOCK);
         }).ConfigureAwait(false);
     }
 
@@ -178,9 +161,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
 
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            _logger.LogDebug($"Reverting {playerName}'s Glamourer data!", LoggerType.IpcGlamourer);
             RevertUserByName.Invoke(playerName, SUNDOULEIA_LOCK);
-            _logger.LogDebug($"Unlocking {playerName}'s Glamourer data!", LoggerType.IpcGlamourer);
             UnlockUserByName.Invoke(playerName, SUNDOULEIA_LOCK);
         }).ConfigureAwait(false);
     }

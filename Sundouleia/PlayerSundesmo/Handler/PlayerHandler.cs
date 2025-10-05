@@ -47,13 +47,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // If penumbra is already initialized create the temp collection here.
         if (IpcCallerPenumbra.APIAvailable && _tempCollection == Guid.Empty)
-            _tempCollection = _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
+            _tempCollection = _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID).GetAwaiter().GetResult();
 
         // Maybe do something on zone switch? but not really sure lol. I would personally continue
         // any existing downloads we have.
 
         // this just creates 'a collection' it does not assign anyone to it yet.
-        Mediator.Subscribe<PenumbraInitialized>(this, _ => _tempCollection = _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID));
+        Mediator.Subscribe<PenumbraInitialized>(this, async _ =>
+        {
+            _tempCollection = await _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
+        });
 
         // Old subscriber here for class/job change?
         // Old subscribers here for combat/performance start/stop. Reapplies should fix this but yeah can probably just do redraw.
@@ -402,20 +405,42 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task RevertAlterations(string playerName, CancellationToken token)
+    public async Task RevertAlterations(string aliasOrUid, string name, IntPtr address, ushort objIdx, CancellationToken token)
     {
-        // Fail if not rendered, since we do address-based reversion here.
-        if (Address == IntPtr.Zero)
+        if (address == IntPtr.Zero)
             return;
-
         // We can care about parallel execution here if we really want to but i dont care atm.
-        Logger.LogDebug($"Reverting {playerName}'s alteration data", LoggerType.PairHandler);
-        await _ipc.Glamourer.ReleaseActor(this).ConfigureAwait(false);
-        await _ipc.Heels.RestoreUserOffset(this).ConfigureAwait(false);
-        await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-        await _ipc.Honorific.ClearTitleAsync(this).ConfigureAwait(false);
-        await _ipc.Moodles.ClearByPtr(Address).ConfigureAwait(false);
-        await _ipc.PetNames.ClearPetNamesByPtr(Address).ConfigureAwait(false);
+        if (IpcCallerGlamourer.APIAvailable)
+        {
+            Logger.LogTrace($"Reverting {name}({aliasOrUid})'s Actor state", LoggerType.PairHandler);
+            await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
+        }
+        if (IpcCallerHeels.APIAvailable)
+        {
+            Logger.LogTrace($"Restoring {name}({aliasOrUid})'s heels offset.", LoggerType.PairHandler);
+            await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
+        }
+        if (IpcCallerCustomize.APIAvailable && _tempProfile != Guid.Empty)
+        {
+            Logger.LogTrace($"Reverting {name}({aliasOrUid})'s CPlus profile.", LoggerType.PairHandler);
+            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            _tempProfile = Guid.Empty;
+        }
+        if (IpcCallerHonorific.APIAvailable)
+        {
+            Logger.LogTrace($"Clearing {name}({aliasOrUid})'s honorific title.", LoggerType.PairHandler);
+            await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
+        }
+        if (IpcCallerMoodles.APIAvailable)
+        {
+            Logger.LogTrace($"Clearing {name}({aliasOrUid})'s moodles status.", LoggerType.PairHandler);
+            await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
+        }
+        if (IpcCallerPetNames.APIAvailable)
+        {
+            Logger.LogTrace($"Clearing {name}({aliasOrUid})'s pet nicknames.", LoggerType.PairHandler);
+            await _ipc.PetNames.ClearPetNamesByPtr(address).ConfigureAwait(false);
+        }
     }
 
     // NOTE: This can be very prone to crashing or inconsistant states!
@@ -425,65 +450,52 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
         // store the name and address to reference removal properly.
         var name = PlayerName;
-        Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
-        // Perform a safe disposal.
+        // Stop any actively running tasks.
+        _newModsCTS.SafeCancelDispose();
+        _downloadCTS.SafeCancelDispose();
+        _timeoutCTS.SafeCancelDispose();
+        // dispose the downloader.
+        _downloader.Dispose();
+        // If they were valid before, parse out the event message for their disposal.
+        if (!string.IsNullOrEmpty(name))
+        {
+            Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
+            Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Disposed")));
+        }
+        // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
+        _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), name).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     What to fire whenever called on application shutdown instead of the normal disposal method.
+    /// </summary>
+    private async Task SafeRevertOnDisposal(string nickAliasOrUid, string name)
+    {
         try
         {
-            // Stop any actively running tasks.
-            _newModsCTS.SafeCancelDispose();
-            _downloadCTS.SafeCancelDispose();
-            _timeoutCTS.SafeCancelDispose();
-            // dispose the downloader.
-            _downloader.Dispose();
-
-            // If they were valid before, parse out the event message for their disposal.
-            if (!string.IsNullOrEmpty(name))
-                Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Disposed")));
-
-            // Remove of the collection, or at least try to.
-            if (IpcCallerPenumbra.APIAvailable && _tempCollection != Guid.Empty)
+            if (_tempCollection != Guid.Empty)
             {
-                Logger.LogTrace($"Removing temp collection for {name}. ({Sundesmo.UserData.AliasOrUID})", LoggerType.PairHandler);
-                _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection);
+                Logger.LogTrace($"Removing {name}(({nickAliasOrUid})'s temporary collection.", LoggerType.PairHandler);
+                await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
             }
-
-            // If the lifetime host is stopping, log it is and return.
-            if (_lifetime.ApplicationStopping.IsCancellationRequested)
+            // revert glamourer by name.
+            if (!IsRendered && !string.IsNullOrEmpty(name))
             {
-                Logger.LogDebug("Host application is stopping, skipping cleanup.", LoggerType.PairHandler);
-                unsafe { _player = null; }
-                return;
+                Logger.LogTrace($"Reverting {name}(({nickAliasOrUid})'s actor state", LoggerType.PairHandler);
+                await _ipc.Glamourer.ReleaseByName(name).ConfigureAwait(false);
             }
-
-            // Otherwise begin cleanup if valid to do so.
-            if (!PlayerData.IsZoning && !PlayerData.InCutscene && !string.IsNullOrEmpty(name))
+            // Check for zone relative data.
+            if (!PlayerData.IsZoning && !PlayerData.InCutscene && IsRendered)
             {
-                // If they are no longer visible, revert states by their name.
-                if (!IsRendered)
-                {
-                    Logger.LogTrace($"Disposed sundesmo {name} is not rendered, reverting by name where possible.", LoggerType.PairHandler);
-                    _ipc.Glamourer.ReleaseByName(name).GetAwaiter().GetResult();
-                    // Anything else that could be maybe?
-                }
-                else
-                {
-                    using var cts = new CancellationTokenSource();
-                    cts.CancelAfter(TimeSpan.FromSeconds(30));
-                    Logger.LogInformation($"There is CachedData for {name} that requires removal.");
-                    try
-                    {
-                        RevertAlterations(name, cts.Token).GetAwaiter().GetResult();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError($"Error reverting {name}: {ex.Message}", LoggerType.PairHandler);
-                    }
-                }
+                Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
+                using var timoutCTS = new CancellationTokenSource();
+                timoutCTS.CancelAfter(TimeSpan.FromSeconds(30));
+                await RevertAlterations(nickAliasOrUid, name, Address, ObjIndex, timoutCTS.Token).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Error upon disposal of {name}: {ex}", LoggerType.PairHandler);
+            Logger.LogError($"Error reverting {name}({nickAliasOrUid} on shutdown: {ex}");
         }
         finally
         {

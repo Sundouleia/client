@@ -76,13 +76,9 @@ public sealed class IpcCallerHeels : IIpcCaller
     /// <summary>
     ///     Resets the Heels offset of the provided <paramref name="sundesmo"/>.
     /// </summary>
-    public async Task RestoreUserOffset(PlayerHandler sundesmo)
+    public async Task RestoreUserOffset(ushort objIdx)
     {
-        if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            _logger.LogDebug($"Restoring heels offset for {sundesmo.PlayerName}");
-            UnregisterPlayer.InvokeAction(sundesmo.ObjIndex);
-        }).ConfigureAwait(false);
+        if (!APIAvailable) return;
+        await Svc.Framework.RunOnFrameworkThread(() => UnregisterPlayer.InvokeAction(objIdx)).ConfigureAwait(false);
     }
 }

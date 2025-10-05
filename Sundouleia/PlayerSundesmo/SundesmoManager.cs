@@ -93,12 +93,6 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         Svc.ContextMenu.OnMenuOpened -= OnOpenContextMenu;
         DisposeSundesmos();
         _disconnectTimeoutCTS.SafeCancelDispose();
-        try
-        {
-            _disconnectTimeoutTask?.Wait();
-        }
-        catch (AggregateException ex) when (ex.InnerExceptions.All(e => e is OperationCanceledException)) { }
-        _disconnectTimeoutTask = null;
     }
 
     public void AddSundesmo(UserPair dto)
@@ -186,11 +180,17 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     {
         Logger.LogDebug("Disposing all Pairs", LoggerType.PairManagement);
         var pairCount = _allSundesmos.Count;
-        Parallel.ForEach(_allSundesmos, item =>
+        foreach (var sundesmo in _allSundesmos.Values)
         {
-            item.Value.MarkOffline();
-            item.Value.DisposeData();
-        });
+            Logger.LogTrace($"Disposing {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
+            sundesmo.MarkOffline();
+            sundesmo.DisposeData();
+        }
+        //Parallel.ForEach(_allSundesmos, item =>
+        //{
+        //    item.Value.MarkOffline();
+        //    item.Value.DisposeData();
+        //});
         Logger.LogDebug($"Marked {pairCount} sundesmos as offline", LoggerType.PairManagement);
         RecreateLazy();
     }

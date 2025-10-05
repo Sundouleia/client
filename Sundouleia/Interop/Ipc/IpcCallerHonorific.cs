@@ -118,14 +118,9 @@ public sealed class IpcCallerHonorific : IIpcCaller
     /// <summary>
     ///     Clears off the title from the provided <paramref name="sundesmo"/>.
     /// </summary>
-    public async Task ClearTitleAsync(PlayerHandler sundesmo)
+    public async Task ClearTitleAsync(ushort objIdx)
     {
-        if (!APIAvailable || sundesmo.Address == IntPtr.Zero) return;
-
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            _logger.LogTrace($"Removing title for {sundesmo.PlayerName}");
-            ClearUserTitle.InvokeAction(sundesmo.ObjIndex);
-        }).ConfigureAwait(false);
+        if (!APIAvailable) return;
+        await Svc.Framework.RunOnFrameworkThread(() => ClearUserTitle.InvokeAction(objIdx)).ConfigureAwait(false);
     }
 }

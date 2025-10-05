@@ -5,6 +5,7 @@ using Sundouleia.Interop;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
+using static Lumina.Data.Parsing.Layer.LayerCommon;
 
 namespace Sundouleia.Pairs;
 
@@ -199,7 +200,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task RevertAlterations()
+    public async Task RevertAlterations(ushort objIdx)
     {
         if (Address == IntPtr.Zero) return;
 
@@ -207,8 +208,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         if (_tempProfile != Guid.Empty)
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
         
-        await _ipc.Glamourer.ReleaseActor(this).ConfigureAwait(false);
-        _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
+        _ipc.Penumbra.RedrawGameObject(objIdx);
     }
 
     // NOTE: This can be very prone to crashing or inconsistant states!
@@ -218,59 +219,50 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
         // store the name and address to reference removal properly.
         var name = ObjectName;
-        // Perform a safe disposal.
+        // If they were valid before, parse out the event message for their disposal.
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
+            Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Owned Object Disposed")));
+        }
+
+        // Process off the disposal thread.
+        _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), name).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     What to fire whenever called on application shutdown instead of the normal disposal method.
+    /// </summary>
+    private async Task SafeRevertOnDisposal(string nickAliasOrUid, string name)
+    {
         try
         {
-            // If they were valid before, parse out the event message for their disposal.
-            if (!string.IsNullOrEmpty(name))
+            // revert glamourer by name.
+            if (!IsRendered && !string.IsNullOrEmpty(name))
             {
-                Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
-                Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Owned Object Disposed")));
-            }
-            // If the lifetime host is stopping, log it is and return.
-            if (_lifetime.ApplicationStopping.IsCancellationRequested)
-            {
-                // null the rendered player.
-                unsafe { _gameObject = null; }
-                return;
+                Logger.LogTrace($"Reverting {name}(({nickAliasOrUid})'s actor state", LoggerType.PairHandler);
+                await _ipc.Glamourer.ReleaseByName(name).ConfigureAwait(false);
             }
 
-            // Otherwise begin cleanup if valid to do so.
-            if (!PlayerData.IsZoning && !PlayerData.InCutscene && !string.IsNullOrEmpty(name))
-            { 
-                Logger.LogTrace($"Restoring state for {name}. ({Sundesmo.UserData.AliasOrUID})", LoggerType.PairHandler);
-                if (Address == IntPtr.Zero)
-                {
-                    _ipc.Glamourer.ReleaseByName(name).GetAwaiter().GetResult();
-                }                
-                else
-                {
-                    using var cts = new CancellationTokenSource();
-                    cts.CancelAfter(TimeSpan.FromSeconds(30));
-                    Logger.LogInformation($"There is CachedData for {name} that requires removal.");
-                    try
-                    {
-                        RevertAlterations().GetAwaiter().GetResult();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning($"Error reverting alterations for {name}: {ex.Message}", LoggerType.PairHandler);
-                    }
-                }
+            // Check for zone relative data.
+            if (!PlayerData.IsZoning && !PlayerData.InCutscene && IsRendered)
+            {
+                Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
+                await RevertAlterations(ObjIndex).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Error upon disposal of {name}: {ex.Message}", LoggerType.PairHandler);
+            Logger.LogError($"Error reverting {name}({nickAliasOrUid} on shutdown: {ex}");
         }
         finally
         {
-            // null the rendered player.
-            unsafe { _gameObject = null; }
-            // Cancel any pending timeouts.
+            // Clear internal data.
             _timeoutCTS.SafeCancel();
+            _tempProfile = Guid.Empty;
+            _appearanceData = new();
             ObjectName = string.Empty;
-            _appearanceData = null;
+            unsafe { _gameObject = null; }
         }
     }
 }

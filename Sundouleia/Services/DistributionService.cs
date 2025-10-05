@@ -308,6 +308,10 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // process the tasks for each object in parallel.
         var tasks = new List<Task>();
         foreach (var (obj, kinds) in newChanges)
+        {
+            if (kinds == IpcKind.None)
+                continue;
+
             tasks.Add(obj switch
             {
                 OwnedObject.Player => TryUpdatePlayerCache(kinds, _lastOwnIpc, finalChanges),
@@ -316,6 +320,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 OwnedObject.Companion => UpdateNonPlayerCache(obj, kinds, _lastBuddyIpc, finalChanges),
                 _ => Task.FromResult(false)
             });
+        }
         // Execute in parallel.
         await Task.WhenAll(tasks).ConfigureAwait(false);
         return finalChanges;

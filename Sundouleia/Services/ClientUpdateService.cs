@@ -42,6 +42,8 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _watcher = watcher;
         _distributor = distributor;
 
+        _pendingUpdates = Enum.GetValues<OwnedObject>().ToDictionary(o => o, _ => IpcKind.None);
+
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
         _ipc.Glamourer.OnStateChanged.Enable();
         _ipc.CustomizePlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
@@ -59,8 +61,10 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        _debounceCTS.SafeCancelDispose();
-        Generic.Safe(() => _debounceTask?.Wait());
+        if (disposing)
+        {
+            _debounceCTS.SafeCancelDispose();
+        }
 
         _ipc.Glamourer.OnStateChanged?.Disable();
         _ipc.Glamourer.OnStateChanged?.Dispose();
@@ -90,7 +94,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     private void OnFrameworkTick(IFramework framework)
     {
         // If no updates, do not update.
-        if (_pendingUpdates.Count is 0)
+        if (_allPendingUpdates is 0)
             return;
         // Make sure we are available.
         if (PlayerData.IsZoning || !PlayerData.Available)
@@ -113,7 +117,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
 
             // If there is only a single thing to update, send that over.
             var modUpdate = _allPendingUpdates.HasAny(IpcKind.Mods);
-            var isSingle = _pendingUpdates.Keys.Count is 1 && SundouleiaEx.IsSingleFlagSet((byte)_allPendingUpdates);
+            var isSingle = SundouleiaEx.IsSingleFlagSet((byte)_allPendingUpdates);
             try
             {
                 switch (modUpdate, isSingle)
@@ -128,7 +132,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
                         break;
                     case (false, false):
                         Logger.LogInformation($"Processing partial update ({_allPendingUpdates}) for {_pendingUpdates.Count} objects.");
-                        _distributor.UpdateModCache();
+                        _distributor.UpdateIpcCache(_pendingUpdates);
                         break;
                     case (false, true):
                         Logger.LogInformation($"Processing single partial update ({_allPendingUpdates}) for {_pendingUpdates.Keys.First()}.");
@@ -147,14 +151,15 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
 
     private void AddPendingUpdate(OwnedObject type, IpcKind kind)
     {
-        _debounceCTS.SafeCancelRecreate();
+        _debounceCTS = _debounceCTS.SafeCancelRecreate();
         _pendingUpdates[type] |= kind;
         _allPendingUpdates |= kind;
     }
 
     private void ClearPendingUpdates()
     {
-        _pendingUpdates.Clear();
+        foreach (var key in _pendingUpdates.Keys)
+            _pendingUpdates[key] = IpcKind.None;
         _allPendingUpdates = IpcKind.None;
     }
 
