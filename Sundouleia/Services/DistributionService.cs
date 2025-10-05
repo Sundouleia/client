@@ -4,7 +4,9 @@ using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
+using TerraFX.Interop.Windows;
 using static FFXIVClientStructs.FFXIV.Client.UI.Misc.BannerHelper.Delegates;
+using static SundouleiaAPI.Data.VisualUpdate;
 
 namespace Sundouleia.Services;
 
@@ -25,11 +27,11 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     // Management for the task involving making an update to our latest data.
     // If this is ever processing, we should await it prior to distributing data.
     // This way we make sure that when we do distribute the data, it has the latest information.
-    private CancellationTokenSource _latestDataUpdateCTS = new();
-    private Task? _latestDataUpdateTask;
+    private readonly SemaphoreSlim _dataUpdateLock = new(1, 1);
 
     // Task runs the distribution of our data to other sundesmos.
     // should always await the above task, if active, before firing.
+    private readonly SemaphoreSlim _distributionLock = new(1, 1);
     private CancellationTokenSource _distributeDataCTS = new();
     private Task? _distributeDataTask;
 
@@ -42,6 +44,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     private IpcDataCache _lastMinionMountIpc = new();
     private IpcDataCache _lastPetIpc = new();
     private IpcDataCache _lastBuddyIpc = new();
+
+    public bool UpdatingData => _dataUpdateLock.CurrentCount is 0;
+    public bool DistributingData => _distributionLock.CurrentCount is 0; // only use if we dont want to cancel distributions.
 
     public DistributionService(ILogger<DistributionService> logger, SundouleiaMediator mediator,
         MainHub hub, IpcManager ipc, SundesmoManager pairs, CharaObjectWatcher ownedObjects)
@@ -70,7 +75,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     public HashSet<UserData> NewVisible { get; private set; } = new();
     public HashSet<UserData> InLimbo { get; private set; } = new();
-    public bool ProcessingCacheUpdate => _latestDataUpdateTask is not null && !_latestDataUpdateTask.IsCompleted;
 
 
     // When a sundesmo connects there is a chance that they are already rendered. If so we should update them here.
@@ -122,15 +126,25 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     // If this gets abused through we can very easily add timeout functionality here too.
     private async void OnHubConnected()
     {
-        // Cancel any current data update tasks.
-        _latestDataUpdateCTS = _latestDataUpdateCTS.SafeCancelRecreate();
-        _latestDataUpdateTask = Task.Run(SetInitialCache, _latestDataUpdateCTS.Token);
-        // await the task.
-        await _latestDataUpdateTask.ConfigureAwait(false);
-        Logger.LogInformation("Initial Ipc Cache fetched after reconnection. Sending off to visible users.");
-        // Send off to all visible users.
+        // Ensure we wait for the previous update to finish if it is running.
+        await _dataUpdateLock.WaitAsync();
+        try
+        {
+            // Not set the initialCache.
+            Logger.LogInformation("Hub connected, fetching initial Ipc Cache.");
+            await SetInitialCache().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during OnHubConnected: {ex}");
+        }
+        finally
+        {
+            _dataUpdateLock.Release();
+        }
 
-        // cancel any current update task as this always takes priority.
+        // Send off to all visible users.
+        Logger.LogInformation("Distributing initial Ipc Cache to visible sundesmos.");
         _distributeDataCTS = _distributeDataCTS.SafeCancelRecreate();
         _distributeDataTask = Task.Run(async () =>
         {
@@ -163,11 +177,11 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             return;
 
         // If we are zoning or not available, do not process any updates from us.
-        if (PlayerData.IsZoning || !PlayerData.Available || MainHub.IsConnected)
+        if (PlayerData.IsZoning || !PlayerData.Available || !MainHub.IsConnected)
             return;
 
         // Do not process the task if we are currently updating our latest data.
-        if (_latestDataUpdateTask is not null && !_latestDataUpdateTask.IsCompleted)
+        if (UpdatingData)
             return;
 
         // If we are already distributing data, do not start another distribution.
@@ -241,13 +255,12 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     #region Cache Updates
     // if it is a full update we do not care about the changes,
     // only that the cache is updated prior to the change.
-    public void UpdateIpcCacheFull(Dictionary<OwnedObject, IpcKind> newChanges)
+    public async Task UpdateIpcCacheFull(Dictionary<OwnedObject, IpcKind> newChanges)
     {
-        if (ProcessingCacheUpdate)
-            throw new Exception("Update already Processing!");
-
-        // Assign the update task with the token. (not sure yet how we will handling cancellation if we do)
-        _latestDataUpdateTask = Task.Run(async () =>
+        // await for the next process to become available.
+        await _dataUpdateLock.WaitAsync();
+        // perform the update.
+        try
         {
             // Should process both the mod and ipc updates within this method.
             // If feeling slow can always run this together but might be best to run seperately.
@@ -263,15 +276,23 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 Logger.LogDebug("Clearing limbo as we have a new state.");
                 InLimbo.Clear();
             }
-        }, _latestDataUpdateCTS.Token);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during UpdateIpcCacheFull: {ex}");
+        }
+        finally
+        {
+            _dataUpdateLock.Release();
+        }
     }
 
-    public void UpdateModCache()
+    public async Task UpdateModCache()
     {
-        if (ProcessingCacheUpdate)
-            throw new Exception("Update already Processing!");
-        // Assign the update task with the token. (not sure yet how we will handling cancellation if we do)
-        _latestDataUpdateTask = Task.Run(async () =>
+        // await for the next process to become available.
+        await _dataUpdateLock.WaitAsync();
+        // perform the update.
+        try
         {
             var modChanges = await UpdateModCacheInternal().ConfigureAwait(false);
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
@@ -283,18 +304,25 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 Logger.LogDebug("Clearing limbo as we have a new state.");
                 InLimbo.Clear();
             }
-        }, _latestDataUpdateCTS.Token);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during UpdateModCache: {ex}");
+        }
+        finally
+        {
+            _dataUpdateLock.Release();
+        }
     }
 
-    public void UpdateIpcCache(Dictionary<OwnedObject, IpcKind> newChanges)
+    public async Task UpdateIpcCache(Dictionary<OwnedObject, IpcKind> newChanges)
     {
-        if (ProcessingCacheUpdate)
-            throw new Exception("Update already Processing!");
-        // Assign the update task with the token. (not sure yet how we will handling cancellation if we do)
-        _latestDataUpdateTask = Task.Run(async () =>
+        // await for the next process to become available.
+        await _dataUpdateLock.WaitAsync();
+        // perform the update.
+        try
         {
             var visualChanges = await UpdateIpcCacheInternal(newChanges).ConfigureAwait(false);
-            // If no change, do not push.
             if (!visualChanges.HasData())
             {
                 Logger.LogInformation($"Ipc Cache Visuals Update found no changes, skipping push.");
@@ -302,39 +330,60 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             }
 
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
-            await _hub.UserPushIpcOther(new(SundesmosForUpdatePush, visualChanges)).ConfigureAwait(false);
-            Logger.LogInformation($"Ipc Cache Visuals Update completed.");
+            var toSend = SundesmosForUpdatePush;
+            await _hub.UserPushIpcOther(new(toSend, visualChanges)).ConfigureAwait(false);
+            Logger.LogInformation($"Pushed Visual IpcCache update to {toSend.Count} sundesmos. ({visualChanges.ToChangesString()})");
             // Clear the limbo list as they will need a full update next time.
             if (InLimbo.Count is not 0)
             {
                 Logger.LogDebug("Clearing limbo as we have a new state.");
                 InLimbo.Clear();
             }
-        }, _latestDataUpdateCTS.Token);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during UpdateIpcCache: {ex}");
+        }
+        finally
+        {
+            _dataUpdateLock.Release();
+        }
     }
 
-    public void UpdateIpcCacheSingle(OwnedObject obj, IpcKind type)
+    public async Task UpdateIpcCacheSingle(OwnedObject obj, IpcKind type)
     {
-        if (ProcessingCacheUpdate)
-            throw new Exception("Update already Processing!");
-        // Assign the update task with the token. (not sure yet how we will handling cancellation if we do)
-        _latestDataUpdateTask = Task.Run(async () =>
+        // await for the next process to become available.
+        await _dataUpdateLock.WaitAsync();
+        // perform the update.
+        try
         {
             (bool changed, string? data) = await UpdateIpcCacheInternal(obj, type).ConfigureAwait(false);
             if (!changed || data is null)
+            {
+                Logger.LogInformation($"IpcCacheSingle ({obj})({type}) had no changes, skipping.");
                 return;
+            }
             // Things changed, inform of update.
 
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
-            await _hub.UserPushIpcSingle(new(SundesmosForUpdatePush, obj, type, data)).ConfigureAwait(false);
-            Logger.LogInformation($"Ipc Cache Single Update completed for {obj} - {type}.");
+            var toSend = SundesmosForUpdatePush;
+            await _hub.UserPushIpcSingle(new(toSend, obj, type, data)).ConfigureAwait(false);
+            Logger.LogInformation($"Pushed IpcCacheSingle update to {toSend.Count} sundesmos. ({obj})({type})");
             // Clear the limbo list as they will need a full update next time.
             if (InLimbo.Count is not 0)
             {
                 Logger.LogDebug("Clearing limbo as we have a new state.");
                 InLimbo.Clear();
             }
-        }, _latestDataUpdateCTS.Token);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during UpdateIpcCacheSingle: {ex}");
+        }
+        finally
+        {
+            _dataUpdateLock.Release();
+        }
     }
 
     private async Task<SentModUpdate> UpdateModCacheInternal()
@@ -446,10 +495,11 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // current cache is already updated, so return the the new data.
         if (applied != IpcKind.None)
         {
-            Logger.LogDebug($"Player Cache Update checked. Changes: {applied}");
+            Logger.LogDebug($"IpcPlayerCache had changes: {applied}");
             newData = newData with { Updates = applied };
             compiledData.PlayerChanges = newData;
         }
+
     }
 
     private async Task UpdateNonPlayerCache(OwnedObject obj, IpcKind toUpdate, IpcDataCache current, VisualUpdate compiledData)

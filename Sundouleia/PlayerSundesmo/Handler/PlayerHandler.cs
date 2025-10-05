@@ -162,11 +162,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             }
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                 await _ipc.Glamourer.ReleaseByName(PlayerName).ConfigureAwait(false);
-
-            _tempCollection = Guid.Empty;
+             
             _replacements.Clear();
-            _tempProfile = Guid.Empty;
-            _appearanceData = new();
+            _appearanceData = null;
             PlayerName = string.Empty;
             unsafe { _player = null; }
             // Notify the owner that we went poofy or whatever if we need to here.

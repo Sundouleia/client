@@ -177,7 +177,7 @@ public class Sundesmo : IComparable<Sundesmo>
         _watcher.CheckForExisting(_pet);
         _watcher.CheckForExisting(_companion);
         // if anything is rendered and has alterations, reapply them.
-        ReapplyAlterations();
+        if (PlayerRendered) ReapplyAlterations();
     }
 
     /// <summary>

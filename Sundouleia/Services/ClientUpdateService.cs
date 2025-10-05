@@ -54,7 +54,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     }
 
     public bool IsUpdateProcessing
-        => (_debounceTask is not null && !_debounceTask.IsCompleted) || _distributor.ProcessingCacheUpdate;
+        => (_debounceTask is not null && !_debounceTask.IsCompleted) || _distributor.UpdatingData;
 
     protected override void Dispose(bool disposing)
     {
@@ -76,74 +76,74 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
 
     // Could maybe even speed this up if we have a faster file comparer.
     private int GetDebounceTime()
-        => _allPendingUpdates switch
-        {
-            IpcKind.Mods => 1000,
-            IpcKind.Glamourer => 750,
-            IpcKind.Heels => 750,
-            IpcKind.CPlus => 750,
-            IpcKind.Honorific => 500,
-            IpcKind.Moodles => 250,
-            IpcKind.ModManips => 250,
-            IpcKind.PetNames => 150,
-            _ => 1500,
-        };
+    {
+        if (_allPendingUpdates.HasAny(IpcKind.Mods))        return 1000;
+        if (_allPendingUpdates.HasAny(IpcKind.Glamourer))   return 750;
+        if (_allPendingUpdates.HasAny(IpcKind.Heels))       return 750;
+        if (_allPendingUpdates.HasAny(IpcKind.CPlus))       return 750;
+        if (_allPendingUpdates.HasAny(IpcKind.Honorific))   return 500;
+        if (_allPendingUpdates.HasAny(IpcKind.Moodles))     return 250;
+        if (_allPendingUpdates.HasAny(IpcKind.ModManips))   return 250;
+        if (_allPendingUpdates.HasAny(IpcKind.PetNames))    return 150;
+        return 1500;
+    }
+
+    // Can make other updates faster if we have some cancellation token logic with _canceledInUpdate triggers to avoid deboune time.
 
     private void OnFrameworkTick(IFramework framework)
     {
         // If no updates, do not update.
         if (_allPendingUpdates is 0)
             return;
+
         // Make sure we are available.
         if (PlayerData.IsZoning || !PlayerData.Available)
             return;
-        // Do not run if task already running.
-        if (_debounceTask is not null && !_debounceTask.IsCompleted)
+
+        if (IsUpdateProcessing)
             return;
 
         // Otherwise, assign update task.
         _debounceTask = Task.Run(async () =>
         {
             // await for the processed debounce time, or until cancelled.
+            Logger.LogTrace($"Waiting for debounce time of {GetDebounceTime()}ms");
             await Task.Delay(GetDebounceTime(), _debounceCTS.Token).ConfigureAwait(false);
-            // after the delay retrieve the current visible users to send the update to.
+            // snapshot the changes dictionary and clear after.
+            var pendingSnapshot = new Dictionary<OwnedObject, IpcKind>(_pendingUpdates);
+            var allPendingSnapshot = _allPendingUpdates;
+            ClearPendingUpdates();
+
             if (_distributor.SundesmosForUpdatePush.Count is 0)
-            {
-                ClearPendingUpdates();
-                return; 
-            }
+                return;
 
             // If there is only a single thing to update, send that over.
-            var modUpdate = _allPendingUpdates.HasAny(IpcKind.Mods);
-            var isSingle = _pendingUpdates.Count is 1 && SundouleiaEx.IsSingleFlagSet((byte)_allPendingUpdates);
+            var modUpdate = allPendingSnapshot.HasAny(IpcKind.Mods);
+            var isSingle = pendingSnapshot.Count is 1 && SundouleiaEx.IsSingleFlagSet((byte)allPendingSnapshot);
             try
             {
                 switch (modUpdate, isSingle)
                 {
                     case (true, false):
-                        Logger.LogInformation($"Processing full Mod update for {_pendingUpdates.Count} objects.");
-                        _distributor.UpdateIpcCacheFull(_pendingUpdates);
+                        Logger.LogDebug($"Processing full Mod update for {pendingSnapshot.Count} objects.");
+                        await _distributor.UpdateIpcCacheFull(pendingSnapshot).ConfigureAwait(false);
                         break;
                     case (true, true):
-                        Logger.LogInformation($"Processing single Mod update for {_pendingUpdates.Keys.First()}.");
-                        _distributor.UpdateModCache();
+                        Logger.LogDebug($"Processing single Mod update for {pendingSnapshot.Keys.First()}.");
+                        await _distributor.UpdateModCache().ConfigureAwait(false);
                         break;
                     case (false, false):
-                        Logger.LogInformation($"Processing partial update ({_allPendingUpdates}) for {_pendingUpdates.Count} objects.");
-                        _distributor.UpdateIpcCache(_pendingUpdates);
+                        Logger.LogDebug($"Processing partial update ({allPendingSnapshot}) for {pendingSnapshot.Count} objects.");
+                        await _distributor.UpdateIpcCache(pendingSnapshot).ConfigureAwait(false);
                         break;
                     case (false, true):
-                        Logger.LogInformation($"Processing single partial update ({_allPendingUpdates}) for {_pendingUpdates.Keys.First()}.");
-                        _distributor.UpdateIpcCacheSingle(_pendingUpdates.Keys.First(), _allPendingUpdates);
+                        Logger.LogDebug($"Processing single partial update ({allPendingSnapshot}) for {pendingSnapshot.Keys.First()}.");
+                        await _distributor.UpdateIpcCacheSingle(pendingSnapshot.Keys.First(), allPendingSnapshot).ConfigureAwait(false);
                         break;
                 }
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { Logger.LogCritical($"Error during ClientUpdate Process: {ex}"); }
-            finally
-            {
-                ClearPendingUpdates();
-            }
         }, _debounceCTS.Token);
     }
 
@@ -155,6 +155,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
             _pendingUpdates[type] |= kind;
         else
             _pendingUpdates[type] = kind;
+        _allPendingUpdates |= kind;
     }
 
     private void ClearPendingUpdates()
