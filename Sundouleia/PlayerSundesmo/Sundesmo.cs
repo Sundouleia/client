@@ -166,16 +166,16 @@ public class Sundesmo : IComparable<Sundesmo>
     {
         OnlineUser = dto;
         _mediator.Publish(new SundesmoOnline(this, PlayerRendered));
-        // if they are rendered we should halt any timeouts occuring.
-        if (PlayerRendered) _player.StopTimeoutTask();
-        if (MountMinionRendered) _mountMinion.StopTimeoutTask();
-        if (PetRendered) _pet.StopTimeoutTask();
-        if (CompanionRendered) _companion.StopTimeoutTask();
         // Now that we have the ident we should run a check against all of the handlers.
         _watcher.CheckForExisting(_player);
         _watcher.CheckForExisting(_mountMinion);
         _watcher.CheckForExisting(_pet);
         _watcher.CheckForExisting(_companion);
+        // if they are rendered we should halt any timeouts occuring.
+        if (PlayerRendered) _player.StopTimeoutTask();
+        if (MountMinionRendered) _mountMinion.StopTimeoutTask();
+        if (PetRendered) _pet.StopTimeoutTask();
+        if (CompanionRendered) _companion.StopTimeoutTask();
         // if anything is rendered and has alterations, reapply them.
         if (PlayerRendered) ReapplyAlterations();
     }

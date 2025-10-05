@@ -28,8 +28,6 @@ public class RequestsTab : DisposableMediatorSubscriberBase
 
     private bool _hoveringIncoming = false;
     private bool _hoveringOutgoing = false;
-    private bool _incomingExpanded = false;
-    private bool _outgoingExpanded = false;
     private ImmutableList<DrawSundesmoRequest> _incoming;
     private ImmutableList<DrawSundesmoRequest> _outgoing;
 

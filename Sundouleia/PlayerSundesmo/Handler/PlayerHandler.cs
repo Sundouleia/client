@@ -56,7 +56,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // this just creates 'a collection' it does not assign anyone to it yet.
         Mediator.Subscribe<PenumbraInitialized>(this, async _ =>
         {
-            _tempCollection = await _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
+            if (_tempCollection == Guid.Empty)
+                _tempCollection = await _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
         });
 
         // Old subscriber here for class/job change?
@@ -162,14 +163,19 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             }
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                 await _ipc.Glamourer.ReleaseByName(PlayerName).ConfigureAwait(false);
-             
+
+            Mediator.Publish(new SundesmoTimedOut(this));
+            if (IsRendered)
+            {
+                using var ct = new CancellationTokenSource();
+                ct.CancelAfter(10000); // 10 second timeout to avoid hanging forever.
+                await RevertAlterations(Sundesmo.GetNickAliasOrUid(), PlayerName, Address, ObjIndex, ct.Token).ConfigureAwait(false);
+            }
             _replacements.Clear();
             _appearanceData = null;
             PlayerName = string.Empty;
             unsafe { _player = null; }
-            // Notify the owner that we went poofy or whatever if we need to here.
-            Mediator.Publish(new SundesmoTimedOut(this));
-        });
+        }, _timeoutCTS.Token);
     }
 
     public void StopTimeoutTask() => _timeoutCTS.SafeCancel();

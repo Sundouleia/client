@@ -190,7 +190,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     /// </summary>
     public void RedrawGameObject(ushort objectIdx)
     {
-        Logger.LogWarning($"Redrawing actor at ObjectIdx [{objectIdx}]", LoggerType.IpcPenumbra);
+        // Logger.LogWarning($"Redrawing actor at ObjectIdx [{objectIdx}]", LoggerType.IpcPenumbra);
         RedrawObject.Invoke(objectIdx, RedrawType.Redraw);
     }
     
