@@ -5,6 +5,7 @@ using Penumbra.Api.Helpers;
 using Penumbra.Api.IpcSubscribers;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
 
 namespace Sundouleia.Interop;
 
@@ -163,8 +164,11 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     /// <remarks> This will fire multiple times, one for each collection, if multiple collections are linked to it.</remarks>
     private void ModSettingsChanged(ModSettingChange change, Guid collectionId, string modDir, bool inherited)
     {
-        Logger.LogInformation($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]");
-        Mediator.Publish(new PenumbraSettingsChanged());
+        if (change is ModSettingChange.EnableState)
+        {
+            Logger.LogInformation($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]");
+            Mediator.Publish(new PenumbraSettingsChanged());
+        }
     }
 
     /// <summary>

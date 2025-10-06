@@ -275,6 +275,14 @@ public partial class MainHub
     #endregion Radar Callbacks
 
     #region Status Update Callbacks
+    public Task Callback_UserPerformingFullReload(UserDto dto)
+    {
+        Logger.LogDebug($"Callback_UserPerformingFullReload: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.MarkSundesmoReloading(dto.User));
+        return Task.CompletedTask;
+    }
+
+
     /// <summary>
     ///     Whenever one of our Sundesmo disconnects from Sundouleia.
     /// </summary>

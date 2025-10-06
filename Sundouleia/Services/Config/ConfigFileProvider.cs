@@ -19,12 +19,11 @@ public class ConfigFileProvider : IConfigFileProvider
     // Shared Client Configs
     public readonly string MainConfig;
     public readonly string TransientCache;
+    public readonly string PlzNoCrashFriends;
     public readonly string RecentChatLog;
     public readonly string Favorites;
-    public readonly string LoadedResources; // for help with transient file data.
-
-    // Leave this here as an example reference.
-    public string CKFS_Triggers => Path.Combine(FileSysDirectory, "fs-triggers.json");
+    public readonly string LoadedResources;
+    public readonly string FileCacheCsv;
 
     // Shared Server Configs
     public readonly string NicknameConfig;
@@ -45,9 +44,11 @@ public class ConfigFileProvider : IConfigFileProvider
 
         MainConfig = Path.Combine(SundouleiaDirectory, "config.json");
         TransientCache = Path.Combine(SundouleiaDirectory, "transientcache.json");
+        PlzNoCrashFriends = Path.Combine(SundouleiaDirectory, "plznocrashfriends.json");
         RecentChatLog = Path.Combine(SundouleiaDirectory, "chat-recent.json");
         Favorites = Path.Combine(SundouleiaDirectory, "favorites.json");
         LoadedResources = Path.Combine(SundouleiaDirectory, "loaded-resources.json");
+        FileCacheCsv = Path.Combine(SundouleiaDirectory, "filecache.csv");
 
         NicknameConfig = Path.Combine(SundouleiaDirectory, "nicknames.json");
         AccountConfig = Path.Combine(SundouleiaDirectory, "account.json");

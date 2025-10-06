@@ -15,9 +15,9 @@ public class FileCacheEntity
     }
 
     public long? CompressedSize { get; set; }
-    public string CsvEntry => $"{Hash}{FileCacheManager.CSV_SPLIT}{PrefixedFilePath}{FileCacheManager.CSV_SPLIT}{LastModifiedDateTicks}|{Size ?? -1}|{CompressedSize ?? -1}";
+    public string CsvEntry => $"{Hash}{Constants.CsvSplit}{PrefixedFilePath}{Constants.CsvSplit}{LastModifiedDateTicks}|{Size ?? -1}|{CompressedSize ?? -1}";
     public string Hash { get; set; }
-    public bool IsCacheEntry => PrefixedFilePath.StartsWith(FileCacheManager.CACHE_PREFIX, StringComparison.OrdinalIgnoreCase);
+    public bool IsCacheEntry => PrefixedFilePath.StartsWith(Constants.PrefixCache, StringComparison.OrdinalIgnoreCase);
     public string LastModifiedDateTicks { get; set; }
     public string PrefixedFilePath { get; init; }
     public string ResolvedFilepath { get; private set; } = string.Empty;

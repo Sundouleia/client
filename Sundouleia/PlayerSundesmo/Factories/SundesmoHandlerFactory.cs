@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Hosting;
-using Sundouleia.ModFiles;
 using Sundouleia.Interop;
+using Sundouleia.ModFiles;
+using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
 using Sundouleia.WebAPI.Files;
-using Sundouleia.Services;
 
 namespace Sundouleia.Pairs.Factories;
 

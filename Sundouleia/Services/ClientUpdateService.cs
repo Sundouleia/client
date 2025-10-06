@@ -6,6 +6,7 @@ using Glamourer.Api.IpcSubscribers;
 using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 
 namespace Sundouleia.Services;

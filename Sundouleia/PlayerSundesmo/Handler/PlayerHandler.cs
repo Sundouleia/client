@@ -182,9 +182,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     public void ReapplyAlterations()
     {
-        // To Reapply, must be rendered and have non-null appearance data.
         if (!IsRendered)
             return;
+
         // Reapply the alterations.
         if (_appearanceData is not null)
             ReapplyVisuals().ConfigureAwait(false);

@@ -154,7 +154,7 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
         Parallel.ForEach(_allSundesmos, s => s.Value.MarkOffline());
         RecreateLazy();
         // assign the delayed task.
-        _disconnectTimeoutTask =  Task.Run(async () =>
+        _disconnectTimeoutTask = Task.Run(async () =>
         {
             try
             {
@@ -226,6 +226,20 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     }
 
     /// <summary>
+    ///     Marks a user as reloading. Implying they are shutting down the plugin or performing an interaction
+    ///     that clears their sundesmos information. <para />
+    ///     Useful to help us identify when a sundesmo is in need of a full data update or not.
+    /// </summary>
+    public void MarkSundesmoReloading(UserData user)
+    {
+        if (_allSundesmos.TryGetValue(user, out var pair))
+        {
+            Logger.LogTrace($"Marked {pair.PlayerName}({pair.GetNickAliasOrUid()}) as reloading", LoggerType.PairManagement);
+            pair.MarkReloading();
+        }
+    }
+
+    /// <summary>
     ///     Marks a user pair as offline. This will clear their OnlineUserDTO. <para />
     ///     A Sundesmo's Chara* can still be valid while offline, and they can still download & apply changes.
     /// </summary>
@@ -236,8 +250,9 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
             Logger.LogTrace($"Marked {pair.PlayerName}({pair.GetNickAliasOrUid()}) as offline", LoggerType.PairManagement);
             Mediator.Publish(new ClearProfileDataMessage(pair.UserData));
             pair.MarkOffline();
+            RecreateLazy();
+
         }
-        RecreateLazy();
     }
 
     private void ReapplyAlterations()

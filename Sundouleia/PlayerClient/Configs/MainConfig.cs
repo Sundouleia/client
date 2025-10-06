@@ -20,7 +20,7 @@ public class ConfigStorage
     public bool CompactCache { get; set; } = true;
     // Ideally we can remove this if our cleanup function works properly.
     // Which it should, because if we are using radars it better be lol.
-    public int MaxCacheInGiB { get; set; } = 20;
+    public double MaxCacheInGiB { get; set; } = 20;
     public string CacheScanComplete { get; set; } = string.Empty;
     public int MaxParallelDownloads { get; set; } = 10;
     public int DownloadLimitBytes { get; set; } = 0;

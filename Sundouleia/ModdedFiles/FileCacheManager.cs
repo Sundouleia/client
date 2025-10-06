@@ -10,56 +10,66 @@ using System.Globalization;
 
 namespace Sundouleia.ModFiles;
 
-// Manages the contents of the FileCache.csv file
+/// <summary>
+///     Manages the contents of the FileCache.csv file
+/// </summary>
 public sealed class FileCacheManager : IHostedService
 {
-    public const string CACHE_PREFIX = "{cache}";
-    public const string CSV_SPLIT = "|";
-    public const string PENUMBRA_PREFIX = "{penumbra}";
-
     private readonly ILogger<FileCacheManager> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
+    private readonly ConfigFileProvider _fileNames;
 
-    private readonly string _csvPath;
     private readonly ConcurrentDictionary<string, List<FileCacheEntity>> _fileCaches = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _getCachesByPathsSemaphore = new(1, 1);
     private readonly object _fileWriteLock = new();
 
-    public FileCacheManager(ILogger<FileCacheManager> logger, SundouleiaMediator mediator, MainConfig config)
+    public FileCacheManager(ILogger<FileCacheManager> logger, SundouleiaMediator mediator,
+        MainConfig config, ConfigFileProvider fileNames)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
-        _csvPath = Path.Combine(ConfigFileProvider.SundouleiaDirectory, "FileCache.csv");
+        _fileNames = fileNames;
     }
 
-    public string CacheFolder => _config.Current.CacheFolder;
-    private string CsvBakPath => _csvPath + ".bak";
+    private string CsvBakPath => _fileNames.FileCacheCsv + ".bak";
 
+    /// <summary>
+    ///     Creates a new entity to reflect the provided sundouleia file path, if it exists. <para />
+    ///     The created entity is then returned, or null if invalid.
+    /// </summary>
     public FileCacheEntity? CreateCacheEntry(string path)
     {
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
-        _logger.LogTrace("Creating cache entry for {path}", path);
+        _logger.LogTrace($"Creating cache entry for {path}");
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(_config.Current.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
-        string prefixedPath = fullName.Replace(_config.Current.CacheFolder.ToLowerInvariant(), CACHE_PREFIX + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+        string prefixedPath = fullName.Replace(_config.Current.CacheFolder.ToLowerInvariant(), Constants.PrefixCache + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath);
     }
 
+    /// <summary>
+    ///     Creates a new entity to reflect the provided penumbra file path, if the file exists. <para />
+    ///     The created entity is then returned, or null if invalid.
+    /// </summary>
     public FileCacheEntity? CreateFileEntry(string path)
     {
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
-        _logger.LogTrace("Creating file entry for {path}", path);
+        _logger.LogTrace($"Creating file entry for {path}");
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(IpcCallerPenumbra.ModDirectory!.ToLowerInvariant(), StringComparison.Ordinal)) return null;
-        string prefixedPath = fullName.Replace(IpcCallerPenumbra.ModDirectory!.ToLowerInvariant(), PENUMBRA_PREFIX + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+        string prefixedPath = fullName.Replace(IpcCallerPenumbra.ModDirectory!.ToLowerInvariant(), Constants.PrefixPenumbra + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath);
     }
 
-    public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.SelectMany(v => v).ToList();
+    /// <summary>
+    ///     Retrieves all current file caches in the concurrent dictionary.
+    /// </summary>
+    public List<FileCacheEntity> GetAllFileCaches()
+        => _fileCaches.Values.SelectMany(v => v).ToList();
 
     public List<FileCacheEntity> GetAllFileCachesByHash(string hash, bool ignoreCacheEntries = false, bool validate = true)
     {
@@ -80,7 +90,7 @@ public sealed class FileCacheManager : IHostedService
         return output;
     }
 
-    // may not need later.
+    // may not need later. (Primarily used to validate cache integrity but we can also just add a helper method for this).
     public Task<List<FileCacheEntity>> ValidateLocalIntegrity(IProgress<(int, int, FileCacheEntity)> progress, CancellationToken cancellationToken)
     {
         // _mediator.Publish(new HaltScanMessage(nameof(ValidateLocalIntegrity)));
@@ -136,11 +146,11 @@ public sealed class FileCacheManager : IHostedService
         return Task.FromResult(brokenEntities);
     }
 
+    // Used mainly for download management and MCDF handling.
     public string GetCacheFilePath(string hash, string extension)
-    {
-        return Path.Combine(_config.Current.CacheFolder, hash + "." + extension);
-    }
+        => Path.Combine(_config.Current.CacheFolder, hash + "." + extension);
 
+    // Used mainly for download management and MCDF handling.
     public async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
     {
         var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
@@ -148,21 +158,24 @@ public sealed class FileCacheManager : IHostedService
             (int)new FileInfo(fileCache).Length));
     }
 
-    // grabs the cached file entity from the hash string.
+    /// <summary>
+    ///     Obtain the cached file entity in the managers concurrent dictionary via lookup by hash.
+    /// </summary>
     public FileCacheEntity? GetFileCacheByHash(string hash)
     {
         // Locate it from the concurrent dictionary
-        if (_fileCaches.TryGetValue(hash, out var hashes))
-        {
-            // sort by penumbra prefix first, internal cache second.
-            var item = hashes.OrderBy(p => p.PrefixedFilePath.Contains(PENUMBRA_PREFIX) ? 0 : 1).FirstOrDefault();
-
-            // Return the validated file cache if it exists.
-            if (item != null) 
-                return GetValidatedFileCache(item);
-        }
+        if (!_fileCaches.TryGetValue(hash, out var hashes))
+            return null;
+        // File was found for the hash, but it could represent multiple cached file entities.
+        // Prioritize the ones from penumbra first, then the internal cache.
+        var item = hashes.OrderBy(p => p.PrefixedFilePath.Contains(Constants.PrefixPenumbra) ? 0 : 1).FirstOrDefault();
+        // If there is a valid item, return the validated entity.
+        if (item is not null)
+            return GetValidatedFileCache(item);
+        // Otherwise null return.
         return null;
     }
+
 
     private FileCacheEntity? GetFileCacheByPath(string path)
     {
@@ -193,10 +206,13 @@ public sealed class FileCacheManager : IHostedService
             // retrieved the cleansed paths via the penumbra mod directory and cache folder (not sure why we would need this, but whatever)
             var cleanedPaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p,
                 p => p.Replace("/", "\\", StringComparison.OrdinalIgnoreCase)
-                    .Replace(IpcCallerPenumbra.ModDirectory!, IpcCallerPenumbra.ModDirectory!.EndsWith('\\') ? PENUMBRA_PREFIX + '\\' : PENUMBRA_PREFIX, StringComparison.OrdinalIgnoreCase)
-                    .Replace(_config.Current.CacheFolder, _config.Current.CacheFolder.EndsWith('\\') ? CACHE_PREFIX + '\\' : CACHE_PREFIX, StringComparison.OrdinalIgnoreCase)
+                    .Replace(IpcCallerPenumbra.ModDirectory!, IpcCallerPenumbra.ModDirectory!.EndsWith('\\') ? Constants.PrefixPenumbra + '\\' : Constants.PrefixPenumbra, StringComparison.OrdinalIgnoreCase)
+                    .Replace(_config.Current.CacheFolder, _config.Current.CacheFolder.EndsWith('\\') ? Constants.PrefixCache + '\\' : Constants.PrefixCache, StringComparison.OrdinalIgnoreCase)
                     .Replace("\\\\", "\\", StringComparison.Ordinal),
                 StringComparer.OrdinalIgnoreCase);
+            _logger.LogDebug($"== Fetching FileCaches by Paths Cleaned Paths ==");
+            foreach ( var entry in cleanedPaths)
+                _logger.LogDebug($"Key: {entry.Key}, Value: {entry.Value}");
 
             // not sure why this isnt merged with the line below, but whatever, basically just constructs the result.
             Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
@@ -216,7 +232,7 @@ public sealed class FileCacheManager : IHostedService
                 }
                 else
                 {
-                    if (!entry.Value.Contains(CACHE_PREFIX, StringComparison.Ordinal))
+                    if (!entry.Value.Contains(Constants.PrefixCache, StringComparison.Ordinal))
                         result.Add(entry.Key, CreateFileEntry(entry.Key));
                     else
                         result.Add(entry.Key, CreateCacheEntry(entry.Key));
@@ -292,13 +308,13 @@ public sealed class FileCacheManager : IHostedService
                 sb.AppendLine(entry.CsvEntry);
 
             // Make a backup!
-            if (File.Exists(_csvPath))
-                File.Copy(_csvPath, CsvBakPath, overwrite: true);
+            if (File.Exists(_fileNames.FileCacheCsv))
+                File.Copy(_fileNames.FileCacheCsv, CsvBakPath, overwrite: true);
 
             // Write all text to the main one, and then delete the backup if successful.
             try
             {
-                File.WriteAllText(_csvPath, sb.ToString());
+                File.WriteAllText(_fileNames.FileCacheCsv, sb.ToString());
                 File.Delete(CsvBakPath);
             }
             catch
@@ -353,7 +369,7 @@ public sealed class FileCacheManager : IHostedService
         AddHashedFile(entity);
         lock (_fileWriteLock)
         {
-            File.AppendAllLines(_csvPath, new[] { entity.CsvEntry });
+            File.AppendAllLines(_fileNames.FileCacheCsv, new[] { entity.CsvEntry });
         }
         var result = GetFileCacheByPath(fileInfo.FullName);
         _logger.LogTrace("Creating cache entity for {name} success: {success}", fileInfo.FullName, (result != null));
@@ -378,13 +394,13 @@ public sealed class FileCacheManager : IHostedService
     /// <returns> The FileCacheEntity with the updated path. </returns>
     private FileCacheEntity ReplacePathPrefixes(FileCacheEntity fileCache)
     {
-        if (fileCache.PrefixedFilePath.StartsWith(PENUMBRA_PREFIX, StringComparison.OrdinalIgnoreCase))
+        if (fileCache.PrefixedFilePath.StartsWith(Constants.PrefixPenumbra, StringComparison.OrdinalIgnoreCase))
         {
-            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(PENUMBRA_PREFIX, IpcCallerPenumbra.ModDirectory, StringComparison.Ordinal));
+            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(Constants.PrefixPenumbra, IpcCallerPenumbra.ModDirectory, StringComparison.Ordinal));
         }
-        else if (fileCache.PrefixedFilePath.StartsWith(CACHE_PREFIX, StringComparison.OrdinalIgnoreCase))
+        else if (fileCache.PrefixedFilePath.StartsWith(Constants.PrefixCache, StringComparison.OrdinalIgnoreCase))
         {
-            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(CACHE_PREFIX, _config.Current.CacheFolder, StringComparison.Ordinal));
+            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(Constants.PrefixCache, _config.Current.CacheFolder, StringComparison.Ordinal));
         }
 
         return fileCache;
@@ -425,9 +441,9 @@ public sealed class FileCacheManager : IHostedService
 
                 if (File.Exists(CsvBakPath))
                 {
-                    _logger.LogInformation("{bakPath} found, moving to {csvPath}", CsvBakPath, _csvPath);
+                    _logger.LogInformation("{bakPath} found, moving to {csvPath}", CsvBakPath, _fileNames.FileCacheCsv);
 
-                    File.Move(CsvBakPath, _csvPath, overwrite: true);
+                    File.Move(CsvBakPath, _fileNames.FileCacheCsv, overwrite: true);
                 }
             }
             catch (Exception ex)
@@ -445,7 +461,7 @@ public sealed class FileCacheManager : IHostedService
             }
         }
 
-        if (File.Exists(_csvPath))
+        if (File.Exists(_fileNames.FileCacheCsv))
         {
             if (!IpcCallerPenumbra.APIAvailable || string.IsNullOrEmpty(IpcCallerPenumbra.ModDirectory))
             {
@@ -454,7 +470,7 @@ public sealed class FileCacheManager : IHostedService
                     "After, reload Sundeouleia in the Plugin installer.", NotificationType.Error));
             }
 
-            _logger.LogInformation("{csvPath} found, parsing", _csvPath);
+            _logger.LogInformation("{csvPath} found, parsing", _fileNames.FileCacheCsv);
 
             bool success = false;
             string[] entries = [];
@@ -463,29 +479,29 @@ public sealed class FileCacheManager : IHostedService
             {
                 try
                 {
-                    _logger.LogInformation("Attempting to read {csvPath}", _csvPath);
-                    entries = File.ReadAllLines(_csvPath);
+                    _logger.LogInformation("Attempting to read {csvPath}", _fileNames.FileCacheCsv);
+                    entries = File.ReadAllLines(_fileNames.FileCacheCsv);
                     success = true;
                 }
                 catch (Exception ex)
                 {
                     attempts++;
-                    _logger.LogWarning(ex, "Could not open {file}, trying again", _csvPath);
+                    _logger.LogWarning(ex, "Could not open {file}, trying again", _fileNames.FileCacheCsv);
                     Thread.Sleep(100);
                 }
             }
 
             if (!entries.Any())
             {
-                _logger.LogWarning("Could not load entries from {path}, continuing with empty file cache", _csvPath);
+                _logger.LogWarning("Could not load entries from {path}, continuing with empty file cache", _fileNames.FileCacheCsv);
             }
 
-            _logger.LogInformation("Found {amount} files in {path}", entries.Length, _csvPath);
+            _logger.LogInformation("Found {amount} files in {path}", entries.Length, _fileNames.FileCacheCsv);
 
             Dictionary<string, bool> processedFiles = new(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in entries)
             {
-                var splittedEntry = entry.Split(CSV_SPLIT, StringSplitOptions.None);
+                var splittedEntry = entry.Split(Constants.CsvSplit, StringSplitOptions.None);
                 try
                 {
                     var hash = splittedEntry[0];

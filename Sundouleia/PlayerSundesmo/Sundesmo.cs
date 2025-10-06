@@ -4,6 +4,7 @@ using Sundouleia.Pairs.Factories;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
@@ -44,6 +45,8 @@ public class Sundesmo : IComparable<Sundesmo>
         _pet = factory.Create(OwnedObject.Pet, this);
         _companion = factory.Create(OwnedObject.Companion, this);
     }
+
+    public bool PerformingFullReload { get; private set; } = false;
 
     public bool PlayerNull => _player == null;
     public bool MountMinionNull => _mountMinion == null;
@@ -107,6 +110,16 @@ public class Sundesmo : IComparable<Sundesmo>
     public string? GetNickname() => _nickConfig.GetNicknameForUid(UserData.UID);
     public string GetNickAliasOrUid() => GetNickname() ?? UserData.AliasOrUID;
 
+    // Validate Handlers for existing objects if any.
+    public void CheckForExisting()
+    {
+        _watcher.CheckForExisting(_player);
+        _watcher.CheckForExisting(_mountMinion);
+        _watcher.CheckForExisting(_pet);
+        _watcher.CheckForExisting(_companion);
+    }
+
+    // Reapply all existing data to all rendered objects.
     public void ReapplyAlterations()
     {
         _player.ReapplyAlterations();
@@ -133,16 +146,16 @@ public class Sundesmo : IComparable<Sundesmo>
 
     public async void ApplyIpcData(VisualUpdate newIpc)
     {
-        if (newIpc.PlayerChanges != null)
+        if (newIpc.PlayerChanges is not null)
             await _player.ApplyIpcData(newIpc.PlayerChanges);
 
-        if (newIpc.MinionMountChanges != null)
+        if (newIpc.MinionMountChanges is not null)
             await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
 
-        if (newIpc.PetChanges != null)
+        if (newIpc.PetChanges is not null)
             await _pet.ApplyIpcData(newIpc.PetChanges);
 
-        if (newIpc.CompanionChanges != null)
+        if (newIpc.CompanionChanges is not null)
             await _companion.ApplyIpcData(newIpc.CompanionChanges);
     }
 
@@ -165,19 +178,37 @@ public class Sundesmo : IComparable<Sundesmo>
     public void MarkOnline(OnlineUser dto)
     {
         OnlineUser = dto;
-        _mediator.Publish(new SundesmoOnline(this, PlayerRendered));
+        // mark them as no longer performing a full reload if they were.
+        _mediator.Publish(new SundesmoOnline(this, PlayerRendered, PerformingFullReload));
+        PerformingFullReload = false;
+
         // Now that we have the ident we should run a check against all of the handlers.
-        _watcher.CheckForExisting(_player);
-        _watcher.CheckForExisting(_mountMinion);
-        _watcher.CheckForExisting(_pet);
-        _watcher.CheckForExisting(_companion);
+        CheckForExisting();
+
         // if they are rendered we should halt any timeouts occuring.
-        if (PlayerRendered) _player.StopTimeoutTask();
-        if (MountMinionRendered) _mountMinion.StopTimeoutTask();
-        if (PetRendered) _pet.StopTimeoutTask();
-        if (CompanionRendered) _companion.StopTimeoutTask();
+        if (PlayerRendered) 
+            _player.StopTimeoutTask();
+        if (MountMinionRendered) 
+            _mountMinion.StopTimeoutTask();
+        if (PetRendered) 
+            _pet.StopTimeoutTask();
+        if (CompanionRendered) 
+            _companion.StopTimeoutTask();
+        
         // if anything is rendered and has alterations, reapply them.
-        if (PlayerRendered) ReapplyAlterations();
+        if (PlayerRendered)
+            ReapplyAlterations();
+    }
+
+    /// <summary>
+    ///     Marks the sundesmo to have reloading status, informing our distributor 
+    ///     that they require a full update upon next connection. <para />
+    ///     Note that this does not mean we need to clear the visible state, but
+    ///     they will send us a full update upon reconnection regardless. <para />
+    /// </summary>
+    public void MarkReloading()
+    {
+
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI.Utils;
 
-namespace Sundouleia.Services;
+namespace Sundouleia.Watchers;
 
 /// <summary> 
 ///     ClientState.LocalPlayer doesn't allow us to get player data outside the games framework thread. <para />

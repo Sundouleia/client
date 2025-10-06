@@ -3,6 +3,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
 
 namespace Sundouleia.ModFiles;
 
@@ -148,6 +149,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         if (_cachedHandledPaths.Contains(gamePath))
             return;
 
+        Logger.LogTrace($"ResourceLoad for {objKind} at {address:X}: {gamePath} => {filePath}");
+
         lock (_cacheAdditionLock)
         {
             _cachedHandledPaths.Add(gamePath);
@@ -240,7 +243,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     }
 
     // Death.
-    public void CleanupSemiTransients(OwnedObject obj, List<string>? replacements = null)
+    public void CleanupSemiTransients(OwnedObject obj, List<ModdedFile>? replacements = null)
     {
         if (!SemiTransientResources.TryGetValue(obj, out HashSet<string>? value))
             return;
@@ -252,9 +255,11 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             return;
         }
 
+        Logger.LogDebug($"Cleaning up SemiTransients for {obj}, Current Count: {value.Count}, Replacements Count: {replacements.Count}");
+
         // Otherwise we have paths to remove so remove them.
         int removedPaths = 0;
-        foreach (var replacementGamePath in replacements.ToList())
+        foreach (var replacementGamePath in replacements.Where(p => p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
         {
             removedPaths += _config.RemovePath(CurrentClientKey, obj, replacementGamePath);
             value.Remove(replacementGamePath);

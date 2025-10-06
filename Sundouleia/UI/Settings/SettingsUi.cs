@@ -23,15 +23,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly MainConfig _mainConfig;
     private readonly AccountManagerTab _accountsTab;
     private readonly DebugTab _debugTab;
+    private readonly ModStorageTab _storageTab;
 
     public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, MainHub hub,
-        MainConfig config, AccountManagerTab accounts, DebugTab debug) 
+        MainConfig config, AccountManagerTab accounts, DebugTab debug, ModStorageTab storage)
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;
         _mainConfig = config;
         _accountsTab = accounts;
         _debugTab = debug;
+        _storageTab = storage;
 
         Flags = WFlags.NoScrollbar;
         this.PinningClickthroughFalse();
@@ -132,7 +134,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
             if (ImGui.BeginTabItem(CkLoc.Settings.TabStorage))
             {
-                CkGui.CenterColorTextAligned("Storage Manager WIP", ImGuiColors.ParsedGold);
+                _storageTab.DrawModStorage();
                 ImGui.EndTabItem();
             }
 

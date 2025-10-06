@@ -89,7 +89,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     /// </summary>
     public async Task<string?> GetBase64StateByPtr(IntPtr charaAddr)
     {
-        if (!APIAvailable) return null;
+        if (!APIAvailable || charaAddr == IntPtr.Zero) return null;
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
             if (Svc.Objects.CreateObjectReference(charaAddr) is { } obj && obj is ICharacter c)

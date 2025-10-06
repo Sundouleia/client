@@ -53,6 +53,12 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserDelete)).ConfigureAwait(false);
     }
 
+    public async Task<HubResponse> PerformingFullReload()
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(PerformingFullReload)).ConfigureAwait(false);
+    }
+
 
     // --- Pair/Request Interactions ---
     public async Task<HubResponse<SundesmoRequest>> UserSendRequest(CreateRequest dto)

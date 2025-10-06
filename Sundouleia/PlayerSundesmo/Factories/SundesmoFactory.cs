@@ -1,6 +1,7 @@
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.Pairs.Factories;

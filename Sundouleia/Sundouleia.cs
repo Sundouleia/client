@@ -11,6 +11,7 @@ using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
+using Sundouleia.ModFiles.Cache;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
@@ -21,6 +22,7 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
+using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
 using System.Net.Http.Headers;
@@ -119,6 +121,9 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaLoc>()
 
         // Mod Files (revise)
+        .AddSingleton<CacheMonitor>()
+        .AddSingleton<PenumbraWatcher>()
+        .AddSingleton<SundouleiaWatcher>()
         .AddSingleton<FileCacheManager>()
         .AddSingleton<FileDownloader>()
         .AddSingleton<FileUploadManager>()
@@ -134,21 +139,25 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundesmoHandlerFactory>()
         .AddSingleton<SundesmoManager>()
 
+        // Profiles
+        .AddSingleton<ProfileFactory>()
+        .AddSingleton<ProfileService>()
+
+        // Distribution
+        .AddSingleton<ClientUpdateService>()
+        .AddSingleton<DistributionService>()
+        .AddSingleton<TransientResourceManager>()
+        .AddSingleton<PlzNoCrashFrens>()
+
         // Services
         .AddSingleton<CharaObjectWatcher>()
-        .AddSingleton<SundouleiaMediator>()
-        .AddSingleton<ProfileFactory>()
-
-        .AddSingleton<ClientUpdateService>()
-        .AddSingleton<ProfileService>()
         .AddSingleton<CosmeticService>()
-        .AddSingleton<TutorialService>()
-        .AddSingleton<UiFontService>()
-
-        .AddSingleton<DistributionService>()
         .AddSingleton<DtrBarService>()
         .AddSingleton<NotificationService>()
         .AddSingleton<OnTickService>()
+        .AddSingleton<SundouleiaMediator>()
+        .AddSingleton<TutorialService>()
+        .AddSingleton<UiFontService>()
 
         // UI (Probably mostly in Scoped)
         .AddSingleton<IdDisplayHandler>()
@@ -183,11 +192,13 @@ public static class SundouleiaServiceExtensions
 
     public static IServiceCollection AddSundouleiaConfigs(this IServiceCollection services)
     => services
-        .AddSingleton<ConfigFileProvider>()
-        .AddSingleton<MainConfig>()
-        .AddSingleton<GroupsConfig>()
         .AddSingleton<AccountConfig>()
+        .AddSingleton<ConfigFileProvider>()
+        .AddSingleton<GroupsConfig>()
+        .AddSingleton<MainConfig>()
         .AddSingleton<NickConfig>()
+        .AddSingleton<NoCrashFriendsConfig>()
+        .AddSingleton<TransientCacheConfig>()
         .AddSingleton<ServerConfigManager>()
         .AddSingleton<HybridSaveService>();
 
@@ -229,6 +240,7 @@ public static class SundouleiaServiceExtensions
         .AddScoped<WindowMediatorSubscriberBase, SettingsUi>()
         .AddScoped<AccountManagerTab>()
         .AddScoped<DebugTab>()
+        .AddScoped<ModStorageTab>()
 
         // Scoped Misc
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
