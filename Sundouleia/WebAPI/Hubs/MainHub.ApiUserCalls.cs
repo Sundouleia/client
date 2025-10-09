@@ -53,10 +53,10 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserDelete)).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> PerformingFullReload()
+    public async Task<HubResponse> UserNotifyIsUnloading()
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(PerformingFullReload)).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserNotifyIsUnloading)).ConfigureAwait(false);
     }
 
 

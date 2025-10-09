@@ -2,6 +2,7 @@ using CkCommons;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Gui;
+using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
@@ -113,6 +114,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
             // startup services that have no other services that call on them, yet are essential.
             _runtimeServiceScope.ServiceProvider.GetRequiredService<UiService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<CommandManager>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<CacheMonitor>();
 
             // display changelog if we should.
             if (_config.Current.LastRunVersion != Assembly.GetExecutingAssembly().GetName().Version!)

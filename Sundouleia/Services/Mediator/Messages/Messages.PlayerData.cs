@@ -9,7 +9,6 @@ public record SundesmoOffline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoPlayerRendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming visible"
 public record SundesmoPlayerUnrendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming invisible"
 public record SundesmoTimedOut(PlayerHandler Handler) : MessageBase; // Whenever unrendered long enough to be considered invalid.
-
 public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // called when publishing a targeted pair connection (see UI)
 
 
@@ -20,8 +19,15 @@ public record FileDownloadReady(Guid RequestId) : MessageBase; // Maybe remove t
 public record FileDownloadStarted(PlayerHandler Player, Dictionary<string, string> Status) : MessageBase;
 public record FileDownloadComplete(PlayerHandler Player) : MessageBase;
 
-public record WatchedObjectCreated(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
-public record WatchedObjectDestroyed(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
+/// <summary>
+///     Whenever a NON-CLIENT OWNED OBJECT is created. Intended for Sundesmos.
+/// </summary>
+public record WatchedObjectCreated(IntPtr Address) : SameThreadMessage;
+
+/// <summary>
+///     Whenever a NON-CLIENT OWNED OBJECT is destroyed. Intended for Sundesmos.
+/// </summary>
+public record WatchedObjectDestroyed(IntPtr Address) : SameThreadMessage;
 
 
 

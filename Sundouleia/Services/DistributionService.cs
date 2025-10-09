@@ -287,9 +287,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         Dictionary<string, List<ushort>>? boneIndices;
         unsafe { boneIndices = _noCrashPlz.GetSkeletonBoneIndices((GameObject*)_watcher.WatchedPlayerAddr); }
 
-        // Can use this to get all resource paths at once:
-        // Dictionary<ushort, Dictionary<string, HashSet<string>>>
-
         // Obtain our current on-screen actor state.
         if (await _ipc.Penumbra.GetCharacterResourcePathData(0).ConfigureAwait(false) is not { } onScreenPaths)
             throw new InvalidOperationException("Penumbra returned null data");
@@ -310,15 +307,16 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             ct.ThrowIfCancellationRequested();
         }
 
-        // At this point we would want to add any pet resources as transient resources, then clear them from this list (if we even need to)
+        // At this point we would want to add any pet resources as transient resources,
+        // then clear them from this list (if we even need to)
 
-        // Remove all transient paths that were caught by the on-screen actor? (Could still leave undesired transients active i guess but idk)
-        _transients.ClearTransientPaths(OwnedObject.Player, moddedPaths.SelectMany(c => c.GamePaths).ToList());
 
-        // get all remaining paths and resolve them
-        var transientPaths = ManageSemiTransientData(OwnedObject.Player);
-        var resolvedTransientPaths = await GetFileReplacementsFromPaths(transientPaths).ConfigureAwait(false);
+        // Removes any resources caught from fetching the on-screen actor resources from that which loaded as transient (glowing armor vfx ext)
+        // any remaining transients for this OwnedObject are marked as PersistantTransients and returned.
+        var persistants = _transients.ClearTransientsAndGetPersistants(OwnedObject.Player, moddedPaths.SelectMany(c => c.GamePaths).ToList());
 
+        // For these paths, get their file replacement objects.
+        var resolvedTransientPaths = await GetFileReplacementsFromPaths(persistants).ConfigureAwait(false);
         Logger.LogDebug("== Transient Replacements ==");
         foreach (var replacement in resolvedTransientPaths.Select(c => new ModdedFile([.. c.Value], c.Key)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
         {
@@ -326,22 +324,18 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             moddedPaths.Add(replacement);
         }
 
-        // Clean out the semi-transient resources.
-        _transients.CleanupSemiTransients(OwnedObject.Player, [.. moddedPaths]);
-
-        ct.ThrowIfCancellationRequested();
-
+        _transients.RemoveUnmoddedPersistantTransients(OwnedObject.Player, [.. moddedPaths]);
         // obtain the final moddedFiles to send that is the result.
         moddedPaths = new HashSet<ModdedFile>(moddedPaths.Where(p => p.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), ModdedFileComparer.Instance);
-
         ct.ThrowIfCancellationRequested();
 
-        // Identify which file replacements are not yet identified as a file swap.
+        // All remaining paths that are not fileswaps come from modded game files that need to be sent over sundouleia servers.
+        // To authorize them we need their 40 character SHA1 computed hashes from their file data.
         var toCompute = moddedPaths.Where(f => !f.IsFileSwap).ToArray();
         Logger.LogDebug($"Computing hashes for {toCompute.Length} files.");
-
-        // Determine the hashes for the files & stuff.
+        // Grab these hashes via the FileCacheEntity .
         var computedPaths = _cacheManager.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
+        // Ensure we set and log said computed hashes.
         foreach (var file in toCompute)
         {
             ct.ThrowIfCancellationRequested();
@@ -349,14 +343,14 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             Logger.LogDebug($"=> {file} (Hash: {file.Hash})");
         }
 
-        // Remove invalid file hashes.
-        Logger.LogDebug("== Removing Invalid File Hashes ==");
+        // Finally as a santity check, remove any invalid file hashes for files that are no longer valid.
         var removed = moddedPaths.RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
-        if (removed > 0)
+        if (removed > 0) 
             Logger.LogDebug($"=> Removed {removed} invalid file hashes.");
 
+        // Final throw check.
         ct.ThrowIfCancellationRequested();
-
+        // This is original if (OwnedObject is OwnedObject.Player), can fix later.
         if (true)
         {
             // Helps ensure we are not going to send files that will crash people yippee
@@ -375,68 +369,31 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
         // grab the reverse paths for the forward paths.
         Logger.LogDebug("== Resolving Forward Paths ==");
+        // grab them from penumbra. (causes a 20ms delay becuz ipc life)
         var (forward, reverse) = await _ipc.Penumbra.ResolveModPaths(forwardPaths, reversePaths).ConfigureAwait(false);
         for (int i = 0; i < forwardPaths.Length; i++)
         {
             var filePath = forward[i].ToLowerInvariant();
-            Logger.LogDebug($"=> ForwardPath: {filePath}");
-            // attempt to locate the forward path in the list of resolved paths. If found, add it.
             if (resolvedPaths.TryGetValue(filePath, out var list))
-            {
-                Logger.LogDebug($"=> Adding to existing list for {filePath}: {forwardPaths[i]}");
                 list.Add(forwardPaths[i].ToLowerInvariant());
-            }
             else
-            {
-                Logger.LogDebug($"=> Creating new list for {filePath}: {forwardPaths[i]}");
                 resolvedPaths[filePath] = [forwardPaths[i].ToLowerInvariant()];
-            }
         }
 
         Logger.LogDebug("== Resolving Reverse Paths ==");
         for (int i = 0; i < reversePaths.Length; i++)
         {
             var filePath = reversePaths[i].ToLowerInvariant();
-            Logger.LogDebug($"=> ReversePath: {filePath}");
             if (resolvedPaths.TryGetValue(filePath, out var list))
-            {
-                Logger.LogDebug($"=> Adding to existing list for {filePath}: {string.Join(",", reverse[i])}");
                 list.AddRange(reverse[i].Select(c => c.ToLowerInvariant()));
-            }
             else
-            {
-                Logger.LogDebug($"=> Creating new list for {filePath}: {string.Join(",", reverse[i])}");
                 resolvedPaths[filePath] = reverse[i].Select(c => c.ToLowerInvariant()).ToList();
-            }
         }
         Logger.LogDebug("== Resolved Paths ==");
         foreach (var kvp in resolvedPaths.OrderBy(k => k.Key, StringComparer.Ordinal))
             Logger.LogDebug($"=> {kvp.Key} : {string.Join(", ", kvp.Value)}");
         return resolvedPaths.ToDictionary(k => k.Key, k => k.Value.ToArray(), StringComparer.OrdinalIgnoreCase).AsReadOnly();
     }
-
-    private HashSet<string> ManageSemiTransientData(OwnedObject kind)
-    {
-        Logger.LogDebug($"Peristing transients for {kind}");
-        _transients.PersistTransients(kind);
-        // Now
-        HashSet<string> pathsToResolve = new(StringComparer.Ordinal);
-        // log the initial semi-transients.
-        Logger.LogDebug("== Semi-Transient Paths ==");
-        var semiTransients = _transients.GetSemiTransients(kind);
-        foreach (var kvp in semiTransients)
-            Logger.LogDebug($"=> {kvp}");
-
-        Logger.LogDebug("== Persisted Paths To Resolve ==");
-        foreach (var path in semiTransients.Where(path => !string.IsNullOrEmpty(path)))
-        {
-            Logger.LogDebug($"=> {path}");
-            pathsToResolve.Add(path);
-        }
-        // finally return the paths to resolve.
-        return pathsToResolve;
-    }
-
 
     #region Cache Updates
     // if it is a full update we do not care about the changes,
@@ -481,15 +438,15 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         try
         {
             var modChanges = await UpdateModCacheInternal().ConfigureAwait(false);
-            // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
-            await _hub.UserPushIpcMods(new(SundesmosForUpdatePush, modChanges)).ConfigureAwait(false);
-            Logger.LogInformation($"Ipc Cache Mod Update completed.");
-            // Clear the limbo list as they will need a full update next time.
-            if (InLimbo.Count is not 0)
-            {
-                Logger.LogDebug("Clearing limbo as we have a new state.");
-                InLimbo.Clear();
-            }
+            //// Send this update off to all our visibly connected sundesmos that are not in limbo or new.
+            //await _hub.UserPushIpcMods(new(SundesmosForUpdatePush, modChanges)).ConfigureAwait(false);
+            //Logger.LogInformation($"Ipc Cache Mod Update completed.");
+            //// Clear the limbo list as they will need a full update next time.
+            //if (InLimbo.Count is not 0)
+            //{
+            //    Logger.LogDebug("Clearing limbo as we have a new state.");
+            //    InLimbo.Clear();
+            //}
         }
         catch (Exception ex)
         {
@@ -574,6 +531,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     private async Task<SentModUpdate> UpdateModCacheInternal()
     {
+        await CollectModdedState(CancellationToken.None).ConfigureAwait(false);
         // do some kind of file scan voodoo with our db and transient resource handler to grab the
         // latest active hashes for our character.
         return new SentModUpdate(new List<ModFileInfo>(), new List<string>());

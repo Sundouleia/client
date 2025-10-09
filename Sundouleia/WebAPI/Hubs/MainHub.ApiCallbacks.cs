@@ -275,10 +275,10 @@ public partial class MainHub
     #endregion Radar Callbacks
 
     #region Status Update Callbacks
-    public Task Callback_UserPerformingFullReload(UserDto dto)
+    public Task Callback_UserIsUnloading(UserDto dto)
     {
-        Logger.LogDebug($"Callback_UserPerformingFullReload: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.MarkSundesmoReloading(dto.User));
+        Logger.LogDebug($"Callback_UserIsUnloading: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.MarkSundesmoForUnload(dto.User));
         return Task.CompletedTask;
     }
 
@@ -453,6 +453,12 @@ public partial class MainHub
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_RadarChat), act);
+    }
+
+    public void OnUserIsUnloading(Action<UserDto> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_UserIsUnloading), act);
     }
 
     public void OnUserOffline(Action<UserDto> act)

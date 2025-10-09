@@ -230,12 +230,12 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     ///     that clears their sundesmos information. <para />
     ///     Useful to help us identify when a sundesmo is in need of a full data update or not.
     /// </summary>
-    public void MarkSundesmoReloading(UserData user)
+    public void MarkSundesmoForUnload(UserData user)
     {
         if (_allSundesmos.TryGetValue(user, out var pair))
         {
             Logger.LogTrace($"Marked {pair.PlayerName}({pair.GetNickAliasOrUid()}) as reloading", LoggerType.PairManagement);
-            pair.MarkReloading();
+            pair.MarkForUnload();
         }
     }
 

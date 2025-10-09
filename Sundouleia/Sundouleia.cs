@@ -121,7 +121,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaLoc>()
 
         // Mod Files (revise)
-        .AddSingleton<CacheMonitor>()
         .AddSingleton<PenumbraWatcher>()
         .AddSingleton<SundouleiaWatcher>()
         .AddSingleton<FileCacheManager>()
@@ -205,6 +204,9 @@ public static class SundouleiaServiceExtensions
     #region ScopedServices
     public static IServiceCollection AddSundouleiaScoped(this IServiceCollection services)
     => services
+        // Scopes monitors (important to make this thing scoped so it is only processed during access!)
+        .AddScoped<CacheMonitor>()
+
         // Scoped Components
         .AddScoped<ProfileHelper>()
 
@@ -269,6 +271,7 @@ public static class SundouleiaServiceExtensions
         .AddHostedService(p => p.GetRequiredService<OnTickService>())       // Starts & monitors the framework update cycle.
 
         // Cached Data That MUST be initialized before anything else for validity.
+        .AddHostedService(p => p.GetRequiredService<FileCacheManager>())      // Handle the csv cache for all file locations.
         .AddHostedService(p => p.GetRequiredService<CosmeticService>())     // Provides all Textures necessary for the plugin.
         .AddHostedService(p => p.GetRequiredService<UiFontService>())       // Provides all fonts necessary for the plugin.
 

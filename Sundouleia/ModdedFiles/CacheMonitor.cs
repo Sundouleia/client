@@ -1,8 +1,10 @@
 ﻿using CkCommons;
+using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles.Cache;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModFiles;
 
@@ -17,6 +19,8 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     private long _currentFileProgress = 0;
     private readonly CancellationTokenSource _cacheSizeCheckCTS = new();
     private CancellationTokenSource _cacheScanCTS = new();
+    private TimeSpan _lastScanTime = TimeSpan.Zero;
+    private TimeSpan _lastCacheWriteTime = TimeSpan.Zero;
 
     public CacheMonitor(ILogger<CacheMonitor> logger, SundouleiaMediator mediator, MainConfig config,
         FileCompactor fileCompactor, FileCacheManager fileDbManager,
@@ -64,6 +68,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     }
 
     // various helper properties. (Mostly stuff to grab for the UI Display)
+    public int ScannedCacheEntities => _fileDbManager.TotalCacheEntities;
     public long FileCacheSize { get; set; }
     public long FileCacheDriveFree { get; set; }
     public ConcurrentDictionary<string, int> HaltScanLocks { get; set; } = new(StringComparer.Ordinal); // Fizzle this out.
@@ -74,6 +79,8 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     public bool StorageIsNTFS => _mainWatcher.StorageisNTFS;
     public string? PenumbraPath => _penumbraWatcher.Watcher?.Path;
     public string? SundeouleiaPath => _mainWatcher.Watcher?.Path;
+    public string LastScanReadStr => _lastScanTime.ToString(@"s's 'fff'ms'");
+    public string LastScanWriteStr => _lastCacheWriteTime.ToString(@"s's 'fff'ms'");
 
     /// <summary>
     ///     Preiodically checks the size of the cache. <para />
@@ -176,7 +183,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         // Run as fire-and-forget, with the cancellation token, to not block the main thread.
         _ = Task.Run(async () =>
         {
-            Logger.LogDebug("=== Starting Full File Scan ===");
+            Logger.LogDebug("=== Starting Full File Scan ===", LoggerType.FileMonitor);
             // Wait to leave the game's framework update thread before we start.
             while (Svc.Framework.IsInFrameworkUpdateThread)
             {
@@ -220,6 +227,8 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     private void FullFileScan(CancellationToken ct)
     {
         TotalFiles = 1;
+        var sw = new Stopwatch();
+        sw.Start();
         var penumbraDir = IpcCallerPenumbra.ModDirectory;
         // Assume both watcher directories are valid.
         bool penDirExists = true;
@@ -242,11 +251,11 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         // grab the priority of the thread we have be assigned (should be lowest) and set to lowest if not.
         // this will help lighten the burden on the client's PC and prevent impact of gameplay.
         var previousThreadPriority = Thread.CurrentThread.Priority;
-        Logger.LogDebug($"Current Thread Priority is: {previousThreadPriority}");
+        Logger.LogDebug($"Current Thread Priority is: {previousThreadPriority}", LoggerType.FileMonitor);
         Thread.CurrentThread.Priority = ThreadPriority.Lowest;
 
         // Retrieve all paths from penumbra's directory.
-        Logger.LogDebug($"Getting files from {penumbraDir} and {_config.Current.CacheFolder}");
+        Logger.LogDebug($"Getting files from {penumbraDir} and {_config.Current.CacheFolder}", LoggerType.FileMonitor);
         Dictionary<string, string[]> penumbraFiles = new(StringComparer.Ordinal);
         // split by all top level directories within penumbra's mod directory.
         foreach (var folder in Directory.EnumerateDirectories(penumbraDir!))
@@ -300,6 +309,10 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         TotalFiles = allScannedFiles.Count;
         Thread.CurrentThread.Priority = previousThreadPriority;
 
+        sw.Stop();
+        _lastScanTime = sw.Elapsed;
+        Logger.LogDebug($"FileScan Complete (took {_lastScanTime.ToString(@"s's 'fff'ms'")})", LoggerType.FileMonitor);
+
         // make thread take eepy for a bit before we scan the database.
         Thread.Sleep(TimeSpan.FromSeconds(2));
 
@@ -320,16 +333,17 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         ConcurrentQueue<FileCacheEntity> fileCaches = new(_fileDbManager.GetAllFileCaches());
         // Mark results.
         TotalFilesStorage = fileCaches.Count;
+        sw.Restart();
 
         // Spawn all worker threads to process the file caches queue in parallel.
         // spawn all threads on the lowest priority as a background task to avoid performance impact.
         for (int i = 0; i < threadCount; i++)
         {
-            Logger.LogTrace($"Creating Thread {i}");
+            Logger.LogTrace($"Creating Thread {i}", LoggerType.FileMonitor);
             workerThreads[i] = new Thread((tcounter) =>
             {
                 var threadNr = (int)tcounter!;
-                Logger.LogTrace($"Spawning Worker Thread {threadNr}");
+                Logger.LogTrace($"Spawning Worker Thread {threadNr}", LoggerType.FileMonitor);
                 // While we can still dequeue concurrently from the queue in this thread, process the workload.
                 while (!ct.IsCancellationRequested && fileCaches.TryDequeue(out var workload))
                 {
@@ -355,13 +369,13 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
                         // If it requires update or deletion, add to the respective lists.
                         if (validatedCacheResult.State == FileState.RequireUpdate)
                         {
-                            Logger.LogTrace("To update: {path}", validatedCacheResult.FileCache.ResolvedFilepath);
+                            Logger.LogTrace($"To update: {validatedCacheResult.FileCache.ResolvedFilepath}", LoggerType.FileMonitor);
                             lock (sync) { entitiesToUpdate.Add(validatedCacheResult.FileCache); }
                         }
                         // if it requires deletion, add to the removal list.
                         else if (validatedCacheResult.State == FileState.RequireDeletion)
                         {
-                            Logger.LogTrace("To delete: {path}", validatedCacheResult.FileCache.ResolvedFilepath);
+                            Logger.LogTrace("To delete: {validatedCacheResult.FileCache.ResolvedFilepath}", LoggerType.FileMonitor);
                             lock (sync) { entitiesToRemove.Add(validatedCacheResult.FileCache); }
                         }
                     }
@@ -373,7 +387,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
                     Interlocked.Increment(ref _currentFileProgress);
                 }
                 // Once this thread is finished log its finalization.
-                Logger.LogTrace($"Ending Worker Thread {threadNr}");
+                Logger.LogTrace($"Ending Worker Thread {threadNr}", LoggerType.FileMonitor);
             })
             {
                 Priority = ThreadPriority.Lowest,
@@ -387,11 +401,12 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         while (!ct.IsCancellationRequested && workerThreads.Any(u => u.IsAlive))
             Thread.Sleep(1000);
 
-        Logger.LogTrace("Threads exited");
+        Logger.LogTrace("Threads exited", LoggerType.FileMonitor);
         // Guess what its another token & penumbra validation check 
         if (ct.IsCancellationRequested) return;
         if (!IpcCallerPenumbra.APIAvailable) return;
 
+        sw.Restart();
         // Now that we have the entities to update, and the ones to remove, handle them.
         if (entitiesToUpdate.Any() || entitiesToRemove.Any())
         {
@@ -405,7 +420,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             _fileDbManager.WriteOutFullCsv();
         }
 
-        Logger.LogTrace("Scanner validated existing db files");
+        Logger.LogTrace("Scanner validated existing db files", LoggerType.FileMonitor);
         // Guess what its another token & penumbra validation check 
         if (ct.IsCancellationRequested) return;
         if (!IpcCallerPenumbra.APIAvailable) return;
@@ -440,11 +455,13 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
                     Interlocked.Increment(ref _currentFileProgress);
                 });
 
-            Logger.LogTrace($"Scanner added {allScannedFiles.Count(c => !c.Value)} new files to db");
+            Logger.LogTrace($"Scanner added {allScannedFiles.Count(c => !c.Value)} new files to db", LoggerType.FileMonitor);
         }
 
         // oh my god we made it out alive.
-        Logger.LogDebug("Scan complete");
+        sw.Stop();
+        _lastCacheWriteTime = sw.Elapsed;
+        Logger.LogDebug($"Scan Write complete (took {_lastCacheWriteTime.ToString(@"s's 'fff'ms'")})", LoggerType.FileMonitor);
         TotalFiles = 0;
         _currentFileProgress = 0;
         entitiesToRemove.Clear();

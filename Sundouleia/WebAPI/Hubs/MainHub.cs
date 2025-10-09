@@ -191,6 +191,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         OnRadarRemoveUser(dto => _ = Callback_RadarRemoveUser(dto));
         OnRadarChat(dto => _ = Callback_RadarChat(dto));
 
+        OnUserIsUnloading(dto => _ = Callback_UserIsUnloading(dto));
         OnUserOffline(dto => _ = Callback_UserOffline(dto));
         OnUserOnline(dto => _ = Callback_UserOnline(dto));
         OnProfileUpdated(dto => _ = Callback_ProfileUpdated(dto));

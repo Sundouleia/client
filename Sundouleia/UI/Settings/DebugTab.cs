@@ -17,7 +17,7 @@ public class DebugTab
             LoggerType.IpcSundouleia, LoggerType.IpcPenumbra, LoggerType.IpcGlamourer, LoggerType.IpcCustomize, LoggerType.IpcMoodles,
             LoggerType.IpcHeels, LoggerType.IpcHonorific, LoggerType.IpcPetNames ]),
         ("Client Data", [ LoggerType.ResourceMonitor, LoggerType.OwnedObjects ]),
-        ("File Info", [ LoggerType.FileCache, LoggerType.FileMonitor, LoggerType.PairFileCache ]),
+        ("File Info", [ LoggerType.FileCache, LoggerType.FileCsv, LoggerType.FileMonitor, LoggerType.PairFileCache ]),
         ("Pair Data", [
             LoggerType.PairManagement, LoggerType.PairDataTransfer, LoggerType.PairHandler,
             LoggerType.PairMods, LoggerType.PairAppearance, LoggerType.PairVisibility ]),

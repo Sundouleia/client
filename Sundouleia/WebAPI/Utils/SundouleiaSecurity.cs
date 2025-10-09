@@ -1,8 +1,16 @@
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
 
 namespace Sundouleia.WebAPI.Utils;
 
+
+/// <summary>
+///     Uses SHA256 and SHA1 Hashing for security and datahashing. <para />
+///     SHA256 is more secure, while SHA1 is faster. <para />
+///     For iterating files, we will process datahashes using SHA1 (40bits) <para />
+///     For hashing secret keys, we will use SHA256 (64bits).
+/// </summary>
 public static class SundouleiaSecurity
 {
     // i think they are just using the player hash to make it more less likely to have the same identifier occur? If so, all of this is useless.
@@ -11,10 +19,7 @@ public static class SundouleiaSecurity
     private static readonly SHA256 _sha256CryptoProvider = SHA256.Create();
 
     public static string GetFileHash(this string filePath)
-    {
-        using var cryptoProvider = SHA256.Create();
-        return BitConverter.ToString(cryptoProvider.ComputeHash(File.ReadAllBytes(filePath))).Replace("-", "", StringComparison.Ordinal);
-    }
+        => BitConverter.ToString(SHA1.HashData(File.ReadAllBytes(filePath))).Replace("-", "", StringComparison.Ordinal);
 
     /// <summary>
     ///     Only call this when the ptr is visible.

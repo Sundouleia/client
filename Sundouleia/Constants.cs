@@ -15,6 +15,6 @@ public static class Constants
     public const string CsvSplit = "|";
     // File Filtering.
     public static readonly IImmutableList<string> ValidExtensions   = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".pbd", ".scd", ".skp", ".shpk"];
-    private static readonly IEnumerable<string> HandledExtensions   = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
-    private static readonly IEnumerable<string> RecordingExtensions = ["tex", "mdl", "mtrl"];
+    public static readonly IEnumerable<string> HandledExtensions   = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
+    public static readonly IEnumerable<string> RecordingExtensions = ["tex", "mdl", "mtrl"];
 }

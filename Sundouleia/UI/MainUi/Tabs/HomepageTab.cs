@@ -8,6 +8,7 @@ using Dalamud.Interface.Utility.Raii;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -18,13 +19,15 @@ namespace Sundouleia.Gui.MainWindow;
 public class HomepageTab
 {
     private readonly SundouleiaMediator _mediator;
+    private readonly CharaObjectWatcher _watcher;
 
     private int HoveredItemIndex = -1;
     private readonly List<(string Label, FontAwesomeIcon Icon, Action OnClick)> Modules;
 
-    public HomepageTab(SundouleiaMediator mediator)
+    public HomepageTab(SundouleiaMediator mediator, CharaObjectWatcher watcher)
     {
         _mediator = mediator;
+        _watcher = watcher;
         // Define all module information in a single place
         Modules = new List<(string, FontAwesomeIcon, Action)>
         {
@@ -65,7 +68,21 @@ public class HomepageTab
         }
         // if itemGotHovered is false, reset the index.
         if (!itemGotHovered)
-            HoveredItemIndex = -1;        
+            HoveredItemIndex = -1;
+
+        try
+        {
+            ImGui.Text($"Player Addr: {_watcher.WatchedPlayerAddr:X}");
+            ImGui.Text($"MountMinion Addr: {_watcher.WatchedMinionMountAddr:X}");
+            ImGui.Text($"Pet Addr: {_watcher.WatchedPetAddr:X}");
+            ImGui.Text($"Companion Addr: {_watcher.WatchedCompanionAddr:X}");
+        }
+        catch (Exception ex)
+        {
+            Svc.Logger.Error($"Exception in HomepageTab Draw: {ex}");
+        }
+
+
     }
 
     private bool HomepageSelectable(string label, FontAwesomeIcon icon, Vector2 region, bool hovered = false)

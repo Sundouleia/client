@@ -22,7 +22,6 @@ namespace Sundouleia.Pairs;
 /// </summary>
 public class PlayerHandler : DisposableMediatorSubscriberBase
 {
-    private readonly IHostApplicationLifetime _lifetime;
     private readonly FileCacheManager _fileCache;
     private readonly FileDownloader _downloader;
     private readonly IpcManager _ipc;
@@ -36,12 +35,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private Task? _timeoutTask;
 
     public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
-        IHostApplicationLifetime lifetime, FileCacheManager fileCache, FileDownloader downloads,
-        IpcManager ipc) : base(logger, mediator)
+        FileCacheManager fileCache, FileDownloader downloads, IpcManager ipc) 
+        : base(logger, mediator)
     {
         Sundesmo = sundesmo;
 
-        _lifetime = lifetime;
         _fileCache = fileCache;
         _downloader = downloads;
         _ipc = ipc;
@@ -67,17 +65,22 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             Mediator.Subscribe<WatchedObjectCreated>(this, msg =>
             {
-                if (msg.Kind != OwnedObject.Player || Address != nint.Zero) return;
-                // Check hash for match, if found, create!
+                // do not create if they are not online or already created.
+                if (Address != IntPtr.Zero || !Sundesmo.IsOnline) return;
+                // If the Ident is not valid do not create.
+                if (string.IsNullOrEmpty(Sundesmo.Ident)) return;
+                // If a match can be found, set the player object.
                 if (Sundesmo.Ident == SundouleiaSecurity.GetIdentHashByCharacterPtr(msg.Address))
-                   ObjectRendered((Character*)msg.Address);
+                {
+                    Logger.LogDebug($"Matched {Sundesmo.GetNickAliasOrUid()} to a created object @ [{msg.Address:X}]", LoggerType.PairHandler);
+                    ObjectRendered((Character*)msg.Address);
+                }
             });
 
             Mediator.Subscribe<WatchedObjectDestroyed>(this, msg =>
             {
-                if (msg.Kind != OwnedObject.Player || Address == nint.Zero || msg.Address != Address)
-                    return;
-                ClearRenderedPlayer(msg.Kind);
+                if (Address == IntPtr.Zero || msg.Address != Address) return;
+                ClearRenderedPlayer();
             });
         }
     }
@@ -114,10 +117,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Mediator.Publish(new SundesmoPlayerRendered(this));
     }
 
-    public unsafe void ClearRenderedPlayer(OwnedObject type)
+    public unsafe void ClearRenderedPlayer()
     {
         _player = null;
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {type} unrendered!", LoggerType.PairHandler);
+        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] unrendered!", LoggerType.PairHandler);
         Mediator.Publish(new SundesmoPlayerUnrendered(this));
         StartTimeoutTask();
     }
@@ -491,6 +494,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
             Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Disposed")));
         }
+
+        // Do not dispose if the framework is unloading!
+        // (means we are shutting down the game and cannot transmit calls to other ipcs without causing fatal errors!)
+        if (Svc.Framework.IsFrameworkUnloading)
+        {
+            Logger.LogWarning($"Framework is unloading, skipping disposal for {name}({Sundesmo.GetNickAliasOrUid()})");
+            return;
+        }
+
         // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
         _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), name).ConfigureAwait(false);
     }

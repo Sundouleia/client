@@ -83,10 +83,10 @@ public class Sundesmo : IComparable<Sundesmo>
     public IntPtr GetAddress(OwnedObject obj)
         => obj switch
         {
-            OwnedObject.Player => _player?.Address ?? IntPtr.Zero,
-            OwnedObject.MinionOrMount => _mountMinion?.Address ?? IntPtr.Zero,
-            OwnedObject.Pet => _pet?.Address ?? IntPtr.Zero,
-            OwnedObject.Companion => _companion?.Address ?? IntPtr.Zero,
+            OwnedObject.Player => PlayerRendered ? _player.Address : IntPtr.Zero,
+            OwnedObject.MinionOrMount => MountMinionRendered ? _mountMinion.Address : IntPtr.Zero,
+            OwnedObject.Pet => PetRendered ? _pet.Address : IntPtr.Zero,
+            OwnedObject.Companion => CompanionRendered ? _companion.Address : IntPtr.Zero,
             _ => IntPtr.Zero,
         };
 
@@ -201,12 +201,12 @@ public class Sundesmo : IComparable<Sundesmo>
     }
 
     /// <summary>
-    ///     Marks the sundesmo to have reloading status, informing our distributor 
-    ///     that they require a full update upon next connection. <para />
-    ///     Note that this does not mean we need to clear the visible state, but
-    ///     they will send us a full update upon reconnection regardless. <para />
+    ///     Should occur whenever the sundesmo reloads the plugin or performs a manual full disconnect. <para />
+    ///     Any disconnects or temporary timeouts do not call this. It should be used to skip any timeouts,
+    ///     and immidiately remove any active alterations the next time they are marked offline. <para />
+    ///     This also will prevent them from being sent into limbo in the distribution service.
     /// </summary>
-    public void MarkReloading()
+    public void MarkForUnload()
     {
 
     }

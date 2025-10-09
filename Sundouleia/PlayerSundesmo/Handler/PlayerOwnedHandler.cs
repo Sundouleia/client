@@ -1,65 +1,87 @@
 using CkCommons;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
-using static Lumina.Data.Parsing.Layer.LayerCommon;
 
 namespace Sundouleia.Pairs;
-
-// MAINTAINERS NOTE:
-// It would actually be benificial to create a 'SundesmoMainHandler' and 'SundesmoSubHandler' (for minions / mounts / pets / ext)
-// this would help reduce process time complexity and allow for framented data analysis with faster performance optimizations.
-// also since only the player needs to manage download data it can handle it seperately.
-
-// Example:
-// - CharaCreated -> Player? -> SundesmoMainHandler -> Manage IPC + Penumbra + Mods + Downloads -> Reapply on application.
-// - CharaCreated -> Pet? -> SundesmoSubHandler -> Manage IPC only, Redraw on application.
 
 /// <summary>
 ///     Stores information about visual appearance data for a sundesmo's player-owned objects.
 ///     This includes their minion/mount, pet, or companion. <para />
 ///     
-///     Any changes will result in a redraw of their character. <para />
+///     Any changes will result in a redraw of this object. <para />
 ///     
 ///     The Sundesmo object will handle player timeouts and inform the object handler 
 ///     directly of any changes. You will not need to handle timers internally here.
 /// </summary>
 public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 {
-    private readonly IHostApplicationLifetime _lifetime;
     private readonly IpcManager _ipc;
 
     private CancellationTokenSource _timeoutCTS = new();
     private Task? _timeoutTask = null;
 
     public PlayerOwnedHandler(OwnedObject kind, Sundesmo sundesmo, ILogger<PlayerOwnedHandler> logger,
-        SundouleiaMediator mediator, IHostApplicationLifetime lifetime, IpcManager ipc) 
+        SundouleiaMediator mediator, IpcManager ipc) 
         : base(logger, mediator)
     {
         ObjectType = kind;
         Sundesmo = sundesmo;
 
-        _lifetime = lifetime;
         _ipc = ipc;
 
+        // Will likely need to revise this a lot until we get it right.
+        // There is some discrepancy with object creation order potentially, unsure.
+        // for right now the implemented solution is a band-aid fix.
         unsafe
         {
             Mediator.Subscribe<WatchedObjectCreated>(this, msg =>
             {
-                if (msg.Kind == OwnedObject.Player || Address != nint.Zero)
-                    return;
-                // Validate this is for the correct sundesmo, then create if so
-                if (((GameObject*)msg.Address)->OwnerId != Sundesmo.PlayerEntityId)
-                    return;
-                ObjectRendered((GameObject*)msg.Address);
+                // Ignore if already rendered.
+                if (msg.Address != nint.Zero) return;
+                // Ignore if the Player is not rendered.
+                if (!Sundesmo.PlayerRendered) return;
+                // Ignore if the address's OwnerId is not equal to the sundesmo's PlayerId.
+                if (((GameObject*)msg.Address)->OwnerId != Sundesmo.PlayerEntityId) return;
+
+                // Now we must handle it based on if it is a mount/minion, pet, or companion.
+                var ownerChara = (BattleChara*)Sundesmo.GetAddress(OwnedObject.Player);
+                // Test for pet.
+                if (ObjectType is OwnedObject.MinionOrMount)
+                {
+                    var expectedAddr = (IntPtr)GameObjectManager.Instance()->Objects.IndexSorted[ownerChara->ObjectIndex + 1].Value;
+                    if (expectedAddr == msg.Address)
+                    {
+                        Logger.LogDebug($"Detected {Sundesmo.GetNickAliasOrUid()}'s Minion/Mount creation @ [{msg.Address:X}]", LoggerType.PairHandler);
+                        ObjectRendered((GameObject*)msg.Address);
+                    }
+                }
+                else if (ObjectType is OwnedObject.Pet)
+                {
+                    var expectedAddr = (IntPtr)CharacterManager.Instance()->LookupPetByOwnerObject(ownerChara);
+                    if (expectedAddr == msg.Address)
+                    {
+                        Logger.LogDebug($"Detected {Sundesmo.GetNickAliasOrUid()}'s Pet creation @ [{msg.Address:X}]", LoggerType.PairHandler);
+                        ObjectRendered((GameObject*)msg.Address);
+                    }
+                }
+                else if (ObjectType is OwnedObject.Companion)
+                {
+                    var expectedAddr = (IntPtr)CharacterManager.Instance()->LookupBuddyByOwnerObject(ownerChara);
+                    if (expectedAddr == msg.Address)
+                    {
+                        Logger.LogDebug($"Detected {Sundesmo.GetNickAliasOrUid()}'s Companion creation @ [{msg.Address:X}]", LoggerType.PairHandler);
+                        ObjectRendered((GameObject*)msg.Address);
+                    }
+                }
             });
 
             Mediator.Subscribe<WatchedObjectDestroyed>(this, msg =>
             {
-                if (msg.Kind == OwnedObject.Player || Address == nint.Zero || msg.Address != Address)
+                if (Address == nint.Zero || msg.Address != Address)
                     return;
                 ClearRenderedObject();
             });
@@ -233,6 +255,14 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         {
             Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
             Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Owned Object Disposed")));
+        }
+
+        // Do not dispose if the framework is unloading!
+        // (means we are shutting down the game and cannot transmit calls to other ipcs without causing fatal errors!)
+        if (Svc.Framework.IsFrameworkUnloading)
+        {
+            Logger.LogWarning($"Framework is unloading, skipping disposal for {name}({Sundesmo.GetNickAliasOrUid()})");
+            return;
         }
 
         // Process off the disposal thread.

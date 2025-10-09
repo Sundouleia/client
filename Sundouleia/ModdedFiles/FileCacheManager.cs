@@ -18,6 +18,7 @@ public sealed class FileCacheManager : IHostedService
     private readonly ILogger<FileCacheManager> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
+    private readonly IpcManager _ipc;
     private readonly ConfigFileProvider _fileNames;
 
     private readonly ConcurrentDictionary<string, List<FileCacheEntity>> _fileCaches = new(StringComparer.Ordinal);
@@ -25,14 +26,16 @@ public sealed class FileCacheManager : IHostedService
     private readonly object _fileWriteLock = new();
 
     public FileCacheManager(ILogger<FileCacheManager> logger, SundouleiaMediator mediator,
-        MainConfig config, ConfigFileProvider fileNames)
+        MainConfig config, IpcManager ipc, ConfigFileProvider fileNames)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
+        _ipc = ipc;
         _fileNames = fileNames;
     }
 
+    public int TotalCacheEntities => _fileCaches.Sum(k => k.Value.Count);
     private string CsvBakPath => _fileNames.FileCacheCsv + ".bak";
 
     /// <summary>
@@ -43,7 +46,7 @@ public sealed class FileCacheManager : IHostedService
     {
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
-        _logger.LogTrace($"Creating cache entry for {path}");
+        _logger.LogTrace($"Creating cache entry for {path}", LoggerType.FileCache);
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(_config.Current.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
         string prefixedPath = fullName.Replace(_config.Current.CacheFolder.ToLowerInvariant(), Constants.PrefixCache + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
@@ -58,7 +61,7 @@ public sealed class FileCacheManager : IHostedService
     {
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
-        _logger.LogTrace($"Creating file entry for {path}");
+        _logger.LogTrace($"Creating file entry for {path}", LoggerType.FileCache);
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(IpcCallerPenumbra.ModDirectory!.ToLowerInvariant(), StringComparison.Ordinal)) return null;
         string prefixedPath = fullName.Replace(IpcCallerPenumbra.ModDirectory!.ToLowerInvariant(), Constants.PrefixPenumbra + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
@@ -182,10 +185,9 @@ public sealed class FileCacheManager : IHostedService
         var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant()
             .Replace(IpcCallerPenumbra.ModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
         var entry = _fileCaches.SelectMany(v => v.Value).FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
-
-        if (entry == null)
+        if (entry is null)
         {
-            _logger.LogDebug("Found no entries for {path}", cleanedPath);
+            _logger.LogDebug($"Found no entries for {cleanedPath}", LoggerType.FileCache);
             return CreateFileEntry(path);
         }
 
@@ -210,9 +212,9 @@ public sealed class FileCacheManager : IHostedService
                     .Replace(_config.Current.CacheFolder, _config.Current.CacheFolder.EndsWith('\\') ? Constants.PrefixCache + '\\' : Constants.PrefixCache, StringComparison.OrdinalIgnoreCase)
                     .Replace("\\\\", "\\", StringComparison.Ordinal),
                 StringComparer.OrdinalIgnoreCase);
-            _logger.LogDebug($"== Fetching FileCaches by Paths Cleaned Paths ==");
+            _logger.LogDebug($"== Fetching FileCaches by Paths Cleaned Paths ==", LoggerType.FileCache);
             foreach ( var entry in cleanedPaths)
-                _logger.LogDebug($"Key: {entry.Key}, Value: {entry.Value}");
+                _logger.LogDebug($"Key: {entry.Key}, Value: {entry.Value}", LoggerType.FileCache);
 
             // not sure why this isnt merged with the line below, but whatever, basically just constructs the result.
             Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
@@ -252,7 +254,7 @@ public sealed class FileCacheManager : IHostedService
         if (_fileCaches.TryGetValue(hash, out var caches))
         {
             var removedCount = caches?.RemoveAll(c => string.Equals(c.PrefixedFilePath, prefixedFilePath, StringComparison.Ordinal));
-            _logger.LogTrace("Removed from DB: {count} file(s) with hash {hash} and file cache {path}", removedCount, hash, prefixedFilePath);
+            _logger.LogTrace($"Removed from DB: {removedCount} file(s) with hash {hash} and file cache {prefixedFilePath}", LoggerType.FileCache);
 
             if (caches?.Count == 0)
             {
@@ -265,7 +267,7 @@ public sealed class FileCacheManager : IHostedService
     // This might explain why the sundouleia-cache grows overtime without any cleanup system.
     public void UpdateHashedFile(FileCacheEntity fileCache, bool computeProperties = true)
     {
-        _logger.LogTrace("Updating hash for {path}", fileCache.ResolvedFilepath);
+        _logger.LogTrace($"Updating hash for {fileCache.ResolvedFilepath}", LoggerType.FileCache);
         var oldHash = fileCache.Hash;
         var prefixedPath = fileCache.PrefixedFilePath;
         if (computeProperties)
@@ -336,13 +338,13 @@ public sealed class FileCacheManager : IHostedService
             var newHashedEntity = new FileCacheEntity(fileCache.Hash, fileCache.PrefixedFilePath + "." + ext, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
             newHashedEntity.SetResolvedFilePath(extensionPath);
             AddHashedFile(newHashedEntity);
-            _logger.LogTrace("Migrated from {oldPath} to {newPath}", fileCache.ResolvedFilepath, newHashedEntity.ResolvedFilepath);
+            _logger.LogTrace($"Migrated from {fileCache.ResolvedFilepath} to {newHashedEntity.ResolvedFilepath}", LoggerType.FileCache);
             return newHashedEntity;
         }
         catch (Exception ex)
         {
             AddHashedFile(fileCache);
-            _logger.LogWarning(ex, "Failed to migrate entity {entity}", fileCache.PrefixedFilePath);
+            _logger.LogWarning($"Failed to migrate entity {fileCache.PrefixedFilePath}: {ex}");
             return fileCache;
         }
     }
@@ -372,7 +374,7 @@ public sealed class FileCacheManager : IHostedService
             File.AppendAllLines(_fileNames.FileCacheCsv, new[] { entity.CsvEntry });
         }
         var result = GetFileCacheByPath(fileInfo.FullName);
-        _logger.LogTrace("Creating cache entity for {name} success: {success}", fileInfo.FullName, (result != null));
+        _logger.LogTrace($"Creating cache entity for {fileInfo.FullName} success: {(result != null)}", LoggerType.FileCache);
         return result;
     }
 
@@ -437,12 +439,11 @@ public sealed class FileCacheManager : IHostedService
         {
             try
             {
-                _logger.LogInformation("Checking for {bakPath}", CsvBakPath);
+                _logger.LogInformation($"Checking for {CsvBakPath}", LoggerType.FileCsv);
 
                 if (File.Exists(CsvBakPath))
                 {
-                    _logger.LogInformation("{bakPath} found, moving to {csvPath}", CsvBakPath, _fileNames.FileCacheCsv);
-
+                    _logger.LogInformation($"{CsvBakPath} found, moving to {_fileNames.FileCacheCsv}", LoggerType.FileCsv);
                     File.Move(CsvBakPath, _fileNames.FileCacheCsv, overwrite: true);
                 }
             }
@@ -463,6 +464,9 @@ public sealed class FileCacheManager : IHostedService
 
         if (File.Exists(_fileNames.FileCacheCsv))
         {
+            if (IpcCallerPenumbra.APIAvailable && string.IsNullOrEmpty(IpcCallerPenumbra.ModDirectory))
+                _ipc.Penumbra.CheckModDirectory();
+
             if (!IpcCallerPenumbra.APIAvailable || string.IsNullOrEmpty(IpcCallerPenumbra.ModDirectory))
             {
                 _mediator.Publish(new NotificationMessage("Penumbra not connected", "Could not load local file cache data. " +
@@ -470,7 +474,7 @@ public sealed class FileCacheManager : IHostedService
                     "After, reload Sundeouleia in the Plugin installer.", NotificationType.Error));
             }
 
-            _logger.LogInformation("{csvPath} found, parsing", _fileNames.FileCacheCsv);
+            _logger.LogInformation($"{_fileNames.FileCacheCsv} found, parsing");
 
             bool success = false;
             string[] entries = [];
@@ -479,24 +483,24 @@ public sealed class FileCacheManager : IHostedService
             {
                 try
                 {
-                    _logger.LogInformation("Attempting to read {csvPath}", _fileNames.FileCacheCsv);
+                    _logger.LogInformation($"Attempting to read {_fileNames.FileCacheCsv}", LoggerType.FileCsv);
                     entries = File.ReadAllLines(_fileNames.FileCacheCsv);
                     success = true;
                 }
                 catch (Exception ex)
                 {
                     attempts++;
-                    _logger.LogWarning(ex, "Could not open {file}, trying again", _fileNames.FileCacheCsv);
+                    _logger.LogWarning($"Could not open {_fileNames.FileCacheCsv}, trying again: {ex}");
                     Thread.Sleep(100);
                 }
             }
 
             if (!entries.Any())
             {
-                _logger.LogWarning("Could not load entries from {path}, continuing with empty file cache", _fileNames.FileCacheCsv);
+                _logger.LogWarning($"Could not load entries from {_fileNames.FileCacheCsv}, continuing with empty file cache");
             }
 
-            _logger.LogInformation("Found {amount} files in {path}", entries.Length, _fileNames.FileCacheCsv);
+            _logger.LogInformation($"Found {entries.Length} files in {_fileNames.FileCacheCsv}", LoggerType.FileCsv);
 
             Dictionary<string, bool> processedFiles = new(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in entries)
@@ -511,7 +515,7 @@ public sealed class FileCacheManager : IHostedService
 
                     if (processedFiles.ContainsKey(path))
                     {
-                        _logger.LogWarning("Already processed {file}, ignoring", path);
+                        _logger.LogWarning($"Already processed {path}, ignoring");
                         continue;
                     }
 
@@ -534,7 +538,7 @@ public sealed class FileCacheManager : IHostedService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to initialize entry {entry}, ignoring", entry);
+                    _logger.LogWarning($"Failed to initialize entry {entry}, ignoring: {ex}");
                 }
             }
 
@@ -545,7 +549,6 @@ public sealed class FileCacheManager : IHostedService
         }
 
         _logger.LogInformation("Started FileCacheManager");
-
         return Task.CompletedTask;
     }
 
