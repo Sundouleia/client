@@ -437,7 +437,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // perform the update.
         try
         {
-            var modChanges = await UpdateModCacheInternal().ConfigureAwait(false);
+            // var modChanges = await UpdateModCacheInternal().ConfigureAwait(false);
             //// Send this update off to all our visibly connected sundesmos that are not in limbo or new.
             //await _hub.UserPushIpcMods(new(SundesmosForUpdatePush, modChanges)).ConfigureAwait(false);
             //Logger.LogInformation($"Ipc Cache Mod Update completed.");
@@ -531,7 +531,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     private async Task<SentModUpdate> UpdateModCacheInternal()
     {
-        await CollectModdedState(CancellationToken.None).ConfigureAwait(false);
+        // await CollectModdedState(CancellationToken.None).ConfigureAwait(false);
         // do some kind of file scan voodoo with our db and transient resource handler to grab the
         // latest active hashes for our character.
         return new SentModUpdate(new List<ModFileInfo>(), new List<string>());

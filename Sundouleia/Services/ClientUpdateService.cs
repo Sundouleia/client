@@ -124,26 +124,25 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
             try
             {
                 // Debug mod changes for now.
-                await _distributor.UpdateModCache().ConfigureAwait(false);
-                //switch (modUpdate, isSingle)
-                //{
-                //    case (true, false):
-                //        Logger.LogDebug($"Processing full Mod update for {pendingSnapshot.Count} objects.");
-                //        await _distributor.UpdateIpcCacheFull(pendingSnapshot).ConfigureAwait(false);
-                //        break;
-                //    case (true, true):
-                //        Logger.LogDebug($"Processing single Mod update for {pendingSnapshot.Keys.First()}.");
-                //        await _distributor.UpdateModCache().ConfigureAwait(false);
-                //        break;
-                //    case (false, false):
-                //        Logger.LogDebug($"Processing partial update ({allPendingSnapshot}) for {pendingSnapshot.Count} objects.");
-                //        await _distributor.UpdateIpcCache(pendingSnapshot).ConfigureAwait(false);
-                //        break;
-                //    case (false, true):
-                //        Logger.LogDebug($"Processing single partial update ({allPendingSnapshot}) for {pendingSnapshot.Keys.First()}.");
-                //        await _distributor.UpdateIpcCacheSingle(pendingSnapshot.Keys.First(), allPendingSnapshot).ConfigureAwait(false);
-                //        break;
-                //}
+                switch (modUpdate, isSingle)
+                {
+                    case (true, false):
+                        Logger.LogDebug($"Processing full Mod update for {pendingSnapshot.Count} objects.");
+                        await _distributor.UpdateIpcCacheFull(pendingSnapshot).ConfigureAwait(false);
+                        break;
+                    case (true, true):
+                        Logger.LogDebug($"Processing single Mod update for {pendingSnapshot.Keys.First()}.");
+                        await _distributor.UpdateModCache().ConfigureAwait(false);
+                        break;
+                    case (false, false):
+                        Logger.LogDebug($"Processing partial update ({allPendingSnapshot}) for {pendingSnapshot.Count} objects.");
+                        await _distributor.UpdateIpcCache(pendingSnapshot).ConfigureAwait(false);
+                        break;
+                    case (false, true):
+                        Logger.LogDebug($"Processing single partial update ({allPendingSnapshot}) for {pendingSnapshot.Keys.First()}.");
+                        await _distributor.UpdateIpcCacheSingle(pendingSnapshot.Keys.First(), allPendingSnapshot).ConfigureAwait(false);
+                        break;
+                }
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { Logger.LogCritical($"Error during ClientUpdate Process: {ex}"); }
