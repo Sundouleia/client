@@ -83,7 +83,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     public unsafe IntPtr Address => (nint)_gameObject;
     public unsafe ushort ObjIndex => _gameObject->ObjectIndex;
     public unsafe ulong EntityId => _gameObject->EntityId;
-    public unsafe ulong GameObjectId => _gameObject->GetGameObjectId().Id;
+    public unsafe ulong GameObjectId => _gameObject->GetGameObjectId().ObjectId;
     public string NameString { get; private set; } = string.Empty; // Manually set so it can be used on timeouts.
 
     public bool IsOwnerValid => Sundesmo.IsRendered;

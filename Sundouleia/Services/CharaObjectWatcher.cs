@@ -140,18 +140,9 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         {
             GameObject* obj = objManager->Objects.IndexSorted[i];
             if (obj is null) continue;
-            var kind = obj->GetObjectKind();
-            // Handle companions.
-            if (kind is ObjectKind.Companion)
-            {
-                NewCompanionRendered((Companion*)obj);
-                continue;
-            }
-            // Players and Battle NPCs
-            if (obj->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc))
-            {
-                NewCharacterRendered((Character*)obj);
-            }
+            // this is confusing because sometimes these can be either?
+            if (obj->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
+                NewCharacterRendered(obj);
         }
     }
 
@@ -160,16 +151,16 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     ///     wishing to detect created objects. <para />
     ///     Doing so will ensure any final lines are processed prior to the address invalidating.
     /// </summary>
-    private void NewCharacterRendered(Character* chara)
+    private void NewCharacterRendered(GameObject* chara)
     {
-        Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->NameString}");
+        Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}");
         var address = (nint)chara;
         if (address == OwnedObjects.PlayerAddress)
         {
             AddOwnedObject(OwnedObject.Player, address);
             WatchedPlayerAddr = address;
         }
-        else if (address == OwnedObjects.MinionOrMountAddress && chara->OwnerId == OwnedObjects.PlayerObject->EntityId)
+        else if (address == OwnedObjects.MinionOrMountAddress)
         {
             AddOwnedObject(OwnedObject.MinionOrMount, address);
             WatchedMinionMountAddr = address;
@@ -178,6 +169,11 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         {
             AddOwnedObject(OwnedObject.Pet, address);
             WatchedPetAddr = address;
+        }
+        else if (chara->BattleNpcSubKind is BattleNpcSubKind.Buddy && address == OwnedObjects.CompanionAddress && chara->OwnerId == OwnedObjects.PlayerObject->EntityId)
+        {
+            AddOwnedObject(OwnedObject.Companion, address);
+            WatchedCompanionAddr = address;
         }
         else
         {
@@ -188,8 +184,9 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         }
     }
 
-    private void CharacterRemoved(Character* chara)
+    private void CharacterRemoved(GameObject* chara)
     {
+        Logger.LogDebug($"Character Removed: {(nint)chara:X} - {chara->GetName()}");
         var address = (nint)chara;
         if (address == WatchedPlayerAddr)
         {
@@ -206,6 +203,11 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
             RemoveOwnedObject(OwnedObject.Pet, address);
             WatchedPetAddr = IntPtr.Zero;
         }
+        else if (address == WatchedCompanionAddr)
+        {
+            RemoveOwnedObject(OwnedObject.Companion, address);
+            WatchedCompanionAddr = IntPtr.Zero;
+        }
         else
         {
             RenderedCharas.Remove(address);
@@ -213,35 +215,37 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         }
     }
 
+    // Best to leave this for logging mostly, and debug why we should include later.
+    // Causes a lot of duplicate additions as they can be called at the same time.
     private void NewCompanionRendered(Companion* companion)
     {
-        Logger.LogDebug($"New Companion Rendered: {(nint)companion:X} - {companion->NameString}");
+        //Logger.LogDebug($"New Companion Rendered: {(nint)companion:X} - {companion->NameString}");
         var address = (nint)companion;
-        if (OwnedObjects.PlayerAddress != IntPtr.Zero && companion->CompanionOwnerId == OwnedObjects.PlayerObject->EntityId)
-        {
-            AddOwnedObject(OwnedObject.Companion, address);
-            WatchedCompanionAddr = address;
-        }
-        else
-        {
-            RenderedCompanions.Add(address);
-            Mediator.Publish(new WatchedObjectCreated(address));
-        }
+        //if (OwnedObjects.PlayerAddress != IntPtr.Zero && companion->ObjectKind == ObjectKind.BattleNpc && companion->OwnerId == OwnedObjects.PlayerObject->EntityId)
+        //{
+        //    AddOwnedObject(OwnedObject.Companion, address);
+        //    WatchedCompanionAddr = address;
+        //}
+        // if it doesn't exist already
+        RenderedCompanions.Add(address);
+        // Mediator.Publish(new WatchedObjectCreated(address));
     }
+    // Best to leave this for logging mostly, and debug why we should include later.
+    // Causes a lot of duplicate additions as they can be called at the same time.
     private void CompanionRemoved(Companion* companion)
     {
-        Logger.LogDebug($"Companion Removed: {(nint)companion:X} - {companion->NameString}");
+        //Logger.LogDebug($"Companion Removed: {(nint)companion:X} - {companion->NameString}");
         var address = (nint)companion;
-        if (OwnedObjects.PlayerAddress != IntPtr.Zero && address != WatchedCompanionAddr)
-        {
-            RemoveOwnedObject(OwnedObject.Companion, address);
-            WatchedCompanionAddr = IntPtr.Zero;
-        }
-        else
-        {
-            RenderedCompanions.Remove(address);
-            Mediator.Publish(new WatchedObjectDestroyed(address));
-        }
+        //if (OwnedObjects.PlayerAddress != IntPtr.Zero && address == WatchedCompanionAddr)
+        //{
+        //    RemoveOwnedObject(OwnedObject.Companion, address);
+        //    WatchedCompanionAddr = IntPtr.Zero;
+        //}
+        //else
+        //{
+        RenderedCompanions.Remove(address);
+        // Mediator.Publish(new WatchedObjectDestroyed(address));
+        //}
     }
 
     private void AddOwnedObject(OwnedObject kind, nint address)
@@ -263,19 +267,19 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     {
         try { OnCharaInitializeHook!.OriginalDisposeSafe(chara); }
         catch (Exception e) { Logger.LogError($"Error: {e}"); }
-        Svc.Framework.Run(() => NewCharacterRendered(chara));
+        Svc.Framework.Run(() => NewCharacterRendered((GameObject*)chara));
     }
 
     private void TerminateCharacter(Character* chara)
     {
-        CharacterRemoved(chara);
+        CharacterRemoved((GameObject*)chara);
         try { OnCharaTerminateHook!.OriginalDisposeSafe(chara); }
         catch (Exception e) { Logger.LogError($"Error: {e}"); }
     }
 
     private GameObject* DestroyCharacter(Character* chara, byte freeMemory)
     {
-        CharacterRemoved(chara);
+        CharacterRemoved((GameObject*)chara);
         try { return OnCharaDestroyHook!.OriginalDisposeSafe(chara, freeMemory); }
         catch (Exception e) { Logger.LogError($"Error: {e}"); return null; }
     }

@@ -98,7 +98,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public Character DataState { get { unsafe { return *_player; } } }
     public unsafe IntPtr Address => (nint)_player;
     public unsafe ulong EntityId => _player->EntityId;
-    public unsafe ulong GameObjectId => _player->GetGameObjectId().Id;
+    public unsafe ulong GameObjectId => _player->GetGameObjectId().ObjectId;
     public unsafe ushort ObjIndex => _player->ObjectIndex;
     public string NameString { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
     public unsafe bool IsRendered => _player != null;

@@ -296,7 +296,7 @@ public class Sundesmo : IComparable<Sundesmo>
         using var node = ImRaii.TreeNode($"Visible Info##{UserData.UID}-visible");
         if (!node) return;
 
-        using (var t = ImRaii.Table("##debug-visible" + UserData.UID, 8, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        using (var t = ImRaii.Table("##debug-visible" + UserData.UID, 9, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
             if (!t) return;
             ImGui.TableSetupColumn("OwnedObject");
@@ -307,6 +307,7 @@ public class Sundesmo : IComparable<Sundesmo>
             ImGui.TableSetupColumn("ObjectIdx");
             ImGui.TableSetupColumn("EntityId");
             ImGui.TableSetupColumn("ObjectId");
+            ImGui.TableSetupColumn("ParentId");
             ImGui.TableHeadersRow();
             // Handle Player.
             ImGuiUtil.DrawFrameColumn("Player");
@@ -321,6 +322,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGuiUtil.DrawFrameColumn(_player.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(PlayerEntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(PlayerObjectId.ToString());
+                ImGuiUtil.DrawFrameColumn("N/A");
             }
             else
             {
@@ -340,6 +342,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGuiUtil.DrawFrameColumn(_mountMinion.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(_mountMinion.EntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(_mountMinion.GameObjectId.ToString());
+                ImGuiUtil.DrawFrameColumn(_mountMinion.DataState.OwnerId.ToString());
             }
             else
             {
@@ -359,6 +362,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGuiUtil.DrawFrameColumn(_pet.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(_pet.EntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(_pet.GameObjectId.ToString());
+                ImGuiUtil.DrawFrameColumn(_pet.DataState.OwnerId.ToString());
             }
             else
             {
@@ -378,6 +382,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGuiUtil.DrawFrameColumn(_companion.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(_companion.EntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(_companion.GameObjectId.ToString());
+                ImGuiUtil.DrawFrameColumn(_companion.DataState.OwnerId.ToString());
             }
         }
     }

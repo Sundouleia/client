@@ -1,3 +1,4 @@
+using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -10,6 +11,7 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI.Utils;
+using System.Runtime.Serialization;
 
 namespace Sundouleia.Gui;
 
@@ -114,7 +116,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->EntityId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->GetGameObjectId().Id.ToString());
+                    ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->OwnerId.ToString());
                 }
@@ -127,7 +129,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                 ImGui.Text("Minion/Mount");
                 if (_watcher.WatchedMinionMountAddr != IntPtr.Zero)
                 {
-                    GameObject* obj = (GameObject*)_watcher.WatchedMinionMountAddr;
+                    Character* obj = (Character*)_watcher.WatchedMinionMountAddr;
                     ImGui.TableNextColumn();
                     CkGui.ColorText($"{_watcher.WatchedMinionMountAddr:X}", ImGuiColors.TankBlue);
                     ImGui.TableNextColumn();
@@ -140,9 +142,9 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->EntityId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->GetGameObjectId().Id.ToString());
+                    ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->OwnerId.ToString());
+                    ImGui.Text(obj->CompanionOwnerId.ToString());
                 }
                 else
                 {
@@ -166,7 +168,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->EntityId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->GetGameObjectId().Id.ToString());
+                    ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->OwnerId.ToString());
                 }
@@ -179,7 +181,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                 ImGui.Text("Companion");
                 if (_watcher.WatchedCompanionAddr != IntPtr.Zero)
                 {
-                    GameObject* obj = (GameObject*)_watcher.WatchedCompanionAddr;
+                    Companion* obj = (Companion*)_watcher.WatchedCompanionAddr;
                     ImGui.TableNextColumn();
                     CkGui.ColorText($"{_watcher.WatchedCompanionAddr:X}", ImGuiColors.TankBlue);
                     ImGui.TableNextColumn();
@@ -192,14 +194,36 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->EntityId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->GetGameObjectId().Id.ToString());
+                    ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->OwnerId.ToString());
+                    ImGui.Text(obj->CompanionOwnerId.ToString());
                 }
                 else
                 {
                     ImGui.TableNextRow();
                 }
+                // Supposed Companion?
+                //ImGui.TableNextColumn();
+                //ImGui.Text("Supposed Companion");
+                //Companion* maybeObj = (Companion*)OwnedObjects.CompanionAddress;
+                //if (maybeObj != null)
+                //{
+                //    ImGui.TableNextColumn();
+                //    CkGui.ColorText($"{(nint)maybeObj:X}", ImGuiColors.TankBlue);
+                //    ImGui.TableNextColumn();
+                //    ImGui.Text(maybeObj->NameString.ToString());
+                //    ImGui.TableNextColumn();
+                //    ImGui.Text(maybeObj->ObjectIndex.ToString());
+                //    ImGui.TableNextColumn();
+                //    ImGui.Text(maybeObj->ObjectKind.ToString());
+                //    ImGui.TableNextColumn();
+                //    ImGui.TableNextColumn();
+                //    ImGui.Text(maybeObj->EntityId.ToString());
+                //    ImGui.TableNextColumn();
+                //    ImGui.Text(maybeObj->GetGameObjectId().ObjectId.ToString());
+                //    ImGui.TableNextColumn();
+                //    ImGui.Text(maybeObj->OwnerId.ToString());
+                //}
             }
             ImGui.Separator();
         }
@@ -251,9 +275,9 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->EntityId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->GetGameObjectId().Id.ToString());
+                    ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->OwnerId.ToString());
+                    ImGui.Text(obj->CompanionOwnerId.ToString());
                 }
             }
             ImGui.Separator();
@@ -297,9 +321,9 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->EntityId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->GetGameObjectId().Id.ToString());
+                    ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
                     ImGui.TableNextColumn();
-                    ImGui.Text(obj->OwnerId.ToString());
+                    ImGui.Text(obj->CompanionOwnerId.ToString());
                 }
             }
             ImGui.Separator();
