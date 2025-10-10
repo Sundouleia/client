@@ -1,5 +1,4 @@
 using Sundouleia.Pairs;
-using SundouleiaAPI.Data;
 
 namespace Sundouleia.Services.Mediator;
 
@@ -7,11 +6,9 @@ namespace Sundouleia.Services.Mediator;
 public record SundesmoOnline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoOffline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoPlayerRendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming visible"
-public record SundesmoPlayerUnrendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming invisible"
-public record SundesmoTimedOut(PlayerHandler Handler) : MessageBase; // Whenever unrendered long enough to be considered invalid.
-public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // called when publishing a targeted pair connection (see UI)
-
-
+public record SundesmoEnteredLimbo(Sundesmo Sundesmo) : SameThreadMessage; // Alteration Timeout Begin.
+public record SundesmoLeftLimbo(Sundesmo Sundesmo) : SameThreadMessage; // Alteration Timeout End.
+public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // when desiring to target a sundesmo.
 public record DownloadLimitChangedMessage : SameThreadMessage;
 public record FileUploading(PlayerHandler Player) : MessageBase;
 public record FileUploaded(PlayerHandler Player) : MessageBase;

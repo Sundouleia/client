@@ -20,9 +20,6 @@ public class ClientDataCache
     public string Moodles       { get; set; } = string.Empty;
     public string PetNames      { get; set; } = string.Empty;
 
-    // True when an update has been applied since the last change.
-    public bool IsCacheDirty    { get; set; } = false;
-
     public ClientDataCache()
     {
         // Ensure default keys for all owned objects.
@@ -41,4 +38,6 @@ public class ClientDataCache
             [OwnedObject.Pet] = string.Empty
         };
     }
+
+    // Helper methods for updates and such here.
 }

@@ -1,3 +1,4 @@
+using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Gui.ContextMenu;
@@ -29,6 +30,9 @@ public class Sundesmo : IComparable<Sundesmo>
     private readonly SundesmoHandlerFactory _factory;
     private readonly CharaObjectWatcher _watcher;
 
+    private CancellationTokenSource _timeoutCTS = new();
+    private Task? _timeoutTask; // may not need? Could fire off thread but unsure.
+
     // Associated Player Data (Created once online).
     private OnlineUser? _onlineUser;
     private PlayerHandler _player;
@@ -53,7 +57,6 @@ public class Sundesmo : IComparable<Sundesmo>
         _companion = factory.Create(OwnedObject.Companion, this);
     }
 
-    public SundesmoState State { get; private set; } = SundesmoState.Offline;
     public bool IsReloading { get; private set; } = false;
 
     // Associated ServerData.
@@ -169,8 +172,7 @@ public class Sundesmo : IComparable<Sundesmo>
     {
         // Set the OnlineUser & update the sundesmo state.
         _onlineUser = dto;
-        State |= SundesmoState.Online;
-        
+       
         // Ensure that IsReloading is false (as if they were reloading, they just have)
         IsReloading = false;
 
@@ -215,19 +217,19 @@ public class Sundesmo : IComparable<Sundesmo>
     /// </summary>
     public void MarkForUnload()
     {
+        // Whenever IsReloading is true, marking as offline will skip the
+        // timeouts entirely and immediately force an unload of alterations.
         IsReloading = true;
     }
 
     /// <summary>
-    ///     Marks the pair as offline.
+    ///     Marks the sundesmo as offline, triggering the alteration data revert timeout. <para />
+    ///     When this expires, all applied alterations will be removed, regardless of visibility state.
     /// </summary>
     public void MarkOffline()
     {
         _onlineUser = null;
-        _player.StartTimeoutTask();
-        _mountMinion.StartTimeoutTask();
-        _pet.StartTimeoutTask();
-        _companion.StartTimeoutTask();
+        TriggerTimeoutTask();
         _mediator.Publish(new SundesmoOffline(this));
     }
 
@@ -238,10 +240,47 @@ public class Sundesmo : IComparable<Sundesmo>
     public void DisposeData()
     {
         _logger.LogDebug($"Disposing data for [{PlayerName}] ({GetNickAliasOrUid()})", UserData.AliasOrUID);
+        // Cancel any existing timeout task, and then dispose of all data.
+        _timeoutCTS.SafeCancel();        
         _player.Dispose();
         _mountMinion.Dispose();
         _pet.Dispose();
         _companion.Dispose();
+    }
+
+    /// <summary>
+    ///     Fired whenever the sundesmo goes offline, or they become unrendered. <para />
+    ///     If this needs to be fired while the task is already active, return.
+    /// </summary>
+    public void TriggerTimeoutTask()
+    {
+        if (_timeoutTask != null && !_timeoutTask.IsCompleted)
+            return;
+
+        _timeoutCTS = _timeoutCTS.SafeCancelRecreate();
+        // Process a task that awaits exactly 7 seconds, and then clear all alterations for all objects.
+        // Note that this is across all handled objects of the sundesmo.
+        _timeoutTask = Task.Run(async () =>
+        {
+            try
+            {
+                // Await for the defined time, then clear the alterations
+                _mediator.Publish(new SundesmoEnteredLimbo(this));
+                await Task.Delay(TimeSpan.FromSeconds(Constants.SundesmoTimeoutSeconds), _timeoutCTS.Token);
+                _mediator.Publish(new SundesmoLeftLimbo(this));
+                _logger.LogDebug($"Timeout elapsed for [{PlayerName}] ({GetNickAliasOrUid()}). Disposing data.", UserData.AliasOrUID);
+                // Revert all alterations.
+                await _player.ClearAlterations(CancellationToken.None).ConfigureAwait(false);
+                await _mountMinion.ClearAlterations().ConfigureAwait(false);
+                await _pet.ClearAlterations().ConfigureAwait(false);
+                await _companion.ClearAlterations().ConfigureAwait(false);
+            }
+            catch (TaskCanceledException)
+            {
+                _logger.LogDebug($"Timeout cancelled for [{PlayerName}] ({GetNickAliasOrUid()}).", UserData.AliasOrUID);
+                _mediator.Publish(new SundesmoLeftLimbo(this));
+            }
+        }, _timeoutCTS.Token);
     }
 
     // --------------- Helper Methods -------------------
@@ -318,7 +357,7 @@ public class Sundesmo : IComparable<Sundesmo>
             {
                 ImGui.TableNextColumn(); // Skip Owner Valid.
                 ImGui.TableNextColumn();
-                CkGui.ColorText(PlayerAddress.ToString(), ImGuiColors.TankBlue);
+                CkGui.ColorText($"{PlayerAddress:X}", ImGuiColors.TankBlue);
                 ImGuiUtil.DrawFrameColumn(_player.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(PlayerEntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(PlayerObjectId.ToString());
@@ -338,7 +377,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGui.TableNextColumn();
                 CkGui.IconText(_mountMinion.IsOwnerValid ? FAI.Check : FAI.Times, _mountMinion.IsOwnerValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
                 ImGui.TableNextColumn();
-                CkGui.ColorText(_mountMinion.Address.ToString(), ImGuiColors.TankBlue);
+                CkGui.ColorText($"{_mountMinion.Address:X}", ImGuiColors.TankBlue);
                 ImGuiUtil.DrawFrameColumn(_mountMinion.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(_mountMinion.EntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(_mountMinion.GameObjectId.ToString());
@@ -358,7 +397,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGui.TableNextColumn();
                 CkGui.IconText(_pet.IsOwnerValid ? FAI.Check : FAI.Times, _pet.IsOwnerValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
                 ImGui.TableNextColumn();
-                CkGui.ColorText(_pet.Address.ToString(), ImGuiColors.TankBlue);
+                CkGui.ColorText($"{_pet.Address:X}", ImGuiColors.TankBlue);
                 ImGuiUtil.DrawFrameColumn(_pet.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(_pet.EntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(_pet.GameObjectId.ToString());
@@ -378,7 +417,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGui.TableNextColumn();
                 CkGui.IconText(_companion.IsOwnerValid ? FAI.Check : FAI.Times, _companion.IsOwnerValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
                 ImGui.TableNextColumn();
-                CkGui.ColorText(_companion.Address.ToString(), ImGuiColors.TankBlue);
+                CkGui.ColorText($"{_companion.Address:X}", ImGuiColors.TankBlue);
                 ImGuiUtil.DrawFrameColumn(_companion.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(_companion.EntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(_companion.GameObjectId.ToString());

@@ -1,10 +1,10 @@
 using CkCommons;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
+using TerraFX.Interop.Windows;
 using static Lumina.Data.Parsing.Layer.LayerCommon;
 
 namespace Sundouleia.Pairs;
@@ -22,9 +22,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 {
     private readonly IpcManager _ipc;
 
-    private CancellationTokenSource _timeoutCTS = new();
-    private Task? _timeoutTask = null;
-
     public PlayerOwnedHandler(OwnedObject kind, Sundesmo sundesmo, ILogger<PlayerOwnedHandler> logger,
         SundouleiaMediator mediator, IpcManager ipc) 
         : base(logger, mediator)
@@ -41,10 +38,9 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         {
             Mediator.Subscribe<WatchedObjectCreated>(this, msg =>
             {
-                // Ignore if already rendered.
-                if (msg.Address != nint.Zero) return;
-                // Ignore if the address's OwnerId is not equal to the sundesmo's PlayerId.
-                if (((GameObject*)msg.Address)->OwnerId != Sundesmo.PlayerEntityId) return;
+                // do not create if they are not online or already created.
+                if (Address != IntPtr.Zero || !Sundesmo.IsRendered || !Sundesmo.IsOnline) return;
+                // Ignore if the address is not the expected address.
                 // Validate address match via helpers based on type.
                 var isMatch = ObjectType switch
                 {
@@ -55,7 +51,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
                 };
                 // Must be a valid match.
                 if (!isMatch) return;
-
                 // If it is, log and render the object.
                 Logger.LogDebug($"Detected {Sundesmo.GetNickAliasOrUid()}'s {ObjectType} creation @ [{msg.Address:X}]", LoggerType.PairHandler);
                 ObjectRendered((GameObject*)msg.Address);
@@ -63,9 +58,9 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
             Mediator.Subscribe<WatchedObjectDestroyed>(this, msg =>
             {
-                if (Address == nint.Zero || msg.Address != Address)
-                    return;
-                ClearRenderedObject();
+                if (Address == IntPtr.Zero || msg.Address != Address) return;
+                // Mark the object as unrendered, triggering the timeout.
+                ObjectUnrendered();
             });
         }
     }
@@ -88,57 +83,68 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
     public bool IsOwnerValid => Sundesmo.IsRendered;
     public unsafe bool IsRendered => _gameObject != null;
+    public bool HasAlterations => _appearanceData != null;
 
+    /// <summary>
+    ///     Fired whenever the OwnedObject is rendered in the game world. <para />
+    ///     This is not to be linked to the appearance alterations in any shape or form.
+    /// </summary>
+    /// <remarks>
+    ///     Due to the sundesmo being on a single timeout for alterations there is a change 
+    ///     we may have cached alterations for a different object. If we need to track the
+    ///     previous type somehow we can add it later.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"></exception>
     public unsafe void ObjectRendered(GameObject* obj)
     {
-        if (obj is null)
-            throw new ArgumentNullException(nameof(obj));
-
-        // Cancel any pending timeouts.
-        _timeoutCTS.SafeCancel();
-
+        if (obj is null) throw new ArgumentNullException(nameof(obj));
         // Init the object and set its name.
         _gameObject = obj;
         NameString = obj->NameString;
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} rendered!", LoggerType.PairHandler);
     }
 
-    public unsafe void ClearRenderedObject()
-    {
-        _gameObject = null;
-        // do not clear the object name and other data yet, hold until timeout occurs, and then revert.
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} unrendered! Reverting in 10s unless reappearing.", LoggerType.PairHandler);
-        StartTimeoutTask();
-    }
-
-    public void StartTimeoutTask()
+    /// <summary>
+    ///     Fired whenever the player is unrendered from the game world. <para />
+    ///     Not linked to appearance alterations.
+    /// </summary>
+    private void ObjectUnrendered()
     {
         if (!IsRendered) return;
-        if (_timeoutTask is not null && !_timeoutTask.IsCompleted) return;
-
-        _timeoutCTS = _timeoutCTS.SafeCancelRecreate();
-        _timeoutTask = Task.Run(async () =>
-        {
-            // Await the proper delay for data removal.
-            await Task.Delay(TimeSpan.FromSeconds(10), _timeoutCTS.Token).ConfigureAwait(false);
-            Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} has been unrendered for 10s, reverting data.", LoggerType.PairHandler);
-            // Revert any applied data.
-            if (_tempProfile != Guid.Empty)
-            {
-                await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-                _tempProfile = Guid.Empty;
-            }
-            if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
-                await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
-
-            _appearanceData = null;
-            NameString = string.Empty;
-            // Notify the owner that we went poofy or whatever if we need to here.
-            Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} data has been reverted due to timeout.", LoggerType.PairHandler);
-        });
+        // Clear the GameData.
+        unsafe { _gameObject = null; }
+        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] unrendered!", LoggerType.PairHandler);
     }
 
-    public void StopTimeoutTask() => _timeoutCTS.SafeCancel();
+    /// <summary>
+    ///     Removes all cached alterations from the OwnedObject and reverts their state. <para />
+    ///     Different reverts will occur based on the rendered state.
+    /// </summary>
+    public async Task ClearAlterations()
+    {
+        // Regardless of rendered state, we should revert any C+ Data if we have any.
+        if (_tempProfile != Guid.Empty)
+        {
+            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            _tempProfile = Guid.Empty;
+        }
+
+        var isValid = !PlayerData.IsZoning && !PlayerData.InCutscene && IsRendered;
+
+        // Revert glamourer based on rendered state.
+        if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
+        {
+            if (isValid)
+                await _ipc.Glamourer.ReleaseActor(ObjIndex).ConfigureAwait(false);
+            else
+                await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
+        }
+
+        if (isValid)
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        // Clear out the alterations data (keep NameString alive so One-Time-Init does not re-fire.)
+        _appearanceData = null;
+    }
 
     public void ReapplyAlterations()
     {
@@ -155,7 +161,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         Logger.LogInformation($"Reapplied ({Sundesmo.GetNickAliasOrUid()})'s alterations.", LoggerType.PairHandler);
     }
 
-    // Thankfully only ever need to worry about cplus and glamourer here!.
+    // Thankfully only ever need to worry about CPlus and glamourer here!.
     public async Task ApplyIpcData(IpcDataUpdate newIpc)
     {
         // 0) Set initial data if none present.
@@ -215,19 +221,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task RevertAlterations(ushort objIdx)
-    {
-        if (Address == IntPtr.Zero) return;
-
-        Logger.LogDebug($"Reverting {NameString}'s alterations.", LoggerType.PairHandler);
-        if (_tempProfile != Guid.Empty)
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-        
-        await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
-        _ipc.Penumbra.RedrawGameObject(objIdx);
-    }
-
-    // NOTE: This can be very prone to crashing or inconsistant states!
+    // NOTE: This can be very prone to crashing or inconsistent states!
     // Please be sure to look into it and verify everything is correct!
     protected override void Dispose(bool disposing)
     {
@@ -260,19 +254,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     {
         try
         {
-            // revert glamourer by name.
-            if (!IsRendered && !string.IsNullOrEmpty(name))
-            {
-                Logger.LogTrace($"Reverting {name}(({nickAliasOrUid})'s actor state", LoggerType.PairHandler);
-                await _ipc.Glamourer.ReleaseByName(name).ConfigureAwait(false);
-            }
-
-            // Check for zone relative data.
-            if (!PlayerData.IsZoning && !PlayerData.InCutscene && IsRendered)
-            {
-                Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
-                await RevertAlterations(ObjIndex).ConfigureAwait(false);
-            }
+            await ClearAlterations().ConfigureAwait(false);
+            Logger.LogInformation($"Reverted {name}({nickAliasOrUid}) on shutdown.", LoggerType.PairHandler);
         }
         catch (Exception ex)
         {
@@ -281,9 +264,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         finally
         {
             // Clear internal data.
-            _timeoutCTS.SafeCancel();
-            _tempProfile = Guid.Empty;
-            _appearanceData = new();
             NameString = string.Empty;
             unsafe { _gameObject = null; }
         }

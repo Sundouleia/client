@@ -5,8 +5,10 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Common.Lua;
 using OtterGui;
 using Sundouleia.ModFiles;
+using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
@@ -19,13 +21,15 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
 {
     private readonly TransientResourceManager _transients;
     private readonly CharaObjectWatcher _watcher;
+    private readonly DistributionService _distributor;
 
     public DebugActiveStateUI(ILogger<DebugActiveStateUI> logger, SundouleiaMediator mediator,
-        TransientResourceManager transients, CharaObjectWatcher watcher) 
+        TransientResourceManager transients, CharaObjectWatcher watcher, DistributionService distributor)
         : base(logger, mediator, "Active State Debug")
     {
         _transients = transients;
         _watcher = watcher;
+        _distributor = distributor;
 
         IsOpen = true;
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
@@ -37,11 +41,34 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
+        if (ImGui.CollapsingHeader("Data Distributor"))
+            DrawDataDistributor();
+
         if (ImGui.CollapsingHeader("CharaObjectWatcher"))
             DrawWatcherInternals();
 
         if (ImGui.CollapsingHeader("Transient Resources"))
             DrawTransients();
+    }
+
+    private void DrawDataDistributor()
+    {
+        ImGui.Text("Updating Data: ");
+        ImGui.SameLine();
+        CkGui.IconText(_distributor.UpdatingData ? FAI.Check : FAI.Times, _distributor.UpdatingData ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+
+        ImGui.Text("Distributing Data: ");
+        ImGui.SameLine();
+        CkGui.IconText(_distributor.DistributingData ? FAI.Check : FAI.Times, _distributor.DistributingData ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+
+        ImGui.Text("NewVisibleUsers: ");
+        CkGui.ColorTextInline(string.Join(", ", _distributor.NewVisibleUsers.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+
+        ImGui.Text("InLimbo: ");
+        CkGui.ColorTextInline(string.Join(", ", _distributor.InLimbo.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+
+        ImGui.Text("For Update Push: ");
+        CkGui.ColorTextInline(string.Join(", ", _distributor.SundesmosForUpdatePush.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
     }
 
     private void DrawWatcherInternals()

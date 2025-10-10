@@ -7,14 +7,16 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
+using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
+using SundouleiaAPI.Hub;
 
 namespace Sundouleia.Services;
 
 /// <summary> 
 ///     Tracks when sundesmos go online/offline, and visible/invisible. <para />
 ///     Reliably tracks when offline/unrendered sundesmos are fully timed out or
-///     experiencing a breif reconnection / timeout, to prevent continuously redrawing data. <para />
+///     experiencing a brief reconnection / timeout, to prevent continuously redrawing data. <para />
 ///     This additionally handles updates regarding when we send out changes to other sundesmos.
 /// </summary>
 public sealed class DistributionService : DisposableMediatorSubscriberBase
@@ -26,6 +28,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     private readonly IpcManager _ipc;
     private readonly SundesmoManager _sundesmos;
     private readonly FileCacheManager _cacheManager;
+    private readonly FileUploader _fileUploader;
     private readonly TransientResourceManager _transients;
     private readonly CharaObjectWatcher _watcher;
 
@@ -44,7 +47,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     // however this would also push sundesmos out of sync and would need to be updated later anyways, so do not think it's worth.
     private ClientDataCache? _lastCreatedData = null;
 
-    // Latest private data state.
+    // Latest private data state. (move into last created character data later)
     private IpcDataPlayerCache _lastOwnIpc = new();
     private IpcDataCache _lastMinionMountIpc = new();
     private IpcDataCache _lastPetIpc = new();
@@ -67,58 +70,21 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _transients = transients;
         _watcher = watcher;
 
-        Mediator.Subscribe<SundesmoOffline>(this, msg => OnSundesmoDisconnected(msg.Sundesmo));
-
-        Mediator.Subscribe<SundesmoTimedOut>(this, msg => OnSundesmoTimedOut(msg.Handler));
-
-
-        Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => OnSundesmoRendered(msg.Handler));
-        Mediator.Subscribe<SundesmoPlayerUnrendered>(this, msg => OnSundesmoUnrendered(msg.Handler));
-
+        // Process sundesmo state changes.
+        Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => NewVisibleUsers.Add(msg.Handler.Sundesmo.UserData));
+        Mediator.Subscribe<SundesmoEnteredLimbo>(this, msg => InLimbo.Add(msg.Sundesmo.UserData));
+        Mediator.Subscribe<SundesmoLeftLimbo>(this, msg => InLimbo.Remove(msg.Sundesmo.UserData));
         // Process connections.
         Mediator.Subscribe<ConnectedMessage>(this, _ => OnHubConnected());
-        Mediator.Subscribe<DisconnectedMessage>(this, _ => NewVisible.Clear());
-
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => NewVisibleUsers.Clear());
+        // Process Update Checking.
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, _ => UpdateCheck());
     }
 
-    public List<UserData> NewVisibleNoLimbo => _sundesmos.GetVisibleConnected().Except(NewVisible).ToList();
-    public List<UserData> SundesmosForUpdatePush => _sundesmos.GetVisibleConnected().Except([.. InLimbo, .. NewVisible]).ToList();
-
-    public HashSet<UserData> NewVisible { get; private set; } = new();
+    public HashSet<UserData> NewVisibleUsers { get; private set; } = new();
     public HashSet<UserData> InLimbo { get; private set; } = new();
 
-    // If in limbo, then they should leave limbo upon DC.
-    private void OnSundesmoDisconnected(Sundesmo sundesmo)
-    {
-        // If this is true it means they were in limbo due to being unrendered but still online, and went offline, satisfying both conditions.
-        if (InLimbo.Remove(sundesmo.UserData))
-            return;
-        // Otherwise they have disconnected but are not in limbo, so we should add them into limbo.
-        Logger.LogDebug($"Sundesmo ({sundesmo.PlayerName}) disconnected while visible. Adding to limbo.", LoggerType.PairVisibility);
-        InLimbo.Add(sundesmo.UserData);
-    }
-    // If they were in limbo, they still have the latest data, so do nothing. Otherwise, add to new visible.
-    private void OnSundesmoRendered(PlayerHandler handler)
-    {
-        if (InLimbo.Remove(handler.Sundesmo.UserData)) return;
-        Logger.LogDebug($"Sundesmo {handler.Sundesmo.PlayerName} rendered, adding to new visible.", LoggerType.PairVisibility);
-        NewVisible.Add(handler.Sundesmo.UserData);
-    }
-
-    private void OnSundesmoUnrendered(PlayerHandler handler)
-    {
-        if (!handler.Sundesmo.IsOnline) return;
-        Logger.LogDebug($"Sundesmo {handler.Sundesmo.PlayerName} unrendered but is still online. Adding to limbo.", LoggerType.PairVisibility);
-        InLimbo.Add(handler.Sundesmo.UserData);
-    }
-
-    // Remove the sundesmo from the limbo hashset, so we send them a full update next time.
-    private void OnSundesmoTimedOut(PlayerHandler handler)
-    {
-        Logger.LogDebug($"Sundesmo {handler.Sundesmo.PlayerName} timed out, removing from limbo.", LoggerType.PairVisibility);
-        InLimbo.Remove(handler.Sundesmo.UserData);
-    }
+    public List<UserData> SundesmosForUpdatePush => _sundesmos.GetVisibleConnected().Except([.. InLimbo, .. NewVisibleUsers]).ToList();
 
     // Only entry point where we ignore timeout states.
     // If this gets abused through we can very easily add timeout functionality here too.
@@ -160,7 +126,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 Logger.LogDebug("Clearing limbo as we have a new state.");
                 InLimbo.Clear();
             }
-            NewVisible.Clear();
+            NewVisibleUsers.Clear();
             var visible = _sundesmos.GetVisibleConnected();
             await _hub.UserPushIpcFull(new(visible, modData, appearance)).ConfigureAwait(false);
             Logger.LogInformation($"Sent initial Ipc Cache to {visible.Count} users after reconnection. 0 Files needed uploading.");
@@ -171,20 +137,16 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     private void UpdateCheck()
     {
         // If there is anyone to push out updates to, do so.
-        if (NewVisible.Count is 0)
-            return;
+        if (NewVisibleUsers.Count is 0) return;
 
         // If we are zoning or not available, do not process any updates from us.
-        if (PlayerData.IsZoning || !PlayerData.Available || !MainHub.IsConnected)
-            return;
+        if (PlayerData.IsZoning || !PlayerData.Available || !MainHub.IsConnected) return;
 
         // Do not process the task if we are currently updating our latest data.
-        if (UpdatingData)
-            return;
+        if (UpdatingData) return;
 
         // If we are already distributing data, do not start another distribution.
-        if (_distributeDataTask is not null && !_distributeDataTask.IsCompleted)
-            return;
+        if (_distributeDataTask is not null && !_distributeDataTask.IsCompleted) return;
 
         // Process a distribution of full data to the newly visible users and then clear the update.
         // (we could use a semaphore here but can forget it for now.)
@@ -202,22 +164,37 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 CompanionChanges = _lastBuddyIpc.ToUpdateApi(),
             };
             // grab the new visible sundesmos not in limbo state.
-            var toSend = NewVisibleNoLimbo.ToList();
+            var toSend = NewVisibleUsers.ToList();
             if (InLimbo.Count is not 0)
             {
                 Logger.LogDebug("Clearing limbo as we have a new state.");
                 InLimbo.Clear();
             }
-            NewVisible.Clear();
+            NewVisibleUsers.Clear();
             // await the full send.
-            await _hub.UserPushIpcFull(new(toSend, modData, appearance)).ConfigureAwait(false);
-            Logger.LogInformation($"Full Ipc Cache sent to {toSend.Count} newly visible users. 0 Files needed uploading.");
-            // by this point we will have which files needed to be uploaded and we can handle that here.\
-            // best to as well, since we have the users to update.
-            // But if we do need to, we can file it off this task as fire-and-forget since it is just for these sundesmos.
+            var res = await _hub.UserPushIpcFull(new(toSend, modData, appearance)).ConfigureAwait(false);
+            if (res.ErrorCode is SundouleiaApiEc.Success)
+            {
+                Logger.LogInformation($"Full Ipc Cache sent to {toSend.Count} newly visible users. {res.Value!.Count} Files needed uploading.");
+                // The callback list contains the files that we need to process the uploads for.
+                // Handle as fire-and-forget so that we do not block the distribution task updates.
+                _ = Task.Run(() =>
+                {
+                    if (res.Value is null || res.Value.Count is 0)
+                        return;
 
-            // Remove the ones we sent the data to from the new visible list.
-            NewVisible.ExceptWith(toSend);
+                    // Upload the files and then send the remainder off to the file uploader.
+
+                    //var newToSend = await _fileUploader.UploadFiles(res.Value, toSend).ConfigureAwait(false);
+                    //if (newToSend.Count is 0)
+                    //    return;
+
+                    Logger.LogInformation($"Sending out uploaded remaining files to {toSend.Count} users.");
+                    // Send the remaining files off to the file uploader.
+                    // await _hub.UserPushIpcMods(new(toSend, newToSend)).ConfigureAwait(false);
+                });
+
+            }
         }, _distributeDataCTS.Token);
     }
 

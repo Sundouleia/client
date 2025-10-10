@@ -8,9 +8,7 @@ using SundouleiaAPI.Data;
 
 namespace Sundouleia.WebAPI.Files;
 
-// Appears to manage the uploading of files to the connected server using the FileTransferOrchestrator.
-// will be fastely simplified later.
-public sealed class FileUploadManager : DisposableMediatorSubscriberBase
+public sealed class FileUploader : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
     private readonly FileCacheManager _fileDbManager;
@@ -18,7 +16,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
     private readonly Dictionary<string, DateTime> _verifiedUploadedHashes = new(StringComparer.Ordinal);
     private CancellationTokenSource? _uploadCTS = new();
 
-    public FileUploadManager(ILogger<FileUploadManager> logger, SundouleiaMediator mediator,
+    public FileUploader(ILogger<FileUploader> logger, SundouleiaMediator mediator,
         MainConfig config, FileCacheManager fileDbManager) : base(logger, mediator)
     {
         _config = config;

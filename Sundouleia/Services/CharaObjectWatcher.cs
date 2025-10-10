@@ -83,7 +83,7 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         var sundesmoIdent = handler.Sundesmo.Ident;
         foreach (var addr in RenderedCharas)
         {
-            // Check via their hashed ident. If it doesnt match, skip.
+            // Check via their hashed ident. If it doesn't match, skip.
             var ident = SundouleiaSecurity.GetIdentHashByCharacterPtr(addr);
             if (ident != sundesmoIdent)
                 continue;
@@ -175,6 +175,7 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
             AddOwnedObject(OwnedObject.Companion, address);
             WatchedCompanionAddr = address;
         }
+        // Should PROBABLY ignore event NPC's lol. Idk though!
         else
         {
             // it is possible we may have difficulty assessing order priority of mediator calls here, if this is the case, 

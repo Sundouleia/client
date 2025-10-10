@@ -125,7 +125,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaWatcher>()
         .AddSingleton<FileCacheManager>()
         .AddSingleton<FileDownloader>()
-        .AddSingleton<FileUploadManager>()
+        .AddSingleton<FileUploader>()
         .AddSingleton<FileTransferOrchestrator>()
         .AddSingleton<FileCompactor>()
 
