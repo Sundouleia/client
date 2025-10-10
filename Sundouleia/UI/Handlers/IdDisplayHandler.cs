@@ -145,7 +145,7 @@ public class IdDisplayHandler
             playerText = pair.UserData.AliasOrUID;
         }
 
-        if (pair.PlayerRendered && !showUidInsteadOfName)
+        if (pair.IsRendered && !showUidInsteadOfName)
         {
             playerText = pair.PlayerName;
             textIsUid = false;

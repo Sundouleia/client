@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
+using static Lumina.Data.Parsing.Layer.LayerCommon;
 
 namespace Sundouleia.Pairs;
 
@@ -42,41 +43,22 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             {
                 // Ignore if already rendered.
                 if (msg.Address != nint.Zero) return;
-                // Ignore if the Player is not rendered.
-                if (!Sundesmo.PlayerRendered) return;
                 // Ignore if the address's OwnerId is not equal to the sundesmo's PlayerId.
                 if (((GameObject*)msg.Address)->OwnerId != Sundesmo.PlayerEntityId) return;
+                // Validate address match via helpers based on type.
+                var isMatch = ObjectType switch
+                {
+                    OwnedObject.MinionOrMount => Sundesmo.IsMountMinionAddress(msg.Address),
+                    OwnedObject.Pet => Sundesmo.IsPetAddress(msg.Address),
+                    OwnedObject.Companion => Sundesmo.IsCompanionAddress(msg.Address),
+                    _ => false
+                };
+                // Must be a valid match.
+                if (!isMatch) return;
 
-                // Now we must handle it based on if it is a mount/minion, pet, or companion.
-                var ownerChara = (BattleChara*)Sundesmo.GetAddress(OwnedObject.Player);
-                // Test for pet.
-                if (ObjectType is OwnedObject.MinionOrMount)
-                {
-                    var expectedAddr = (IntPtr)GameObjectManager.Instance()->Objects.IndexSorted[ownerChara->ObjectIndex + 1].Value;
-                    if (expectedAddr == msg.Address)
-                    {
-                        Logger.LogDebug($"Detected {Sundesmo.GetNickAliasOrUid()}'s Minion/Mount creation @ [{msg.Address:X}]", LoggerType.PairHandler);
-                        ObjectRendered((GameObject*)msg.Address);
-                    }
-                }
-                else if (ObjectType is OwnedObject.Pet)
-                {
-                    var expectedAddr = (IntPtr)CharacterManager.Instance()->LookupPetByOwnerObject(ownerChara);
-                    if (expectedAddr == msg.Address)
-                    {
-                        Logger.LogDebug($"Detected {Sundesmo.GetNickAliasOrUid()}'s Pet creation @ [{msg.Address:X}]", LoggerType.PairHandler);
-                        ObjectRendered((GameObject*)msg.Address);
-                    }
-                }
-                else if (ObjectType is OwnedObject.Companion)
-                {
-                    var expectedAddr = (IntPtr)CharacterManager.Instance()->LookupBuddyByOwnerObject(ownerChara);
-                    if (expectedAddr == msg.Address)
-                    {
-                        Logger.LogDebug($"Detected {Sundesmo.GetNickAliasOrUid()}'s Companion creation @ [{msg.Address:X}]", LoggerType.PairHandler);
-                        ObjectRendered((GameObject*)msg.Address);
-                    }
-                }
+                // If it is, log and render the object.
+                Logger.LogDebug($"Detected {Sundesmo.GetNickAliasOrUid()}'s {ObjectType} creation @ [{msg.Address:X}]", LoggerType.PairHandler);
+                ObjectRendered((GameObject*)msg.Address);
             });
 
             Mediator.Subscribe<WatchedObjectDestroyed>(this, msg =>
@@ -100,9 +82,11 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     public GameObject DataState { get { unsafe { return *_gameObject; } } }
     public unsafe IntPtr Address => (nint)_gameObject;
     public unsafe ushort ObjIndex => _gameObject->ObjectIndex;
-    public string ObjectName { get; private set; } = string.Empty; // Manually set so it can be used on timeouts.
+    public unsafe ulong EntityId => _gameObject->EntityId;
+    public unsafe ulong GameObjectId => _gameObject->GetGameObjectId().Id;
+    public string NameString { get; private set; } = string.Empty; // Manually set so it can be used on timeouts.
 
-    public bool IsOwnerValid => Sundesmo.PlayerRendered;
+    public bool IsOwnerValid => Sundesmo.IsRendered;
     public unsafe bool IsRendered => _gameObject != null;
 
     public unsafe void ObjectRendered(GameObject* obj)
@@ -115,7 +99,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
         // Init the object and set its name.
         _gameObject = obj;
-        ObjectName = obj->NameString;
+        NameString = obj->NameString;
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} rendered!", LoggerType.PairHandler);
     }
 
@@ -145,10 +129,10 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
                 _tempProfile = Guid.Empty;
             }
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
-                await _ipc.Glamourer.ReleaseByName(ObjectName).ConfigureAwait(false);
+                await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
 
             _appearanceData = null;
-            ObjectName = string.Empty;
+            NameString = string.Empty;
             // Notify the owner that we went poofy or whatever if we need to here.
             Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} data has been reverted due to timeout.", LoggerType.PairHandler);
         });
@@ -235,7 +219,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     {
         if (Address == IntPtr.Zero) return;
 
-        Logger.LogDebug($"Reverting {ObjectName}'s alterations.", LoggerType.PairHandler);
+        Logger.LogDebug($"Reverting {NameString}'s alterations.", LoggerType.PairHandler);
         if (_tempProfile != Guid.Empty)
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
         
@@ -249,7 +233,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     {
         base.Dispose(disposing);
         // store the name and address to reference removal properly.
-        var name = ObjectName;
+        var name = NameString;
         // If they were valid before, parse out the event message for their disposal.
         if (!string.IsNullOrWhiteSpace(name))
         {
@@ -300,7 +284,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             _timeoutCTS.SafeCancel();
             _tempProfile = Guid.Empty;
             _appearanceData = new();
-            ObjectName = string.Empty;
+            NameString = string.Empty;
             unsafe { _gameObject = null; }
         }
     }

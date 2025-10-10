@@ -1,6 +1,4 @@
-using MessagePack;
 using SundouleiaAPI.Data;
-using SundouleiaAPI.Enums;
 
 namespace Sundouleia.PlayerClient;
 
@@ -11,7 +9,7 @@ namespace Sundouleia.PlayerClient;
 public class ClientDataCache
 {
     // Key'd by mod hash.
-    public Dictionary<string, ModFileData> AppliedMods { get; set; } = new();
+    public Dictionary<string, ModFile> AppliedMods { get; set; } = new();
 
     public Dictionary<OwnedObject, string> GlamourerState { get; set; } = [];
     public Dictionary<OwnedObject, string> CPlusState { get; set; } = [];

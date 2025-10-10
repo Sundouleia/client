@@ -9,8 +9,11 @@ using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Comparer;
+using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
+using SundouleiaAPI.Util;
 using System.Diagnostics.CodeAnalysis;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Pairs;
 
@@ -18,11 +21,11 @@ namespace Sundouleia.Pairs;
 ///     Manager for paired connections. <para />
 ///     This also applies for temporary pairs.
 /// </summary>
-public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
+public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 {
     // concurrent dictionary of all paired paired to the client.
     private readonly ConcurrentDictionary<UserData, Sundesmo> _allSundesmos;
-    private readonly MainConfig _mainConfig;
+    private readonly MainConfig _config;
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoFactory _pairFactory;
 
@@ -38,28 +41,16 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     {
         _allSundesmos = new(UserDataComparer.Instance);
         _pairFactory = factory;
-        _mainConfig = config;
+        _config = config;
         _serverConfigs = serverConfigs;
+
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => OnClientDisconnected(_.WasHardDisconnect));
+
 
         Mediator.Subscribe<ConnectedMessage>(this, _ => _disconnectTimeoutCTS.SafeCancel());
         Mediator.Subscribe<ReconnectedMessage>(this, _ => _disconnectTimeoutCTS.SafeCancel());
-        Mediator.Subscribe<DisconnectedMessage>(this, _ => OnClientDisconnected());
         Mediator.Subscribe<CutsceneEndMessage>(this, _ => ReapplyAlterations());
-
-        Mediator.Subscribe<TargetSundesmoMessage>(this, (msg) =>
-        {
-            // Fail in pvp or when not rendered.
-            if (PlayerData.IsInPvP || !msg.Sundesmo.PlayerRendered)
-                return;
-            unsafe
-            {
-                if (config.Current.FocusTargetOverTarget)
-                    TargetSystem.Instance()->FocusTarget = (GameObject*)msg.Sundesmo.GetAddress(OwnedObject.Player);
-                else
-                    TargetSystem.Instance()->SetHardTarget((GameObject*)msg.Sundesmo.GetAddress(OwnedObject.Player));
-            }
-        });
-
+        Mediator.Subscribe<TargetSundesmoMessage>(this, (msg) => TargetSundesmo(msg.Sundesmo));
 
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
         Svc.ContextMenu.OnMenuOpened += OnOpenContextMenu;
@@ -69,10 +60,10 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     {
         Logger.LogInformation("Opening Pair Context Menu of type "+args.MenuType, LoggerType.PairManagement);
         if (args.MenuType is ContextMenuType.Inventory) return;
-        if (!_mainConfig.Current.ShowContextMenus) return;
+        if (!_config.Current.ShowContextMenus) return;
         if (args.Target is not MenuTargetDefault target || target.TargetObjectId == 0) return;
         // Find the sundesmo that matches this and display the results.
-        if (DirectPairs.FirstOrDefault(p => p.PlayerRendered && p.PlayerObjectId == target.TargetObjectId && !p.IsPaused) is not { } match)
+        if (DirectPairs.FirstOrDefault(p => p.IsRendered && p.PlayerObjectId == target.TargetObjectId && !p.IsPaused) is not { } match)
             return;
 
         Logger.LogDebug($"Found matching pair for context menu: {match.GetNickAliasOrUid()}", LoggerType.PairManagement);
@@ -141,12 +132,9 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     }
 
     /// <summary>
-    ///     Whenever the client disconnects from the server we should run this function. <para />
-    ///     This will assign a timeout task to wait for 15s before disposing of all handled data. <para />
-    ///     Should the client reconnect before timeout, cancel the await and keep all data intext. <para />
-    ///     Once the delay expires, run a disposal of all data.
+    ///     TBD...
     /// </summary>
-    public void OnClientDisconnected()
+    public void OnClientDisconnected(bool wasHardDisconnect)
     {
         Logger.LogInformation("Client disconnected, starting disconnect timeout.", LoggerType.PairManagement);
         _disconnectTimeoutCTS = _disconnectTimeoutCTS.SafeCancelRecreate();
@@ -196,31 +184,43 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     }
 
     /// <summary> 
-    ///     Mark a stored sundesmo as online, applying their <see cref="OnlineUser"/> DTO.
+    ///     A Sundesmo has just come online. We should mark this, and also run a check for
+    ///     player visibility against the Sundouleia Object Watcher. <para />
+    ///     
+    ///     NOTE: This does not mean the player is visible, only that they are connected.
     /// </summary>
     public void MarkSundesmoOnline(OnlineUser dto, bool notify = true)
     {
+        // Attempt to get the sundesmo via the UserData.
         if (!_allSundesmos.TryGetValue(dto.User, out var sundesmo))
             throw new InvalidOperationException($"No user found [{dto}]");
-        // Refresh their profile data.
+        
+        // They were found, so refresh any existing profile data.
         Mediator.Publish(new ClearProfileDataMessage(dto.User));
+
+        // If they were already online, we should log a error for this and recreate
+        // (( This should never occur with Sundouleia ))
         if (sundesmo.IsOnline)
         {
-            Logger.LogWarning($"Pair [{dto.User.AliasOrUID}] is already marked online. Recreating direct pairs.", LoggerType.PairManagement);
+            Logger.LogError($"Sundesmo [{dto.User.AliasOrUID}] is already marked online. Recreating.");
             RecreateLazy();
             return;
         }
 
         // Init the proper first-time online message.
-        if (notify && _mainConfig.Current.NotifyForOnlinePairs && (_mainConfig.Current.NotifyLimitToNickedPairs && !string.IsNullOrEmpty(sundesmo.GetNickname())))
+        if (notify && _config.Current.OnlineNotifications)
         {
             var nick = sundesmo.GetNickname();
-            var msg = !string.IsNullOrEmpty(sundesmo.GetNickname())
-                ? $"{nick} ({dto.User.AliasOrUID}) is now online" : $"{dto.User.AliasOrUID} is now online";
-            Mediator.Publish(new NotificationMessage("User Online", msg, NotificationType.Info, TimeSpan.FromSeconds(2)));
+            // Do not show if we limit it to nicked pairs and there is no nickname.
+            if (!(_config.Current.NotifyLimitToNickedPairs && string.IsNullOrEmpty(nick)))
+            {
+                var msg = !string.IsNullOrEmpty(nick) ? $"{nick} ({dto.User.AliasOrUID}) is now online" : $"{dto.User.AliasOrUID} is now online";
+                Mediator.Publish(new NotificationMessage("Sundesmo Online", msg, NotificationType.Info, TimeSpan.FromSeconds(2)));
+            }
         }
 
         Logger.LogTrace($"Marked {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()}) as online", LoggerType.PairManagement);
+        // Mark online internally, and then recreate the whitelist display.
         sundesmo.MarkOnline(dto);
         RecreateLazy();
     }
@@ -261,6 +261,18 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
             pair.ReapplyAlterations();
     }
 
+    private void TargetSundesmo(Sundesmo s)
+    {
+        if (PlayerData.IsInPvP || !s.IsRendered) return;
+        unsafe
+        {
+            if (_config.Current.FocusTargetOverTarget)
+                TargetSystem.Instance()->FocusTarget = (GameObject*)s.PlayerAddress;
+            else
+                TargetSystem.Instance()->SetHardTarget((GameObject*)s.PlayerAddress);
+        }
+    }
+
     private void RecreateLazy()
     {
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
@@ -282,18 +294,18 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     ///     The number of sundesmos that are in our render range. <para />
     ///     NOTE: This does not mean that they have applied data!
     /// </summary>
-    public int GetVisibleCount() => _allSundesmos.Count(p => p.Value.PlayerRendered);
+    public int GetVisibleCount() => _allSundesmos.Count(p => p.Value.IsRendered);
 
     /// <summary>
     ///     Get the <see cref="UserData"/> for all rendered sundesmos. <para />
     ///     <b>NOTE: It is possible for a visible sundesmos to be offline!</b>
     /// </summary>
-    public List<UserData> GetVisible() => _allSundesmos.Where(p => p.Value.PlayerRendered).Select(p => p.Key).ToList();
+    public List<UserData> GetVisible() => _allSundesmos.Where(p => p.Value.IsRendered).Select(p => p.Key).ToList();
 
     /// <summary>
     ///     Get the <see cref="UserData"/> for all rendered sundesmos that are connected.
     /// </summary>
-    public List<UserData> GetVisibleConnected() => _allSundesmos.Where(p => p.Value.PlayerRendered && p.Value.IsOnline).Select(p => p.Key).ToList();
+    public List<UserData> GetVisibleConnected() => _allSundesmos.Where(p => p.Value.IsRendered && p.Value.IsOnline).Select(p => p.Key).ToList();
 
     /// <summary>
     ///     If a Sundesmo exists given their UID.
@@ -316,4 +328,134 @@ public sealed partial class SundesmoManager : DisposableMediatorSubscriberBase
     public Sundesmo? GetUserOrDefault(UserData user) => _allSundesmos.TryGetValue(user, out var sundesmo) ? sundesmo : null;
 
     #endregion Manager Helpers
+
+    #region Updates
+    // Should happen only on initial loads.
+    public void ReceiveIpcUpdateFull(UserData target, NewModUpdates newModData, VisualUpdate newIpc)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod and appearance data!", LoggerType.Callbacks);
+        sundesmo.ApplyFullData(newModData, newIpc);
+    }
+
+    // Happens whenever mods should be added or removed.
+    public void ReceiveIpcUpdateMods(UserData target, NewModUpdates newModData)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod data!", LoggerType.Callbacks);
+        sundesmo.ApplyModData(newModData);
+    }
+
+    // Happens whenever non-mod visuals are updated.
+    public void ReceiveIpcUpdateOther(UserData target, VisualUpdate newIpc)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s appearance data updated!", LoggerType.Callbacks);
+        sundesmo.ApplyIpcData(newIpc);
+    }
+
+    // Happens whenever a single non-mod appearance item is updated.
+    public void ReceiveIpcUpdateSingle(UserData target, OwnedObject relatedObject, IpcKind type, string newData)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s [{relatedObject}] updated its [{type}] data!", LoggerType.Callbacks);
+        sundesmo.ApplyIpcSingle(relatedObject, type, newData);
+    }
+
+    // A pair updated one of their global permissions, so handle the change properly.
+    public void PermChangeGlobal(UserData target, string permName, object newValue)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        // Fail if the change could not be properly set.
+        if (!PropertyChanger.TrySetProperty(sundesmo.PairGlobals, permName, newValue, out var finalVal) || finalVal is null)
+            throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
+
+        // Log change and lazily recreate the pairlist.
+        Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s GlobalPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
+        RecreateLazy();
+    }
+
+    public void PermChangeGlobal(UserData target, GlobalPerms newGlobals)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        // cache prev globals and update them.
+        var prevGlobals = sundesmo.PairGlobals with { };
+        sundesmo.UserPair.Globals = newGlobals;
+
+        // Log change and recreate the pair list.
+        Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s GlobalPerms updated in bulk]", LoggerType.PairDataTransfer);
+        RecreateLazy();
+    }
+
+    public void PermChangeUnique(UserData target, string permName, object newValue)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        // If we need to cache the previous state of anything here do so.
+        var prevPause = sundesmo.OwnPerms.PauseVisuals;
+
+        // Perform change.
+        if (!PropertyChanger.TrySetProperty(sundesmo.OwnPerms, permName, newValue, out var finalVal) || finalVal is null)
+            throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
+
+        // Log change and recreate the pair list.
+        Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s OwnPairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
+        RecreateLazy();
+
+        // Clear profile is pause toggled.
+        if (prevPause != sundesmo.OwnPerms.PauseVisuals)
+            Mediator.Publish(new ClearProfileDataMessage(target));
+    }
+
+    public void PermChangeUniqueOther(UserData target, string permName, object newValue)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        // If we need to cache the previous state of anything here do so.
+        var prevPause = sundesmo.PairPerms.PauseVisuals;
+
+        if (!PropertyChanger.TrySetProperty(sundesmo.PairPerms, permName, newValue, out var finalVal) || finalVal is null)
+            throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
+
+        Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s PairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
+        RecreateLazy();
+
+        // Toggle pausing if pausing changed.
+        if (prevPause != sundesmo.PairPerms.PauseVisuals)
+            Mediator.Publish(new ClearProfileDataMessage(target));
+    }
+
+    public void PermBulkChangeUnique(UserData target, PairPerms newPerms)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        // cache prev state and update them.
+        var prevPerms = sundesmo.OwnPerms with { };
+        sundesmo.UserPair.OwnPerms = newPerms;
+
+        // Log and recreate the pair list.
+        Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s OwnPerms updated in bulk.]", LoggerType.PairDataTransfer);
+        RecreateLazy();
+
+        // Clear profile if pausing changed.
+        if (prevPerms.PauseVisuals != newPerms.PauseVisuals)
+            Mediator.Publish(new ClearProfileDataMessage(target));
+    }
+
+    #endregion Updates
 }

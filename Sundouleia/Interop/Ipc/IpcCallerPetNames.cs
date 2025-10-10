@@ -159,7 +159,7 @@ public sealed class IpcCallerPetNames : IIpcCaller
         if (!APIAvailable || handler.Address == IntPtr.Zero) return;
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            _logger.LogTrace($"Clearing Nicknames from {handler.PlayerName}'s pets!");
+            _logger.LogTrace($"Clearing Nicknames from {handler.NameString}'s pets!");
             ClearNicknameData.InvokeAction(handler.ObjIndex);
         }).ConfigureAwait(false);
     }

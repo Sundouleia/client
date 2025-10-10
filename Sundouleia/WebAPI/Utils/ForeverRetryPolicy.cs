@@ -38,12 +38,12 @@ public class ForeverRetryPolicy : IRetryPolicy
         // otherwise, if we are still waiting
         else
         {
-            // if we havent sent a disconnected message yet, send one
+            // if we haven't sent a disconnected message yet, send one
             if (!_sentDisconnected)
             {
                 // send a disconnected message
                 _mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to server", NotificationType.Warning, TimeSpan.FromSeconds(10)));
-                _mediator.Publish(new DisconnectedMessage());
+                _mediator.Publish(new DisconnectedMessage(false));
             }
             // set the sent disconnected flag to true
             _sentDisconnected = true;

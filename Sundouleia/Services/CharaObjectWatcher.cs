@@ -68,43 +68,59 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     }
 
     /// <summary>
-    ///     Checks against <see cref="RenderedCharas"/> to see if the character is rendered.
-    ///     If so, enacts the handler to create the object.
+    ///     Determine if the Sundesmo PlayerHandler is currently rendered. <para />
+    ///     Intended to help with object initialization via Sundesmo creation.
     /// </summary>
-    public void CheckForExisting(PlayerHandler handler)
+    /// <returns> True if a match was found, false otherwise. If false, output is <see cref="IntPtr.Zero"/> </returns>
+    public bool TryGetExisting(PlayerHandler handler, out IntPtr address)
     {
+        address = IntPtr.Zero;
+        // Fail if the address already exists.
         if (handler.Address != IntPtr.Zero)
-            return;
+            return false;
 
+        // Grab the Ident, and then run a check against all rendered characters.
         var sundesmoIdent = handler.Sundesmo.Ident;
         foreach (var addr in RenderedCharas)
         {
+            // Check via their hashed ident. If it doesnt match, skip.
             var ident = SundouleiaSecurity.GetIdentHashByCharacterPtr(addr);
             if (ident != sundesmoIdent)
                 continue;
-            handler.ObjectRendered((Character*)addr);
-            break;
+
+            // Ident match found, so call the handlers object rendered method.
+            address = addr;
+            return true;
         }
+        return false;
     }
 
-    public void CheckForExisting(PlayerOwnedHandler handler)
+    /// <summary>
+    ///     Determine if one of the sundesmo's OwnedObjects is currently rendered. <para />
+    ///     Intended to help with object initialization via Sundesmo creation.
+    /// </summary>
+    /// <returns> True if a match was found, false otherwise. If false, output is <see cref="IntPtr.Zero"/> </returns>
+    public bool TryGetExisting(PlayerOwnedHandler handler, out IntPtr address)
     {
-        // if the owner is not rendered there is no point in checking.
-        if (!handler.Sundesmo.PlayerRendered || handler.Address != IntPtr.Zero)
-            return;
+        address = IntPtr.Zero;
+        // Must be valid.
+        if (!handler.Sundesmo.IsRendered || handler.Address != IntPtr.Zero)
+            return false;
 
-        var addresses = handler.ObjectType is OwnedObject.Companion 
-            ? RenderedCompanions : RenderedCharas;
-        // check all for parent relation
+        // Get the known addresses of the type we are looking for.
+        var known = handler.ObjectType is OwnedObject.Companion ? RenderedCompanions : RenderedCharas;
         var parentId = handler.Sundesmo.PlayerEntityId;
-        foreach (var addr in addresses)
+
+        // Check against all known addresses.
+        foreach (var addr in known)
         {
             if (((GameObject*)addr)->OwnerId != parentId)
                 continue;
 
-            handler.ObjectRendered((GameObject*)addr);
-            break;
+            address = addr;
+            return true;
         }
+        return false;
     }
 
     public nint FromOwned(OwnedObject kind)

@@ -98,7 +98,7 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
             => !u.IsOnline || u.UserPair.OwnPerms.PauseVisuals;
         // collect the sorted list
         List<Sundesmo> BasicSortedList(IEnumerable<Sundesmo> u)
-            => u.OrderByDescending(u => u.PlayerRendered)
+            => u.OrderByDescending(u => u.IsRendered)
                 .ThenByDescending(u => u.IsOnline)
                 .ThenBy(AlphabeticalSort, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -108,8 +108,8 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         // if we wish to display our visible users separately, then do so.
         if (_config.Current.ShowVisibleUsersSeparately)
         {
-            var allVisiblePairs = ImmutablePairList(allPairs.Where(u => u.PlayerRendered && u.IsOnline));
-            var filteredVisiblePairs = BasicSortedList(filteredPairs.Where(u => u.PlayerRendered && u.IsOnline));
+            var allVisiblePairs = ImmutablePairList(allPairs.Where(u => u.IsRendered && u.IsOnline));
+            var filteredVisiblePairs = BasicSortedList(filteredPairs.Where(u => u.IsRendered && u.IsOnline));
             drawFolders.Add(_factory.CreateDrawTagFolder(Constants.CustomVisibleTag, filteredVisiblePairs, allVisiblePairs));
         }
 

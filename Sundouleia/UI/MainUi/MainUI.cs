@@ -332,7 +332,7 @@ public class MainUI : WindowMediatorSubscriberBase
                         // If we are connected, we want to disconnect.
                         _serverConfigs.AccountStorage.FullPause = true;
                         _serverConfigs.Save();
-                        _ = _hub.Disconnect(ServerState.Disconnected);
+                        _ = _hub.Disconnect(ServerState.Disconnected, false);
                     }
                     else if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                     {

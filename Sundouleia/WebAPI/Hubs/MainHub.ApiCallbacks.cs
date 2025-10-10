@@ -60,11 +60,11 @@ public partial class MainHub
                 _serverConfigs.AccountStorage.FullPause = true;
                 _serverConfigs.Save();
                 _suppressNextNotification = true;
-                // create a new connection to force the disconnect.
-                await Disconnect(ServerState.Disconnected).ConfigureAwait(false);
-                // because this is a forced reconnection, clear our token cache between, incase we were banned.
+                // If forcing a hard reconnect, fully unload the client & their sundesmos.
+                await Disconnect(ServerState.Disconnected, true).ConfigureAwait(false);
+                // Clear our token cache between, incase we were banned.
                 _tokenProvider.ResetTokenCache();
-                // after it stops, switch the connection pause back to false and create a new connection.
+                // Revert full pause status and create a new connection.
                 _serverConfigs.AccountStorage.FullPause = false;
                 _serverConfigs.Save();
                 _suppressNextNotification = true;

@@ -28,6 +28,10 @@ public class ConfigStorage
     // could add variables for the transfer bars but Idk if I really want to bother
     // with this, or if we even can detect it with our system we are developing.
 
+    // Used to retain compatibility with existing (M)CDF export logic.
+    public string ExportFolderCDF { get; set; } = string.Empty;
+
+
     // Radar Preferences
     public bool RadarSendPings { get; set; } = false; // If others can send you requests vis context menus.
     public bool RadarNearbyDtr { get; set; } = true;
@@ -42,6 +46,7 @@ public class ConfigStorage
     public bool AllowNSFW { get; set; } = false;
     public float ProfileDelay { get; set; } = 1.5f;
 
+
     // pair listing preferences. This will have a long overhaul, as preferences
     // will mean very little once we can make custom group containers.
     public bool PreferNicknamesOverNames { get; set; } = false;
@@ -51,8 +56,7 @@ public class ConfigStorage
     public bool FocusTargetOverTarget { get; set; } = false;
 
     // Notification preferences
-    public bool NotifyForConnections { get; set; } = true;
-    public bool NotifyForOnlinePairs { get; set; } = true;
+    public bool OnlineNotifications { get; set; } = true;
     public bool NotifyLimitToNickedPairs { get; set; } = false;
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;

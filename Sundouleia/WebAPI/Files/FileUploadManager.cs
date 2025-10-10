@@ -64,15 +64,11 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         await Task.Delay(1).ConfigureAwait(false);
     }
 
-    // Passes in a single ModFileInfo containing the hash and replacement data.
-    // makes a request to upload said files contents.
-    // this is a WIP as we still need to restructure file transfer. The end goal is that this returns the download link, or it doesnt?
-    // point being this operation is just to upload the file conetents. If it does or doesnt return the download link changes if we use it or not when
-    // we send the remaining files to sync in post from this method.
-    public async Task<ModFileData> UploadFiles(ModFileInfo modFileInfo)
+    // Uploads the files returned by the server that were not yet uploaded after sending a mod file transfer dto.
+    // The provided verified mod files contain the authorized upload links needed to upload the remaining files.
+    public async Task UploadFiles(List<VerifiedModFile> filesToUpload)
     {
         await Task.Delay(1).ConfigureAwait(false);
-        return new ModFileData(modFileInfo.Hash, modFileInfo.GamePaths, modFileInfo.SwappedPath, "NULL");
     }
 
     // Inner file upload. Should contain the compressed data that we are doing to upload. WIP.

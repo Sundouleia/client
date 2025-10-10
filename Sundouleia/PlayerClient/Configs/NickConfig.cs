@@ -52,7 +52,7 @@ public class NickConfig : IHybridSavable
         switch (version)
         {
             case 0:
-                LoadV0(jObject["Nicknames "]);
+                LoadV0(jObject["Nicknames"]);
                 break;
             default:
                 _logger.LogError("Invalid Version!");

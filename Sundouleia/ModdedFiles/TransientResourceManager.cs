@@ -123,7 +123,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     public void DrawTransientResources()
     {
-        using var node = ImRaii.TreeNode($"Transient Resources");
+        using var node = ImRaii.TreeNode($"Transient Resources##transient-resource-info");
         if (!node) return;
 
         using var table = ImRaii.Table("transientResources", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
@@ -145,10 +145,10 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     public void DrawPersistantTransients()
     {
-        using var node = ImRaii.TreeNode($"Semi-Transient Resources");
+        using var node = ImRaii.TreeNode($"Persistant-Transients##persistant-transients-info");
         if (!node) return;
 
-        using var table = ImRaii.Table("semitransientResources", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        using var table = ImRaii.Table("persistant-transients", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
         if (!table) return;
 
         ImGui.TableSetupColumn("OwnedObject");

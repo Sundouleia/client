@@ -79,7 +79,7 @@ public class DrawUserPair
             CkGui.IconText(FAI.User);
             userPairText = $"{_pair.GetNickAliasOrUid()} is offline";
         }
-        else if (_pair.PlayerRendered)
+        else if (_pair.IsRendered)
         {
             CkGui.IconText(FAI.Eye, ImGuiColors.ParsedGreen);
             userPairText = $"{_pair.GetNickAliasOrUid()} is visible ({_pair.PlayerName})--SEP--Click to target this player";

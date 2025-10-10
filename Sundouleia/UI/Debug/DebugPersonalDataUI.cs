@@ -5,15 +5,16 @@ using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Common.Lua;
+using OtterGui;
+using OtterGui.Extensions;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
-using SundouleiaAPI.Data.Permissions;
-using OtterGui;
-using OtterGui.Extensions;
-using System.Collections.Immutable;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data.Permissions;
+using System.Collections.Immutable;
 
 namespace Sundouleia.Gui;
 
@@ -29,7 +30,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
         // Ensure the list updates properly.
         Mediator.Subscribe<RefreshWhitelistMessage>(this, _ => UpdateList());
 
-        // IsOpen = true;
+        IsOpen = true;
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
     }
 
@@ -59,7 +60,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
 
         // Take the remaining filtered list, and sort it.
         _immutablePairs = filteredPairs
-            .OrderByDescending(u => u.PlayerRendered)
+            .OrderByDescending(u => u.IsRendered)
             .ThenByDescending(u => u.IsOnline)
             .ThenBy(pair => !pair.PlayerName.IsNullOrEmpty()
                 ? (_config.Current.PreferNicknamesOverNames ? pair.GetNickAliasOrUid() : pair.PlayerName)
@@ -93,72 +94,58 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
 
     private void OwnData()
     {
-        DrawGlobalPermissions("Player", MainHub.ConnectionResponse?.GlobalPerms ?? new());
+        DrawOwnGlobals();
     }
 
-    private void DrawPairData(Sundesmo pair, float width)
+    private void DrawPairData(Sundesmo sundesmo, float width)
     {
-        var nick = pair.GetNickAliasOrUid();
+        var nick = sundesmo.GetNickAliasOrUid();
         using var node = ImRaii.TreeNode($"{nick}'s Pair Info");
         if (!node) return;
 
-        ImGui.Text($"Player Name: {pair.PlayerName}");
-        ImGui.Text($"Player Rendered: {pair.PlayerRendered}");
-        if (pair.PlayerRendered)
-        {
-            ImGui.Text($"Player EntityId: {pair.PlayerEntityId}");
-            ImGui.Text($"Player ObjectId: {pair.PlayerObjectId}");
-        }
-        ImGui.Text($"Mount/Minion Rendered: {pair.MountMinionRendered}");
-        ImGui.Text($"Pet Rendered: {pair.PetRendered}");
-        ImGui.Text($"Companion Rendered: {pair.CompanionRendered}");
-        ImGui.Text($"Is Online: {pair.IsOnline}");
-        ImGui.Text($"Is Temporary: {pair.IsTemporary}");
-        ImGui.Text($"Is Paused: {pair.IsPaused}");
-        ImGui.Text($"Identifier: {pair.Ident}");
-        ImGui.Text($"UID: {pair.UserData.UID}");
-        ImGui.Text($"Alias: {pair.UserData.Alias}");
+        DrawSundesmoInfo(sundesmo);
+        sundesmo.DrawRenderDebug(); 
+        
+        DrawGlobalPermissions(sundesmo);
+        DrawPairPerms(sundesmo);
+        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
+    }
 
-        DrawPairPerms(nick, pair);
-        DrawGlobalPermissions(pair.UserData.UID + "'s Global Perms", pair.PairGlobals);
-        ImGui.Separator();
+    private void DrawIconBoolColumn(bool value)
+    {
+        ImGui.TableNextColumn();
+        CkGui.IconText(value ? FAI.Check : FAI.Times, value ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
     }
 
 
     private void DrawPermissionRowBool(string name, bool value)
     {
         ImGuiUtil.DrawTableColumn(name);
+        DrawIconBoolColumn(value);
+    }
+
+    private void DrawPermissionRowString(string name, string value)
+    {
+        ImGuiUtil.DrawTableColumn(name);
         ImGui.TableNextColumn();
-        CkGui.IconText(value ? FAI.Check : FAI.Times, value ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        ImGui.TableNextRow();
+        ImGui.Text(value);
     }
 
     private void DrawUserPermRowBool(string name, bool valueOwn, bool valueOther)
     {
         ImGuiUtil.DrawTableColumn(name);
-        ImGui.TableNextColumn();
-        CkGui.IconText(valueOwn ? FAI.Check : FAI.Times, valueOwn ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        ImGui.TableNextColumn();
-        CkGui.IconText(valueOther ? FAI.Check : FAI.Times, valueOther ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        ImGui.TableNextRow();
+        DrawIconBoolColumn(valueOwn);
+        DrawIconBoolColumn(valueOther);
     }
 
-    private void DrawUserPermRowString(string name, string valueOwn, string valueOther)
+    private void DrawOwnGlobals()
     {
-        ImGuiUtil.DrawTableColumn(name);
-        ImGuiUtil.DrawTableColumn(valueOwn);
-        ImGuiUtil.DrawTableColumn(valueOther);
-        ImGui.TableNextRow();
-    }
-
-    private void DrawGlobalPermissions(string uid, GlobalPerms perms)
-    {
-        using var nodeMain = ImRaii.TreeNode(uid + " Global Perms");
+        using var nodeMain = ImRaii.TreeNode($"Globals##player-Globals");
         if (!nodeMain) return;
 
-        try
+        var perms = MainHub.GlobalPerms;
+        using (var table = ImRaii.Table("##debug-global-player", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
-            using var table = ImRaii.Table("##debug-global" + uid, 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
             if (!table) return;
             ImGui.TableSetupColumn("Permission");
             ImGui.TableSetupColumn("Value");
@@ -168,29 +155,80 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
             DrawPermissionRowBool("Default Allow Sounds", perms.DefaultAllowSounds);
             DrawPermissionRowBool("Default Allow Vfx", perms.DefaultAllowVfx);
         }
-        catch (Bagagwa e)
+        ImGui.Separator();
+    }
+
+
+    private void DrawGlobalPermissions(Sundesmo s)
+    {
+        using var nodeMain = ImRaii.TreeNode($"Globals##{s.UserData.UID}-Globals");
+        if (!nodeMain) return;
+
+        var perms = s.PairGlobals;
+        using (var table = ImRaii.Table("##debug-global" + s.UserData.UID, 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
-            _logger.LogError($"Error while drawing global permissions for {uid}: {e.Message}");
+            if (!table) return;
+            ImGui.TableSetupColumn("Permission");
+            ImGui.TableSetupColumn("Value");
+            ImGui.TableHeadersRow();
+
+            DrawPermissionRowBool("Default Allow Animations", perms.DefaultAllowAnimations);
+            DrawPermissionRowBool("Default Allow Sounds", perms.DefaultAllowSounds);
+            DrawPermissionRowBool("Default Allow Vfx", perms.DefaultAllowVfx);
         }
     }
 
-    private void DrawPairPerms(string label, Sundesmo k)
+    private void DrawPairPerms(Sundesmo s)
     {
-        using var nodeMain = ImRaii.TreeNode($"{label}'s Pair Permissions");
+        using var nodeMain = ImRaii.TreeNode($"PairPerms##{s.UserData.UID}-pairperms");
         if (!nodeMain) return;
 
-        using var table = ImRaii.Table("##debug-pair" + k.UserData.UID, 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
-        ImGui.TableSetupColumn("Permission");
-        ImGui.TableSetupColumn("Own Setting");
-        ImGui.TableSetupColumn($"{label}'s Setting");
-        ImGui.TableHeadersRow();
+        using (var table = ImRaii.Table("##debug-pair" + s.UserData.UID, 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        {
+            if (!table) return;
+            ImGui.TableSetupColumn("Permission");
+            ImGui.TableSetupColumn("Own Setting");
+            ImGui.TableSetupColumn($"{s.GetNickAliasOrUid()}'s Setting");
+            ImGui.TableHeadersRow();
 
-        DrawUserPermRowBool("Is Paused", k.OwnPerms.PauseVisuals, k.PairPerms.PauseVisuals);
-        ImGui.TableNextRow();
+            DrawUserPermRowBool("Is Paused", s.OwnPerms.PauseVisuals, s.PairPerms.PauseVisuals);
+            DrawUserPermRowBool("Allows Animations", s.OwnPerms.AllowAnimations, s.PairPerms.AllowAnimations);
+            DrawUserPermRowBool("Allows Sounds", s.OwnPerms.AllowSounds, s.PairPerms.AllowSounds);
+            DrawUserPermRowBool("Allows Vfx", s.OwnPerms.AllowVfx, s.PairPerms.AllowVfx);
+        }
+    }
 
-        DrawUserPermRowBool("Allows Animations", k.OwnPerms.AllowAnimations, k.PairPerms.AllowAnimations);
-        DrawUserPermRowBool("Allows Sounds", k.OwnPerms.AllowSounds, k.PairPerms.AllowSounds);
-        DrawUserPermRowBool("Allows Vfx", k.OwnPerms.AllowVfx, k.PairPerms.AllowVfx);
-        ImGui.TableNextRow();
+    private void DrawSundesmoInfo(Sundesmo s)
+    {
+        using (var t = ImRaii.Table("##debug-info" + s.UserData.UID, 9, ImGuiTableFlags.SizingFixedFit))
+        {
+            if (!t) return;
+
+            ImGui.TableSetupColumn("Nickname");
+            ImGui.TableSetupColumn("Alias");
+            ImGui.TableSetupColumn("UID");
+            ImGui.TableSetupColumn("IsTemp");
+            ImGui.TableSetupColumn("Paused");
+            ImGui.TableSetupColumn("Reloading");
+            ImGui.TableSetupColumn("Online");
+            ImGui.TableSetupColumn("Visible");
+            ImGui.TableSetupColumn("Chara Ident");
+            ImGui.TableHeadersRow();
+
+            ImGui.TableNextColumn();
+            CkGui.ColorText(s.GetNickname() ?? "(None Set)", ImGuiColors.DalamudViolet);
+            ImGui.TableNextColumn();
+            if (s.UserData.Alias is not null)
+                CkGui.ColorText(s.UserData.Alias, ImGuiColors.DalamudViolet);
+            ImGui.TableNextColumn();
+            CkGui.ColorText(s.UserData.UID, ImGuiColors.DalamudViolet);
+
+            DrawIconBoolColumn(s.IsTemporary);
+            DrawIconBoolColumn(s.IsPaused);
+            DrawIconBoolColumn(s.IsReloading);
+            DrawIconBoolColumn(s.IsOnline);
+            DrawIconBoolColumn(s.IsRendered);
+            ImGuiUtil.DrawFrameColumn(s.Ident);
+        }
     }
 }

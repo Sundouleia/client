@@ -45,7 +45,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     private ClientDataCache? _lastCreatedData = null;
 
     // Latest private data state.
-    private List<string> _lastSentModHashes = [];
     private IpcDataPlayerCache _lastOwnIpc = new();
     private IpcDataCache _lastMinionMountIpc = new();
     private IpcDataCache _lastPetIpc = new();
@@ -68,11 +67,13 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _transients = transients;
         _watcher = watcher;
 
-        Mediator.Subscribe<SundesmoOnline>(this, msg => OnSundesmoConnected(msg.Sundesmo));
         Mediator.Subscribe<SundesmoOffline>(this, msg => OnSundesmoDisconnected(msg.Sundesmo));
+
+        Mediator.Subscribe<SundesmoTimedOut>(this, msg => OnSundesmoTimedOut(msg.Handler));
+
+
         Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => OnSundesmoRendered(msg.Handler));
         Mediator.Subscribe<SundesmoPlayerUnrendered>(this, msg => OnSundesmoUnrendered(msg.Handler));
-        Mediator.Subscribe<SundesmoTimedOut>(this, msg => OnSundesmoTimedOut(msg.Handler));
 
         // Process connections.
         Mediator.Subscribe<ConnectedMessage>(this, _ => OnHubConnected());
@@ -86,20 +87,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     public HashSet<UserData> NewVisible { get; private set; } = new();
     public HashSet<UserData> InLimbo { get; private set; } = new();
-
-
-    // When a sundesmo connects there is a chance that they are already rendered. If so we should update them here.
-    private void OnSundesmoConnected(Sundesmo sundesmo)
-    {
-        if (!sundesmo.PlayerRendered)
-            return;
-        Logger.LogDebug($"Sundesmo ({sundesmo.PlayerName}) connected and is already rendered. Adding to new visible.", LoggerType.PairVisibility);
-        // we only do this for when going online and are visible, it will not work the other way around though.
-        // when we connect we would only send it to the new visible users who are not part of the existing ones.
-        // (by this i mean when we dc we effectively place all visible sundesmos in limbo, so that on reconnect we only send back
-        // out to the new users not in the old users if no change was made.)
-        NewVisible.Add(sundesmo.UserData);
-    }
 
     // If in limbo, then they should leave limbo upon DC.
     private void OnSundesmoDisconnected(Sundesmo sundesmo)
@@ -159,7 +146,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _distributeDataCTS = _distributeDataCTS.SafeCancelRecreate();
         _distributeDataTask = Task.Run(async () =>
         {
-            var modData = new SentModUpdate(new List<ModFileInfo>(), new List<string>()); // placeholder.
+            var modData = new ModUpdates(new List<ModFile>(), new List<string>());
             var appearance = new VisualUpdate()
             {
                 PlayerChanges = _lastOwnIpc.ToUpdateApi(),
@@ -206,7 +193,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             using var ct = new CancellationTokenSource();
             ct.CancelAfter(10000);
             await CollectModdedState(ct.Token).ConfigureAwait(false);
-            var modData = new SentModUpdate(new List<ModFileInfo>(), new List<string>()); // placeholder.
+            var modData = new ModUpdates(new List<ModFile>(), new List<string>());
             var appearance = new VisualUpdate()
             {
                 PlayerChanges = _lastOwnIpc.ToUpdateApi(),
@@ -266,7 +253,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _lastMinionMountIpc = minionMountCache;
         _lastPetIpc = petCache;
         _lastBuddyIpc = buddyCache;
-        _lastSentModHashes = new List<string>();
     }
 
     private async Task CollectModdedState(CancellationToken ct)
@@ -529,12 +515,12 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task<SentModUpdate> UpdateModCacheInternal()
+    private async Task<ModUpdates> UpdateModCacheInternal()
     {
         // await CollectModdedState(CancellationToken.None).ConfigureAwait(false);
         // do some kind of file scan voodoo with our db and transient resource handler to grab the
         // latest active hashes for our character.
-        return new SentModUpdate(new List<ModFileInfo>(), new List<string>());
+        return new ModUpdates(new List<ModFile>(), new List<string>());
     }
 
     // This task should not in any way be cancelled as it is important we finish it.

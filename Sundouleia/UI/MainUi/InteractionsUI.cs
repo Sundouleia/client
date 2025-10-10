@@ -79,7 +79,7 @@ public class InteractionsUI : WindowMediatorSubscriberBase
             UiService.SetUITask(async () => await ChangeOwnUnique(nameof(PairPerms.PauseVisuals), !isPaused));
         CkGui.AttachToolTip(!isPaused ? "Pause" : "Resume" + $"pairing with {_dispName}.");
 
-        if (_sundesmo.PlayerRendered)
+        if (_sundesmo.IsRendered)
         {
             if (CkGui.IconTextButton(FAI.Sync, "Reload Appearance data", width, true))
                 _sundesmo.ReapplyAlterations();

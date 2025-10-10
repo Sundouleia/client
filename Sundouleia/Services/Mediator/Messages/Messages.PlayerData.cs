@@ -4,7 +4,7 @@ using SundouleiaAPI.Data;
 namespace Sundouleia.Services.Mediator;
 
 // Sundesmo Management, and visibility handling.
-public record SundesmoOnline(Sundesmo Sundesmo, bool AlreadyRendered, bool FromReload) : MessageBase;
+public record SundesmoOnline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoOffline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoPlayerRendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming visible"
 public record SundesmoPlayerUnrendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming invisible"

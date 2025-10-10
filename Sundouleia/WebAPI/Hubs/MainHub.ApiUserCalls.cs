@@ -11,16 +11,16 @@ namespace Sundouleia.WebAPI;
 public partial class MainHub
 {
     // --- Data Updates ---
-    public async Task<HubResponse> UserPushIpcFull(PushIpcFull dto)
+    public async Task<HubResponse<List<VerifiedModFile>>> UserPushIpcFull(PushIpcFull dto)
     {
-        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushIpcFull), dto).ConfigureAwait(false);
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<List<VerifiedModFile>>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<List<VerifiedModFile>>>(nameof(UserPushIpcFull), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> UserPushIpcMods(PushIpcMods dto)
+    public async Task<HubResponse<List<VerifiedModFile>>> UserPushIpcMods(PushIpcMods dto)
     {
-        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushIpcMods), dto).ConfigureAwait(false);
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<List<VerifiedModFile>>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<List<VerifiedModFile>>>(nameof(UserPushIpcMods), dto).ConfigureAwait(false);
     }
 
     public async Task<HubResponse> UserPushIpcOther(PushIpcOther dto)

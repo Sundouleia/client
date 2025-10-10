@@ -19,7 +19,7 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
         : base(() => [
             ..pairs.DirectPairs
                 .OrderByDescending(p => favorites.SundesmoUids.Contains(p.UserData.UID))
-                .ThenByDescending(u => u.PlayerRendered)
+                .ThenByDescending(u => u.IsRendered)
                 .ThenByDescending(u => u.IsOnline)
                 .ThenBy(pair => !pair.PlayerName.IsNullOrEmpty()
                     ? (config.Current.PreferNicknamesOverNames ? pair.GetNickAliasOrUid() : pair.PlayerName)

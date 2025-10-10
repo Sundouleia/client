@@ -39,13 +39,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
         this.PinningClickthroughFalse();
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
 
-#if DEBUG
         TitleBarButtons = new TitleBarButtonBuilder()
             .Add(FAI.Tshirt, "Open Active State Debugger", () => Mediator.Publish(new UiToggleMessage(typeof(DebugActiveStateUI))))
             .Add(FAI.PersonRays, "Open Personal Data Debugger", () => Mediator.Publish(new UiToggleMessage(typeof(DebugPersonalDataUI))))
             .Add(FAI.Database, "Open Storages Debugger", () => Mediator.Publish(new UiToggleMessage(typeof(DebugStorageUI))))
             .Build();
-#endif
     }
 
     protected override void PreDrawInternal()
@@ -284,20 +282,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
         /* --------------- Separator for moving onto the Notifications Section ----------- */
         ImGui.Separator();
         CkGui.FontText(CkLoc.Settings.Preferences.HeaderNotifications, UiFontService.UidFont);
-        var connectionNotifs = _mainConfig.Current.NotifyForConnections;
-        var onlineNotifs = _mainConfig.Current.NotifyForOnlinePairs;
+        var onlineNotifs = _mainConfig.Current.OnlineNotifications;
         var onlineNotifsNickLimited = _mainConfig.Current.NotifyLimitToNickedPairs;
-
-        if (ImGui.Checkbox(CkLoc.Settings.Preferences.ConnectedNotifLabel, ref connectionNotifs))
-        {
-            _mainConfig.Current.NotifyForConnections = connectionNotifs;
-            _mainConfig.Save();
-        }
-        CkGui.HelpText(CkLoc.Settings.Preferences.ConnectedNotifTT);
 
         if (ImGui.Checkbox(CkLoc.Settings.Preferences.OnlineNotifLabel, ref onlineNotifs))
         {
-            _mainConfig.Current.NotifyForOnlinePairs = onlineNotifs;
+            _mainConfig.Current.OnlineNotifications = onlineNotifs;
             if (!onlineNotifs) _mainConfig.Current.NotifyLimitToNickedPairs = false;
             _mainConfig.Save();
         }
