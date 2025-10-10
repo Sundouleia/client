@@ -16,14 +16,14 @@ public class TransientCacheStorage
 public class TransientPlayerCache
 {
     // Effected globally across all jobs.
-    public List<string> PersistantCache { get; set; } = [];
+    public List<string> PersistentCache { get; set; } = [];
 
     // Individual caches per job ID stored for the player. These contain things such as job spesific VFX's or animations,
     // so that we do not have to run as heavy of a check on every transient resource validation.
     public Dictionary<uint, List<string>> JobBasedCache { get; set; } = [];
 
     // Pets are constantly called away and re-summoned, it is nice to retain any files
-    // we have defined for them so they can stay persistant between summons.
+    // we have defined for them so they can stay persistent between summons.
     public Dictionary<uint, List<string>> JobBasedPetCache { get; set; } = [];
 
     public TransientPlayerCache()
@@ -104,7 +104,7 @@ public class TransientCacheConfig : IHybridSavable
             if (kvp.Value.Contains(gamePath, StringComparer.Ordinal))
             {
                 playerCache.JobBasedCache[kvp.Key].Remove(gamePath);
-                playerCache.PersistantCache.Add(gamePath);
+                playerCache.PersistentCache.Add(gamePath);
                 return true;
             }
         }
@@ -152,7 +152,7 @@ public class TransientCacheConfig : IHybridSavable
             return;
 
         // Check if in global cache, if so, do not do anything as we must keep it.
-        if (playerCache.PersistantCache.Contains(gamePath, StringComparer.Ordinal))
+        if (playerCache.PersistentCache.Contains(gamePath, StringComparer.Ordinal))
             return;
         
         if (ElevateIfNeeded(key, jobId, gamePath))

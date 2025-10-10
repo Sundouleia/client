@@ -170,16 +170,16 @@ public class Sundesmo : IComparable<Sundesmo>
     /// </summary>
     public unsafe void MarkOnline(OnlineUser dto)
     {
+        // Cancel any existing timeout task.
+        _timeoutCTS.SafeCancel();
         // Set the OnlineUser & update the sundesmo state.
         _onlineUser = dto;
-       
         // Ensure that IsReloading is false (as if they were reloading, they just have)
         IsReloading = false;
-
         // Notify other parts of Sundouleia they are online.
         _mediator.Publish(new SundesmoOnline(this));
 
-        // If the sundemo is not yet rendered upon being marked, check to see if they are visible or not.
+        // If the sundesmo is not yet rendered upon being marked, check to see if they are visible or not.
         if (!IsRendered && _watcher.TryGetExisting(_player, out IntPtr playerAddr))
         {
             _player.ObjectRendered((Character*)playerAddr);

@@ -28,7 +28,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
 
-    // Static private accessors (persistant across singleton instantiations for other static accessors.)
+    // Static private accessors (persistent across singleton instantiations for other static accessors.)
     private static ServerState _serverStatus = ServerState.Offline;
     private static Version _clientVersion = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
     private static Version _expectedVersion = new Version(0, 0, 0, 0);

@@ -58,7 +58,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     private uint _lastClassJobId = uint.MaxValue;
 
     // Overhead?
-    private ConcurrentDictionary<OwnedObject, HashSet<string>>? _persistantTransients = null;
+    private ConcurrentDictionary<OwnedObject, HashSet<string>>? _persistentTransients = null;
     private readonly object _cacheAdditionLock = new();
     private readonly HashSet<string> _cachedHandledPaths = new(StringComparer.Ordinal);
     
@@ -99,21 +99,21 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     // holds partially valid transient resources that have been loaded in.
     // personally not a fan of this but whatever for right now i dont care too much. just focused on getting it working.
-    private ConcurrentDictionary<OwnedObject, HashSet<string>> PersistantTransients
+    private ConcurrentDictionary<OwnedObject, HashSet<string>> PersistentTransients
     {
         get
         {
             // if none exists yet will need to create a new one for it.
-            if (_persistantTransients == null)
+            if (_persistentTransients == null)
             {
-                _persistantTransients = new();
+                _persistentTransients = new();
                 _clientCache.JobBasedCache.TryGetValue(PlayerData.JobId, out var jobPaths);
-                _persistantTransients[OwnedObject.Player] = _clientCache.PersistantCache.Concat(jobPaths ?? []).ToHashSet(StringComparer.Ordinal);
+                _persistentTransients[OwnedObject.Player] = _clientCache.PersistentCache.Concat(jobPaths ?? []).ToHashSet(StringComparer.Ordinal);
                 _clientCache.JobBasedPetCache.TryGetValue(PlayerData.JobId, out var petPaths);
-                _persistantTransients[OwnedObject.Pet] = [.. petPaths ?? []];
+                _persistentTransients[OwnedObject.Pet] = [.. petPaths ?? []];
             }
 
-            return _persistantTransients;
+            return _persistentTransients;
         }
     }
 
@@ -143,19 +143,19 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
     }
 
-    public void DrawPersistantTransients()
+    public void DrawPersistentTransients()
     {
-        using var node = ImRaii.TreeNode($"Persistant-Transients##persistant-transients-info");
+        using var node = ImRaii.TreeNode($"Persistent-Transients##persistent-transients-info");
         if (!node) return;
 
-        using var table = ImRaii.Table("persistant-transients", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        using var table = ImRaii.Table("persistent-transients", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
         if (!table) return;
 
         ImGui.TableSetupColumn("OwnedObject");
         ImGui.TableSetupColumn("Resource Path");
         ImGui.TableHeadersRow();
 
-        var allEntries = PersistantTransients.SelectMany(kv => kv.Value.Select(path => (OwnedObject: kv.Key, ResourcePath: path)));
+        var allEntries = PersistentTransients.SelectMany(kv => kv.Value.Select(path => (OwnedObject: kv.Key, ResourcePath: path)));
 
         foreach (var (obj, entry) in allEntries)
         {
@@ -174,7 +174,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         Svc.ClientState.Login -= OnLogin;
         Svc.ClientState.ClassJobChanged -= OnJobChange;
         TransientResources.Clear();
-        PersistantTransients.Clear();
+        PersistentTransients.Clear();
     }
 
     private void OnTick(IFramework _)
@@ -197,13 +197,13 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     private void OnJobChange(uint newJobId)
     {
-        if (PersistantTransients.TryGetValue(OwnedObject.Pet, out var value))
+        if (PersistentTransients.TryGetValue(OwnedObject.Pet, out var value))
             value?.Clear();
         // reload the config for this current new classjob. (see if we can fizzle out the double semi-transients later)
         _clientCache.JobBasedCache.TryGetValue(newJobId, out var jobSpecificData);
-        PersistantTransients[OwnedObject.Player] = _clientCache.PersistantCache.Concat(jobSpecificData ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        PersistentTransients[OwnedObject.Player] = _clientCache.PersistentCache.Concat(jobSpecificData ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
         _clientCache.JobBasedPetCache.TryGetValue(newJobId, out var petSpecificData);
-        PersistantTransients[OwnedObject.Pet] = [.. petSpecificData ?? []];
+        PersistentTransients[OwnedObject.Pet] = [.. petSpecificData ?? []];
     }
 
     // Mod Enabled? -> (Item Updates via Auto-Reload Gear ? [It will be in next OnScreenResourceFetch] : [Not on actor so dont care])
@@ -253,7 +253,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             return;
 
         // Leverage the HashSet property of values to avoid a selectMany statement and run an O(1) check with contains for each owned object.
-        if (PersistantTransients.Values.Any(set => set.Contains(gamePath, StringComparer.OrdinalIgnoreCase)))
+        if (PersistentTransients.Values.Any(set => set.Contains(gamePath, StringComparer.OrdinalIgnoreCase)))
             return;
         
         // If it was added, we should log and send a transient changed message.
@@ -274,7 +274,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         // Could yap all day about this, see top of file.
         _ = Task.Run(() =>
         {
-            Logger.LogDebug("Penumbra Mod Settings changed, verifying PersistantTransients", LoggerType.ResourceMonitor);
+            Logger.LogDebug("Penumbra Mod Settings changed, verifying PersistentTransients", LoggerType.ResourceMonitor);
             Mediator.Publish(new TransientResourceLoaded(OwnedObject.Player));
         });
     }
@@ -303,9 +303,9 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     }
 
     // Death
-    public void RemoveUnmoddedPersistantTransients(OwnedObject obj, List<ModdedFile>? replacements = null)
+    public void RemoveUnmoddedPersistentTransients(OwnedObject obj, List<ModdedFile>? replacements = null)
     {
-        if (!PersistantTransients.TryGetValue(obj, out HashSet<string>? value))
+        if (!PersistentTransients.TryGetValue(obj, out HashSet<string>? value))
             return;
         // If null is passed in, clear everything inside.
         if (replacements is null)
@@ -314,8 +314,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             return;
         }
 
-        // Otherwise, remove all unmodded PersistantTransients.
-        Logger.LogDebug($"Removing unmodded PersistantTransients from ({obj})", LoggerType.ResourceMonitor);
+        // Otherwise, remove all unmodded PersistentTransients.
+        Logger.LogDebug($"Removing unmodded PersistentTransients from ({obj})", LoggerType.ResourceMonitor);
         int removedPaths = 0;
         foreach (var replacementGamePath in replacements.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
         {
@@ -325,7 +325,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
         if (removedPaths > 0)
         {
-            Logger.LogTrace($"Removed {removedPaths} PersistantTransients during CleanUp. Saving Config.", LoggerType.ResourceMonitor);
+            Logger.LogTrace($"Removed {removedPaths} PersistentTransients during CleanUp. Saving Config.", LoggerType.ResourceMonitor);
             _config.Save();
         }
     }
@@ -337,9 +337,9 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     /// <param name="obj"></param>
     public void PersistTransients(OwnedObject obj)
     {
-        // Ensure that the PersistantTransients exists.
-        if (!PersistantTransients.TryGetValue(obj, out HashSet<string>? persistantTransients))
-            PersistantTransients[obj] = persistantTransients = new(StringComparer.Ordinal);
+        // Ensure that the PersistentTransients exists.
+        if (!PersistentTransients.TryGetValue(obj, out HashSet<string>? persistentTransients))
+            PersistentTransients[obj] = persistentTransients = new(StringComparer.Ordinal);
 
         // if no transients exist, nothing to keep persistent.
         if (!TransientResources.TryGetValue(obj, out var resources))
@@ -350,10 +350,10 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         Logger.LogDebug($"Persisting {transientResources.Count} transient resources", LoggerType.ResourceMonitor);
 
         // set the newly added game paths as the transients from the transient resources that are not semi-transient resources.
-        List<string> newlyAddedGamePaths = resources.Except(persistantTransients, StringComparer.Ordinal).ToList();
+        List<string> newlyAddedGamePaths = resources.Except(persistentTransients, StringComparer.Ordinal).ToList();
 
         foreach (var gamePath in transientResources)
-            persistantTransients.Add(gamePath);
+            persistentTransients.Add(gamePath);
 
         bool saveConfig = false;
         // if we have newly added paths for our client player, append/elevate them to the persistent cache.
@@ -391,7 +391,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     public void RemoveTransient(OwnedObject obj, string path)
     {
-        if (PersistantTransients.TryGetValue(obj, out var resources))
+        if (PersistentTransients.TryGetValue(obj, out var resources))
         {
             resources.RemoveWhere(f => string.Equals(path, f, StringComparison.Ordinal));
             if (obj is OwnedObject.Player)
@@ -405,7 +405,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     internal bool AddTransient(OwnedObject obj, string item)
     {
-        if (PersistantTransients.TryGetValue(obj, out var semiTransient) && semiTransient != null && semiTransient.Contains(item))
+        if (PersistentTransients.TryGetValue(obj, out var semiTransient) && semiTransient != null && semiTransient.Contains(item))
             return false;
 
         if (!TransientResources.TryGetValue(obj, out HashSet<string>? transientResource))
@@ -422,7 +422,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     ///     all transient resources that match any of the paths in <paramref name="list"/>. <para />
     ///     After this occurs, any remaining transient paths should be considered PersistentTransients (extras) to be processed. 
     /// </summary>
-    public HashSet<string> ClearTransientsAndGetPersistants(OwnedObject obj, List<string> list)
+    public HashSet<string> ClearTransientsAndGetPersistents(OwnedObject obj, List<string> list)
     {
         // Attempt to retrieve the transient resources caught for this owned object.
         if (TransientResources.TryGetValue(obj, out var set))
@@ -432,9 +432,9 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             Logger.LogDebug($"Removed {removed} previously existing transient paths", LoggerType.ResourceMonitor);
         }
 
-        // We should also remove any PersistantTransients that have these paths as well, if present. (Only do this for the Player object)
+        // We should also remove any PersistentTransients that have these paths as well, if present. (Only do this for the Player object)
         bool reloadSemiTransient = false;
-        if (obj is OwnedObject.Player && PersistantTransients.TryGetValue(obj, out var semiset))
+        if (obj is OwnedObject.Player && PersistentTransients.TryGetValue(obj, out var semiset))
         {
             foreach (var file in semiset.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
             {
@@ -443,8 +443,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             }
 
             int removed = semiset.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
-            Logger.LogDebug($"Removed {removed} previously existing PersistantTransient paths", LoggerType.ResourceMonitor);
-            // if any were removed we should reload the persistant transient paths.
+            Logger.LogDebug($"Removed {removed} previously existing PersistentTransient paths", LoggerType.ResourceMonitor);
+            // if any were removed we should reload the persistent transient paths.
             if (removed > 0)
             {
                 reloadSemiTransient = true;
@@ -454,13 +454,13 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
 
         if (reloadSemiTransient)
-            _persistantTransients = null;
+            _persistentTransients = null;
 
-        // Any remaining transients that survived this should now become PersistantTransients.
+        // Any remaining transients that survived this should now become PersistentTransients.
         PersistTransients(obj);
 
-        // Retrieve said PersistantTransients for return value, whose are valid.
-        var pathsToResolve = PersistantTransients.GetValueOrDefault(obj, new HashSet<string>(StringComparer.Ordinal));
+        // Retrieve said PersistentTransients for return value, whose are valid.
+        var pathsToResolve = PersistentTransients.GetValueOrDefault(obj, new HashSet<string>(StringComparer.Ordinal));
         pathsToResolve.RemoveWhere(string.IsNullOrEmpty);
         return pathsToResolve;
     }
@@ -477,16 +477,16 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         //if (_lastClassJobId != _dalamudUtil.ClassJobId)
         //{
         //    _lastClassJobId = _dalamudUtil.ClassJobId;
-        //    if (PersistantTransients.TryGetValue(ObjectKind.Pet, out HashSet<string>? value))
+        //    if (PersistentTransients.TryGetValue(ObjectKind.Pet, out HashSet<string>? value))
         //    {
         //        value?.Clear();
         //    }
 
         //    // reload config for current new classjob
         //    PlayerConfig.JobSpecificCache.TryGetValue(_dalamudUtil.ClassJobId, out var jobSpecificData);
-        //    PersistantTransients[ObjectKind.Player] = PlayerConfig.GlobalPersistentCache.Concat(jobSpecificData ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        //    PersistentTransients[ObjectKind.Player] = PlayerConfig.GlobalPersistentCache.Concat(jobSpecificData ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
         //    PlayerConfig.JobSpecificPetCache.TryGetValue(_dalamudUtil.ClassJobId, out var petSpecificData);
-        //    PersistantTransients[ObjectKind.Pet] = [.. petSpecificData ?? []];
+        //    PersistentTransients[ObjectKind.Pet] = [.. petSpecificData ?? []];
         //}
 
         //foreach (var kind in Enum.GetValues(typeof(ObjectKind)))

@@ -366,6 +366,6 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         // Transient Resolurce Monitoring
         _transients.DrawTransientResources();
         // Semi-Transient Resource Monitoring
-        _transients.DrawPersistantTransients();
+        _transients.DrawPersistentTransients();
     }
 }

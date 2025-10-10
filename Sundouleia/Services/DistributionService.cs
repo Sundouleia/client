@@ -10,6 +10,7 @@ using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Services;
 
@@ -32,27 +33,20 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     private readonly TransientResourceManager _transients;
     private readonly CharaObjectWatcher _watcher;
 
-    // Management for the task involving making an update to our latest data.
-    // If this is ever processing, we should await it prior to distributing data.
-    // This way we make sure that when we do distribute the data, it has the latest information.
-    private readonly SemaphoreSlim _dataUpdateLock = new(1, 1);
-
     // Task runs the distribution of our data to other sundesmos.
     // should always await the above task, if active, before firing.
     private readonly SemaphoreSlim _distributionLock = new(1, 1);
     private CancellationTokenSource _distributeDataCTS = new();
     private Task? _distributeDataTask;
 
-    // It is possible that using a semaphore slim would allow us to push updates as-is even if mid-dataUpdate,
-    // however this would also push sundesmos out of sync and would need to be updated later anyways, so do not think it's worth.
-    private ClientDataCache? _lastCreatedData = null;
+    // Management for the task involving making an update to our latest data.
+    // If this is ever processing, we should await it prior to distributing data.
+    // This way we make sure that when we do distribute the data, it has the latest information.
+    private readonly SemaphoreSlim _dataUpdateLock = new(1, 1);
+    // Should only be modified while the dataUpdateLock is active.
+    private ClientDataCache _lastCreatedData = new();
 
-    // Latest private data state. (move into last created character data later)
-    private IpcDataPlayerCache _lastOwnIpc = new();
-    private IpcDataCache _lastMinionMountIpc = new();
-    private IpcDataCache _lastPetIpc = new();
-    private IpcDataCache _lastBuddyIpc = new();
-
+    // Accessors for the ClientUpdateService
     public bool UpdatingData => _dataUpdateLock.CurrentCount is 0;
     public bool DistributingData => _distributionLock.CurrentCount is 0; // only use if we dont want to cancel distributions.
 
@@ -96,7 +90,24 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         {
             // Not set the initialCache.
             Logger.LogInformation("Hub connected, fetching initial Ipc Cache.");
-            await SetInitialCache().ConfigureAwait(false);
+            // Set everything!!!!
+            _lastCreatedData.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
+            _lastCreatedData.GlamourerState[OwnedObject.Player] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
+            _lastCreatedData.CPlusState[OwnedObject.Player] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
+            _lastCreatedData.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
+            _lastCreatedData.Moodles = await _ipc.Moodles.GetOwn().ConfigureAwait(false) ?? string.Empty;
+            _lastCreatedData.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
+            _lastCreatedData.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
+
+            _lastCreatedData.GlamourerState[OwnedObject.MinionOrMount] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
+            _lastCreatedData.CPlusState[OwnedObject.MinionOrMount] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
+
+            _lastCreatedData.GlamourerState[OwnedObject.Pet] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
+            _lastCreatedData.CPlusState[OwnedObject.Pet] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
+
+            _lastCreatedData.GlamourerState[OwnedObject.Companion] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
+            _lastCreatedData.CPlusState[OwnedObject.Companion] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
+            // TODO: Set modded state (could even run these tasks side by side to complete calculations faster).
         }
         catch (Exception ex)
         {
@@ -113,13 +124,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _distributeDataTask = Task.Run(async () =>
         {
             var modData = new ModUpdates(new List<ModFile>(), new List<string>());
-            var appearance = new VisualUpdate()
-            {
-                PlayerChanges = _lastOwnIpc.ToUpdateApi(),
-                MinionMountChanges = _lastMinionMountIpc.ToUpdateApi(),
-                PetChanges = _lastPetIpc.ToUpdateApi(),
-                CompanionChanges = _lastBuddyIpc.ToUpdateApi(),
-            };
+            var appearance = _lastCreatedData.ToFullUpdate();
+
             // bomb the other data such as new users and limbo users.
             if (InLimbo.Count is not 0)
             {
@@ -156,13 +162,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             ct.CancelAfter(10000);
             await CollectModdedState(ct.Token).ConfigureAwait(false);
             var modData = new ModUpdates(new List<ModFile>(), new List<string>());
-            var appearance = new VisualUpdate()
-            {
-                PlayerChanges = _lastOwnIpc.ToUpdateApi(),
-                MinionMountChanges = _lastMinionMountIpc.ToUpdateApi(),
-                PetChanges = _lastPetIpc.ToUpdateApi(),
-                CompanionChanges = _lastBuddyIpc.ToUpdateApi(),
-            };
+            var appearance = _lastCreatedData.ToFullUpdate();
+
             // grab the new visible sundesmos not in limbo state.
             var toSend = NewVisibleUsers.ToList();
             if (InLimbo.Count is not 0)
@@ -198,40 +199,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }, _distributeDataCTS.Token);
     }
 
-    private async Task SetInitialCache()
-    {
-        // Collect all data from all sources about all activities to get our current state.
-        var playerCache = new IpcDataPlayerCache();
-        playerCache.Data[IpcKind.ModManips] = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
-        playerCache.Data[IpcKind.Glamourer] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
-        playerCache.Data[IpcKind.CPlus] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
-        playerCache.Data[IpcKind.Heels] = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-        playerCache.Data[IpcKind.Moodles] = await _ipc.Moodles.GetOwn().ConfigureAwait(false) ?? string.Empty;
-        playerCache.Data[IpcKind.Honorific] = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
-        playerCache.Data[IpcKind.PetNames] = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
-
-        var minionMountCache = new IpcDataCache();
-        minionMountCache.Data[IpcKind.Glamourer] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
-        minionMountCache.Data[IpcKind.CPlus] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
-
-        var petCache = new IpcDataCache();
-        petCache.Data[IpcKind.Glamourer] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
-        petCache.Data[IpcKind.CPlus] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
-       
-        var buddyCache = new IpcDataCache();
-        buddyCache.Data[IpcKind.Glamourer] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
-        buddyCache.Data[IpcKind.CPlus] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
-
-        using var ct = new CancellationTokenSource();
-        ct.CancelAfter(10000);
-        await CollectModdedState(ct.Token).ConfigureAwait(false);
-
-        _lastOwnIpc = playerCache;
-        _lastMinionMountIpc = minionMountCache;
-        _lastPetIpc = petCache;
-        _lastBuddyIpc = buddyCache;
-    }
-
     private async Task CollectModdedState(CancellationToken ct)
     {
         if (!_config.HasValidCacheFolderSetup())
@@ -245,7 +212,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
         ct.ThrowIfCancellationRequested();
 
-        // A lot of unessisary calculation work that needs to be done simply because people like the idea of custom skeletons,
+        // A lot of unnecessary calculation work that needs to be done simply because people like the idea of custom skeletons,
         // and.... they tend to crash other people :D
         Dictionary<string, List<ushort>>? boneIndices;
         unsafe { boneIndices = _noCrashPlz.GetSkeletonBoneIndices((GameObject*)_watcher.WatchedPlayerAddr); }
@@ -275,11 +242,11 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
 
         // Removes any resources caught from fetching the on-screen actor resources from that which loaded as transient (glowing armor vfx ext)
-        // any remaining transients for this OwnedObject are marked as PersistantTransients and returned.
-        var persistants = _transients.ClearTransientsAndGetPersistants(OwnedObject.Player, moddedPaths.SelectMany(c => c.GamePaths).ToList());
+        // any remaining transients for this OwnedObject are marked as PersistentTransients and returned.
+        var persistents = _transients.ClearTransientsAndGetPersistents(OwnedObject.Player, moddedPaths.SelectMany(c => c.GamePaths).ToList());
 
         // For these paths, get their file replacement objects.
-        var resolvedTransientPaths = await GetFileReplacementsFromPaths(persistants).ConfigureAwait(false);
+        var resolvedTransientPaths = await GetFileReplacementsFromPaths(persistents).ConfigureAwait(false);
         Logger.LogDebug("== Transient Replacements ==");
         foreach (var replacement in resolvedTransientPaths.Select(c => new ModdedFile([.. c.Value], c.Key)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
         {
@@ -287,7 +254,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             moddedPaths.Add(replacement);
         }
 
-        _transients.RemoveUnmoddedPersistantTransients(OwnedObject.Player, [.. moddedPaths]);
+        _transients.RemoveUnmoddedPersistentTransients(OwnedObject.Player, [.. moddedPaths]);
         // obtain the final moddedFiles to send that is the result.
         moddedPaths = new HashSet<ModdedFile>(moddedPaths.Where(p => p.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), ModdedFileComparer.Instance);
         ct.ThrowIfCancellationRequested();
@@ -428,6 +395,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // perform the update.
         try
         {
+            // Process the changes for this cache into the clone of the latest data.
             var visualChanges = await UpdateIpcCacheInternal(newChanges).ConfigureAwait(false);
             if (!visualChanges.HasData())
             {
@@ -463,18 +431,21 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // perform the update.
         try
         {
-            (bool changed, string? data) = await UpdateIpcCacheInternal(obj, type).ConfigureAwait(false);
-            if (!changed || data is null)
+            // Create if null.
+            _lastCreatedData ??= new ClientDataCache();
+
+            // It's ok to modify the original here without cloning it since we are locking access.
+            if (await UpdateDataCacheSingle(obj, type, _lastCreatedData).ConfigureAwait(false) is not { } newData)
             {
                 Logger.LogInformation($"IpcCacheSingle ({obj})({type}) had no changes, skipping.");
                 return;
             }
-            // Things changed, inform of update.
 
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
             var toSend = SundesmosForUpdatePush;
-            await _hub.UserPushIpcSingle(new(toSend, obj, type, data)).ConfigureAwait(false);
+            await _hub.UserPushIpcSingle(new(toSend, obj, type, newData)).ConfigureAwait(false);
             Logger.LogInformation($"Pushed IpcCacheSingle update to {toSend.Count} sundesmos. ({obj})({type})");
+
             // Clear the limbo list as they will need a full update next time.
             if (InLimbo.Count is not 0)
             {
@@ -501,32 +472,48 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     }
 
     // This task should not in any way be cancelled as it is important we finish it.
-    private async Task<VisualUpdate> UpdateIpcCacheInternal(Dictionary<OwnedObject, IpcKind> newChanges)
+    private async Task<VisualUpdate> UpdateIpcCacheInternal(Dictionary<OwnedObject, IpcKind> changes)
     {
-        var finalChanges = new VisualUpdate();
+        // Create _lastCreatedData if it doesn't exist yet.
+        _lastCreatedData ??= new ClientDataCache();
+        // Make a deep clone for the changes.
+        var changedData = _lastCreatedData.DeepClone();
+
         // process the tasks for each object in parallel.
         var tasks = new List<Task>();
-        foreach (var (obj, kinds) in newChanges)
+        foreach (var (obj, kinds) in changes)
         {
-            if (kinds == IpcKind.None)
-                continue;
-
-            tasks.Add(obj switch
-            {
-                OwnedObject.Player => TryUpdatePlayerCache(kinds, _lastOwnIpc, finalChanges),
-                OwnedObject.MinionOrMount => UpdateNonPlayerCache(obj, kinds, _lastMinionMountIpc, finalChanges),
-                OwnedObject.Pet => UpdateNonPlayerCache(obj, kinds, _lastPetIpc, finalChanges),
-                OwnedObject.Companion => UpdateNonPlayerCache(obj, kinds, _lastBuddyIpc, finalChanges),
-                _ => Task.FromResult(false)
-            });
+            if (kinds == IpcKind.None) continue;
+            tasks.Add(UpdateDataCache(obj, kinds, changedData));
         }
         // Execute in parallel.
         await Task.WhenAll(tasks).ConfigureAwait(false);
-        return finalChanges;
+
+        // With all tasks run, run a comparison of the created against the latest.
+        return _lastCreatedData.ApplyAllIpc(changedData);
     }
 
-    private async Task<(bool, string?)> UpdateIpcCacheInternal(OwnedObject obj, IpcKind type)
+    private async Task UpdateDataCache(OwnedObject obj, IpcKind toUpdate, ClientDataCache data)
     {
+        if (toUpdate.HasAny(IpcKind.Glamourer))
+            data.GlamourerState[obj] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
+
+        if (toUpdate.HasAny(IpcKind.CPlus))
+            data.CPlusState[obj] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
+
+        if (obj is not OwnedObject.Player)
+            return;
+
+        if (toUpdate.HasAny(IpcKind.ModManips)) data.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.Heels)) data.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.Moodles)) data.Moodles = await _ipc.Moodles.GetOwn().ConfigureAwait(false) ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.Honorific)) data.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.PetNames)) data.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
+    }
+
+    private async Task<string?> UpdateDataCacheSingle(OwnedObject obj, IpcKind type, ClientDataCache data)
+    {
+        // Attempt to apply the retrieved data string to the latest data, outputting if the change occured.
         var dataStr = type switch
         {
             IpcKind.ModManips => _ipc.Penumbra.GetMetaManipulationsString(),
@@ -538,102 +525,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             IpcKind.PetNames => _ipc.PetNames.GetPetNicknames(),
             _ => string.Empty,
         };
-        // Update accordingly.
-        if (obj is OwnedObject.Player)
-            return (_lastOwnIpc.UpdateCacheSingle(type, dataStr), dataStr);
-        else
-        {
-            var cache = obj switch
-            {
-                OwnedObject.MinionOrMount => _lastMinionMountIpc,
-                OwnedObject.Pet => _lastPetIpc,
-                OwnedObject.Companion => _lastBuddyIpc,
-                _ => null
-            };
-            if (cache is null)
-                return (false, null);
-            // update and return if changed.
-            return (cache.UpdateCacheSingle(type, dataStr), dataStr);
-        }
+        return data.ApplySingleIpc(obj, type, dataStr) ? dataStr : null;
     }
 
     #endregion Cache Updates
-
-    #region Cache Update Helpers
-    private async Task TryUpdatePlayerCache(IpcKind toUpdate, IpcDataPlayerCache current, VisualUpdate compiledData)
-    {
-        var newData = new IpcDataPlayerUpdate(IpcKind.None);
-        var applied = IpcKind.None;
-        if (toUpdate.HasAny(IpcKind.ModManips))
-        {
-            var manipStr = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.ModManips, manipStr) ? IpcKind.ModManips : IpcKind.None;
-        }
-        if (toUpdate.HasAny(IpcKind.Glamourer))
-        {
-            var glamStr = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.Glamourer, glamStr) ? IpcKind.Glamourer : IpcKind.None;
-        }
-        if (toUpdate.HasAny(IpcKind.CPlus))
-        {
-            var cplusStr = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.CPlus, cplusStr) ? IpcKind.CPlus : IpcKind.None;
-        }
-        if (toUpdate.HasAny(IpcKind.Heels))
-        {
-            var heelsStr = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.Heels, heelsStr) ? IpcKind.Heels : IpcKind.None;
-        }
-        if (toUpdate.HasAny(IpcKind.Honorific))
-        {
-            var titleStr = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.Honorific, titleStr) ? IpcKind.Honorific : IpcKind.None;
-        }
-        if (toUpdate.HasAny(IpcKind.Moodles))
-        {
-            var moodleStr = await _ipc.Moodles.GetOwn().ConfigureAwait(false) ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.Moodles, moodleStr) ? IpcKind.Moodles : IpcKind.None;
-        }
-        if (toUpdate.HasAny(IpcKind.PetNames))
-        {
-            var petStr = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.PetNames, petStr) ? IpcKind.PetNames : IpcKind.None;
-        }
-        // current cache is already updated, so return the the new data.
-        if (applied != IpcKind.None)
-        {
-            Logger.LogDebug($"IpcPlayerCache had changes: {applied}");
-            newData = newData with { Updates = applied };
-            compiledData.PlayerChanges = newData;
-        }
-
-    }
-
-    private async Task UpdateNonPlayerCache(OwnedObject obj, IpcKind toUpdate, IpcDataCache current, VisualUpdate compiledData)
-    {
-        var newData = new IpcDataUpdate(IpcKind.None);
-        var applied = IpcKind.None;
-        if (toUpdate.HasAny(IpcKind.Glamourer))
-        {
-            var glamStr = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.Glamourer, glamStr) ? IpcKind.Glamourer : IpcKind.None;
-        }
-        if (toUpdate.HasAny(IpcKind.CPlus))
-        {
-            var cplusStr = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
-            applied |= current.UpdateCacheSingle(IpcKind.CPlus, cplusStr) ? IpcKind.CPlus : IpcKind.None;
-        }
-        // if anything changed, add to the compiled data.
-        if (applied != IpcKind.None)
-        {
-            newData = newData with { Updates = applied };
-            switch (obj)
-            {
-                case OwnedObject.MinionOrMount: compiledData.MinionMountChanges = newData; break;
-                case OwnedObject.Pet: compiledData.PetChanges = newData; break;
-                case OwnedObject.Companion: compiledData.CompanionChanges = newData; break;
-            }
-        }
-    }
-    #endregion Cache Update Helpers
 }
