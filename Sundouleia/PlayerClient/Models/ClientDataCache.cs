@@ -9,7 +9,7 @@ namespace Sundouleia.PlayerClient;
 public class ClientDataCache
 {
     // Key'd by mod hash.
-    public Dictionary<string, ModFile> AppliedMods { get; set; } = new();
+    public Dictionary<string, ModdedFile> AppliedMods { get; set; } = new();
 
     // Can be accessed by multiple tasks concurrently.
     public ConcurrentDictionary<OwnedObject, string> GlamourerState { get; set; } = [];
@@ -70,7 +70,37 @@ public class ClientDataCache
                 CPlusState = CPlusState[OwnedObject.Companion]
             }
         };
+    }
 
+    /// <summary>
+    ///     Applies the new modded state to the clientDataCache. <para />
+    ///     All new additions are marked in toAdd, all old ones are placed in hashes to remove.
+    /// </summary>
+    public ModUpdates ApplyNewModState(HashSet<ModdedFile> moddedState)
+    {
+        var toAdd = new List<ModFile>();
+        var toRemove = new List<string>();
+
+        // First determine which files are removed based on the most currentState.
+        var currentHashes = moddedState.Select(m => m.Hash);
+        var keysToRemove = AppliedMods.Keys.Except(currentHashes).ToList();
+        foreach (var hash in keysToRemove)
+        {
+            AppliedMods.Remove(hash, out _);
+            toRemove.Add(hash);
+        }
+
+        // Now iterate through the new hashes. Any that need to be added should be placed in the ToAdd.
+        foreach (var mod in moddedState)
+        {
+            if (AppliedMods.TryGetValue(mod.Hash, out var file))
+                continue;
+            // Add it as new.
+            AppliedMods[mod.Hash] = mod;
+            toAdd.Add(mod.ToModFileDto());
+        }
+
+        return new ModUpdates(toAdd, toRemove);
     }
 
     public bool ApplySingleIpc(OwnedObject obj, IpcKind kind, string data)

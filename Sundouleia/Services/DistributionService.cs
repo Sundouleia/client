@@ -10,7 +10,6 @@ using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Services;
 
@@ -160,8 +159,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         {
             using var ct = new CancellationTokenSource();
             ct.CancelAfter(10000);
-            await CollectModdedState(ct.Token).ConfigureAwait(false);
-            var modData = new ModUpdates(new List<ModFile>(), new List<string>());
+            var currentModdedState = await CollectModdedState(ct.Token).ConfigureAwait(false);
+            // Apply the new state to the lastCreatedData and retrieve the mod update dto from it.
+            var modData = _lastCreatedData.ApplyNewModState(currentModdedState);
             var appearance = _lastCreatedData.ToFullUpdate();
 
             // grab the new visible sundesmos not in limbo state.
@@ -185,26 +185,26 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                         return;
 
                     // Upload the files and then send the remainder off to the file uploader.
-
-                    //var newToSend = await _fileUploader.UploadFiles(res.Value, toSend).ConfigureAwait(false);
-                    //if (newToSend.Count is 0)
-                    //    return;
+                    var newToSend = await _fileUploader.UploadFiles(res.Value, toSend).ConfigureAwait(false);
+                    if (newToSend.Count is 0)
+                        return;
 
                     Logger.LogInformation($"Sending out uploaded remaining files to {toSend.Count} users.");
                     // Send the remaining files off to the file uploader.
-                    // await _hub.UserPushIpcMods(new(toSend, newToSend)).ConfigureAwait(false);
+                    await _hub.UserPushIpcMods(new(toSend, newToSend)).ConfigureAwait(false);
                 });
 
             }
         }, _distributeDataCTS.Token);
     }
 
-    private async Task CollectModdedState(CancellationToken ct)
+    // Possibly merge into the transient resource manger later, and rename it to moddedStateManager or something.
+    private async Task<HashSet<ModdedFile>> CollectModdedState(CancellationToken ct)
     {
         if (!_config.HasValidCacheFolderSetup())
         {
             Logger.LogWarning("Cache Folder not setup! Cannot process mod files!");
-            return;
+            return new HashSet<ModdedFile>(ModdedFileComparer.Instance);
         }
 
         // await until we are present and visible.
@@ -237,8 +237,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             ct.ThrowIfCancellationRequested();
         }
 
-        // At this point we would want to add any pet resources as transient resources,
-        // then clear them from this list (if we even need to)
+        // At this point we would want to add any pet resources as transient resources, then clear them from this list
+        // (right now this is only grabbing from the player object, but should be grabbing from all other objects simultaneously if possible)
 
 
         // Removes any resources caught from fetching the on-screen actor resources from that which loaded as transient (glowing armor vfx ext)
@@ -259,12 +259,14 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         moddedPaths = new HashSet<ModdedFile>(moddedPaths.Where(p => p.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), ModdedFileComparer.Instance);
         ct.ThrowIfCancellationRequested();
 
-        // All remaining paths that are not fileswaps come from modded game files that need to be sent over sundouleia servers.
+        // All remaining paths that are not file-swaps come from modded game files that need to be sent over sundouleia servers.
         // To authorize them we need their 40 character SHA1 computed hashes from their file data.
         var toCompute = moddedPaths.Where(f => !f.IsFileSwap).ToArray();
         Logger.LogDebug($"Computing hashes for {toCompute.Length} files.");
-        // Grab these hashes via the FileCacheEntity .
+
+        // Grab these hashes via the FileCacheEntity.
         var computedPaths = _cacheManager.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
+        
         // Ensure we set and log said computed hashes.
         foreach (var file in toCompute)
         {
@@ -273,7 +275,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             Logger.LogDebug($"=> {file} (Hash: {file.Hash})");
         }
 
-        // Finally as a santity check, remove any invalid file hashes for files that are no longer valid.
+        // Finally as a sanity check, remove any invalid file hashes for files that are no longer valid.
         var removed = moddedPaths.RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
         if (removed > 0) 
             Logger.LogDebug($"=> Removed {removed} invalid file hashes.");
@@ -286,6 +288,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             // Helps ensure we are not going to send files that will crash people yippee
             await Generic.Safe(async () => await _noCrashPlz.VerifyPlayerAnimationBones(boneIndices, moddedPaths, ct).ConfigureAwait(false));
         }
+
+        // All files should not be file swaps and valid hashes by this point, and as such we should return the result.
+        return moddedPaths;
     }
 
     // Obtains the file replacements for the set of given paths that have forward and reverse resolve.
@@ -326,6 +331,15 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     }
 
     #region Cache Updates
+    private void ClearLimboAfterUpdate()
+    {
+        if (InLimbo.Count is not 0)
+        {
+            Logger.LogDebug("Clearing limbo as they will need a full update next time.");
+            InLimbo.Clear();
+        }
+    }
+
     // if it is a full update we do not care about the changes,
     // only that the cache is updated prior to the change.
     public async Task UpdateIpcCacheFull(Dictionary<OwnedObject, IpcKind> newChanges)
@@ -336,19 +350,14 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         try
         {
             // Should process both the mod and ipc updates within this method.
-            // If feeling slow can always run this together but might be best to run seperately.
+            // If feeling slow can always run this together but might be best to run separately.
             var modChanges = await UpdateModCacheInternal().ConfigureAwait(false);
             var visualChanges = await UpdateIpcCacheInternal(newChanges).ConfigureAwait(false);
 
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
             await _hub.UserPushIpcFull(new(SundesmosForUpdatePush, modChanges, visualChanges)).ConfigureAwait(false);
+            ClearLimboAfterUpdate();
             Logger.LogInformation($"Ipc Cache Full Update completed.");
-            // Clear the limbo list as they will need a full update next time.
-            if (InLimbo.Count is not 0)
-            {
-                Logger.LogDebug("Clearing limbo as we have a new state.");
-                InLimbo.Clear();
-            }
         }
         catch (Exception ex)
         {
@@ -367,16 +376,10 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // perform the update.
         try
         {
-            // var modChanges = await UpdateModCacheInternal().ConfigureAwait(false);
-            //// Send this update off to all our visibly connected sundesmos that are not in limbo or new.
-            //await _hub.UserPushIpcMods(new(SundesmosForUpdatePush, modChanges)).ConfigureAwait(false);
-            //Logger.LogInformation($"Ipc Cache Mod Update completed.");
-            //// Clear the limbo list as they will need a full update next time.
-            //if (InLimbo.Count is not 0)
-            //{
-            //    Logger.LogDebug("Clearing limbo as we have a new state.");
-            //    InLimbo.Clear();
-            //}
+            var modChanges = await UpdateModCacheInternal().ConfigureAwait(false);
+            await _hub.UserPushIpcMods(new(SundesmosForUpdatePush, modChanges)).ConfigureAwait(false);
+            ClearLimboAfterUpdate();
+            Logger.LogInformation($"Ipc Cache Mod Update completed.");
         }
         catch (Exception ex)
         {
@@ -406,13 +409,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
             var toSend = SundesmosForUpdatePush;
             await _hub.UserPushIpcOther(new(toSend, visualChanges)).ConfigureAwait(false);
+            ClearLimboAfterUpdate();
             Logger.LogInformation($"Pushed Visual IpcCache update to {toSend.Count} sundesmos. ({visualChanges.ToChangesString()})");
-            // Clear the limbo list as they will need a full update next time.
-            if (InLimbo.Count is not 0)
-            {
-                Logger.LogDebug("Clearing limbo as we have a new state.");
-                InLimbo.Clear();
-            }
         }
         catch (Exception ex)
         {
@@ -431,9 +429,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // perform the update.
         try
         {
-            // Create if null.
-            _lastCreatedData ??= new ClientDataCache();
-
             // It's ok to modify the original here without cloning it since we are locking access.
             if (await UpdateDataCacheSingle(obj, type, _lastCreatedData).ConfigureAwait(false) is not { } newData)
             {
@@ -444,14 +439,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
             var toSend = SundesmosForUpdatePush;
             await _hub.UserPushIpcSingle(new(toSend, obj, type, newData)).ConfigureAwait(false);
+            ClearLimboAfterUpdate();
             Logger.LogInformation($"Pushed IpcCacheSingle update to {toSend.Count} sundesmos. ({obj})({type})");
-
-            // Clear the limbo list as they will need a full update next time.
-            if (InLimbo.Count is not 0)
-            {
-                Logger.LogDebug("Clearing limbo as we have a new state.");
-                InLimbo.Clear();
-            }
         }
         catch (Exception ex)
         {

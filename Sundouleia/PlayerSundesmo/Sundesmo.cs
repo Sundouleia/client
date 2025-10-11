@@ -248,6 +248,8 @@ public class Sundesmo : IComparable<Sundesmo>
         _companion.Dispose();
     }
 
+    public void EndTimeout() => _timeoutCTS.SafeCancel();
+
     /// <summary>
     ///     Fired whenever the sundesmo goes offline, or they become unrendered. <para />
     ///     If this needs to be fired while the task is already active, return.

@@ -29,10 +29,6 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoFactory _pairFactory;
 
-    private CancellationTokenSource _disconnectTimeoutCTS = new();
-    private Task? _disconnectTimeoutTask = null;
-
-
     private Lazy<List<Sundesmo>> _directPairsInternal;  // the internal direct pairs lazy list for optimization
     public List<Sundesmo> DirectPairs => _directPairsInternal.Value; // the direct pairs the client has with other users.
 
@@ -44,11 +40,10 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         _config = config;
         _serverConfigs = serverConfigs;
 
+        Mediator.Subscribe<ConnectedMessage>(this, _ => OnClientConnected());
+        Mediator.Subscribe<ReconnectedMessage>(this, _ => OnClientConnected());
         Mediator.Subscribe<DisconnectedMessage>(this, _ => OnClientDisconnected(_.WasHardDisconnect));
 
-
-        Mediator.Subscribe<ConnectedMessage>(this, _ => _disconnectTimeoutCTS.SafeCancel());
-        Mediator.Subscribe<ReconnectedMessage>(this, _ => _disconnectTimeoutCTS.SafeCancel());
         Mediator.Subscribe<CutsceneEndMessage>(this, _ => ReapplyAlterations());
         Mediator.Subscribe<TargetSundesmoMessage>(this, (msg) => TargetSundesmo(msg.Sundesmo));
 
@@ -83,7 +78,6 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
         Svc.ContextMenu.OnMenuOpened -= OnOpenContextMenu;
         DisposeSundesmos();
-        _disconnectTimeoutCTS.SafeCancelDispose();
     }
 
     public void AddSundesmo(UserPair dto)
@@ -131,33 +125,30 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
+    public void OnClientConnected()
+    {
+        Logger.LogInformation("Client connected, cancelling any disconnect timeouts.", LoggerType.PairManagement);
+        // Halt all timeouts that were in progress. (may cause issues since we do this after everyone goes online but we'll see)
+        Parallel.ForEach(_allSundesmos, s => s.Value.EndTimeout());
+    }
+
     /// <summary>
-    ///     TBD...
+    ///     Mark all sundesmos as offline upon a disconnection, ensuring that everyone follows the 
+    ///     same timeout flow.
     /// </summary>
     public void OnClientDisconnected(bool wasHardDisconnect)
     {
-        Logger.LogInformation("Client disconnected, starting disconnect timeout.", LoggerType.PairManagement);
-        _disconnectTimeoutCTS = _disconnectTimeoutCTS.SafeCancelRecreate();
-        // Mark all sundesmos offline immidiately.
-        Parallel.ForEach(_allSundesmos, s => s.Value.MarkOffline());
-        RecreateLazy();
-        // assign the delayed task.
-        _disconnectTimeoutTask = Task.Run(async () =>
+        Logger.LogInformation("Client disconnected, marking all sundesmos as offline.", LoggerType.PairManagement);
+        // If a hard disconnect, dispose of the data after.
+        Parallel.ForEach(_allSundesmos, s =>
         {
-            try
-            {
-                // Await 15s for timeout, ensuring that any data that would be reapplied is reapplied.
-                await Task.Delay(TimeSpan.FromSeconds(15), _disconnectTimeoutCTS.Token).ConfigureAwait(false);
-                Logger.LogInformation("ClientDC timeout elapsed, disposing all sundesmos.", LoggerType.PairManagement);
-                Parallel.ForEach(_allSundesmos, s => s.Value.DisposeData());
-                _allSundesmos.Clear();
-                RecreateLazy();
-            }
-            catch (OperationCanceledException)
-            {
-                Logger.LogInformation("ClientDC timeout cancelled upon reconnection.", LoggerType.PairManagement);
-            }
-        }, _disconnectTimeoutCTS.Token);
+            s.Value.MarkOffline();
+            // If it was a hard disconnect, we should dispose of the data.
+            if (wasHardDisconnect)
+                s.Value.DisposeData();
+        });
+        // Recreate the lazy list.
+        RecreateLazy();
     }
 
     /// <summary>

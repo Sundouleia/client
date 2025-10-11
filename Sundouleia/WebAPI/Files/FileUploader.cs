@@ -1,9 +1,6 @@
-﻿using CkCommons;
-using Sundouleia.ModFiles;
+﻿using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI.Files.Models;
 using SundouleiaAPI.Data;
 
 namespace Sundouleia.WebAPI.Files;
@@ -13,16 +10,12 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     private readonly MainConfig _config;
     private readonly FileCacheManager _fileDbManager;
 
-    private readonly Dictionary<string, DateTime> _verifiedUploadedHashes = new(StringComparer.Ordinal);
-    private CancellationTokenSource? _uploadCTS = new();
-
     public FileUploader(ILogger<FileUploader> logger, SundouleiaMediator mediator,
         MainConfig config, FileCacheManager fileDbManager) : base(logger, mediator)
     {
         _config = config;
         _fileDbManager = fileDbManager;
 
-        Mediator.Subscribe<DisconnectedMessage>(this, _ => Reset());
     }
 
     public List<string> CurrentUploads { get; } = []; // update as time does on.
@@ -31,30 +24,8 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        Reset();
     }
 
-    // Resets the upload manager along with all of its valid upload hashes and such.
-    private void Reset()
-    {
-        _uploadCTS.SafeCancelDispose();
-        CurrentUploads.Clear();
-        _verifiedUploadedHashes.Clear();
-    }
-
-    // Cancels the current upload file task.
-    public bool CancelUpload()
-    {
-        if (CurrentUploads.Any())
-        {
-            Logger.LogDebug("Cancelling current upload");
-            _uploadCTS.SafeCancelDispose();
-            CurrentUploads.Clear();
-            return true;
-        }
-
-        return false;
-    }
 
     // Removes all file upload links / uploaded files respective to our user from the server.
     public async Task DeleteAllFiles()
@@ -62,9 +33,8 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
         await Task.Delay(1).ConfigureAwait(false);
     }
 
-    // Uploads the files returned by the server that were not yet uploaded after sending a mod file transfer dto.
-    // The provided verified mod files contain the authorized upload links needed to upload the remaining files.
-    public async Task UploadFiles(List<VerifiedModFile> filesToUpload)
+    // Uploads all necessary files via their authorized upload links to the server.
+    public async Task UploadFiles(List<VerifiedModFile> filesToUpload) // Don't need to include the visible players here just yet.
     {
         await Task.Delay(1).ConfigureAwait(false);
     }

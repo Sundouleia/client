@@ -113,7 +113,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         if (!IsRendered) return;
         // Clear the GameData.
         unsafe { _gameObject = null; }
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] unrendered!", LoggerType.PairHandler);
+        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} unrendered!", LoggerType.PairHandler);
     }
 
     /// <summary>

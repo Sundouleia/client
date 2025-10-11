@@ -212,11 +212,12 @@ public sealed class FileCacheManager : IHostedService
                     .Replace(_config.Current.CacheFolder, _config.Current.CacheFolder.EndsWith('\\') ? Constants.PrefixCache + '\\' : Constants.PrefixCache, StringComparison.OrdinalIgnoreCase)
                     .Replace("\\\\", "\\", StringComparison.Ordinal),
                 StringComparer.OrdinalIgnoreCase);
+
             _logger.LogDebug($"== Fetching FileCaches by Paths Cleaned Paths ==", LoggerType.FileCache);
             foreach ( var entry in cleanedPaths)
                 _logger.LogDebug($"Key: {entry.Key}, Value: {entry.Value}", LoggerType.FileCache);
 
-            // not sure why this isnt merged with the line below, but whatever, basically just constructs the result.
+            // not sure why this isn't merged with the line below, but whatever, basically just constructs the result.
             Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
 
             var dict = _fileCaches.SelectMany(f => f.Value)
@@ -225,7 +226,7 @@ public sealed class FileCacheManager : IHostedService
             // adds the cleansed paths to the result and whatever.
             foreach (var entry in cleanedPaths)
             {
-                // _logger.LogDebug("Checking {path}", entry.Value);
+                _logger.LogTrace($"Checking {entry.Value}", LoggerType.FileCsv);
 
                 if (dict.TryGetValue(entry.Value, out var entity))
                 {
