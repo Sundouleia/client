@@ -25,8 +25,13 @@ public class ConfigStorage
     public int MaxParallelDownloads { get; set; } = 10;
     public int DownloadLimitBytes { get; set; } = 0;
     public DownloadSpeeds DownloadSpeedType { get; set; } = DownloadSpeeds.MBps;
-    // could add variables for the transfer bars but Idk if I really want to bother
-    // with this, or if we even can detect it with our system we are developing.
+
+    public bool ShowUploadingText { get; set; } = false;
+    public bool TransferWindow { get; set; } = false;
+    public bool TransferBars { get; set; } = true;
+    public bool TransferBarText { get; set; } = true;
+    public int TransferBarHeight { get; set; } = 30;
+    public int TransferBarWidth { get; set; } = 250;
 
     // Used to retain compatibility with existing (M)CDF export logic.
     public string ExportFolderCDF { get; set; } = string.Empty;
@@ -58,7 +63,7 @@ public class ConfigStorage
     // Notification preferences
     public bool OnlineNotifications { get; set; } = true;
     public bool NotifyLimitToNickedPairs { get; set; } = false;
-    public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Both;
+    public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
 }

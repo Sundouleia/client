@@ -179,19 +179,17 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 Logger.LogInformation($"Full Ipc Cache sent to {toSend.Count} newly visible users. {res.Value!.Count} Files needed uploading.");
                 // The callback list contains the files that we need to process the uploads for.
                 // Handle as fire-and-forget so that we do not block the distribution task updates.
-                _ = Task.Run(() =>
+                _ = Task.Run(async () =>
                 {
-                    if (res.Value is null || res.Value.Count is 0)
+                    if (res.Value is not { } filesToUpload || filesToUpload.Count is 0)
                         return;
 
                     // Upload the files and then send the remainder off to the file uploader.
-                    var newToSend = await _fileUploader.UploadFiles(res.Value, toSend).ConfigureAwait(false);
-                    if (newToSend.Count is 0)
-                        return;
+                    await _fileUploader.UploadFiles(filesToUpload).ConfigureAwait(false);
 
                     Logger.LogInformation($"Sending out uploaded remaining files to {toSend.Count} users.");
                     // Send the remaining files off to the file uploader.
-                    await _hub.UserPushIpcMods(new(toSend, newToSend)).ConfigureAwait(false);
+                    await _hub.UserPushIpcMods(new(toSend, filesToUpload)).ConfigureAwait(false);
                 });
 
             }

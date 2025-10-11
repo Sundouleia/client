@@ -8,7 +8,7 @@ using System.Reflection;
 namespace Sundouleia.WebAPI.Files;
 
 // Can probably blend this or something idk.
-public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
+public class FileTransferService : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
     private readonly TokenProvider _tokenProvider;
@@ -27,7 +27,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     // [**Think how players loaded in at venues.. lol]
     private int CurrentlyUsedDownloadSlots => _availableDownloadSlots - _downloadSemaphore.CurrentCount;
 
-    public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, SundouleiaMediator mediator,
+    public FileTransferService(ILogger<FileTransferService> logger, SundouleiaMediator mediator,
         MainConfig config, TokenProvider tokenProvider, HttpClient httpClient) 
         : base(logger, mediator)
     {

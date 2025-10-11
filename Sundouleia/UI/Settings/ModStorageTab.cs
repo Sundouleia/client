@@ -1,15 +1,12 @@
 using CkCommons;
 using CkCommons.Gui;
-using CkCommons.Gui.Utility;
 using CkCommons.Helpers;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using OtterGui.Text;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
@@ -17,10 +14,7 @@ using Sundouleia.ModFiles.Cache;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using System.IO;
 using System.Text.RegularExpressions;
-using System.Threading;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Gui;
 
@@ -331,12 +325,14 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
                 return;
             }
 
-            if (PathRegex().IsMatch(path))
+            // Validate the format of the path.
+            if (!ValidPathRegex().IsMatch(path))
             {
                 _pathValidation = FilePathValidation.InvalidPath;
                 return;
             }
 
+            // Validate the existence of the path.
             if (IsValidPath(path))
             {
                 _config.Current.CacheFolder = path;
@@ -415,5 +411,5 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
     }
 
     [GeneratedRegex(@"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript, 5000)]
-    private static partial Regex PathRegex();
+    private static partial Regex ValidPathRegex();
 }

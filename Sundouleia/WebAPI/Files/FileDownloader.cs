@@ -1,108 +1,157 @@
-﻿using K4os.Compression.LZ4.Legacy;
+﻿using CkCommons;
+using K4os.Compression.LZ4.Legacy;
 using Sundouleia.ModFiles;
+using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI.Files.Models;
-using System.Net;
-using System.Net.Http.Json;
+using SundouleiaAPI.Data;
 
 namespace Sundouleia.WebAPI.Files;
 
 // Handles downloading files off the sundouleia servers, provided a valid authorized download link.
+// I hope to god i get help digesting how to get this working with progressable file streams and appropriate integration with the new file host because
+// as of right now my brain is fried, and I am tired of making all of this code just to make something a reality for people.
 public partial class FileDownloader : DisposableMediatorSubscriberBase
 {
-    private readonly Dictionary<string, FileDownloadStatus> _downloadStatus;
-    private readonly FileCompactor _fileCompactor;
-    private readonly FileCacheManager _fileDbManager;
-    private readonly FileTransferOrchestrator _orchestrator;
-    private readonly List<ThrottledStream> _activeDownloadStreams;
+    private readonly FileCompactor _compactor;
+    private readonly FileCacheManager _dbManager;
+    private readonly FileTransferService _service;
 
-    public FileDownloader(ILogger<FileDownloader> logger, SundouleiaMediator mediator, 
-        FileTransferOrchestrator orchestrator, FileCacheManager manager, FileCompactor compactor) 
+    private readonly List<ThrottledStream> _activeDownloadStreams;
+    private readonly Dictionary<string, FileDownloadStatus> _downloadStatus;
+
+    public FileDownloader(ILogger<FileDownloader> logger, SundouleiaMediator mediator,
+        FileCompactor compactor, FileCacheManager manager, FileTransferService service)
         : base(logger, mediator)
     {
-        _downloadStatus = new Dictionary<string, FileDownloadStatus>(StringComparer.Ordinal);
-        _orchestrator = orchestrator;
-        _fileDbManager = manager;
-        _fileCompactor = compactor;
-        _activeDownloadStreams = [];
+        _compactor = compactor;
+        _dbManager = manager;
+        _service = service;
 
-        //Mediator.Subscribe<DownloadLimitChangedMessage>(this, (msg) =>
-        //{
-        //    if (!_activeDownloadStreams.Any()) return;
-        //    var newLimit = _orchestrator.DownloadLimitPerSlot();
-        //    Logger.LogTrace("Setting new Download Speed Limit to {newLimit}", newLimit);
-        //    foreach (var stream in _activeDownloadStreams)
-        //    {
-        //        stream.BandwidthLimit = newLimit;
-        //    }
-        //});
+        _activeDownloadStreams = [];
+        _downloadStatus = new Dictionary<string, FileDownloadStatus>(StringComparer.Ordinal);
+
+        Mediator.Subscribe<DownloadLimitChangedMessage>(this, (msg) =>
+        {
+            if (!_activeDownloadStreams.Any())
+                return;
+            
+            var newLimit = _service.DownloadLimitPerSlot();
+            Logger.LogTrace($"Setting new Download Speed Limit to {newLimit}");
+            foreach (var stream in _activeDownloadStreams)
+                stream.BandwidthLimit = newLimit;
+        });
     }
 
-    //public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = [];
+    // was DownloadFileTransfer
+    public List<string> CurrentDownloads { get; private set; } = [];
+    public bool IsDownloading => !CurrentDownloads.Any();
 
-    //public List<FileTransfer> ForbiddenTransfers => _orchestrator.ForbiddenTransfers;
+    public void ClearDownload()
+    {
+        CurrentDownloads.Clear();
+        _downloadStatus.Clear();
+    }
 
-    //public bool IsDownloading => !CurrentDownloads.Any();
+    // I hate the parameters in this, try to simplify this file to a degree.
+    public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<(string GamePath, string? Hash), string> validDict, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        var missing = new ConcurrentBag<VerifiedModFile>();
 
-    //public static void MungeBuffer(Span<byte> buffer)
-    //{
-    //    for (int i = 0; i < buffer.Length; ++i)
-    //    {
-    //        buffer[i] ^= 42;
-    //    }
-    //}
+        validDict = [];
+        var outputDict = new ConcurrentDictionary<(string GamePath, string? Hash), string>();
+        
+        // Something about migration idk find out later.
+        bool hasMigrationChanges = false;
 
-    //public void ClearDownload()
-    //{
-    //    CurrentDownloads.Clear();
-    //    _downloadStatus.Clear();
-    //}
+        try
+        {
+            // Grab the current expected mod files. For these, we should check in parallel if cached, then place them in the outputDict or missing bag respectively.
+            Parallel.ForEach(replacements.Values.Where(vmf => string.IsNullOrEmpty(vmf.SwappedPath)), new ParallelOptions()
+            {
+                CancellationToken = ct,
+                MaxDegreeOfParallelism = 4
+            },
+            (item) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                // Attempt to locate the path of this file hash in our personal cache
+                if (_dbManager.GetFileCacheByHash(item.Hash) is { } fileCache)
+                {
+                    // Then attempt to fetch the file information via the resolved FilePath+Extension.
+                    // If the FileHash matched, but there was no FileInfo with the extension, we need to migrate it.
+                    if (string.IsNullOrEmpty(new FileInfo(fileCache.ResolvedFilepath).Extension))
+                    {
+                        hasMigrationChanges = true;
+                        fileCache = _dbManager.MigrateFileHashToExtension(fileCache, item.GamePaths[0].Split(".")[^1]);
+                    }
 
-    //public async Task DownloadFiles( GameObjectHandler gameObject, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
-    //{
-    //    Mediator.Publish(new HaltScanMessage(nameof(DownloadFiles)));
-    //    try
-    //    {
-    //        await DownloadFilesInternal(gameObject, fileReplacementDto, ct).ConfigureAwait(false);
-    //    }
-    //    catch
-    //    {
-    //        ClearDownload();
-    //    }
-    //    finally
-    //    {
-    //        Mediator.Publish(new DownloadFinishedMessage(gameObject));
-    //        Mediator.Publish(new ResumeScanMessage(nameof(DownloadFiles)));
-    //    }
-    //}
+                    // Otherwise append the resolved paths into the modded dictionary. (maybe revise later)
+                    foreach (var gamePath in item.GamePaths)
+                        outputDict[(gamePath, item.Hash)] = fileCache.ResolvedFilepath;
+                }
+                else
+                {
+                    Logger.LogTrace($"Missing file: {item.Hash}", LoggerType.PairFileCache);
+                    missing.Add(item);
+                }
+            });
 
-    //protected override void Dispose(bool disposing)
-    //{
-    //    ClearDownload();
-    //    foreach (var stream in _activeDownloadStreams.ToList())
-    //    {
-    //        try
-    //        {
-    //            stream.Dispose();
-    //        }
-    //        catch
-    //        {
-    //            // do nothing
-    //            //
-    //        }
-    //    }
-    //    base.Dispose(disposing);
-    //}
+            // Compose the validDictionary
+            validDict = outputDict.ToDictionary(k => k.Key, k => k.Value);
 
-    //private static byte MungeByte(int byteOrEof)
-    //{
-    //    if (byteOrEof == -1)
-    //    {
-    //        throw new EndOfStreamException();
-    //    }
+            // Run a second check but for all file swap paths?... Idk honestly, the file swap -vs- no file swap is confusing because it seems to remove all before sending.
+            foreach (var item in replacements.Values.Where(vmf => !string.IsNullOrEmpty(vmf.SwappedPath)).ToList())
+            {
+                foreach (var gamePath in item.GamePaths)
+                {
+                    Logger.LogTrace($"Adding file swap for {gamePath}: {item.SwappedPath}");
+                    validDict[(gamePath, item.Hash)] = item.SwappedPath;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error while grabbing existing files from the cache: {ex}");
+        }
 
-    //    return (byte)(byteOrEof ^ 42);
-    //}
+        // If there were migration changes we should re-write out the full csv.
+        if (hasMigrationChanges)
+            _dbManager.WriteOutFullCsv();
+
+        sw.Stop();
+        Logger.LogDebug($"ModdedPaths calculated in {sw.ElapsedMilliseconds}ms, missing files: {missing.Count}, total files: {validDict.Count}");
+        return [.. missing];
+    }
+
+    /// <summary>
+    ///     Downloads a batch of files using authorized download links provided by Sundouleia's FileHost.
+    /// </summary>
+
+    public async Task DownloadFiles(PlayerHandler handler, List<VerifiedModFile> fileReplacementDto, CancellationToken ct)
+    {
+        try
+        {
+            await DownloadFilesInternal(handler, fileReplacementDto, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            ClearDownload();
+        }
+        finally
+        {
+            Mediator.Publish(new FileDownloadComplete(handler));
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        ClearDownload();
+        foreach (var stream in _activeDownloadStreams.ToList())
+            Generic.Safe(stream.Dispose);
+        base.Dispose(disposing);
+    }
 
     //private static (string fileHash, long fileLengthBytes) ReadBlockFileHeader(FileStream fileBlockStream)
     //{
@@ -131,6 +180,231 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     //    return (string.Join("", hashName), long.Parse(string.Join("", fileLength)));
     //}
 
+    //public async Task<List<DownloadFileTransfer>> InitiateDownloadList(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)
+    //{
+    //    Logger.LogDebug("Download start: {id}", gameObjectHandler.Name);
+
+    //    List<DownloadFileDto> downloadFileInfoFromService =
+    //    [
+    //        .. await FilesGetSizes(fileReplacement.Select(f => f.Hash).Distinct(StringComparer.Ordinal).ToList(), ct).ConfigureAwait(false),
+    //    ];
+
+    //    Logger.LogDebug("Files with size 0 or less: {files}", string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
+
+    //    foreach (var dto in downloadFileInfoFromService.Where(c => c.IsForbidden))
+    //    {
+    //        if (!_transferService.ForbiddenTransfers.Exists(f => string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal)))
+    //        {
+    //            _transferService.ForbiddenTransfers.Add(new DownloadFileTransfer(dto));
+    //        }
+    //    }
+
+    //    CurrentDownloads = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
+    //        .Where(d => d.CanBeTransferred).ToList();
+
+    //    return CurrentDownloads;
+    //}
+
+    // I give up trying to digest this, my battery is fucking spent.
+    private async Task DownloadFilesInternal(PlayerHandler handler, List<VerifiedModFile> moddedFiles, CancellationToken ct)
+    {
+        var downloadGroups = CurrentDownloads.GroupBy(f => f.DownloadUri.Host + ":" + f.DownloadUri.Port, StringComparer.Ordinal);
+
+        foreach (var downloadGroup in downloadGroups)
+        {
+            _downloadStatus[downloadGroup.Key] = new FileDownloadStatus()
+            {
+                DownloadStatus = DownloadStatus.Initializing,
+                TotalBytes = downloadGroup.Sum(c => c.Total),
+                TotalFiles = 1,
+                TransferredBytes = 0,
+                TransferredFiles = 0
+            };
+        }
+
+        Mediator.Publish(new DownloadStartedMessage(gameObjectHandler, _downloadStatus));
+
+        await Parallel.ForEachAsync(downloadGroups, new ParallelOptions()
+        {
+            MaxDegreeOfParallelism = downloadGroups.Count(),
+            CancellationToken = ct,
+        },
+        async (fileGroup, token) =>
+        {
+            // let server predownload files
+            var requestIdResponse = await _transferService.SendRequestAsync(HttpMethod.Post, SundeouleiaFiles.RequestEnqueueFullPath(fileGroup.First().DownloadUri),
+                fileGroup.Select(c => c.Hash), token).ConfigureAwait(false);
+            Logger.LogDebug("Sent request for {n} files on server {uri} with result {result}", fileGroup.Count(), fileGroup.First().DownloadUri,
+                await requestIdResponse.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+
+            Guid requestId = Guid.Parse((await requestIdResponse.Content.ReadAsStringAsync().ConfigureAwait(false)).Trim('"'));
+
+            Logger.LogDebug("GUID {requestId} for {n} files on server {uri}", requestId, fileGroup.Count(), fileGroup.First().DownloadUri);
+
+            var blockFile = _fileDbManager.GetCacheFilePath(requestId.ToString("N"), "blk");
+            FileInfo fi = new(blockFile);
+            try
+            {
+                _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.WaitingForSlot;
+                await _transferService.WaitForDownloadSlotAsync(token).ConfigureAwait(false);
+                _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.WaitingForQueue;
+                Progress<long> progress = new((bytesDownloaded) =>
+                {
+                    try
+                    {
+                        if (!_downloadStatus.TryGetValue(fileGroup.Key, out FileDownloadStatus? value)) return;
+                        value.TransferredBytes += bytesDownloaded;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Could not set download progress");
+                    }
+                });
+                await DownloadAndMungeFileHttpClient(fileGroup.Key, requestId, [.. fileGroup], blockFile, progress, token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.LogDebug("{dlName}: Detected cancellation of download, partially extracting files for {id}", fi.Name, gameObjectHandler);
+            }
+            catch (Exception ex)
+            {
+                _transferService.ReleaseDownloadSlot();
+                File.Delete(blockFile);
+                Logger.LogError(ex, "{dlName}: Error during download of {id}", fi.Name, requestId);
+                ClearDownload();
+                return;
+            }
+
+            FileStream? fileBlockStream = null;
+            try
+            {
+                if (_downloadStatus.TryGetValue(fileGroup.Key, out var status))
+                {
+                    status.TransferredFiles = 1;
+                    status.DownloadStatus = DownloadStatus.Decompressing;
+                }
+                fileBlockStream = File.OpenRead(blockFile);
+                while (fileBlockStream.Position < fileBlockStream.Length)
+                {
+                    (string fileHash, long fileLengthBytes) = ReadBlockFileHeader(fileBlockStream);
+
+                    try
+                    {
+                        var fileExtension = fileReplacement.First(f => string.Equals(f.Hash, fileHash, StringComparison.OrdinalIgnoreCase)).GamePaths[0].Split(".")[^1];
+                        var filePath = _fileDbManager.GetCacheFilePath(fileHash, fileExtension);
+                        Logger.LogDebug("{dlName}: Decompressing {file}:{le} => {dest}", fi.Name, fileHash, fileLengthBytes, filePath);
+
+                        byte[] compressedFileContent = new byte[fileLengthBytes];
+                        var readBytes = await fileBlockStream.ReadAsync(compressedFileContent, CancellationToken.None).ConfigureAwait(false);
+                        if (readBytes != fileLengthBytes)
+                        {
+                            throw new EndOfStreamException();
+                        }
+                        MungeBuffer(compressedFileContent);
+
+                        var decompressedFile = LZ4Wrapper.Unwrap(compressedFileContent);
+                        await _fileCompactor.WriteAllBytesAsync(filePath, decompressedFile, CancellationToken.None).ConfigureAwait(false);
+
+                        PersistFileToStorage(fileHash, filePath);
+                    }
+                    catch (EndOfStreamException)
+                    {
+                        Logger.LogWarning("{dlName}: Failure to extract file {fileHash}, stream ended prematurely", fi.Name, fileHash);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.LogWarning(e, "{dlName}: Error during decompression", fi.Name);
+                    }
+                }
+            }
+            catch (EndOfStreamException)
+            {
+                Logger.LogDebug("{dlName}: Failure to extract file header data, stream ended", fi.Name);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "{dlName}: Error during block file read", fi.Name);
+            }
+            finally
+            {
+                _transferService.ReleaseDownloadSlot();
+                if (fileBlockStream != null)
+                    await fileBlockStream.DisposeAsync().ConfigureAwait(false);
+                File.Delete(blockFile);
+            }
+        }).ConfigureAwait(false);
+
+        Logger.LogDebug("Download end: {id}", gameObjectHandler);
+
+        ClearDownload();
+    }
+
+    //private async Task WaitForDownloadReady(List<DownloadFileTransfer> downloadFileTransfer, CancellationToken downloadCt)
+    //{
+    //    bool alreadyCancelled = false;
+    //    try
+    //    {
+    //        CancellationTokenSource localTimeoutCts = new();
+    //        localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+    //        CancellationTokenSource composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
+
+    //        while (!_transferService.IsDownloadReady(requestId))
+    //        {
+    //            try
+    //            {
+    //                await Task.Delay(250, composite.Token).ConfigureAwait(false);
+    //            }
+    //            catch (TaskCanceledException)
+    //            {
+    //                if (downloadCt.IsCancellationRequested) throw;
+
+    //                var req = await _transferService.SendRequestAsync(HttpMethod.Get, SundeouleiaFiles.RequestCheckQueueFullPath(downloadFileTransfer[0].DownloadUri, requestId),
+    //                    downloadFileTransfer.Select(c => c.Hash).ToList(), downloadCt).ConfigureAwait(false);
+    //                req.EnsureSuccessStatusCode();
+    //                localTimeoutCts.Dispose();
+    //                composite.Dispose();
+    //                localTimeoutCts = new();
+    //                localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+    //                composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
+    //            }
+    //        }
+
+    //        localTimeoutCts.Dispose();
+    //        composite.Dispose();
+
+    //        Logger.LogDebug("Download {requestId} ready", requestId);
+    //    }
+    //    catch (TaskCanceledException)
+    //    {
+    //        try
+    //        {
+    //            await _transferService.SendRequestAsync(HttpMethod.Get, SundeouleiaFiles.RequestCancelFullPath(downloadFileTransfer[0].DownloadUri, requestId)).ConfigureAwait(false);
+    //            alreadyCancelled = true;
+    //        }
+    //        catch
+    //        {
+    //            // ignore whatever happens here
+    //        }
+
+    //        throw;
+    //    }
+    //    finally
+    //    {
+    //        if (downloadCt.IsCancellationRequested && !alreadyCancelled)
+    //        {
+    //            try
+    //            {
+    //                await _transferService.SendRequestAsync(HttpMethod.Get, SundeouleiaFiles.RequestCancelFullPath(downloadFileTransfer[0].DownloadUri, requestId)).ConfigureAwait(false);
+    //            }
+    //            catch
+    //            {
+    //                // ignore whatever happens here
+    //            }
+    //        }
+    //        _transferService.ClearDownloadRequest(requestId);
+    //    }
+    //}
+
     //private async Task DownloadAndMungeFileHttpClient(string downloadGroup, Guid requestId, List<DownloadFileTransfer> fileTransfer, string tempPath, IProgress<long> progress, CancellationToken ct)
     //{
     //    Logger.LogDebug("GUID {requestId} on server {uri} for files {files}", requestId, fileTransfer[0].DownloadUri, string.Join(", ", fileTransfer.Select(c => c.Hash).ToList()));
@@ -145,7 +419,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     //    Logger.LogDebug("Downloading {requestUrl} for request {id}", requestUrl, requestId);
     //    try
     //    {
-    //        response = await _orchestrator.SendRequestAsync(HttpMethod.Get, requestUrl, ct, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+    //        response = await _transferService.SendRequestAsync(HttpMethod.Get, requestUrl, ct, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
     //        response.EnsureSuccessStatusCode();
     //    }
     //    catch (HttpRequestException ex)
@@ -167,7 +441,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     //            var buffer = new byte[bufferSize];
 
     //            var bytesRead = 0;
-    //            var limit = _orchestrator.DownloadLimitPerSlot();
+    //            var limit = _transferService.DownloadLimitPerSlot();
     //            Logger.LogTrace("Starting Download of {id} with a speed limit of {limit} to {tempPath}", requestId, limit, tempPath);
     //            stream = new ThrottledStream(await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), limit);
     //            _activeDownloadStreams.Add(stream);
@@ -212,168 +486,10 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     //    }
     //}
 
-    //public async Task<List<DownloadFileTransfer>> InitiateDownloadList(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)
-    //{
-    //    Logger.LogDebug("Download start: {id}", gameObjectHandler.Name);
-
-    //    List<DownloadFileDto> downloadFileInfoFromService =
-    //    [
-    //        .. await FilesGetSizes(fileReplacement.Select(f => f.Hash).Distinct(StringComparer.Ordinal).ToList(), ct).ConfigureAwait(false),
-    //    ];
-
-    //    Logger.LogDebug("Files with size 0 or less: {files}", string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
-
-    //    foreach (var dto in downloadFileInfoFromService.Where(c => c.IsForbidden))
-    //    {
-    //        if (!_orchestrator.ForbiddenTransfers.Exists(f => string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal)))
-    //        {
-    //            _orchestrator.ForbiddenTransfers.Add(new DownloadFileTransfer(dto));
-    //        }
-    //    }
-
-    //    CurrentDownloads = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
-    //        .Where(d => d.CanBeTransferred).ToList();
-
-    //    return CurrentDownloads;
-    //}
-
-    //private async Task DownloadFilesInternal(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)
-    //{
-    //    var downloadGroups = CurrentDownloads.GroupBy(f => f.DownloadUri.Host + ":" + f.DownloadUri.Port, StringComparer.Ordinal);
-
-    //    foreach (var downloadGroup in downloadGroups)
-    //    {
-    //        _downloadStatus[downloadGroup.Key] = new FileDownloadStatus()
-    //        {
-    //            DownloadStatus = DownloadStatus.Initializing,
-    //            TotalBytes = downloadGroup.Sum(c => c.Total),
-    //            TotalFiles = 1,
-    //            TransferredBytes = 0,
-    //            TransferredFiles = 0
-    //        };
-    //    }
-
-    //    Mediator.Publish(new DownloadStartedMessage(gameObjectHandler, _downloadStatus));
-
-    //    await Parallel.ForEachAsync(downloadGroups, new ParallelOptions()
-    //    {
-    //        MaxDegreeOfParallelism = downloadGroups.Count(),
-    //        CancellationToken = ct,
-    //    },
-    //    async (fileGroup, token) =>
-    //    {
-    //        // let server predownload files
-    //        var requestIdResponse = await _orchestrator.SendRequestAsync(HttpMethod.Post, SundeouleiaFiles.RequestEnqueueFullPath(fileGroup.First().DownloadUri),
-    //            fileGroup.Select(c => c.Hash), token).ConfigureAwait(false);
-    //        Logger.LogDebug("Sent request for {n} files on server {uri} with result {result}", fileGroup.Count(), fileGroup.First().DownloadUri,
-    //            await requestIdResponse.Content.ReadAsStringAsync(token).ConfigureAwait(false));
-
-    //        Guid requestId = Guid.Parse((await requestIdResponse.Content.ReadAsStringAsync().ConfigureAwait(false)).Trim('"'));
-
-    //        Logger.LogDebug("GUID {requestId} for {n} files on server {uri}", requestId, fileGroup.Count(), fileGroup.First().DownloadUri);
-
-    //        var blockFile = _fileDbManager.GetCacheFilePath(requestId.ToString("N"), "blk");
-    //        FileInfo fi = new(blockFile);
-    //        try
-    //        {
-    //            _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.WaitingForSlot;
-    //            await _orchestrator.WaitForDownloadSlotAsync(token).ConfigureAwait(false);
-    //            _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.WaitingForQueue;
-    //            Progress<long> progress = new((bytesDownloaded) =>
-    //            {
-    //                try
-    //                {
-    //                    if (!_downloadStatus.TryGetValue(fileGroup.Key, out FileDownloadStatus? value)) return;
-    //                    value.TransferredBytes += bytesDownloaded;
-    //                }
-    //                catch (Exception ex)
-    //                {
-    //                    Logger.LogWarning(ex, "Could not set download progress");
-    //                }
-    //            });
-    //            await DownloadAndMungeFileHttpClient(fileGroup.Key, requestId, [.. fileGroup], blockFile, progress, token).ConfigureAwait(false);
-    //        }
-    //        catch (OperationCanceledException)
-    //        {
-    //            Logger.LogDebug("{dlName}: Detected cancellation of download, partially extracting files for {id}", fi.Name, gameObjectHandler);
-    //        }
-    //        catch (Exception ex)
-    //        {
-    //            _orchestrator.ReleaseDownloadSlot();
-    //            File.Delete(blockFile);
-    //            Logger.LogError(ex, "{dlName}: Error during download of {id}", fi.Name, requestId);
-    //            ClearDownload();
-    //            return;
-    //        }
-
-    //        FileStream? fileBlockStream = null;
-    //        try
-    //        {
-    //            if (_downloadStatus.TryGetValue(fileGroup.Key, out var status))
-    //            {
-    //                status.TransferredFiles = 1;
-    //                status.DownloadStatus = DownloadStatus.Decompressing;
-    //            }
-    //            fileBlockStream = File.OpenRead(blockFile);
-    //            while (fileBlockStream.Position < fileBlockStream.Length)
-    //            {
-    //                (string fileHash, long fileLengthBytes) = ReadBlockFileHeader(fileBlockStream);
-
-    //                try
-    //                {
-    //                    var fileExtension = fileReplacement.First(f => string.Equals(f.Hash, fileHash, StringComparison.OrdinalIgnoreCase)).GamePaths[0].Split(".")[^1];
-    //                    var filePath = _fileDbManager.GetCacheFilePath(fileHash, fileExtension);
-    //                    Logger.LogDebug("{dlName}: Decompressing {file}:{le} => {dest}", fi.Name, fileHash, fileLengthBytes, filePath);
-
-    //                    byte[] compressedFileContent = new byte[fileLengthBytes];
-    //                    var readBytes = await fileBlockStream.ReadAsync(compressedFileContent, CancellationToken.None).ConfigureAwait(false);
-    //                    if (readBytes != fileLengthBytes)
-    //                    {
-    //                        throw new EndOfStreamException();
-    //                    }
-    //                    MungeBuffer(compressedFileContent);
-
-    //                    var decompressedFile = LZ4Wrapper.Unwrap(compressedFileContent);
-    //                    await _fileCompactor.WriteAllBytesAsync(filePath, decompressedFile, CancellationToken.None).ConfigureAwait(false);
-
-    //                    PersistFileToStorage(fileHash, filePath);
-    //                }
-    //                catch (EndOfStreamException)
-    //                {
-    //                    Logger.LogWarning("{dlName}: Failure to extract file {fileHash}, stream ended prematurely", fi.Name, fileHash);
-    //                }
-    //                catch (Exception e)
-    //                {
-    //                    Logger.LogWarning(e, "{dlName}: Error during decompression", fi.Name);
-    //                }
-    //            }
-    //        }
-    //        catch (EndOfStreamException)
-    //        {
-    //            Logger.LogDebug("{dlName}: Failure to extract file header data, stream ended", fi.Name);
-    //        }
-    //        catch (Exception ex)
-    //        {
-    //            Logger.LogError(ex, "{dlName}: Error during block file read", fi.Name);
-    //        }
-    //        finally
-    //        {
-    //            _orchestrator.ReleaseDownloadSlot();
-    //            if (fileBlockStream != null)
-    //                await fileBlockStream.DisposeAsync().ConfigureAwait(false);
-    //            File.Delete(blockFile);
-    //        }
-    //    }).ConfigureAwait(false);
-
-    //    Logger.LogDebug("Download end: {id}", gameObjectHandler);
-
-    //    ClearDownload();
-    //}
-
     //private async Task<List<DownloadFileDto>> FilesGetSizes(List<string> hashes, CancellationToken ct)
     //{
-    //    if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
-    //    var response = await _orchestrator.SendRequestAsync(HttpMethod.Get, SundeouleiaFiles.ServerFilesGetSizesFullPath(_orchestrator.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
+    //    if (!_transferService.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
+    //    var response = await _transferService.SendRequestAsync(HttpMethod.Get, SundeouleiaFiles.ServerFilesGetSizesFullPath(_transferService.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
     //    return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? [];
     //}
 
@@ -404,72 +520,6 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     //    catch (Exception ex)
     //    {
     //        Logger.LogWarning(ex, "Error creating cache entry");
-    //    }
-    //}
-
-    //private async Task WaitForDownloadReady(List<DownloadFileTransfer> downloadFileTransfer, Guid requestId, CancellationToken downloadCt)
-    //{
-    //    bool alreadyCancelled = false;
-    //    try
-    //    {
-    //        CancellationTokenSource localTimeoutCts = new();
-    //        localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
-    //        CancellationTokenSource composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
-
-    //        while (!_orchestrator.IsDownloadReady(requestId))
-    //        {
-    //            try
-    //            {
-    //                await Task.Delay(250, composite.Token).ConfigureAwait(false);
-    //            }
-    //            catch (TaskCanceledException)
-    //            {
-    //                if (downloadCt.IsCancellationRequested) throw;
-
-    //                var req = await _orchestrator.SendRequestAsync(HttpMethod.Get, SundeouleiaFiles.RequestCheckQueueFullPath(downloadFileTransfer[0].DownloadUri, requestId),
-    //                    downloadFileTransfer.Select(c => c.Hash).ToList(), downloadCt).ConfigureAwait(false);
-    //                req.EnsureSuccessStatusCode();
-    //                localTimeoutCts.Dispose();
-    //                composite.Dispose();
-    //                localTimeoutCts = new();
-    //                localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
-    //                composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
-    //            }
-    //        }
-
-    //        localTimeoutCts.Dispose();
-    //        composite.Dispose();
-
-    //        Logger.LogDebug("Download {requestId} ready", requestId);
-    //    }
-    //    catch (TaskCanceledException)
-    //    {
-    //        try
-    //        {
-    //            await _orchestrator.SendRequestAsync(HttpMethod.Get, SundeouleiaFiles.RequestCancelFullPath(downloadFileTransfer[0].DownloadUri, requestId)).ConfigureAwait(false);
-    //            alreadyCancelled = true;
-    //        }
-    //        catch
-    //        {
-    //            // ignore whatever happens here
-    //        }
-
-    //        throw;
-    //    }
-    //    finally
-    //    {
-    //        if (downloadCt.IsCancellationRequested && !alreadyCancelled)
-    //        {
-    //            try
-    //            {
-    //                await _orchestrator.SendRequestAsync(HttpMethod.Get, SundeouleiaFiles.RequestCancelFullPath(downloadFileTransfer[0].DownloadUri, requestId)).ConfigureAwait(false);
-    //            }
-    //            catch
-    //            {
-    //                // ignore whatever happens here
-    //            }
-    //        }
-    //        _orchestrator.ClearDownloadRequest(requestId);
     //    }
     //}
 }

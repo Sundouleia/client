@@ -1,4 +1,5 @@
 using Sundouleia.Pairs;
+using Sundouleia.WebAPI.Files.Models;
 
 namespace Sundouleia.Services.Mediator;
 
@@ -13,7 +14,7 @@ public record DownloadLimitChangedMessage : SameThreadMessage;
 public record FileUploading(PlayerHandler Player) : MessageBase;
 public record FileUploaded(PlayerHandler Player) : MessageBase;
 public record FileDownloadReady(Guid RequestId) : MessageBase; // Maybe remove this.
-public record FileDownloadStarted(PlayerHandler Player, Dictionary<string, string> Status) : MessageBase;
+public record FileDownloadStarted(PlayerHandler Player, Dictionary<string, FileDownloadStatus> Status) : MessageBase;
 public record FileDownloadComplete(PlayerHandler Player) : MessageBase;
 
 /// <summary>

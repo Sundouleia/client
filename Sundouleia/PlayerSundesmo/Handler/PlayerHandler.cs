@@ -14,11 +14,7 @@ namespace Sundouleia.Pairs;
 
 /// <summary>
 ///     Stores information about a pairing (Sundesmo) between 2 users. <para />
-///     Main difference with sundesmo and past Moon solutions is that sundesmo 
-///     does not do hash comparisons between 2 full data updates. <para />
-///     Instead, the <see cref="VisualDataUpdate"/> and <see cref="ModDataUpdate"/> 
-///     recieved holds all pending changes to be applied to your stored Data 
-///     of the same types.
+///     Handled a lot differently than what people may be used to seeing from past solutions.
 /// </summary>
 public class PlayerHandler : DisposableMediatorSubscriberBase
 {
@@ -88,7 +84,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     // cached data for appearance.
     private Guid _tempCollection;
-    private Dictionary<string, ModFile> _replacements = []; // GamePath -> FilePath (maybe have internal manager idk)
+    private Dictionary<string, VerifiedModFile> _replacements = []; // Hash -> VerifiedFile with download link included if necessary.
     private Guid _tempProfile; // CPlus temp profile id.
     private IpcDataPlayerCache? _appearanceData = null;
 
@@ -204,9 +200,23 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (_appearanceData is not null)
             ReapplyVisuals().ConfigureAwait(false);
         if (_tempCollection != Guid.Empty && _replacements.Count > 0)
-            ApplyModData().ConfigureAwait(false);
+        {
+            _downloader.GetExistingFromCache(_replacements, out var moddedDict, CancellationToken.None);
+            ApplyModData(moddedDict.ToDictionary(k => k.Key.GamePath, k => k.Value, StringComparer.Ordinal)).ConfigureAwait(false);
+        }
         // redraw for now, reapply later after glamourer implements methods for reapply.
         _ipc.Penumbra.RedrawGameObject(ObjIndex);
+    }
+
+    // Placeholder stuff for now.
+    private void UpdateReplacements(NewModUpdates newData)
+    {
+        // Remove all keys to remove.
+        foreach (var hash in newData.HashesToRemove)
+            _replacements.Remove(hash);
+        // Add all new files to add.
+        foreach (var file in newData.FilesToAdd)
+            _replacements[file.Hash] = file;
     }
 
     public void UpdateAndApplyFullData(NewModUpdates modData, IpcDataPlayerUpdate ipcData)
@@ -216,17 +226,17 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // 2) Need to store all data but not apply if not rendered yet.
         if (!IsRendered)
         {
-            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.FullDataReceive,
-                "Downloading but not applying data [NOT-RENDERED]")));
-            Logger.LogWarning("Received data for this sundesmo but their object is not yet present!\n" +
-                "With this new ObjectWatcher system this should never happen. If it does, determine why immidiately.");
-            // Determine the pending changes to apply for both.
-            // TODO: (Having multiple of these errors might lead to inconsistant states to maybe have a 'pendingData' object?
-            // (spesifcally an issue for mods)
+            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.FullDataReceive, "Downloading but not applying data [NOT-RENDERED]")));
+            Logger.LogWarning("Data received from an object not currently present! If this happens, report / determine why immediately.");
+            // Update the Mod Replacements with the new changes. (Does not apply them!)
+            UpdateReplacements(modData);
+            // Update the appearance data with the new ipc data.
             _appearanceData ??= new();
             _appearanceData.UpdateCache(ipcData);
             return;
         }
+
+        // The old mare transfer bars would technically not work here as we would be both uploading files while downloading current ones at the same time.
 
         // 3) Player is rendered, so process the ipc & mods.
         ApplyIpcData(ipcData).ConfigureAwait(false);
@@ -243,67 +253,82 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return;
         }
 
-        // Logger.LogDebug("Mod Data changes detected, processing comparisons.", LoggerType.PairHandler);
-
-
-
         // Check for any differenced in the modified paths to know what new data we have.
-        // Logger.LogDebug("ModData update requests removing [X] files from temp collection. [Y] new files are to be added. [if any are awaiting a second send mention it here]", LoggerType.PairHandler);
+        Logger.LogDebug($"NewModUpdate is removing {modData.HashesToRemove.Count} files, and adding {modData.FilesToAdd} new files added | WaitingOnMore: {modData.NotAllSent}", LoggerType.PairHandler);
 
-        // By now the above method should have returned:
-        // - What files we in the previous that are not in the current (backup safety net, but should never need)
-        // - What hashes were in the ModData's REMOVEFROM group.
-        // - What hashes were in the ModData's ADDTO group.
-        // Logger.LogTrace("Removing outdated and requested removal files from collection.", LoggerType.PairHandler);
-        
-        // TODO: Replace this with an IPC call whenever we get the ability to add/remove changed items from a temporary mod.
-        // - Remove Gamepaths from it that should be removed.
-        // Log what is left to be done.
-        // Logger.LogDebug("Removed [X] paths, Replaced [Y] paths, Adding [Z] paths.", LoggerType.PairHandler);
-        
-        // Determine here via checking the filecache which files we already have the replacement paths for the paths to add.
+        UpdateReplacements(modData);
+        Logger.LogTrace("Removing outdated and requested removal files from collection.", LoggerType.PairHandler);
 
-        // Log the fetched results. [NOTE: 'X of Y paths didnt have download links' will be removed later as they will not be provided in the callback.
-        // Logger.LogDebug("Of the [X] new paths to add, [Y] were cached. Downloading remainder uncached if any.", LoggerType.PairHandler);
-        var downloadLinks = 2;
-        if (downloadLinks > 4)
+        // Determine here via checking the FileCache which files we already have the replacement paths for the paths to add.
+        // process the download manager here and await its completion or whatever.
+        _downloadCTS = _downloadCTS.SafeCancelRecreate();
+        var missingFiles = _downloader.GetExistingFromCache(_replacements, out var moddedDict, _downloadCTS.Token);
+
+        // Make this fire-and-forget if we run into more problems than solutions.
+        Logger.LogDebug($"Of the {moddedDict.Count} new paths to add, {missingFiles.Count} were not cached. Downloading remainder uncached if any.", LoggerType.PairHandler);
+        // This should only be intended to download new files. Any files existing in the hashes should already be downloaded? Not sure.
+        // Would need to look into this later, im too exhausted at the moment.
+        // In essence, upon receiving newModData, those should be checked, but afterwards, these hashes and their respective file paths
+        // in the cache should all be valid. If they are not, they should be cleared and reloaded.
+        if (missingFiles.Count > 0)
         {
-            // Cancel any current 'uploading' display.
-            Mediator.Publish(new FileUploaded(this));
-            // Push to event.
-            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data.")));
-            Logger.LogDebug($"Downloading {downloadLinks} files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairHandler);
-            // process the download manager here and await its completion or whatever.
-            _downloadCTS = _downloadCTS.SafeCancelRecreate();
-            var downloadToken = _downloadCTS.Token;
+            int attempts = 0;
 
-            // Make this fire-and-forget if we run into more problems than solutions.
-            // (can pull this into a seperate call or something idk lol. We have a personalized download manager so why not use that XD)
+            while (missingFiles.Count > 0 && attempts++ <= 10 && !_downloadCTS.Token.IsCancellationRequested)
+            {
+                // await for the previous download task to complete.
+                if (_downloadTask is not null && !_downloadTask.IsCompleted)
+                {
+                    Logger.LogDebug($"Finishing prior download task for {NameString} ({Sundesmo.GetNickAliasOrUid()}", LoggerType.PairFileCache);
+                    await _downloadTask.ConfigureAwait(false);
+                }
 
+                // Begin the download task.
+                Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data.")));
+                Logger.LogDebug($"Downloading {missingFiles.Count} files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairHandler);
+                
+                _downloadTask = Task.Run(async () => await _downloader.DownloadFiles(this, missingFiles, _downloadCTS.Token).ConfigureAwait(false), _downloadCTS.Token);
+
+                await _downloadTask.ConfigureAwait(false);
+
+                // If we wanted to back out, then back out.
+                if (_downloadCTS.Token.IsCancellationRequested)
+                {
+                    Logger.LogWarning($"Download task for {NameString}({Sundesmo.GetNickAliasOrUid()}) was cancelled, aborting further downloads.", LoggerType.PairHandler);
+                    return;
+                }
+
+                // Now that we have downloaded the files, check again to see which files we still need.
+                missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _downloadCTS.Token);
+
+                // Delay 2s between download monitors?
+                await Task.Delay(TimeSpan.FromSeconds(2), _downloadCTS.Token).ConfigureAwait(false);
+            }
         }
 
         // 4) Append the new data.
-        // Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairHandler);
-        // - Replace any existing gamepaths that have new paths.
-        // - Add any new gamepaths that are not already present.
-
+        _downloadCTS.Token.ThrowIfCancellationRequested();
+        Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairHandler);
         // 5) Apply the new mod data if rendered.
-        // Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
-        await ApplyModData().ConfigureAwait(false);   
+        Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        await ApplyModData(moddedDict.ToDictionary(k => k.Key.GamePath, k => k.Value, StringComparer.Ordinal)).ConfigureAwait(false);   
     }
-
-    private async Task ApplyModData()
+     
+    // Would need a way to retrieve the existing modded dictionary from the file cache or something here, not sure. We shouldnt need to download anything on a reapplication.
+    private async Task ApplyModData(Dictionary<string, string> moddedPaths)
     {
         if (!IsRendered || _tempCollection == Guid.Empty || _replacements.Count == 0)
         {
-            // Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered or has no mod data to apply, skipping mod application.", LoggerType.PairHandler);
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered or has no mod data to apply, skipping mod application.", LoggerType.PairHandler);
             return;
         }
         
         Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairHandler);
-        // await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, _replacements).ConfigureAwait(false);
+        // Maybe we need to do this for our other objects too? Im not sure, guess we'll find out and stuff.
+        await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
+        await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);        
         // do a reapply here (but need to do a redraw for now)
-        // _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        _ipc.Penumbra.RedrawGameObject(ObjIndex);
     }
 
     public async Task ReapplyVisuals()
