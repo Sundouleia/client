@@ -6,16 +6,16 @@ public class ProgressableStreamContent : StreamContent
 {
     private const int _defaultBufferSize = 4096;
     private readonly int _bufferSize;
-    private readonly IProgress<UploadProgress>? _progress;
+    private readonly IProgress<FileTransferProgress>? _progress;
     private readonly Stream _streamToWrite;
     private bool _contentConsumed;
 
-    public ProgressableStreamContent(Stream streamToWrite, IProgress<UploadProgress>? downloader)
+    public ProgressableStreamContent(Stream streamToWrite, IProgress<FileTransferProgress>? downloader)
         : this(streamToWrite, _defaultBufferSize, downloader)
     {
     }
 
-    public ProgressableStreamContent(Stream streamToWrite, int bufferSize, IProgress<UploadProgress>? progress)
+    public ProgressableStreamContent(Stream streamToWrite, int bufferSize, IProgress<FileTransferProgress>? progress)
         : base(streamToWrite, bufferSize)
     {
         if (streamToWrite == null)
@@ -62,7 +62,7 @@ public class ProgressableStreamContent : StreamContent
                 }
 
                 uploaded += length;
-                _progress?.Report(new UploadProgress(uploaded, size));
+                _progress?.Report(new FileTransferProgress(uploaded, size));
                 await stream.WriteAsync(buffer.AsMemory(0, length)).ConfigureAwait(false);
             }
         }

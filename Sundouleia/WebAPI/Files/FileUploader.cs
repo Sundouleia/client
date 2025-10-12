@@ -10,30 +10,22 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
     private readonly FileCacheManager _fileDbManager;
-    private readonly HttpClient _httpClient = new(new HttpClientHandler
-    {
-        AutomaticDecompression = System.Net.DecompressionMethods.All,
-    });
+    private readonly FileTransferService _transferService;
 
     public FileUploader(ILogger<FileUploader> logger, SundouleiaMediator mediator,
-        MainConfig config, FileCacheManager fileDbManager) : base(logger, mediator)
+        MainConfig config, FileCacheManager fileDbManager, FileTransferService fileTransferService) : base(logger, mediator)
     {
         _config = config;
         _fileDbManager = fileDbManager;
-
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("SundouleiaClient/versionmaybe");
+        _transferService = fileTransferService;
     }
 
-    public ConcurrentDictionary<string, UploadProgress> CurrentUploads { get; } = []; // update as time does on.
+    public ConcurrentDictionary<string, FileTransferProgress> CurrentUploads { get; } = []; // update as time does on.
     public bool IsUploading => CurrentUploads.Count > 0;
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        if (disposing)
-        {
-            _httpClient.Dispose();
-        }
     }
 
     // Uploads all necessary files via their authorized upload links to the server.
@@ -41,7 +33,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     {
         foreach (var file in filesToUpload)
         {
-            if (CurrentUploads.GetOrAdd(file.Verified.Hash, new UploadProgress(0, file.Size)) is not null)
+            if (CurrentUploads.GetOrAdd(file.Verified.Hash, new FileTransferProgress(0, file.Size)) is not null)
             {
                 Logger.LogWarning("File {FileName} is already being uploaded, skipping.", file.Verified.Hash);
                 continue;
@@ -70,7 +62,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
         if (!File.Exists(file.LocalPath))
             throw new FileNotFoundException("File to upload does not exist.", file.LocalPath);
 
-        Progress<UploadProgress>? progressTracker = new((prog) =>
+        Progress<FileTransferProgress>? progressTracker = new((prog) =>
         {
             try
             {
@@ -85,12 +77,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
         using var fileStream = File.OpenRead(file.LocalPath);
         using var content = new ProgressableStreamContent(fileStream, progressTracker);
 
-        using var request = new HttpRequestMessage(HttpMethod.Put, file.Verified.Link)
-        {
-            Content = content
-        };
-
-        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancelToken).ConfigureAwait(false);
+        var response = await _transferService.SendRequestStreamAsync(HttpMethod.Put, new(file.Verified.Link), content, cancelToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
     }
 }

@@ -1,9 +1,9 @@
-﻿using Sundouleia.PlayerClient;
-using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI.Files.Models;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
+using Sundouleia.PlayerClient;
+using Sundouleia.Services.Mediator;
+using Sundouleia.WebAPI.Files.Models;
 
 namespace Sundouleia.WebAPI.Files;
 
@@ -11,28 +11,26 @@ namespace Sundouleia.WebAPI.Files;
 public class FileTransferService : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
-    private readonly TokenProvider _tokenProvider;
 
     // Concurrent dictionary to handle asynchronous file downloading between multiple characters at the same time (most likely).
     private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
     // Client being used to establish contact with the static FTP server.
     private readonly HttpClient _httpClient;
-    
+
     // Download semephore attributes.
     private readonly object _semaphoreModificationLock = new();
     private int _availableDownloadSlots;
     private SemaphoreSlim _downloadSemaphore;
-    
+
     // How many downloads are in use (how many characters are we downloading from at once)
     // [**Think how players loaded in at venues.. lol]
     private int CurrentlyUsedDownloadSlots => _availableDownloadSlots - _downloadSemaphore.CurrentCount;
 
     public FileTransferService(ILogger<FileTransferService> logger, SundouleiaMediator mediator,
-        MainConfig config, TokenProvider tokenProvider, HttpClient httpClient) 
+        MainConfig config, HttpClient httpClient)
         : base(logger, mediator)
     {
         _config = config;
-        _tokenProvider = tokenProvider;
         _httpClient = httpClient;
 
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
@@ -50,15 +48,6 @@ public class FileTransferService : DisposableMediatorSubscriberBase
         // does not exist, so it's assumed we know beforehand. Could be unsafe though, and maybe do with a revision?
         Mediator.Subscribe<FileDownloadReady>(this, (msg) => _downloadReady[msg.RequestId] = true);
     }
-
-    // Connection to file host.
-    public Uri FilesCdnUri => new(MainHub.MAIN_SERVER_URI);
-
-    // Holds the list of all forbidden file transfer hashes we attempted to upload or download).
-    // (not sure why this would EVER be in download if we forbid it on upload?) [ malicious forks are the only thing i could think of? ]
-    public List<string> ForbiddenTransfers { get; } = [];
-
-    public bool IsInitialized => FilesCdnUri != null;
 
     // Revoke a download allowance from being made by a specified GUID
     public void ClearDownloadRequest(Guid guid)
@@ -126,7 +115,7 @@ public class FileTransferService : DisposableMediatorSubscriberBase
     }
 
     // awaits for a download slot to become available for us to start processing the download task.
-    public async Task WaitForDownloadSlotAsync(CancellationToken token)
+    public async Task WaitForDownloadSlotAsync(CancellationToken ct)
     {
         // some voodoo magic here I have yet to fully understand, but I know that it recreates the download semaphore if:
         // the parallel download slots have changed in the config and the available download slots are the same as the current semaphore count.
@@ -141,7 +130,7 @@ public class FileTransferService : DisposableMediatorSubscriberBase
         }
 
         // await for the semaphore to have an available slot, with a token for cancellation.
-        await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
+        await _downloadSemaphore.WaitAsync(ct).ConfigureAwait(false);
         // For some reason this always pushed that the download limit changed even though it might not have?
         // idk anymore, might be related to some kind of queue in the download manager.
         Mediator.Publish(new DownloadLimitChangedMessage());
@@ -176,11 +165,6 @@ public class FileTransferService : DisposableMediatorSubscriberBase
     // Internally send a request off to the FTP servers
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage reqMsg, CancellationToken? ct = null, HttpCompletionOption endOption = HttpCompletionOption.ResponseContentRead)
     {
-        // Retrieve the same token we use for the signalR hub connection that we use to connect to the primary servers.
-        var token = _tokenProvider.GetToken();
-        // add the "Bearer" to the authentication header authorization field.
-        reqMsg.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
         // if the request message content has content already, and it is not stream content, or byte array content, convert it to JsonContent we read as a string.
         if (reqMsg.Content != null && reqMsg.Content is not StreamContent && reqMsg.Content is not ByteArrayContent)
         {
