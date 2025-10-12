@@ -194,7 +194,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
                     Logger.LogInformation($"Sending out uploaded remaining files to {toSend.Count} users.");
                     // Send the remaining files off to the file uploader.
-                    await _hub.UserPushIpcMods(new(toSend, filesToUpload)).ConfigureAwait(false);
+                    await _hub.UserPushIpcMods(new(toSend, new ModUpdates([.. filesToUpload.Select(v => new ModFile(v.Hash, v.GamePaths, v.SwappedPath))], []))).ConfigureAwait(false);
                 });
 
             }

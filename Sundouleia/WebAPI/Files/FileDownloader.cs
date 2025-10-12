@@ -35,7 +35,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
         {
             if (!_activeDownloadStreams.Any())
                 return;
-            
+
             var newLimit = _service.DownloadLimitPerSlot();
             Logger.LogTrace($"Setting new Download Speed Limit to {newLimit}");
             foreach (var stream in _activeDownloadStreams)
@@ -45,7 +45,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
 
     // was DownloadFileTransfer
     public List<string> CurrentDownloads { get; private set; } = [];
-    public bool IsDownloading => !CurrentDownloads.Any();
+    public bool IsDownloading => CurrentDownloads.Count > 0;
 
     public void ClearDownload()
     {
@@ -57,23 +57,17 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<(string GamePath, string? Hash), string> validDict, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
-        var missing = new ConcurrentBag<VerifiedModFile>();
+        var missing = new List<VerifiedModFile>();
 
         validDict = [];
-        var outputDict = new ConcurrentDictionary<(string GamePath, string? Hash), string>();
-        
+
         // Something about migration idk find out later.
         bool hasMigrationChanges = false;
 
         try
         {
             // Grab the current expected mod files. For these, we should check in parallel if cached, then place them in the outputDict or missing bag respectively.
-            Parallel.ForEach(replacements.Values.Where(vmf => string.IsNullOrEmpty(vmf.SwappedPath)), new ParallelOptions()
-            {
-                CancellationToken = ct,
-                MaxDegreeOfParallelism = 4
-            },
-            (item) =>
+            foreach (var item in replacements.Values.Where(vmf => string.IsNullOrEmpty(vmf.SwappedPath)))
             {
                 ct.ThrowIfCancellationRequested();
                 // Attempt to locate the path of this file hash in our personal cache
@@ -89,17 +83,14 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
 
                     // Otherwise append the resolved paths into the modded dictionary. (maybe revise later)
                     foreach (var gamePath in item.GamePaths)
-                        outputDict[(gamePath, item.Hash)] = fileCache.ResolvedFilepath;
+                        validDict[(gamePath, item.Hash)] = fileCache.ResolvedFilepath;
                 }
                 else
                 {
                     Logger.LogTrace($"Missing file: {item.Hash}", LoggerType.PairFileCache);
                     missing.Add(item);
                 }
-            });
-
-            // Compose the validDictionary
-            validDict = outputDict.ToDictionary(k => k.Key, k => k.Value);
+            }
 
             // Run a second check but for all file swap paths?... Idk honestly, the file swap -vs- no file swap is confusing because it seems to remove all before sending.
             foreach (var item in replacements.Values.Where(vmf => !string.IsNullOrEmpty(vmf.SwappedPath)).ToList())
@@ -122,7 +113,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
 
         sw.Stop();
         Logger.LogDebug($"ModdedPaths calculated in {sw.ElapsedMilliseconds}ms, missing files: {missing.Count}, total files: {validDict.Count}");
-        return [.. missing];
+        return missing;
     }
 
     /// <summary>
