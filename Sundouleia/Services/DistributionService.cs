@@ -8,6 +8,7 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
+using Sundouleia.WebAPI.Files.Models;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
 
@@ -181,11 +182,15 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 // Handle as fire-and-forget so that we do not block the distribution task updates.
                 _ = Task.Run(async () =>
                 {
-                    if (res.Value is not { } filesToUpload || filesToUpload.Count is 0)
+                    if (res.Value is not { } filesToUpload || filesToUpload is null || filesToUpload.Count is 0)
                         return;
 
                     // Upload the files and then send the remainder off to the file uploader.
-                    await _fileUploader.UploadFiles(filesToUpload).ConfigureAwait(false);
+                    await _fileUploader.UploadFiles(filesToUpload.Select(v =>
+                    {
+                        var moddedFile = currentModdedState.First(f => f.Hash == v.Hash);
+                        return moddedFile?.ResolvedPath.Length > 0 && !moddedFile.IsFileSwap ? new UploadableFile(v, moddedFile.ResolvedPath, FileSize(moddedFile.ResolvedPath)) : default(UploadableFile);
+                    })!).ConfigureAwait(false);
 
                     Logger.LogInformation($"Sending out uploaded remaining files to {toSend.Count} users.");
                     // Send the remaining files off to the file uploader.
@@ -195,6 +200,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             }
         }, _distributeDataCTS.Token);
     }
+
+    private static long FileSize(string path) => File.Exists(path) ? new FileInfo(path).Length : 0;
 
     // Possibly merge into the transient resource manger later, and rename it to moddedStateManager or something.
     private async Task<HashSet<ModdedFile>> CollectModdedState(CancellationToken ct)
@@ -264,7 +271,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
         // Grab these hashes via the FileCacheEntity.
         var computedPaths = _cacheManager.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
-        
+
         // Ensure we set and log said computed hashes.
         foreach (var file in toCompute)
         {
@@ -275,7 +282,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
         // Finally as a sanity check, remove any invalid file hashes for files that are no longer valid.
         var removed = moddedPaths.RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
-        if (removed > 0) 
+        if (removed > 0)
             Logger.LogDebug($"=> Removed {removed} invalid file hashes.");
 
         // Final throw check.
