@@ -1,10 +1,4 @@
 using CkCommons;
-using CkCommons.Gui;
-using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using OtterGui;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
@@ -13,13 +7,8 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
-using Sundouleia.WebAPI.Files.Models;
 using SundouleiaAPI.Data;
-using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
-using System.Reflection;
-using System.Windows.Forms;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Services;
 
@@ -32,14 +21,13 @@ namespace Sundouleia.Services;
 public sealed class DistributionService : DisposableMediatorSubscriberBase
 {
     // likely file sending somewhere in here.
-    private readonly MainConfig _config;
     private readonly MainHub _hub;
-    private readonly PlzNoCrashFrens _noCrashPlz;
+    private readonly MainConfig _config;
     private readonly IpcManager _ipc;
     private readonly SundesmoManager _sundesmos;
     private readonly FileCacheManager _cacheManager;
     private readonly FileUploader _fileUploader;
-    private readonly ModdedStateManager _transients;
+    private readonly ModdedStateManager _moddedState;
     private readonly CharaObjectWatcher _watcher;
 
     // Task runs the distribution of our data to other sundesmos.
@@ -59,18 +47,26 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     public bool UpdatingData => _dataUpdateLock.CurrentCount is 0;
     public bool DistributingData => _distributionLock.CurrentCount is 0; // only use if we dont want to cancel distributions.
 
-    public DistributionService(ILogger<DistributionService> logger, SundouleiaMediator mediator,
-        MainConfig config, MainHub hub, PlzNoCrashFrens noCrashPlz, IpcManager ipc, SundesmoManager pairs,
-        FileCacheManager cacheManager, ModdedStateManager transients, CharaObjectWatcher watcher)
-        : base(logger, mediator)
+    public DistributionService(
+        ILogger<DistributionService> logger,
+        SundouleiaMediator mediator,
+        MainHub hub,
+        MainConfig config,
+        PlzNoCrashFrens noCrashPlz,
+        IpcManager ipc,
+        SundesmoManager pairs,
+        FileCacheManager cacheManager,
+        FileUploader fileUploader,
+        ModdedStateManager moddedState,
+        CharaObjectWatcher watcher) : base(logger, mediator)
     {
-        _config = config;
         _hub = hub;
-        _noCrashPlz = noCrashPlz;
+        _config = config;
         _ipc = ipc;
         _sundesmos = pairs;
         _cacheManager = cacheManager;
-        _transients = transients;
+        _fileUploader = fileUploader;
+        _moddedState = moddedState;
         _watcher = watcher;
 
         // Process sundesmo state changes.
@@ -116,7 +112,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             LastCreatedData.GlamourerState[OwnedObject.Companion] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             LastCreatedData.CPlusState[OwnedObject.Companion] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             // Cache mods.
-            LastCreatedData.ApplyNewModState(await _transients.CollectModdedState(CancellationToken.None).ConfigureAwait(false));
+            LastCreatedData.ApplyNewModState(await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false));
 
         }
         catch (Exception ex)
@@ -130,7 +126,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }
 
         // Send off to all visible users after awaiting for any other distribution task to process.
-        Logger.LogInformation("Distributing initial Ipc Cache to visible sundesmos.", LoggerType.DataDistributor);
+        Logger.LogInformation("(OnHubConnected) Distributing to visible.", LoggerType.DataDistributor);
         _distributeDataCTS = _distributeDataCTS.SafeCancelRecreate();
         _distributeDataTask = Task.Run(async () =>
         {
@@ -154,6 +150,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // Process a distribution of full data to the newly visible users and then clear the update.
         _distributeDataTask = Task.Run(async () =>
         {
+            Logger.LogInformation("(UpdateCheck) Distributing to new visible.", LoggerType.DataDistributor);
             var recipients = NewVisibleUsers.ToList();
             NewVisibleUsers.Clear();
             await ResendAll(recipients).ConfigureAwait(false);
@@ -172,6 +169,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         
         Logger.LogDebug($"Uploaded {uploadedFiles.Count}/{filesNeedingUpload.Count} missing files. If any failed, there are integrity issues with your cache!", LoggerType.DataDistributor);
         await _hub.UserPushIpcMods(new PushIpcMods(usersToPushDataTo, new(uploadedFiles, []))).ConfigureAwait(false);
+        Logger.LogDebug($"Sent PushIpcMods out to {usersToPushDataTo.Count} users after uploading missing files.", LoggerType.DataDistributor);
     }
 
     #region Cache Updates
@@ -373,7 +371,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     private async Task<ModUpdates> UpdateModsInternal(CancellationToken ct)
     {
         // Collect the current modded state.
-        var currentState = await _transients.CollectModdedState(ct).ConfigureAwait(false);
+        var currentState = await _moddedState.CollectModdedState(ct).ConfigureAwait(false);
         // Apply the new state to the latest to get the new changed values from it.
         return LastCreatedData.ApplyNewModState(currentState);
     }

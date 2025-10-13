@@ -43,6 +43,10 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _watcher = watcher;
         _distributor = distributor;
 
+        // For whenever a setting in our mod path changes. Helps us know when we are about to get a flood of resource loads from penumbra, or when to check what is still present or not.
+        // That being said, this is somewhat wierd to have given it will always be out of sync?
+        Mediator.Subscribe<PenumbraSettingsChanged>(this, _ => OnModSettingsChanged());
+
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
         _ipc.Glamourer.OnStateChanged.Enable();
         _ipc.CustomizePlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
@@ -164,6 +168,13 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     {
         _pendingUpdates.Clear();
         _allPendingUpdates = IpcKind.None;
+    }
+
+    private void OnModSettingsChanged()
+    {
+        // could have changed on any collection, for any mod. To be safe, run a mod check on all owned objects.
+        foreach (var (addr, type) in _watcher.WatchedTypes)
+            AddPendingUpdate(type, IpcKind.Mods);
     }
 
     // Fired within the framework thread.

@@ -1,5 +1,5 @@
+using Blake3;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
 
 namespace Sundouleia.WebAPI.Utils;
@@ -18,8 +18,11 @@ public static class SundouleiaSecurity
     private static readonly Dictionary<string, string> _hashListSHA256 = new(StringComparer.Ordinal);
     private static readonly SHA256 _sha256CryptoProvider = SHA256.Create();
 
+    /// <summary>
+    ///     Obtain the BLAKE3 hash of a file.
+    /// </summary>
     public static string GetFileHash(this string filePath)
-        => BitConverter.ToString(SHA1.HashData(File.ReadAllBytes(filePath))).Replace("-", "", StringComparison.Ordinal);
+        => Hasher.Hash(File.ReadAllBytes(filePath)).ToString();
 
     /// <summary>
     ///     Only call this when the ptr is visible.
@@ -33,17 +36,9 @@ public static class SundouleiaSecurity
     public static async Task<string> GetClientIdentHash()
         => await Svc.Framework.RunOnFrameworkThread(() => Svc.ClientState.LocalContentId.ToString().GetHash256());
 
-    // dont even ask me what any of these do, its just black magic encryption bullshit.
-    public static string GetHash256(this (string, ushort) playerToHash)
-    {
-        if (_hashListPlayersSHA256.TryGetValue(playerToHash, out var hash))
-            return hash;
-
-        return _hashListPlayersSHA256[playerToHash] =
-            BitConverter.ToString(_sha256CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(playerToHash.Item1 + playerToHash.Item2.ToString()))).Replace("-", "", StringComparison.Ordinal);
-    }
-
-    // for right now i wont be encrypting in and out the secret keys but later on i can keep this here and just add it back in. 
+    /// <summary>
+    ///     for right now i wont be encrypting in and out the secret keys but later on i can keep this here and just add it back in. 
+    /// </summary>
     public static string GetHash256(this string stringToHash)
         => GetOrComputeHashSHA256(stringToHash);
 

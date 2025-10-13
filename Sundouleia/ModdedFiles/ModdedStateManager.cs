@@ -104,10 +104,6 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         // but there is not much I can do about that.
         Mediator.Subscribe<PenumbraResourceLoaded>(this, _ => OnPenumbraLoadedResource(_.Address, _.GamePath, _.ReplacePath));
 
-        // For whenever a setting in our mod path changes. Helps us know when we are about to get a flood of resource loads from penumbra, or when to check what is still present or not.
-        // That being said, this is somewhat wierd to have given it will always be out of sync?
-        Mediator.Subscribe<PenumbraSettingsChanged>(this, _ => OnModSettingsChanged());
-
         // Need to make sure we get the correct key for our current logged in player.
         Svc.Framework.Update += OnTick;
         Svc.ClientState.Login += OnLogin;
@@ -235,21 +231,6 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
             Logger.LogDebug($"Distinct Transient Added [{replacedGamePath}] => [{filePath}]", LoggerType.ResourceMonitor);
             SendTransients(address, objKind);
         }
-    }
-
-    /// <summary>
-    ///     Occurs whenever a penumbra setting had changed. <para />
-    ///     We use this to track when mods are disabled, because they fire 0 resource loaded 
-    ///     events upon a disable if Glamourers Auto-Reload gear is off.
-    /// </summary>
-    private void OnModSettingsChanged()
-    {
-        // Could yap all day about this, see top of file.
-        _ = Task.Run(() =>
-        {
-            Logger.LogDebug("Penumbra Mod Settings changed, verifying PersistentTransients", LoggerType.ResourceMonitor);
-            Mediator.Publish(new TransientResourceLoaded(OwnedObject.Player));
-        });
     }
 
     // It is possible that we could be just spamming between outfits or jobs or whatever. In this case it is a good idea

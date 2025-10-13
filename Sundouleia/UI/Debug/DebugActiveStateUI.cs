@@ -124,7 +124,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         if (!table) return;
 
         ImGui.TableSetupColumn("Data Type");
-        ImGui.TableSetupColumn("Data Value");
+        ImGui.TableSetupColumn("Data Value", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableHeadersRow();
 
         ImGui.TableNextColumn();
