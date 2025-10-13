@@ -73,7 +73,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<SundesmoOnline>(this, msg =>
         {
             // If they were performing a reload, send them your full data again.
-            if (msg.WasReloading)
+            if (msg.NeedsFullData)
                 NewVisibleUsers.Add(msg.Sundesmo.UserData);
         });
         Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => NewVisibleUsers.Add(msg.Handler.Sundesmo.UserData));

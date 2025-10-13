@@ -193,7 +193,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     public void ReapplyAlterations()
     {
-        if (!IsRendered) 
+        if (!IsRendered)
             return;
 
         // Reapply the alterations.
@@ -254,7 +254,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
 
         // Check for any differenced in the modified paths to know what new data we have.
-        Logger.LogDebug($"NewModUpdate is removing {modData.HashesToRemove.Count} files, and adding {modData.FilesToAdd} new files added | WaitingOnMore: {modData.NotAllSent}", LoggerType.PairHandler);
+        Logger.LogDebug($"NewModUpdate is removing {modData.HashesToRemove.Count} files, and adding {modData.FilesToAdd.Count} new files added | WaitingOnMore: {modData.NotAllSent}", LoggerType.PairHandler);
 
         UpdateReplacements(modData);
         Logger.LogTrace("Removing outdated and requested removal files from collection.", LoggerType.PairHandler);
@@ -317,7 +317,17 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     // Would need a way to retrieve the existing modded dictionary from the file cache or something here, not sure. We shouldnt need to download anything on a reapplication.
     private async Task ApplyModData(Dictionary<string, string> moddedPaths)
     {
-        if (!IsRendered || _tempCollection == Guid.Empty || _replacements.Count == 0)
+        if (!IsRendered)
+        {
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered, skipping mod application.", LoggerType.PairHandler);
+            return;
+        }
+        if (_tempCollection == Guid.Empty)
+        {
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] does not have a temporary collection, skipping mod application.", LoggerType.PairHandler);
+            return;
+        }
+        if (_replacements.Count == 0)
         {
             Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered or has no mod data to apply, skipping mod application.", LoggerType.PairHandler);
             return;

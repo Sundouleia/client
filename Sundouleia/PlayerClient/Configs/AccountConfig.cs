@@ -67,7 +67,6 @@ public class AccountConfig : IHybridSavable
     public AccountStorage Current { get; set; } = new AccountStorage();
 }
 
-// reformat to reflect a hybrid of GS and Mare account management.
 public class AccountStorage
 {
     /// <summary>

@@ -287,16 +287,19 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
         _dialogService.OpenFolderPicker("Pick Sundouleia's Cache Folder", (success, path) =>
         {
             // Ensure dialog success is yippee 
-            if (!success) return;
+            if (!success)
+                return;
 
             // Need to validate that the selected path is a valid path prior to setting it.
             if (path.Contains("onedrive", StringComparison.OrdinalIgnoreCase))
             {
+                Logger.LogWarning($"User attempted to set cache path to OneDrive folder: {path}");
                 _pathValidation = FilePathValidation.IsOneDrive;
                 return;
             }
             if (string.Equals(path.ToLowerInvariant(), IpcCallerPenumbra.ModDirectory?.ToLowerInvariant(), StringComparison.Ordinal))
             {
+                Logger.LogWarning($"User attempted to set cache path to Penumbra Mod Directory: {path}");
                 _pathValidation = FilePathValidation.IsPenumbraDir;
                 return;
             }
@@ -304,18 +307,18 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
             foreach (var file in files)
             {
                 var fileName = Path.GetFileNameWithoutExtension(file);
-                if (fileName.Length != 40 && !string.Equals(fileName, "desktop", StringComparison.OrdinalIgnoreCase))
+                if (fileName.Length != 64 && !string.Equals(fileName, "desktop", StringComparison.OrdinalIgnoreCase))
                 {
                     _pathValidation = FilePathValidation.HasOtherFiles;
                     Logger.LogWarning($"Found illegal file in {path}: {file}");
-                    break;
+                    return;
                 }
             }
             var dirs = Directory.GetDirectories(path);
             if (dirs.Any())
             {
                 _pathValidation = FilePathValidation.HasOtherFiles;
-                Logger.LogWarning($"Found folders in {path} not belonging to Mare: {string.Join(", ", dirs)}");
+                Logger.LogWarning($"Found folders in {path} not belonging to Sundouleia: {string.Join(", ", dirs)}");
                 return;
             }
 
@@ -343,7 +346,7 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
         }, _rootPath, true);
     }
 
-    private bool IsValidPath(string path) => !string.IsNullOrEmpty(path) && !Directory.Exists(path) && _pathValidation is FilePathValidation.Valid;
+    private bool IsValidPath(string path) => !string.IsNullOrEmpty(path) && Directory.Exists(path);
     private bool CachePresetRootDirExists()
     {
         var sundouleiaCacheDir = Path.Combine(_rootPath, "SundouleiaCache");

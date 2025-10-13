@@ -175,7 +175,8 @@ public class Sundesmo : IComparable<Sundesmo>
         // Set the OnlineUser & update the sundesmo state.
         _onlineUser = dto;
         // Notify other parts of Sundouleia they are online.
-        _mediator.Publish(new SundesmoOnline(this, IsReloading));
+        var needsFullData = IsReloading || (IsRendered && !_player.HasAlterations);
+        _mediator.Publish(new SundesmoOnline(this, needsFullData));
         // Ensure that IsReloading is false (prior to sending that they are online)
         IsReloading = false;
 
