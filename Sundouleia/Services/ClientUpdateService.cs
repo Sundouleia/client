@@ -128,19 +128,19 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
                 {
                     case (true, false):
                         Logger.LogDebug($"Processing full Mod update for {pendingSnapshot.Count} objects.");
-                        await _distributor.UpdateIpcCacheFull(pendingSnapshot).ConfigureAwait(false);
+                        await _distributor.UpdateAndSendAll(pendingSnapshot).ConfigureAwait(false);
                         break;
                     case (true, true):
                         Logger.LogDebug($"Processing single Mod update for {pendingSnapshot.Keys.First()}.");
-                        await _distributor.UpdateModCache().ConfigureAwait(false);
+                        await _distributor.UpdateAndSendMods().ConfigureAwait(false);
                         break;
                     case (false, false):
                         Logger.LogDebug($"Processing partial update ({allPendingSnapshot}) for {pendingSnapshot.Count} objects.");
-                        await _distributor.UpdateIpcCache(pendingSnapshot).ConfigureAwait(false);
+                        await _distributor.UpdateAndSendVisuals(pendingSnapshot).ConfigureAwait(false);
                         break;
                     case (false, true):
                         Logger.LogDebug($"Processing single partial update ({allPendingSnapshot}) for {pendingSnapshot.Keys.First()}.");
-                        await _distributor.UpdateIpcCacheSingle(pendingSnapshot.Keys.First(), allPendingSnapshot).ConfigureAwait(false);
+                        await _distributor.UpdateAndSendSingle(pendingSnapshot.Keys.First(), allPendingSnapshot).ConfigureAwait(false);
                         break;
                 }
             }

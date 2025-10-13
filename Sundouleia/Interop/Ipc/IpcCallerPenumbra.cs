@@ -166,7 +166,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     {
         if (change is ModSettingChange.EnableState)
         {
-            Logger.LogInformation($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]");
+            Logger.LogTrace($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]", LoggerType.IpcPenumbra);
             Mediator.Publish(new PenumbraSettingsChanged());
         }
     }
@@ -194,7 +194,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     /// </summary>
     public void RedrawGameObject(ushort objectIdx)
     {
-        // Logger.LogWarning($"Redrawing actor at ObjectIdx [{objectIdx}]", LoggerType.IpcPenumbra);
+        Logger.LogTrace($"Redrawing actor at ObjectIdx [{objectIdx}]", LoggerType.IpcPenumbra);
         RedrawObject.Invoke(objectIdx, RedrawType.Redraw);
     }
     
@@ -220,7 +220,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
 
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            Logger.LogTrace($"Calling: GetGameObjectResourcePaths for ObjectIdx [{objIdx}]");
+            Logger.LogTrace($"Calling: GetGameObjectResourcePaths for ObjectIdx [{objIdx}]", LoggerType.IpcPenumbra);
             return GetObjectResourcePaths.Invoke(objIdx)[0];
         }).ConfigureAwait(false);
     }
@@ -245,7 +245,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         {
             if (CreateTempCollection.Invoke(SUNDOULEIA_ID, name, out Guid id) is { } ret && ret is PenumbraApiEc.Success)
             {
-                Logger.LogTrace($"TempCollection {{{name}}} -> ID: {id}");
+                Logger.LogDebug($"New Temp {{{name}}} -> ID: {id}", LoggerType.IpcPenumbra);
                 return id;
             }
             return Guid.Empty;
@@ -262,7 +262,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
             var ret = AssignTempCollection.Invoke(id, objIdx, true);
-            Logger.LogTrace($"Assigning User Collection to {Svc.Objects[objIdx]?.Name ?? "UNK"}, Success: [{ret}] ({id})");
+            Logger.LogTrace($"Assigning User Collection to {Svc.Objects[objIdx]?.Name ?? "UNK"}, Success: [{ret}] ({id})", LoggerType.IpcPenumbra);
             return ret;
         }).ConfigureAwait(false);
     }
@@ -279,14 +279,14 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         {
             // Likely do not log this here, log it somewhere else, if this sends the full list every time this will get very spammy.
             foreach (var mod in modPaths)
-                Logger.LogTrace($"[SundesmoTempMods] Change: {mod.Key} => {mod.Value}");
+                Logger.LogTrace($"[SundesmoTempMods] Change: {mod.Key} => {mod.Value}", LoggerType.IpcPenumbra);
 
             // remove the existing temporary mod
             var retRemove = RemoveTempMod.Invoke(SUNDOULEIA_MOD_PREFIX, collection, 0);
-            Logger.LogTrace($"Removed Existing Temp Mod for Collection: {collection}, Success: [{retRemove}]");
+            Logger.LogTrace($"Removed Existing Temp Mod for Collection: {collection}, Success: [{retRemove}]", LoggerType.IpcPenumbra);
             // add the new temporary mod with the new paths.
             var retAdded = AddTempMod.Invoke(SUNDOULEIA_MOD_PREFIX, collection, modPaths, string.Empty, 0);
-            Logger.LogTrace($"Added Temp Mod for Collection: {collection}, Success: [{retAdded}]");
+            Logger.LogTrace($"Added Temp Mod for Collection: {collection}, Success: [{retAdded}]", LoggerType.IpcPenumbra);
         }).ConfigureAwait(false);
     }
 
@@ -297,9 +297,9 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     public async Task RemoveSundesmoCollection(Guid id)
     {
         if (!APIAvailable) return;
-        Logger.LogTrace($"Removing Sundesmo Collection {{{id}}}");
+        Logger.LogDebug($"Removing Sundesmo Collection {{{id}}}", LoggerType.IpcPenumbra);
         var ret = await Svc.Framework.RunOnFrameworkThread(() => DeleteTempCollection.Invoke(id)).ConfigureAwait(false);
-        Logger.LogTrace($"Sundesmo Collection {{{id}}} deleted. [RetCode: {ret}]");
+        Logger.LogDebug($"Sundesmo Collection {{{id}}} deleted. [RetCode: {ret}]", LoggerType.IpcPenumbra);
     }
 
     /// <summary>
@@ -315,7 +315,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
             var retAdded = AddTempMod.Invoke(SUNDOULEIA_META_MANIP_NAME, collection, [], manipulationDataString, 0);
-            Logger.LogTrace($"Manipulation Data updated for Sundesmo Collection {{{collection}}} [RetCode: {retAdded}]");
+            Logger.LogTrace($"Manipulation Data updated for Sundesmo Collection {{{collection}}} [RetCode: {retAdded}]", LoggerType.IpcPenumbra);
         }).ConfigureAwait(false);
     }
 }

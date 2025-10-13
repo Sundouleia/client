@@ -7,14 +7,14 @@ namespace Sundouleia.Services.Mediator;
 public record SundesmoOnline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoOffline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoPlayerRendered(PlayerHandler Handler) : SameThreadMessage; // Effectively "becoming visible"
-public record SundesmoEnteredLimbo(Sundesmo Sundesmo) : SameThreadMessage; // Alteration Timeout Begin.
-public record SundesmoLeftLimbo(Sundesmo Sundesmo) : SameThreadMessage; // Alteration Timeout End.
+public record SundesmoEnteredLimbo(Sundesmo Sundesmo) : MessageBase; // Alteration Timeout Begin.
+public record SundesmoLeftLimbo(Sundesmo Sundesmo) : MessageBase; // Alteration Timeout End.
 public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // when desiring to target a sundesmo.
 public record DownloadLimitChangedMessage : SameThreadMessage;
 public record FileUploading(PlayerHandler Player) : MessageBase;
 public record FileUploaded(PlayerHandler Player) : MessageBase;
 public record FileDownloadReady(Guid RequestId) : MessageBase; // Maybe remove this.
-public record FileDownloadStarted(PlayerHandler Player, Dictionary<string, FileDownloadStatus> Status) : MessageBase;
+public record FileDownloadStarted(PlayerHandler Player, ConcurrentDictionary<string, FileTransferProgress> Status) : MessageBase;
 public record FileDownloadComplete(PlayerHandler Player) : MessageBase;
 
 /// <summary>

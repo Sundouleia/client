@@ -7,7 +7,9 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Common.Lua;
 using OtterGui;
+using Sundouleia.Interop;
 using Sundouleia.ModFiles;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
@@ -19,12 +21,12 @@ namespace Sundouleia.Gui;
 
 public class DebugActiveStateUI : WindowMediatorSubscriberBase
 {
-    private readonly TransientResourceManager _transients;
+    private readonly ModdedStateManager _transients;
     private readonly CharaObjectWatcher _watcher;
     private readonly DistributionService _distributor;
 
     public DebugActiveStateUI(ILogger<DebugActiveStateUI> logger, SundouleiaMediator mediator,
-        TransientResourceManager transients, CharaObjectWatcher watcher, DistributionService distributor)
+        ModdedStateManager transients, CharaObjectWatcher watcher, DistributionService distributor)
         : base(logger, mediator, "Active State Debug")
     {
         _transients = transients;
@@ -69,6 +71,119 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
 
         ImGui.Text("For Update Push: ");
         CkGui.ColorTextInline(string.Join(", ", _distributor.SundesmosForUpdatePush.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+
+        using var node = ImRaii.TreeNode($"Distribution CharaDataCache##chara-data-cache-info");
+        if (!node) return;
+
+        var dataCache = _distributor.LastCreatedData;
+        DebugAppliedMods(dataCache);
+        DebugDataCachePlayer(dataCache);
+        DebugDataCacheNonPlayer(dataCache, OwnedObject.MinionOrMount);
+        DebugDataCacheNonPlayer(dataCache, OwnedObject.Pet);
+        DebugDataCacheNonPlayer(dataCache, OwnedObject.Companion);
+    }
+
+    // In respect to the player for now, might make in respect to OwnedObject later but idk.
+    private void DebugAppliedMods(ClientDataCache dataCache)
+    {
+        using var node = ImRaii.TreeNode($"Applied Mods##chara-data-cache-mods");
+        if (!node) return;
+
+        using var table = ImRaii.Table("chara-data-cache-mods-table", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        if (!table) return;
+
+        ImGui.TableSetupColumn("Hash");
+        ImGui.TableSetupColumn("Replaced?");
+        ImGui.TableSetupColumn("Swap?");
+        ImGui.TableSetupColumn("Game Paths");
+        ImGui.TableSetupColumn("Resolved Path");
+        ImGui.TableHeadersRow();
+
+        foreach (var (hash, mod) in dataCache.AppliedMods)
+        {
+            ImGui.TableNextColumn();
+            CkGui.ColorText(hash, ImGuiColors.DalamudViolet);
+
+            DrawIconBoolColumn(mod.HasFileReplacement);
+            DrawIconBoolColumn(mod.IsFileSwap);
+
+            ImGui.TableNextColumn();
+            ImGui.Text(string.Join("\n", mod.GamePaths));
+
+            ImGui.TableNextColumn();
+            ImGui.Text(mod.ResolvedPath);
+        }
+    }
+
+    private void DebugDataCachePlayer(ClientDataCache dataCache)
+    {
+        using var node = ImRaii.TreeNode($"Player Data##chara-data-cache-player");
+        if (!node) return;
+
+        using var table = ImRaii.Table("chara-data-cache-playerdata", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        if (!table) return;
+
+        ImGui.TableSetupColumn("Data Type");
+        ImGui.TableSetupColumn("Data Value");
+        ImGui.TableHeadersRow();
+
+        ImGui.TableNextColumn();
+        ImGui.Text("Glamourer");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.GlamourerState[OwnedObject.Player]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("CPlus");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.CPlusState[OwnedObject.Player]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("ModManips");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.ModManips);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("HeelsOffset");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.HeelsOffset);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("TitleData");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.TitleData);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("Moodles");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.Moodles);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("PetNames");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.PetNames);
+    }
+
+    private void DebugDataCacheNonPlayer(ClientDataCache dataCache, OwnedObject obj)
+    {
+        using var node = ImRaii.TreeNode($"{obj} Data##chara-data-cache-{obj}");
+        if (!node) return;
+
+        using var table = ImRaii.Table($"chara-data-cache-{obj}data", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        if (!table) return;
+
+        ImGui.TableSetupColumn("Data Type");
+        ImGui.TableSetupColumn("Data Value");
+        ImGui.TableHeadersRow();
+
+        ImGui.TableNextColumn();
+        ImGui.Text("Glamourer");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.GlamourerState[obj]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("CPlus");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.CPlusState[obj]);
     }
 
     private void DrawWatcherInternals()
@@ -367,5 +482,11 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         _transients.DrawTransientResources();
         // Semi-Transient Resource Monitoring
         _transients.DrawPersistentTransients();
+    }
+
+    private void DrawIconBoolColumn(bool value)
+    {
+        ImGui.TableNextColumn();
+        CkGui.IconText(value ? FAI.Check : FAI.Times, value ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
     }
 }

@@ -112,7 +112,7 @@ public class CosmeticService : IHostedService, IDisposable
     public static (IDalamudTextureWrap? SupporterWrap, string Tooltip) GetSupporterInfo(UserData user)
         => user.Tier switch
         {
-            CkVanityTier.KinkporiumMistress => (CoreTextures.Cache[CoreTexture.Tier4Icon], "The Owner of CK, and the Dev of Sundouleia."),
+            CkVanityTier.ShopKeeper => (CoreTextures.Cache[CoreTexture.Tier4Icon], "Plugin Author of Sundouleia."),
             CkVanityTier.DistinguishedConnoisseur => (CoreTextures.Cache[CoreTexture.Tier3Icon], $"{user.AliasOrUID} is supporting Sundouleia as a Distinguished Connoisseur"),
             CkVanityTier.EsteemedPatron => (CoreTextures.Cache[CoreTexture.Tier2Icon], $"{user.AliasOrUID} is supporting Sundouleia as a Esteemed Patron"),
             CkVanityTier.IllustriousSupporter => (CoreTextures.Cache[CoreTexture.Tier1Icon], $"{user.AliasOrUID} is supporting Sundouleia as a Illustrious Supporter"),

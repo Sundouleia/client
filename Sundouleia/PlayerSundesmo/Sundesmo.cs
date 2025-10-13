@@ -266,12 +266,18 @@ public class Sundesmo : IComparable<Sundesmo>
         {
             try
             {
+                // If visible, send into limbo.
+                if (IsRendered)
+                    _mediator.Publish(new SundesmoEnteredLimbo(this));
+
                 // Await for the defined time, then clear the alterations
-                _mediator.Publish(new SundesmoEnteredLimbo(this));
                 await Task.Delay(TimeSpan.FromSeconds(Constants.SundesmoTimeoutSeconds), _timeoutCTS.Token);
+                
+                // Clear regardless of render or not.
                 _mediator.Publish(new SundesmoLeftLimbo(this));
-                _logger.LogDebug($"Timeout elapsed for [{PlayerName}] ({GetNickAliasOrUid()}). Disposing data.", UserData.AliasOrUID);
+
                 // Revert all alterations.
+                _logger.LogDebug($"Timeout elapsed for [{PlayerName}] ({GetNickAliasOrUid()}). Disposing data.", UserData.AliasOrUID);
                 await _player.ClearAlterations(CancellationToken.None).ConfigureAwait(false);
                 await _mountMinion.ClearAlterations().ConfigureAwait(false);
                 await _pet.ClearAlterations().ConfigureAwait(false);

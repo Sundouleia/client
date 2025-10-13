@@ -149,6 +149,15 @@ public sealed class FileCacheManager : IHostedService
         return Task.FromResult(brokenEntities);
     }
 
+    public long GetFileSizeByPath(string path) => File.Exists(path) ? new FileInfo(path).Length : 0;
+
+    public long GetFileSizeByHash(string hash)
+    {
+        if (GetFileCacheByHash(hash) is not { } entity) return 0;
+        return File.Exists(entity.ResolvedFilepath) ? new FileInfo(entity.ResolvedFilepath).Length : 0;
+    }
+
+
     // Used mainly for download management and MCDF handling.
     public string GetCacheFilePath(string hash, string extension)
         => Path.Combine(_config.Current.CacheFolder, hash + "." + extension);
@@ -184,6 +193,7 @@ public sealed class FileCacheManager : IHostedService
     {
         var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant()
             .Replace(IpcCallerPenumbra.ModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
+
         var entry = _fileCaches.SelectMany(v => v.Value).FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
         if (entry is null)
         {

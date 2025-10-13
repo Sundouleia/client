@@ -12,8 +12,7 @@ public class ProgressableStreamContent : StreamContent
 
     public ProgressableStreamContent(Stream streamToWrite, IProgress<FileTransferProgress>? downloader)
         : this(streamToWrite, _defaultBufferSize, downloader)
-    {
-    }
+    { }
 
     public ProgressableStreamContent(Stream streamToWrite, int bufferSize, IProgress<FileTransferProgress>? progress)
         : base(streamToWrite, bufferSize)

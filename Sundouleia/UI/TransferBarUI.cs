@@ -1,17 +1,13 @@
-﻿using Dalamud.Bindings.ImGui;
+﻿using CkCommons.Gui;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
-using Sundouleia;
 using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Utils;
 using Sundouleia.WebAPI.Files;
 using Sundouleia.WebAPI.Files.Models;
-using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
-using System.Numerics;
-using Sundouleia.PlayerClient;
-using Sundouleia.Utils;
-using CkCommons.Gui;
 
 namespace Sundouleia.Gui;
 
@@ -26,7 +22,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
     // Change this later to have Sundouleias own flavor and taste, as the original was somewhat bland.
     // Additionally i dislike the way these dictionaries are structured and believe they deserve to be changed.
     private readonly ConcurrentDictionary<PlayerHandler, bool> _uploads = new();
-    private readonly ConcurrentDictionary<PlayerHandler, Dictionary<string, FileDownloadStatus>> _downloads = new();
+    private readonly ConcurrentDictionary<PlayerHandler, ConcurrentDictionary<string, FileTransferProgress>> _downloads = new();
 
     public TransferBarUI(ILogger<TransferBarUI> logger, SundouleiaMediator mediator, MainConfig config, 
         FileUploader fileUploader) : base(logger, mediator, "##SundouleiaDLs")
@@ -54,7 +50,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         // Temporarily do this, hopefully we dont always need to.
         Mediator.Subscribe<FileDownloadStarted>(this, (msg) => _downloads[msg.Player] = msg.Status);
         Mediator.Subscribe<FileDownloadComplete>(this, (msg) => _downloads.TryRemove(msg.Player, out _));
-        // For uploads
+        // For uploads (can configure later as there is not much reason with our new system)
         Mediator.Subscribe<FileUploading>(this, _ => _uploads[_.Player] = true);
         Mediator.Subscribe<FileUploaded>(this, (msg) => _uploads.TryRemove(msg.Player, out _));
         // For GPose handling.
@@ -62,42 +58,45 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         Mediator.Subscribe<GPoseEndMessage>(this, _ => IsOpen = true);
     }
 
+    protected override void PreDrawInternal()
+    { }
+
     protected override void DrawInternal()
     {
-        if (_config.Current.TransferWindow)
+        try
         {
-            try
-            {
+            if (_config.Current.TransferWindow)
                 DrawTransferWindow();
-            }
-            catch { }
-        }
-        if (_config.Current.TransferBars)
-        {
-            try
-            {
+
+            if (_config.Current.TransferBars)
                 DrawTransferBars();
-            }
-            catch
-            { }
+
+            if (_config.Current.ShowUploadingText)
+                DrawUploadingText();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"Failed to draw TransferUI: {ex}", LoggerType.UIManagement);
         }
     }
+
+    protected override void PostDrawInternal()
+    { }
 
     private void DrawTransferWindow()
     {
         if (_fileUploader.CurrentUploads.Any())
         {
-            var currentUploads = _fileUploader.CurrentUploads.ToList();
+            var currentUploads = _fileUploader.CurrentUploads.Values.ToList();
             var totalUploads = currentUploads.Count;
 
-            var doneUploads = currentUploads.Count(c => c.IsTransferred);
             var totalUploaded = currentUploads.Sum(c => c.Transferred);
-            var totalToUpload = currentUploads.Sum(c => c.Total);
+            var totalToUpload = currentUploads.Sum(c => c.TotalSize);
 
             CkGui.OutlinedFont($"▲", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
             ImGui.SameLine();
             var xDistance = ImGui.GetCursorPosX();
-            CkGui.OutlinedFont($"Compressing+Uploading {doneUploads}/{totalUploads}",
+            CkGui.OutlinedFont($"Uploading {totalUploads} files.",
                 ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
             ImGui.NewLine();
             ImGui.SameLine(xDistance);
@@ -105,26 +104,6 @@ public class TransferBarUI : WindowMediatorSubscriberBase
 
             if (_downloads.Any())
                 ImGui.Separator();
-        }
-
-        foreach (var item in _downloads.ToList())
-        {
-            var dlSlot = item.Value.Count(c => c.Value.DownloadStatus == DownloadStatus.WaitingForSlot);
-            var dlQueue = item.Value.Count(c => c.Value.DownloadStatus == DownloadStatus.WaitingForQueue);
-            var dlProg = item.Value.Count(c => c.Value.DownloadStatus == DownloadStatus.Downloading);
-            var dlDecomp = item.Value.Count(c => c.Value.DownloadStatus == DownloadStatus.Decompressing);
-            var totalFiles = item.Value.Sum(c => c.Value.TotalFiles);
-            var transferredFiles = item.Value.Sum(c => c.Value.TransferredFiles);
-            var totalBytes = item.Value.Sum(c => c.Value.TotalBytes);
-            var transferredBytes = item.Value.Sum(c => c.Value.TransferredBytes);
-
-            CkGui.OutlinedFont($"▼", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
-            ImGui.SameLine();
-            var xDistance = ImGui.GetCursorPosX();
-            CkGui.OutlinedFont($"{item.Key.NameString} [W:{dlSlot}/Q:{dlQueue}/P:{dlProg}/D:{dlDecomp}]", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
-            ImGui.NewLine();
-            ImGui.SameLine(xDistance);
-            CkGui.OutlinedFont($"{transferredFiles}/{totalFiles} ({SundouleiaEx.ByteToString(transferredBytes, false)}/{SundouleiaEx.ByteToString(totalBytes)})", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
         }
     }
 
@@ -143,8 +122,8 @@ public class TransferBarUI : WindowMediatorSubscriberBase
                 continue;
 
             // Obtain the transfer in bytes.
-            var totalBytes = downloads.Sum(c => c.Value.TotalBytes);
-            var transferredBytes = downloads.Sum(c => c.Value.TransferredBytes);
+            var totalBytes = downloads.Sum(c => c.Value.TotalSize);
+            var transferredBytes = downloads.Sum(c => c.Value.Transferred);
 
             var maxDlText = $"{SundouleiaEx.ByteToString(totalBytes, addSuffix: false)}/{SundouleiaEx.ByteToString(totalBytes)}";
             var textSize = _config.Current.TransferBarText ? ImGui.CalcTextSize(maxDlText) : new Vector2(10, 10);

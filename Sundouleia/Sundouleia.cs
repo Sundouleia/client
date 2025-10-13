@@ -145,7 +145,7 @@ public static class SundouleiaServiceExtensions
         // Distribution
         .AddSingleton<ClientUpdateService>()
         .AddSingleton<DistributionService>()
-        .AddSingleton<TransientResourceManager>()
+        .AddSingleton<ModdedStateManager>()
         .AddSingleton<PlzNoCrashFrens>()
 
         // Services

@@ -40,7 +40,10 @@ public class ClientDataCache
         };
     }
 
-    public VisualUpdate ToFullUpdate()
+    public ModUpdates ToModUpdates()
+        => new ModUpdates(AppliedMods.Values.Select(m => m.ToModFileDto()).ToList(), AppliedMods.Keys.ToList());
+
+    public VisualUpdate ToVisualUpdate()
     {
         return new VisualUpdate()
         {

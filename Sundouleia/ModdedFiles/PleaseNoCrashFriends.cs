@@ -18,17 +18,15 @@ public class PlzNoCrashFrens
     private readonly SundouleiaMediator _mediator;
     private readonly NoCrashFriendsConfig _config;
     private readonly FileCacheManager _manager;
-    private readonly TransientResourceManager _transients;
     private readonly List<string> _failedCalculatedTris = [];
 
     public PlzNoCrashFrens(ILogger<PlzNoCrashFrens> logger, SundouleiaMediator mediator,
-        NoCrashFriendsConfig config, FileCacheManager manager, TransientResourceManager transients)
+        NoCrashFriendsConfig config, FileCacheManager manager)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
         _manager = manager;
-        _transients = transients;
     }
 
     // Generously barrowed old Moon code for validating skeletons so that custom animations do not crash other peoples games.
@@ -50,7 +48,7 @@ public class PlzNoCrashFrens
             for (int i = 0; i < objectBase->Skeleton->PartialSkeletonCount; i++)
             {
                 var handle = *(skelHandles + i);
-                _logger.LogTrace("Iterating over SkeletonResourceHandle #{i}:{x}", i, ((nint)handle).ToString("X"));
+                _logger.LogTrace($"Iterating over SkeletonResourceHandle #{i}:{((nint)handle).ToString("X")}", LoggerType.ResourceMonitor);
                 if ((nint)handle == nint.Zero)
                     continue;
 
@@ -77,68 +75,82 @@ public class PlzNoCrashFrens
         return (outputIndices.Count != 0 && outputIndices.Values.All(u => u.Count > 0)) ? outputIndices : null;
     }
 
-    // This helps ensure we are not going to crash people! Yay! :D
-    public async Task VerifyPlayerAnimationBones(Dictionary<string, List<ushort>>? boneIndices, HashSet<ModdedFile> moddedFiles, CancellationToken ct)
+    /// <summary>
+    ///     This helps ensure we are not going to crash people! Yay! :D
+    /// </summary>
+    /// <returns> The list of hashes to remove from the persistent transients. (Occurs on validation failure) </returns>
+    public async Task<List<string>> VerifyPlayerAnimationBones(Dictionary<string, List<ushort>>? boneIndices, HashSet<ModdedFile> moddedFiles, CancellationToken ct)
     {
         // If there was no indices then we do not care.
         if (boneIndices is null)
-            return;
+            return [];
 
         // Log the bone indices if found.
         foreach (var kvp in boneIndices)
-            _logger.LogDebug($"Found {kvp.Key} ({(kvp.Value.Any() ? kvp.Value.Max() : 0)} bone indices) on player: {string.Join(',', kvp.Value)}");
+            _logger.LogDebug($"Found {kvp.Key} ({(kvp.Value.Any() ? kvp.Value.Max() : 0)} bone indices) on player: {string.Join(',', kvp.Value)}", LoggerType.ResourceMonitor);
 
         if (boneIndices.All(u => u.Value.Count == 0))
-            return;
+            return [];
 
         int noValidationFailed = 0;
         // only scan animation files.
         var animationFiles = moddedFiles.Where(f => !f.IsFileSwap && f.GamePaths.First().EndsWith("pap", StringComparison.OrdinalIgnoreCase)).ToList();
-        foreach (var file in animationFiles)
+        
+        var toRemove = new List<string>();
+
+        try
         {
-            // throw if cancelled at any point in time.
-            ct.ThrowIfCancellationRequested();
-
-            // Grab the indices from the pap file, or the config cache if defined.
-            var skeletonIndices = await Svc.Framework.RunOnFrameworkThread(() => GetBoneIndicesFromPap(file.Hash)).ConfigureAwait(false);
-            // track if we failed validation.
-            bool validationFailed = false;
-            if (skeletonIndices != null)
+            foreach (var file in animationFiles)
             {
-                // 105 == Vanilla Player Skeleton maximum.
-                if (skeletonIndices.All(k => k.Value.Max() <= 105))
-                {
-                    _logger.LogTrace($"All indices of {file.ResolvedPath} are <= 105, ignoring");
-                    continue;
-                }
+                // throw if cancelled at any point in time.
+                ct.ThrowIfCancellationRequested();
 
-                _logger.LogDebug($"Verifying bone indices for {file.ResolvedPath}, found {skeletonIndices.Count} skeletons");
-                // validate all skeletons against the player skeleton.
-                foreach (var boneCount in skeletonIndices.Select(k => k).ToList())
+                // Grab the indices from the pap file, or the config cache if defined.
+                var skeletonIndices = await Svc.Framework.RunOnFrameworkThread(() => GetBoneIndicesFromPap(file.Hash)).ConfigureAwait(false);
+                // track if we failed validation.
+                bool validationFailed = false;
+                if (skeletonIndices != null)
                 {
-                    if (boneCount.Value.Max() > boneIndices.SelectMany(b => b.Value).Max())
+                    // 105 == Vanilla Player Skeleton maximum.
+                    if (skeletonIndices.All(k => k.Value.Max() <= 105))
                     {
-                        _logger.LogWarning($"Found more bone indices on the animation {file.ResolvedPath} skeleton {boneCount.Key} (max indice {boneCount.Value.Max()})" +
-                            $"than on any player related skeleton (max indice {boneIndices.SelectMany(b => b.Value).Max()})");
-                        validationFailed = true;
-                        // Break out of this foreach loop, we failed validation for this file.
-                        break;
+                        _logger.LogTrace($"All indices of {file.ResolvedPath} are <= 105, ignoring", LoggerType.ResourceMonitor);
+                        continue;
+                    }
+
+                    _logger.LogDebug($"Verifying bone indices for {file.ResolvedPath}, found {skeletonIndices.Count} skeletons", LoggerType.ResourceMonitor);
+                    // validate all skeletons against the player skeleton.
+                    foreach (var boneCount in skeletonIndices.Select(k => k).ToList())
+                    {
+                        if (boneCount.Value.Max() > boneIndices.SelectMany(b => b.Value).Max())
+                        {
+                            _logger.LogWarning($"Found more bone indices on the animation {file.ResolvedPath} skeleton {boneCount.Key} (max indice {boneCount.Value.Max()})" +
+                                $"than on any player related skeleton (max indice {boneIndices.SelectMany(b => b.Value).Max()})");
+                            validationFailed = true;
+                            // Break out of this foreach loop, we failed validation for this file.
+                            break;
+                        }
                     }
                 }
-            }
 
-            // if we failed, log it and remove it from the files that we send over.
-            if (validationFailed)
-            {
-                noValidationFailed++;
-                _logger.LogDebug($"Removing {file.ResolvedPath} from sent file replacements and transient data");
-                moddedFiles.Remove(file);
-                // remove all associated gamepaths from the transient resource manager for this player.
-                foreach (var gamePath in file.GamePaths)
-                    _transients.RemoveTransient(OwnedObject.Player, gamePath);
+                // if we failed, log it and remove it from the files that we send over.
+                if (validationFailed)
+                {
+                    noValidationFailed++;
+                    _logger.LogDebug($"Removing {file.ResolvedPath} from sent file replacements and transient data", LoggerType.ResourceMonitor);
+                    moddedFiles.Remove(file);
+                    toRemove.AddRange(file.GamePaths);
+                }
             }
-
-            // proceed to check the other pap files so we can still send valid ones.
+        }
+        catch (OperationCanceledException)
+        {
+            return [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogInformation($"Cancelled verifying player animation bones: {ex}");
+            return [];
         }
 
         // If we failed any validation, notify the user that some of their animations were removed.
@@ -149,9 +161,13 @@ public class PlzNoCrashFrens
                 $"Verify you're using the correct skeleton for those animations (Check /xllog for more information).",
                 NotificationType.Warning, TimeSpan.FromSeconds(10)));
         }
+
+        return toRemove;
     }
 
-    // <SkeletonName, List<ushort> BoneIndices>, fetched by pap's file datahash name. 
+    /// <summary>
+    ///     <c>{SkeletonName, List{ushort} BoneIndices}</c>, fetched by pap's file datahash name. 
+    /// </summary>
     public unsafe Dictionary<string, List<ushort>>? GetBoneIndicesFromPap(string hash)
     {
         // If we have already cached the bones from this file, then we can simply return the bones for the custom animation to avoid calculating this file.

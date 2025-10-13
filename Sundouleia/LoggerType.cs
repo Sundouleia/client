@@ -23,23 +23,23 @@ public enum LoggerType : long
     // Client Player Object Data
     ResourceMonitor     = 1L << 11,
     OwnedObjects        = 1L << 12,
+    DataDistributor     = 1L << 13,
 
     // File Info
-    FileCache           = 1L << 13,
-    FileCsv             = 1L << 14,
-    FileMonitor         = 1L << 15,
-    PairFileCache       = 1L << 16,
-    FileUploads         = 1L << 17,
-    FileDownloads       = 1L << 18,
-    FileService         = 1L << 19,
+    FileCache           = 1L << 14,
+    FileCsv             = 1L << 15,
+    FileMonitor         = 1L << 16,
+    PairFileCache       = 1L << 17,
+    FileUploads         = 1L << 18,
+    FileDownloads       = 1L << 19,
+    FileService         = 1L << 20,
 
     // Pair Data (Pair Handling)
-    PairManagement      = 1L << 20, // Adding / removing / updates
-    PairDataTransfer    = 1L << 21, // All Data transfer updates.
-    PairHandler         = 1L << 22, // Anything related to handled pair object.
-    PairMods            = 1L << 23, // Mod info changes.
-    PairAppearance      = 1L << 24, // Appearance info changes.
-    PairVisibility      = 1L << 25, // Change between visibility states. (For visibility service)
+    PairManagement      = 1L << 21, // Adding / removing / updates
+    PairDataTransfer    = 1L << 22, // All Data transfer updates.
+    PairHandler         = 1L << 23, // Anything related to handled pair object.
+    PairMods            = 1L << 24, // Mod info changes.
+    PairAppearance      = 1L << 25, // Appearance info changes.
 
     // Radar Logging
     RadarManagement     = 1L << 26,
@@ -65,9 +65,9 @@ public enum LoggerType : long
     Recommended =
         Achievements |
         IpcSundouleia | IpcPenumbra | IpcGlamourer | IpcCustomize | IpcMoodles | IpcHeels | IpcHonorific | IpcPetNames |
-        OwnedObjects |
+        OwnedObjects | DataDistributor |
         FileCache | PairFileCache | FileService |
-        PairManagement | PairDataTransfer | PairHandler | PairVisibility |
+        PairManagement | PairDataTransfer | PairHandler |
         RadarManagement | RadarData |
         DtrBar |
         ApiCore | Callbacks | HubFactory,

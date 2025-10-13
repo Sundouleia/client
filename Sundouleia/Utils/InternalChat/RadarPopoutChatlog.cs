@@ -71,7 +71,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         // 2) Initial assumption of the sender name.
         var finalName = message.Sender.AnonName; // "Anon.User-XXXX"
         // 3) Adjust sender name based on special conditions.
-        if (message.Sender.Tier is CkVanityTier.KinkporiumMistress)
+        if (message.Sender.Tier is CkVanityTier.ShopKeeper)
             finalName = $"Cordy";
         else if (_sundesmos.GetUserOrDefault(message.Sender) is { } sundesmo)
             finalName = $"{sundesmo.GetNickAliasOrUid()} ({message.Sender.UID[..4]})";
@@ -85,7 +85,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
     protected override void AddMessage(RadarCkChatMessage newMsg)
     {
         // Cordy is special girl :3
-        if (newMsg.Tier is CkVanityTier.KinkporiumMistress)
+        if (newMsg.Tier is CkVanityTier.ShopKeeper)
         {
             // Force set the uid color to her favorite color.
             UserColors[newMsg.UID] = CkColor.CkMistressColor.Vec4();
@@ -124,7 +124,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
     private void AddExistingMessage(RadarCkChatMessage newMsg)
     {
         // Cordy is special girl :3
-        if (newMsg.Tier is CkVanityTier.KinkporiumMistress)
+        if (newMsg.Tier is CkVanityTier.ShopKeeper)
         {
             // Force set the uid color to her favorite color.
             UserColors[newMsg.UID] = CkColor.CkMistressColor.Vec4();
@@ -340,7 +340,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         foreach (var msg in savedChatlog.Messages)
         {
             // Cordy is special girl :3
-            if (msg.Tier is CkVanityTier.KinkporiumMistress)
+            if (msg.Tier is CkVanityTier.ShopKeeper)
                 UserColors[msg.UID] = CkColor.CkMistressColor.Vec4();
             else
                 AssignSenderColor(msg);

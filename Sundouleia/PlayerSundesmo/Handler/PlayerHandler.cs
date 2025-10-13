@@ -430,46 +430,46 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     private async Task ApplyGlamourer()
     {
-        Logger.LogDebug($"Applying glamourer state for {NameString}");
+        Logger.LogDebug($"Applying glamourer state for {NameString}", LoggerType.PairAppearance);
         await _ipc.Glamourer.ApplyBase64StateByIdx(ObjIndex, _appearanceData!.Data[IpcKind.Glamourer]).ConfigureAwait(false);
     }
     private async Task ApplyHeels()
     {
-        Logger.LogDebug($"Setting heels offset for {NameString}");
+        Logger.LogDebug($"Setting heels offset for {NameString}", LoggerType.PairAppearance);
         await _ipc.Heels.SetUserOffset(ObjIndex, _appearanceData!.Data[IpcKind.Heels]).ConfigureAwait(false);
     }
     private async Task ApplyHonorific()
     {
-        Logger.LogDebug($"Setting honorific title for {NameString}");
+        Logger.LogDebug($"Setting honorific title for {NameString}", LoggerType.PairAppearance);
         await _ipc.Honorific.SetTitleAsync(ObjIndex, _appearanceData!.Data[IpcKind.Honorific]).ConfigureAwait(false);
     }
     private async Task ApplyMoodles()
     {
-        Logger.LogDebug($"Setting moodles status for {NameString}");
+        Logger.LogDebug($"Setting moodles status for {NameString}", LoggerType.PairAppearance);
         await _ipc.Moodles.SetByPtr(Address, _appearanceData!.Data[IpcKind.Moodles]).ConfigureAwait(false);
     }
     private async Task ApplyModManips()
     {
-        Logger.LogDebug($"Setting mod manipulations for {NameString}");
+        Logger.LogDebug($"Setting mod manipulations for {NameString}", LoggerType.PairAppearance);
         await _ipc.Penumbra.SetSundesmoManipulations(_tempCollection, _appearanceData!.Data[IpcKind.ModManips]).ConfigureAwait(false);
     }
     private async Task ApplyPetNames()
     {
         var nickData = _appearanceData!.Data[IpcKind.PetNames];
-        Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {NameString}");
+        Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {NameString}", LoggerType.PairAppearance);
         await _ipc.PetNames.SetNamesByIdx(ObjIndex, _appearanceData!.Data[IpcKind.PetNames]).ConfigureAwait(false);
     }
     private async Task ApplyCPlus()
     {
         if (string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.CPlus]) && _tempProfile != Guid.Empty)
         {
-            Logger.LogDebug($"Reverting CPlus profile for {NameString}");
+            Logger.LogDebug($"Reverting CPlus profile for {NameString}", LoggerType.PairAppearance);
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
         else
         {
-            Logger.LogDebug($"Applying CPlus profile for {NameString}");
+            Logger.LogDebug($"Applying CPlus profile for {NameString}", LoggerType.PairAppearance);
             _tempProfile = await _ipc.CustomizePlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
         }
     }

@@ -152,11 +152,11 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
         if (!_monitor.IsScanRunning)
         {
             CkGui.ColorTextFrameAlignedInline("Idle", _config.Current.InitialScanComplete ? ImGuiColors.HealerGreen : ImGuiColors.DalamudGrey, false);
-            CkGui.ColorTextFrameAlignedInline($"(Scanned {_monitor.ScannedCacheEntities} files in {_monitor.LastScanReadStr}, created all entries in {_monitor.LastScanWriteStr})", ImGuiColors.DalamudGrey2);
+            CkGui.ColorTextFrameAlignedInline($"(Scanned {_monitor.ScannedCacheEntities} files in {_monitor.LastScanReadStr}, created entries in {_monitor.LastScanWriteStr})", ImGuiColors.DalamudGrey2);
             if (_config.Current.InitialScanComplete)
             {
-                ImGui.SameLine(ImGui.GetContentRegionAvail().X - CkGui.IconTextButtonSize(FAI.PlayCircle, "Force Rescan"));
-                if (CkGui.IconTextButton(FAI.Play, "Force Rescan"))
+                ImGui.SameLine(ImGui.GetContentRegionAvail().X - CkGui.IconTextButtonSize(FAI.Play, "Rescan"));
+                if (CkGui.IconTextButton(FAI.Play, "Rescan"))
                     _monitor.InvokeScan();
             }
         }
@@ -168,7 +168,7 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
         }
 
         var allWatchersValid = _mainWatcher.Watcher is not null && _penumbraWatcher.Watcher is not null;
-        var restartStopWidth = CkGui.IconTextButtonSize(FAI.Play, "Resart") + ImUtf8.ItemInnerSpacing.X + CkGui.IconTextButtonSize(FAI.StopCircle, "Stop");
+        var restartStopWidth = CkGui.IconTextButtonSize(FAI.Play, "Restart") + ImUtf8.ItemInnerSpacing.X + CkGui.IconTextButtonSize(FAI.StopCircle, "Stop");
         CkGui.FramedIconText(FAI.GlobeAsia);
         CkGui.TextFrameAlignedInline("Penumbra Monitor:");
         

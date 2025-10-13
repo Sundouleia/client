@@ -5,11 +5,14 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using OtterGui;
+using Sundouleia.Interop;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
+using SundouleiaAPI.Data;
 
 namespace Sundouleia.ModFiles;
 
@@ -45,20 +48,31 @@ namespace Sundouleia.ModFiles;
 // Then everything would be synced as simple as that.
 //
 // But right now, we have a lot of people fighting over what they think is a competition, which makes it difficult to request any
-// changes for things related to helping with update syncronization. This is underandable, but unfortunate, and will need patience
+// changes for things related to helping with update synchronization. This is understandable, but unfortunate, and will need patience
 // until the dust settles and these changes can see reason for implementation.
 
-public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
+
+/// <summary>
+///     Processes changes to transient data, and tracks persistent data, along with on-screen data, 
+///     to calculate the client's current modded state. <para />
+///     Maybe rename to something shorter idk.
+/// </summary>
+public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
 {
-    private readonly TransientCacheConfig _config;
+    private readonly MainConfig _config;
+    private readonly TransientCacheConfig _cacheConfig;
+    private readonly PlzNoCrashFrens _noCrashPlz;
+    private readonly FileCacheManager _fileDb;
+    private readonly IpcManager _ipc;
     private readonly CharaObjectWatcher _watcher; // saves my sanity.
 
-    // internal vars.
     private string CurrentClientKey = string.Empty;
     private uint _lastClassJobId = uint.MaxValue;
 
-    // Overhead?
+    // Tracks transients for each of the clients owned objects, to help with processing.
     private ConcurrentDictionary<OwnedObject, HashSet<string>>? _persistentTransients = null;
+
+    // Only really useful for like, helping mitigate transient data loading at massive venues and stuff, but otherwise useless.
     private readonly object _cacheAdditionLock = new();
     private readonly HashSet<string> _cachedHandledPaths = new(StringComparer.Ordinal);
     
@@ -69,16 +83,21 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     {
         get
         {
-            if (!_config.Current.PlayerCaches.TryGetValue(CurrentClientKey, out var cache))
-                _config.Current.PlayerCaches[CurrentClientKey] = cache = new();
+            if (!_cacheConfig.Current.PlayerCaches.TryGetValue(CurrentClientKey, out var cache))
+                _cacheConfig.Current.PlayerCaches[CurrentClientKey] = cache = new();
             return cache;
         }
     }
 
-    public TransientResourceManager(ILogger<TransientResourceManager> logger, SundouleiaMediator mediator,
-        TransientCacheConfig config, CharaObjectWatcher watcher) : base(logger, mediator)
+    public ModdedStateManager(ILogger<ModdedStateManager> logger, SundouleiaMediator mediator, MainConfig config, 
+        TransientCacheConfig cacheConfig, PlzNoCrashFrens noCrashPlz, FileCacheManager fileDb, IpcManager ipc, 
+        CharaObjectWatcher watcher) : base(logger, mediator)
     {
         _config = config;
+        _cacheConfig = cacheConfig;
+        _noCrashPlz = noCrashPlz;
+        _fileDb = fileDb;
+        _ipc = ipc;
         _watcher = watcher;
 
         // Tells us whenever any resource, from any source, is loaded by anything. I wish i could avoid needing to detour this,
@@ -117,54 +136,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
     }
 
-    // Fully transient resoruces for each owned client object.
+    // Fully transient resources for each owned client object.
     private ConcurrentDictionary<OwnedObject, HashSet<string>> TransientResources { get; } = new();
-
-
-    public void DrawTransientResources()
-    {
-        using var node = ImRaii.TreeNode($"Transient Resources##transient-resource-info");
-        if (!node) return;
-
-        using var table = ImRaii.Table("transientResources", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
-        if (!table) return;
-
-        ImGui.TableSetupColumn("OwnedObject");
-        ImGui.TableSetupColumn("Resource Path");
-        ImGui.TableHeadersRow();
-
-        var allEntries = TransientResources.SelectMany(kv => kv.Value.Select(path => (OwnedObject: kv.Key, ResourcePath: path)));
-
-        foreach (var (obj, entry) in allEntries)
-        {
-            ImGui.TableNextColumn();
-            CkGui.ColorText(obj.ToString(), ImGuiColors.TankBlue.ToUint());
-            ImGuiUtil.DrawTableColumn(entry.ToString());
-        }
-    }
-
-    public void DrawPersistentTransients()
-    {
-        using var node = ImRaii.TreeNode($"Persistent-Transients##persistent-transients-info");
-        if (!node) return;
-
-        using var table = ImRaii.Table("persistent-transients", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
-        if (!table) return;
-
-        ImGui.TableSetupColumn("OwnedObject");
-        ImGui.TableSetupColumn("Resource Path");
-        ImGui.TableHeadersRow();
-
-        var allEntries = PersistentTransients.SelectMany(kv => kv.Value.Select(path => (OwnedObject: kv.Key, ResourcePath: path)));
-
-        foreach (var (obj, entry) in allEntries)
-        {
-            ImGui.TableNextColumn();
-            CkGui.ColorText(obj.ToString(), ImGuiColors.TankBlue.ToUint());
-            ImGuiUtil.DrawTableColumn(entry.ToString());
-        }
-    }
-
 
     protected override void Dispose(bool disposing)
     {
@@ -282,7 +255,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     // It is possible that we could be just spamming between outfits or jobs or whatever. In this case it is a good idea
     // to put a debouncer on the transient sender to avoid any unessisary calculations where possible.
     private CancellationTokenSource _sendTransientCts = new();
-    private void SendTransients(nint address, OwnedObject objKind)
+    private void SendTransients(nint address, OwnedObject obj)
     {
         // Hold 5s, then send off the transient resources changed event for all transient resources.
         _ = Task.Run(async () =>
@@ -293,10 +266,10 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
             foreach (var kvp in TransientResources)
             {
-                if (TransientResources.TryGetValue(objKind, out var values) && values.Any())
+                if (TransientResources.TryGetValue(obj, out var values) && values.Any())
                 {
-                    Logger.LogTrace($"Sending Transients for {objKind}", LoggerType.ResourceMonitor);
-                    Mediator.Publish(new TransientResourceLoaded(objKind));
+                    Logger.LogTrace($"Sending Transients for {obj}", LoggerType.ResourceMonitor);
+                    Mediator.Publish(new TransientResourceLoaded(obj));
                 }
             }
         });
@@ -320,13 +293,13 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         foreach (var replacementGamePath in replacements.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
         {
             // Remove it from the config directly as well.
-            removedPaths += _config.RemovePath(CurrentClientKey, obj, replacementGamePath);
+            removedPaths += _cacheConfig.RemovePath(CurrentClientKey, obj, replacementGamePath);
             value.Remove(replacementGamePath);
         }
         if (removedPaths > 0)
         {
             Logger.LogTrace($"Removed {removedPaths} PersistentTransients during CleanUp. Saving Config.", LoggerType.ResourceMonitor);
-            _config.Save();
+            _cacheConfig.Save();
         }
     }
 
@@ -334,7 +307,6 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     ///     Called by the function fetched modded resources from the player shortly after calling <see cref="ClearTransientPaths"/> <para />
     ///     If any paths are still present in the the TransientResources after this is processed, they should be marked as PersistentTransients.
     /// </summary>
-    /// <param name="obj"></param>
     public void PersistTransients(OwnedObject obj)
     {
         // Ensure that the PersistentTransients exists.
@@ -361,7 +333,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         {
             saveConfig = true;
             foreach (var item in newlyAddedGamePaths.Where(f => !string.IsNullOrEmpty(f)))
-                _config.AddOrElevate(CurrentClientKey, PlayerData.JobId, item);
+                _cacheConfig.AddOrElevate(CurrentClientKey, PlayerData.JobId, item);
         }
         // Prevent redraw city.
         else if (obj is OwnedObject.Pet && newlyAddedGamePaths.Count != 0)
@@ -377,7 +349,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         if (saveConfig)
         {
             Logger.LogTrace("Saving transient.json from PersistTransientResources", LoggerType.ResourceMonitor);
-            _config.Save();
+            _cacheConfig.Save();
         }
 
         Logger.LogDebug($"Removing remaining {resources.Count} transient resources", LoggerType.ResourceMonitor);
@@ -388,38 +360,9 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         TransientResources[obj].Clear();
     }
 
-
-    public void RemoveTransient(OwnedObject obj, string path)
-    {
-        if (PersistentTransients.TryGetValue(obj, out var resources))
-        {
-            resources.RemoveWhere(f => string.Equals(path, f, StringComparison.Ordinal));
-            if (obj is OwnedObject.Player)
-            {
-                _config.RemovePath(CurrentClientKey, obj, path);
-                Logger.LogTrace("Saving transient.json from RemoveTransient", LoggerType.ResourceMonitor);
-                _config.Save();
-            }
-        }
-    }
-
-    internal bool AddTransient(OwnedObject obj, string item)
-    {
-        if (PersistentTransients.TryGetValue(obj, out var semiTransient) && semiTransient != null && semiTransient.Contains(item))
-            return false;
-
-        if (!TransientResources.TryGetValue(obj, out HashSet<string>? transientResource))
-        {
-            transientResource = new HashSet<string>(StringComparer.Ordinal);
-            TransientResources[obj] = transientResource;
-        }
-
-        return transientResource.Add(item.ToLowerInvariant());
-    }
-
     /// <summary>
-    ///     Given an owned object <paramref name="obj"/>, and a list of their present modded gamepaths, remove
-    ///     all transient resources that match any of the paths in <paramref name="list"/>. <para />
+    ///     Given an owned object <paramref name="obj"/>, and a list of their present modded game-paths, 
+    ///     remove all transient resources that match any of the paths in <paramref name="list"/>. <para />
     ///     After this occurs, any remaining transient paths should be considered PersistentTransients (extras) to be processed. 
     /// </summary>
     public HashSet<string> ClearTransientsAndGetPersistents(OwnedObject obj, List<string> list)
@@ -439,7 +382,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             foreach (var file in semiset.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
             {
                 Logger.LogTrace($"Removing From SemiTransient: {file}", LoggerType.ResourceMonitor);
-                _config.RemovePath(CurrentClientKey, obj, file);
+                _cacheConfig.RemovePath(CurrentClientKey, obj, file);
             }
 
             int removed = semiset.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
@@ -449,7 +392,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             {
                 reloadSemiTransient = true;
                 Logger.LogTrace("Saving transient.json from ClearTransientPaths", LoggerType.ResourceMonitor);
-                _config.Save();
+                _cacheConfig.Save();
             }
         }
 
@@ -465,36 +408,218 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         return pathsToResolve;
     }
 
-    // :catscream: (try and remove this if possible, idk)
-    private void OnFrameworkUpdate()
+    private bool AddTransient(OwnedObject obj, string item)
     {
-        //_cachedFrameAddresses = new(_playerRelatedPointers.Where(k => k.Address != nint.Zero).ToDictionary(c => c.Address, c => c.ObjectKind));
-        //lock (_cacheAdditionLock)
-        //{
-        //    _cachedHandledPaths.Clear();
-        //}
+        if (PersistentTransients.TryGetValue(obj, out var semiTransient) && semiTransient != null && semiTransient.Contains(item))
+            return false;
 
-        //if (_lastClassJobId != _dalamudUtil.ClassJobId)
-        //{
-        //    _lastClassJobId = _dalamudUtil.ClassJobId;
-        //    if (PersistentTransients.TryGetValue(ObjectKind.Pet, out HashSet<string>? value))
-        //    {
-        //        value?.Clear();
-        //    }
+        if (!TransientResources.TryGetValue(obj, out HashSet<string>? transientResource))
+        {
+            transientResource = new HashSet<string>(StringComparer.Ordinal);
+            TransientResources[obj] = transientResource;
+        }
 
-        //    // reload config for current new classjob
-        //    PlayerConfig.JobSpecificCache.TryGetValue(_dalamudUtil.ClassJobId, out var jobSpecificData);
-        //    PersistentTransients[ObjectKind.Player] = PlayerConfig.GlobalPersistentCache.Concat(jobSpecificData ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        //    PlayerConfig.JobSpecificPetCache.TryGetValue(_dalamudUtil.ClassJobId, out var petSpecificData);
-        //    PersistentTransients[ObjectKind.Pet] = [.. petSpecificData ?? []];
-        //}
+        return transientResource.Add(item.ToLowerInvariant());
+    }
 
-        //foreach (var kind in Enum.GetValues(typeof(ObjectKind)))
-        //{
-        //    if (!_cachedFrameAddresses.Any(k => k.Value == (ObjectKind)kind) && TransientResources.Remove((ObjectKind)kind, out _))
-        //    {
-        //        Logger.LogDebug("Object not present anymore: {kind}", kind.ToString());
-        //    }
-        //}
+    private void RemoveTransient(OwnedObject obj, string path)
+    {
+        if (PersistentTransients.TryGetValue(obj, out var resources))
+        {
+            resources.RemoveWhere(f => string.Equals(path, f, StringComparison.Ordinal));
+            if (obj is OwnedObject.Player)
+            {
+                _cacheConfig.RemovePath(CurrentClientKey, obj, path);
+                Logger.LogTrace("Saving transient.json from RemoveTransient", LoggerType.ResourceMonitor);
+                _cacheConfig.Save();
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Collects up all transients, on-screen data, and persistent transients, calculating the Client's current modded state. <para />
+    ///     TODO: Separate this to process all owned objects concurrently, with special logic for pets.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<HashSet<ModdedFile>> CollectModdedState(CancellationToken ct)
+    {
+        if (!_config.HasValidCacheFolderSetup())
+        {
+            Logger.LogWarning("Cache Folder not setup! Cannot process mod files!");
+            return new HashSet<ModdedFile>(ModdedFileComparer.Instance);
+        }
+
+        // await until we are present and visible.
+        await SundouleiaEx.WaitForPlayerLoading().ConfigureAwait(false);
+
+        ct.ThrowIfCancellationRequested();
+
+        // A lot of unnecessary calculation work that needs to be done simply because people like the idea of custom skeletons,
+        // and.... they tend to crash other people :D
+        Dictionary<string, List<ushort>>? boneIndices;
+        unsafe { boneIndices = _noCrashPlz.GetSkeletonBoneIndices((GameObject*)_watcher.WatchedPlayerAddr); }
+
+        // Obtain our current on-screen actor state.
+        if (await _ipc.Penumbra.GetCharacterResourcePathData(0).ConfigureAwait(false) is not { } onScreenPaths)
+            throw new InvalidOperationException("Penumbra returned null data");
+
+        // Set the file replacements to all currently visible paths on our player data, where they are modded.
+        var moddedPaths = new HashSet<ModdedFile>(onScreenPaths.Select(c => new ModdedFile([.. c.Value], c.Key)), ModdedFileComparer.Instance).Where(p => p.HasFileReplacement).ToHashSet();
+        // Remove unsupported filetypes.
+        moddedPaths.RemoveWhere(c => c.GamePaths.Any(g => !Constants.ValidExtensions.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
+
+        // If we wished to abort then abort.
+        ct.ThrowIfCancellationRequested();
+
+        // Log the remaining files. (without checking for transients.
+        Logger.LogTrace("== Static Replacements ==", LoggerType.ResourceMonitor);
+        foreach (var replacement in moddedPaths.OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
+        {
+            Logger.LogTrace($"=> {replacement}", LoggerType.ResourceMonitor);
+            ct.ThrowIfCancellationRequested();
+        }
+
+        // At this point we would want to add any pet resources as transient resources, then clear them from this list
+        // (right now this is only grabbing from the player object, but should be grabbing from all other objects simultaneously if possible)
+
+
+        // Removes any resources caught from fetching the on-screen actor resources from that which loaded as transient (glowing armor vfx ext)
+        // any remaining transients for this OwnedObject are marked as PersistentTransients and returned.
+        var persistents = ClearTransientsAndGetPersistents(OwnedObject.Player, moddedPaths.SelectMany(c => c.GamePaths).ToList());
+
+        // For these paths, get their file replacement objects.
+        var resolvedTransientPaths = await GetFileReplacementsFromPaths(persistents).ConfigureAwait(false);
+        Logger.LogTrace("== Transient Replacements ==", LoggerType.ResourceMonitor);
+        foreach (var replacement in resolvedTransientPaths.Select(c => new ModdedFile([.. c.Value], c.Key)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
+        {
+            Logger.LogTrace($"=> {replacement}", LoggerType.ResourceMonitor);
+            moddedPaths.Add(replacement);
+        }
+
+        RemoveUnmoddedPersistentTransients(OwnedObject.Player, [.. moddedPaths]);
+        // obtain the final moddedFiles to send that is the result.
+        moddedPaths = new HashSet<ModdedFile>(moddedPaths.Where(p => p.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), ModdedFileComparer.Instance);
+        ct.ThrowIfCancellationRequested();
+
+        // All remaining paths that are not file-swaps come from modded game files that need to be sent over sundouleia servers.
+        // To authorize them we need their 40 character SHA1 computed hashes from their file data.
+        var toCompute = moddedPaths.Where(f => !f.IsFileSwap).ToArray();
+        Logger.LogDebug($"Computing hashes for {toCompute.Length} files.", LoggerType.ResourceMonitor);
+
+        // Grab these hashes via the FileCacheEntity.
+        var computedPaths = _fileDb.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
+
+        // Ensure we set and log said computed hashes.
+        foreach (var file in toCompute)
+        {
+            ct.ThrowIfCancellationRequested();
+            file.Hash = computedPaths[file.ResolvedPath]?.Hash ?? string.Empty;
+            Logger.LogDebug($"=> {file} (Hash: {file.Hash})", LoggerType.ResourceMonitor);
+        }
+
+        // Finally as a sanity check, remove any invalid file hashes for files that are no longer valid.
+        var removed = moddedPaths.RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
+        if (removed > 0)
+            Logger.LogDebug($"=> Removed {removed} invalid file hashes.", LoggerType.ResourceMonitor);
+
+        // Final throw check.
+        ct.ThrowIfCancellationRequested();
+        // This is original if (OwnedObject is OwnedObject.Player), can fix later.
+        if (true)
+        {
+            // Helps ensure we are not going to send files that will crash people yippee
+            var invalidHashes = await _noCrashPlz.VerifyPlayerAnimationBones(boneIndices, moddedPaths, ct).ConfigureAwait(false);
+            // Remove any invalid hashes from the persistent transients if any.
+            foreach (var invalid in invalidHashes)
+                RemoveTransient(OwnedObject.Player, invalid);
+        }
+        return moddedPaths;
+    }
+
+    /// <summary>
+    ///     Obtains the file replacements for the set of given paths that have forward and reverse resolve.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string[]>> GetFileReplacementsFromPaths(HashSet<string> forwardResolve)
+    {
+        var forwardPaths = forwardResolve.ToArray();
+        string[] reversePaths = Array.Empty<string>();
+
+        // track our resolved paths.
+        Dictionary<string, List<string>> resolvedPaths = new(StringComparer.Ordinal);
+
+        // grab them from penumbra. (causes a 20ms delay becuz ipc life)
+        var (forward, reverse) = await _ipc.Penumbra.ResolveModPaths(forwardPaths, reversePaths).ConfigureAwait(false);
+        for (int i = 0; i < forwardPaths.Length; i++)
+        {
+            var filePath = forward[i].ToLowerInvariant();
+            if (resolvedPaths.TryGetValue(filePath, out var list))
+                list.Add(forwardPaths[i].ToLowerInvariant());
+            else
+                resolvedPaths[filePath] = [forwardPaths[i].ToLowerInvariant()];
+        }
+
+        for (int i = 0; i < reversePaths.Length; i++)
+        {
+            var filePath = reversePaths[i].ToLowerInvariant();
+            if (resolvedPaths.TryGetValue(filePath, out var list))
+                list.AddRange(reverse[i].Select(c => c.ToLowerInvariant()));
+            else
+                resolvedPaths[filePath] = reverse[i].Select(c => c.ToLowerInvariant()).ToList();
+        }
+
+        Logger.LogTrace("== Resolved Paths ==", LoggerType.ResourceMonitor);
+        foreach (var kvp in resolvedPaths.OrderBy(k => k.Key, StringComparer.Ordinal))
+            Logger.LogTrace($"=> {kvp.Key} : {string.Join(", ", kvp.Value)}", LoggerType.ResourceMonitor);
+        return resolvedPaths.ToDictionary(k => k.Key, k => k.Value.ToArray(), StringComparer.OrdinalIgnoreCase).AsReadOnly();
+    }
+
+    /// <summary>
+    ///     Drawer for debug UI. Internal so it can access private attributes.
+    /// </summary>
+    public void DrawTransientResources()
+    {
+        using var node = ImRaii.TreeNode($"Transient Resources##transient-resource-info");
+        if (!node) return;
+
+        using var table = ImRaii.Table("transientResources", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        if (!table) return;
+
+        ImGui.TableSetupColumn("OwnedObject");
+        ImGui.TableSetupColumn("Resource Path");
+        ImGui.TableHeadersRow();
+
+        var allEntries = TransientResources.SelectMany(kv => kv.Value.Select(path => (OwnedObject: kv.Key, ResourcePath: path)));
+
+        foreach (var (obj, entry) in allEntries)
+        {
+            ImGui.TableNextColumn();
+            CkGui.ColorText(obj.ToString(), ImGuiColors.TankBlue.ToUint());
+            ImGuiUtil.DrawTableColumn(entry.ToString());
+        }
+    }
+
+    /// <summary>
+    ///     Drawer for debug UI. Internal so it can access private attributes.
+    /// </summary>
+    public void DrawPersistentTransients()
+    {
+        using var node = ImRaii.TreeNode($"Persistent-Transients##persistent-transients-info");
+        if (!node) return;
+
+        using var table = ImRaii.Table("persistent-transients", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        if (!table) return;
+
+        ImGui.TableSetupColumn("OwnedObject");
+        ImGui.TableSetupColumn("Resource Path");
+        ImGui.TableHeadersRow();
+
+        var allEntries = PersistentTransients.SelectMany(kv => kv.Value.Select(path => (OwnedObject: kv.Key, ResourcePath: path)));
+
+        foreach (var (obj, entry) in allEntries)
+        {
+            ImGui.TableNextColumn();
+            CkGui.ColorText(obj.ToString(), ImGuiColors.TankBlue.ToUint());
+            ImGuiUtil.DrawTableColumn(entry.ToString());
+        }
     }
 }

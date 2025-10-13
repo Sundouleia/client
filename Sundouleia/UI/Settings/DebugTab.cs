@@ -14,13 +14,15 @@ public class DebugTab
     {
         ("Achievements", [ LoggerType.Achievements, LoggerType.AchievementEvents, LoggerType.AchievementInfo ]),
         ("Interop / IPC", [ 
-            LoggerType.IpcSundouleia, LoggerType.IpcPenumbra, LoggerType.IpcGlamourer, LoggerType.IpcCustomize, LoggerType.IpcMoodles,
-            LoggerType.IpcHeels, LoggerType.IpcHonorific, LoggerType.IpcPetNames ]),
-        ("Client Data", [ LoggerType.ResourceMonitor, LoggerType.OwnedObjects ]),
-        ("File Info", [ LoggerType.FileCache, LoggerType.FileCsv, LoggerType.FileMonitor, LoggerType.PairFileCache ]),
+            LoggerType.IpcSundouleia, LoggerType.IpcPenumbra, LoggerType.IpcGlamourer, LoggerType.IpcCustomize,
+            LoggerType.IpcMoodles, LoggerType.IpcHeels, LoggerType.IpcHonorific, LoggerType.IpcPetNames ]),
+        ("Client Data", [ LoggerType.ResourceMonitor, LoggerType.OwnedObjects, LoggerType.DataDistributor ]),
+        ("File Info", [ 
+            LoggerType.FileCache, LoggerType.FileCsv, LoggerType.FileMonitor, LoggerType.PairFileCache,
+            LoggerType.FileUploads, LoggerType.FileDownloads, LoggerType.FileService ]),
         ("Pair Data", [
-            LoggerType.PairManagement, LoggerType.PairDataTransfer, LoggerType.PairHandler,
-            LoggerType.PairMods, LoggerType.PairAppearance, LoggerType.PairVisibility ]),
+            LoggerType.PairManagement, LoggerType.PairDataTransfer, LoggerType.PairHandler, LoggerType.PairMods, 
+            LoggerType.PairAppearance ]),
         ("Radar", [ LoggerType.RadarManagement, LoggerType.RadarData, LoggerType.RadarChat ]),
         ("Services", [
             LoggerType.UIManagement, LoggerType.Textures, LoggerType.DtrBar, LoggerType.Profiles, 

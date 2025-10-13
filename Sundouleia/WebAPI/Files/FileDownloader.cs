@@ -43,12 +43,19 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
         });
     }
 
-    public void ClearDownload()
+    protected override void Dispose(bool disposing)
     {
-        _downloadStatus.Clear();
+        ClearDownload();
+        foreach (var stream in _activeDownloadStreams.ToList())
+            Generic.Safe(stream.Dispose);
+        base.Dispose(disposing);
     }
 
-    // I hate the parameters in this, try to simplify this file to a degree.
+    public void ClearDownload() => _downloadStatus.Clear();
+
+    /// <summary>
+    ///     I hate the parameters in this, try to simplify this file to a degree.
+    /// </summary>
     public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<(string GamePath, string? Hash), string> validDict, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
@@ -114,7 +121,6 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     /// <summary>
     ///     Downloads a batch of files using authorized download links provided by Sundouleia's FileHost.
     /// </summary>
-
     public async Task DownloadFiles(PlayerHandler handler, List<VerifiedModFile> fileReplacementDto, CancellationToken ct)
     {
         try
@@ -131,41 +137,16 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
         }
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        ClearDownload();
-        foreach (var stream in _activeDownloadStreams.ToList())
-            Generic.Safe(stream.Dispose);
-        base.Dispose(disposing);
-    }
-
-    private Progress<long> CreateProgressReporter(string fileHash)
-    {
-        return new((bytesDownloaded) =>
-        {
-            try
-            {
-                if (!_downloadStatus.TryGetValue(fileHash, out FileTransferProgress? value)) return;
-                _downloadStatus[fileHash] = value with { Transferred = value.Transferred + bytesDownloaded };
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Could not set download progress");
-            }
-        });
-    }
-
-    // I give up trying to digest this, my battery is fucking spent.
     private async Task DownloadFilesInternal(PlayerHandler handler, List<VerifiedModFile> moddedFiles, CancellationToken ct)
     {
+        // Init the download status for each of the files.
         foreach (var v in moddedFiles)
-        {
             _downloadStatus[v.Hash] = new FileTransferProgress(0, 0);
-        }
 
-        // TODO: Hook up download progress to the mediator so the UI can show it
-        // Mediator.Publish(new DownloadStartedMessage(handler, _downloadStatus));
+        // Inform the download UI that there are download(s) starting, passing in the status dictionary.
+        Mediator.Publish(new FileDownloadStarted(handler, _downloadStatus));
 
+        // Begin the parallel downloads, managed via the download slots.
         await Parallel.ForEachAsync(moddedFiles, new ParallelOptions()
         {
             MaxDegreeOfParallelism = Math.Min(moddedFiles.Count, 10), // 1-10 parallel downloads
@@ -175,19 +156,10 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
         {
             try
             {
+                // await for an available download slot
                 await _transferService.WaitForDownloadSlotAsync(cancelToken).ConfigureAwait(false);
-                Progress<long> progress = new((bytesDownloaded) =>
-                {
-                    try
-                    {
-                        if (!_downloadStatus.TryGetValue(modFile.Hash, out FileTransferProgress? value)) return;
-                        _downloadStatus[modFile.Hash] = value with { Transferred = value.Transferred + bytesDownloaded };
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "Could not set download progress");
-                    }
-                });
+                // create progress reporter for this file
+                Progress<long> progress = CreateProgressReporter(modFile.Hash);
 
                 // download the file via transfer service
                 var downloadResponse = await _transferService.SendRequestAsync(HttpMethod.Get, new Uri(modFile.Link), cancelToken, HttpCompletionOption.ResponseHeadersRead);
@@ -217,7 +189,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
                     // move temp file to final location
                     File.Move(tempFilePath, filePath, true);
                     PersistFileToStorage(modFile.Hash, filePath);
-                    Logger.LogDebug("Downloaded file {hash} to {path}", modFile.Hash, filePath);
+                    Logger.LogDebug($"Downloaded file {modFile.Hash} to {filePath}", LoggerType.FileDownloads);
                 }
                 finally
                 {
@@ -226,11 +198,11 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
             }
             catch (OperationCanceledException)
             {
-                Logger.LogDebug("Detected cancellation of download for {id}", modFile.Hash);
+                Logger.LogDebug($"Detected cancellation of download for {modFile.Hash}", LoggerType.FileDownloads);
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error during download of {id}", modFile.Hash);
+                Logger.LogError($"Error during download of {modFile.Hash}: {ex}");
                 return;
             }
             finally
@@ -240,9 +212,25 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
             }
         }).ConfigureAwait(false);
 
-        Logger.LogDebug("Download end: {id}", handler);
+        Logger.LogDebug($"Download end: {handler}", LoggerType.FileDownloads);
 
         ClearDownload();
+    }
+
+    private Progress<long> CreateProgressReporter(string fileHash)
+    {
+        return new((bytesDownloaded) =>
+        {
+            try
+            {
+                if (!_downloadStatus.TryGetValue(fileHash, out FileTransferProgress? value)) return;
+                _downloadStatus[fileHash] = value with { Transferred = value.Transferred + bytesDownloaded };
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Could not set download progress: {ex}");
+            }
+        });
     }
 
     private void PersistFileToStorage(string fileHash, string filePath)
@@ -252,14 +240,14 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
             var entry = _dbManager.CreateCacheEntry(filePath);
             if (entry != null && !string.Equals(entry.Hash, fileHash, StringComparison.OrdinalIgnoreCase))
             {
-                Logger.LogError("Hash mismatch after extracting, got {hash}, expected {expectedHash}, deleting file", entry.Hash, fileHash);
+                Logger.LogError($"Hash mismatch after extracting, got {entry.Hash}, expected {fileHash}, deleting file");
                 File.Delete(filePath);
                 _dbManager.RemoveHashedFile(entry.Hash, entry.PrefixedFilePath);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "Error creating cache entry");
+            Logger.LogWarning($"Error creating cache entry: {ex}");
         }
     }
 }

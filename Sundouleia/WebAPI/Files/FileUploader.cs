@@ -13,71 +13,82 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     private readonly FileTransferService _transferService;
 
     public FileUploader(ILogger<FileUploader> logger, SundouleiaMediator mediator,
-        MainConfig config, FileCacheManager fileDbManager, FileTransferService fileTransferService) : base(logger, mediator)
+        MainConfig config, FileCacheManager fileDbManager, FileTransferService transferService) 
+        : base(logger, mediator)
     {
         _config = config;
         _fileDbManager = fileDbManager;
-        _transferService = fileTransferService;
+        _transferService = transferService;
     }
 
     public ConcurrentDictionary<string, FileTransferProgress> CurrentUploads { get; } = []; // update as time does on.
     public bool IsUploading => CurrentUploads.Count > 0;
 
-    protected override void Dispose(bool disposing)
+    /// <summary>
+    ///     Uploads all necessary files via their authorized upload links to the server.
+    /// </summary>
+    public async Task<List<ModFile>> UploadFiles(List<VerifiedModFile> filesToUpload)
     {
-        base.Dispose(disposing);
-    }
-
-    // Uploads all necessary files via their authorized upload links to the server.
-    public async Task UploadFiles(IEnumerable<UploadableFile> filesToUpload) // Don't need to include the visible players here just yet.
-    {
+        var toReturn = new List<ModFile>();
         foreach (var file in filesToUpload)
         {
-            if (CurrentUploads.GetOrAdd(file.Verified.Hash, new FileTransferProgress(0, file.Size)) is not null)
+            // If the file is not cached, we should not upload it. The file needs to be valid.
+            if (_fileDbManager.GetFileCacheByHash(file.Hash) is not { } fileEntity)
             {
-                Logger.LogWarning("File {FileName} is already being uploaded, skipping.", file.Verified.Hash);
+                Logger.LogWarning($"File {file.Hash} is not cached, skipping upload.");
+                continue;
+            }
+            
+            // If the upload is already being processed, skip over it. (Try and faze out allowing .Size to be nullable)
+            if (CurrentUploads.GetOrAdd(file.Hash, new FileTransferProgress(0, fileEntity.Size ?? 0)) is not null)
+            {
+                Logger.LogWarning($"File {file.Hash} is already being uploaded, skipping.");
                 continue;
             }
 
             try
             {
-                await UploadFile(file, CancellationToken.None).ConfigureAwait(false);
-
-                Logger.LogDebug("Successfully uploaded file {FileName}.", file.Verified.Hash);
+                // Attempt to upload the file using the authorized upload link.
+                await UploadFile(file, fileEntity, CancellationToken.None).ConfigureAwait(false);
+                Logger.LogDebug($"Successfully uploaded file {file.Hash}.", LoggerType.FileUploads);
+                toReturn.Add(new ModFile(file.Hash, file.GamePaths, file.SwappedPath));
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error uploading file {FileName}.", file.Verified.Hash);
+                Logger.LogError($"Error uploading file {file.Hash}. {ex}");
             }
             finally
             {
-                CurrentUploads.Remove(file.Verified.Hash, out _);
+                CurrentUploads.Remove(file.Hash, out _);
             }
         }
+        // Return the uploaded files to transfer.
+        return toReturn;
     }
 
-    // Inner file upload. Should contain the compressed data that we are doing to upload. WIP.
-    private async Task UploadFile(UploadableFile file, CancellationToken cancelToken)
+    /// <summary>
+    ///     Inner file upload. Should contain the compressed data that we are doing to upload. WIP.
+    /// </summary>
+    /// <exception cref="FileNotFoundException"></exception>
+    private async Task UploadFile(VerifiedModFile modFile, FileCacheEntity fileInfo, CancellationToken cancelToken)
     {
-        if (!File.Exists(file.LocalPath))
-            throw new FileNotFoundException("File to upload does not exist.", file.LocalPath);
-
+        // Construct a new FileTransferProgress tracker to monitor the upload progress.
         Progress<FileTransferProgress>? progressTracker = new((prog) =>
         {
             try
             {
-                CurrentUploads[file.Verified.Hash] = prog;
+                CurrentUploads[modFile.Hash] = prog;
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "[{hash}] Could not set upload progress", file.Verified.Hash);
+                Logger.LogWarning($"[{modFile.Hash}] Could not set upload progress. {ex}");
             }
         });
 
-        using var fileStream = File.OpenRead(file.LocalPath);
+        using var fileStream = File.OpenRead(fileInfo.ResolvedFilepath);
         using var content = new ProgressableStreamContent(fileStream, progressTracker);
 
-        var response = await _transferService.SendRequestStreamAsync(HttpMethod.Put, new(file.Verified.Link), content, cancelToken).ConfigureAwait(false);
+        var response = await _transferService.SendRequestStreamAsync(HttpMethod.Put, new(modFile.Link), content, cancelToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
     }
 }
