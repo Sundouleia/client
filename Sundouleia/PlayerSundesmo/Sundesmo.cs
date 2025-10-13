@@ -174,10 +174,10 @@ public class Sundesmo : IComparable<Sundesmo>
         _timeoutCTS.SafeCancel();
         // Set the OnlineUser & update the sundesmo state.
         _onlineUser = dto;
-        // Ensure that IsReloading is false (as if they were reloading, they just have)
-        IsReloading = false;
         // Notify other parts of Sundouleia they are online.
-        _mediator.Publish(new SundesmoOnline(this));
+        _mediator.Publish(new SundesmoOnline(this, IsReloading));
+        // Ensure that IsReloading is false (prior to sending that they are online)
+        IsReloading = false;
 
         // If the sundesmo is not yet rendered upon being marked, check to see if they are visible or not.
         if (!IsRendered && _watcher.TryGetExisting(_player, out IntPtr playerAddr))
@@ -219,6 +219,7 @@ public class Sundesmo : IComparable<Sundesmo>
     {
         // Whenever IsReloading is true, marking as offline will skip the
         // timeouts entirely and immediately force an unload of alterations.
+        _logger.LogDebug($"Marking [{PlayerName}] ({GetNickAliasOrUid()}) as reloading.", LoggerType.PairManagement);
         IsReloading = true;
     }
 

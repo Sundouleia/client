@@ -70,6 +70,12 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _watcher = watcher;
 
         // Process sundesmo state changes.
+        Mediator.Subscribe<SundesmoOnline>(this, msg =>
+        {
+            // If they were performing a reload, send them your full data again.
+            if (msg.WasReloading)
+                NewVisibleUsers.Add(msg.Sundesmo.UserData);
+        });
         Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => NewVisibleUsers.Add(msg.Handler.Sundesmo.UserData));
         Mediator.Subscribe<SundesmoEnteredLimbo>(this, msg => InLimbo.Add(msg.Sundesmo.UserData));
         Mediator.Subscribe<SundesmoLeftLimbo>(this, msg => InLimbo.Remove(msg.Sundesmo.UserData));

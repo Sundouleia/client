@@ -180,12 +180,12 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
                     var fileExtension = modFile.GamePaths[0].Split(".")[^1]; // maybe pass extension in the (Verified)ModFile dto:s?
                     var filePath = _dbManager.GetCacheFilePath(modFile.Hash, fileExtension);
                     var tempFilePath = filePath + ".part";
-                    using var fileStream = File.Create(tempFilePath);
-
-                    // copy from the http stream to temp file with progress tracking
-                    await throttledStream.CopyToAsync(fileStream, progress, cancelToken);
-                    await fileStream.FlushAsync(cancelToken).ConfigureAwait(false);
-
+                    using (var fileStream = File.Create(tempFilePath))
+                    {
+                        // copy from the http stream to temp file with progress tracking
+                        await throttledStream.CopyToAsync(fileStream, progress, cancelToken);
+                        await fileStream.FlushAsync(cancelToken).ConfigureAwait(false);
+                    };
                     // move temp file to final location
                     File.Move(tempFilePath, filePath, true);
                     PersistFileToStorage(modFile.Hash, filePath);
