@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+using System.Reflection;
 using CkCommons;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
@@ -25,15 +27,18 @@ using Sundouleia.Utils;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
-using System.Net.Http.Headers;
-using System.Reflection;
 using TerraFX.Interop.Windows;
 using static FFXIVClientStructs.FFXIV.Client.UI.Misc.RaptureMacroModule;
 
 namespace Sundouleia;
+
 public sealed class Sundouleia : IDalamudPlugin
 {
     private readonly IHost _host;  // the host builder for the plugin instance. (What makes everything work)
+    private readonly HttpClientHandler _httpHandler = new() // the http client handler for the plugin instance.
+    {
+        AutomaticDecompression = System.Net.DecompressionMethods.All
+    };
     public Sundouleia(IDalamudPluginInterface pi)
     {
         pi.Create<Svc>();
@@ -61,7 +66,7 @@ public sealed class Sundouleia : IDalamudPlugin
             {
                 var services = GetPluginServices(serviceCollection);
                 //services.ValidateDependencyInjector();
-            }) 
+            })
             .Build();
     }
 
@@ -84,7 +89,7 @@ public sealed class Sundouleia : IDalamudPlugin
             .AddSingleton<UiFileDialogService>()
             .AddSingleton(new Dalamud.Localization("Sundouleia.Localization.", "", useEmbedded: true))
             // add the generic services for Sundouleia
-            .AddSundouleiaGeneric()
+            .AddSundouleiaGeneric(_httpHandler)
             // add the services related to the IPC calls for Sundouleia
             .AddSundouleiaIPC()
             // add the services related to the configs for Sundouleia
@@ -103,6 +108,8 @@ public sealed class Sundouleia : IDalamudPlugin
         CkCommonsHost.Dispose();
         // Dispose cleanup of GameDataSvc.
         GameDataSvc.Dispose();
+        // Dispose the HttpClientHandler.
+        _httpHandler.Dispose();
         // Dispose the Host.
         _host.Dispose();
 
@@ -112,7 +119,7 @@ public sealed class Sundouleia : IDalamudPlugin
 public static class SundouleiaServiceExtensions
 {
     #region GenericServices
-    public static IServiceCollection AddSundouleiaGeneric(this IServiceCollection services)
+    public static IServiceCollection AddSundouleiaGeneric(this IServiceCollection services, HttpClientHandler httpHandler)
     => services
         // Necessary Services
         .AddSingleton<ILoggerProvider, Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider>()
@@ -170,7 +177,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<TokenProvider>()
         .AddSingleton((s) =>
         {
-            var httpClient = new HttpClient();
+            var httpClient = new HttpClient(httpHandler);
             var ver = Assembly.GetExecutingAssembly().GetName().Version;
             httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Sundouleia", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
             return httpClient;
