@@ -275,14 +275,14 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
     public void DrawDebugInfo()
     {
-        using var node = ImRaii.TreeNode($"Alterations##{Sundesmo.UserData.UID}-alterations");
+        using var node = ImRaii.TreeNode($"{ObjectType} Alterations##{Sundesmo.UserData.UID}-alterations-{ObjectType}");
         if (!node) return;
 
         if (_appearanceData is null)
             CkGui.ColorText("No Alteration Data", ImGuiColors.DalamudRed);
         else
         {
-            using (var table = ImRaii.Table("sundesmo-appearance", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
+            using (var table = ImRaii.Table($"sundesmo-appearance-{ObjectType}", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
             {
                 if (!table) return;
 

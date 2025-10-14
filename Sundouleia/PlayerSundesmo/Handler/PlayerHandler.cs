@@ -617,7 +617,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     public void DrawDebugInfo()
     {
-        using var node = ImRaii.TreeNode($"Alterations##{Sundesmo.UserData.UID}-alterations");
+        using var node = ImRaii.TreeNode($"Player Alterations##{Sundesmo.UserData.UID}-alterations-player");
         if (!node) return;
 
         DebugAppliedMods();
@@ -650,7 +650,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     private void DebugAppearance()
     {
-        using var node = ImRaii.TreeNode($"Appearance##{Sundesmo.UserData.UID}-appearance");
+        using var node = ImRaii.TreeNode($"Appearance##{Sundesmo.UserData.UID}-appearance-player");
         if (!node) return;
 
         using var table = ImRaii.Table("sundesmo-appearance", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
