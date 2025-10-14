@@ -245,6 +245,7 @@ public static class SundouleiaServiceExtensions
         .AddScoped<ModStorageTab>()
 
         // Scoped Misc
+        .AddScoped<WindowMediatorSubscriberBase, TransferBarUI>()
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
         .AddScoped<WindowMediatorSubscriberBase, ChangelogUI>()
         .AddScoped<WindowMediatorSubscriberBase, RadarChatPopoutUI>()

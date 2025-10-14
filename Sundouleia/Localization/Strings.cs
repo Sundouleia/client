@@ -201,8 +201,9 @@ namespace Sundouleia.Localization
 
     public class MainOptions
     {
-        public readonly string HeaderRadar = Loc.Localize("MainOptions_HeaderRadar", "Radar Preferences");
-        public readonly string HeaderUi = Loc.Localize("MainOptions_HeaderUi", "UI Options");
+        public readonly string HeaderGeneric = Loc.Localize("MainOptions_HeaderGeneric", "Generic");
+        public readonly string HeaderRadar = Loc.Localize("MainOptions_HeaderRadar", "Radar");
+        public readonly string HeaderExports = Loc.Localize("MainOptions_HeaderExports", "Exports");
 
         // Player synchronization options here and stuff.
 
@@ -215,26 +216,75 @@ namespace Sundouleia.Localization
         public readonly string ProfileDelayLabel = Loc.Localize("Preferences_ProfileDelayLabel", "Hover Delay");
         public readonly string ProfileDelayTT = Loc.Localize("Preferences_ProfileDelayTT", "Sets the delay before a profile is displayed on hover.");
 
+        public readonly string AllowNSFWLabel = Loc.Localize("Preferences_AllowNSFWLabel", "Show NSFW Profiles");
+        public readonly string AllowNSFWTT = Loc.Localize("Preferences_AllowNSFWTT", "NSFW profiles are masked when disabled.");
+
+        // Radar Options
+        public readonly string RadarSendPingsLabel = Loc.Localize("Preferences_RadarSendPingsLabel", "Send Pings");
+        public readonly string RadarSendPingsTT = Loc.Localize("Preferences_RadarSendPingsTT", "Allow other users in the area to send requests via R-Click -> Examine.");
+
+        public readonly string RadarNearbyDtrLabel = Loc.Localize("Preferences_RadarNearbyDtrLabel", "Show Nearby Players");
+        public readonly string RadarNearbyDtrTT = Loc.Localize("Preferences_RadarNearbyDtrTT", "Display a DTR entry for an overview of Sundouleia users in the area.");
+
+        public readonly string RadarJoinChatsLabel = Loc.Localize("Preferences_RadarJoinChatsLabel", "Join Chats");
+        public readonly string RadarJoinChatsTT = Loc.Localize("Preferences_RadarJoinChatsTT", "Automatically join/leave zone-specific radar chats with others!");
+
+        public readonly string RadarChatUnreadDtrLabel = Loc.Localize("Preferences_RadarChatUnreadDtrLabel", "Show Unread Chat DTR");
+        public readonly string RadarChatUnreadDtrTT = Loc.Localize("Preferences_RadarChatUnreadDtrTT", "Adds an unread message count bubble to the DTR.");
+
+        public readonly string RadarShowUnreadBubbleLabel = Loc.Localize("Preferences_RadarShowUnreadBubbleLabel", "Show Unread Chat Bubble");
+        public readonly string RadarShowUnreadBubbleTT = Loc.Localize("Preferences_RadarShowUnreadBubbleTT", "Displays a small bubble on the MainUI Chat tab for unread messages.");
+
+        // Export Options
+        public readonly string ExportFolderCDFLabel = Loc.Localize("Preferences_ExportFolderCDFLabel", "Export Folder for CDF/Mods");
     }
 
     public class Preferences
     {
         // UI Preferences Section
-        public readonly string HeaderPairPref = Loc.Localize("Preferences_HeaderPairPref", "Pair Preferences");
-        public readonly string HeaderNotifyPref = Loc.Localize("Preferences_HeaderNotifyPref", "Notifications");
+        public readonly string HeaderDownloads = Loc.Localize("Preferences_HeaderDownloadPref", "Downloads");
+        public readonly string HeaderPairs = Loc.Localize("Preferences_HeaderPairPref", "Pairs");
+        public readonly string HeaderNotifier = Loc.Localize("Preferences_HeaderNotifier", "Notifier");
 
-        public readonly string ShowVisibleSeparateLabel = Loc.Localize("Preferences_ShowVisibleSeparateLabel", "Show separate Visible group");
-        public readonly string ShowVisibleSeparateTT = Loc.Localize("Preferences_ShowVisibleSeparateTT", "Lists paired players within render range in a separate group.");
+        // Download Section
+        public readonly string MaxParallelDLsLabel = Loc.Localize("Preferences_MaxParallelDLsLabel", "Max Parallel Downloads");
+        public readonly string MaxParallelDLsTT = Loc.Localize("Preferences_MaxParallelDLsTT", "How many simultaneous downloads can occur at once.");
 
-        public readonly string ShowOfflineSeparateLabel = Loc.Localize("Preferences_ShowOfflineSeparateLabel", "Show separate Offline group");
-        public readonly string ShowOfflineSeparateTT = Loc.Localize("Preferences_ShowOfflineSeparateTT", "Lists offline paired players in a separate group.");
+        public readonly string DownloadLimitLabel = Loc.Localize("Preferences_DownloadLimitLabel", "Download Limit");
+        public readonly string DownloadLimitTT = Loc.Localize("Preferences_DownloadLimitTT", "Sets a maximum download speed limit. 0 is unlimited.");
 
+        public readonly string DownloadSpeedTypeTT = Loc.Localize("Preferences_DownloadSpeedTypeTT", "Sets the unit for the download speed limit.");
+
+        public readonly string ShowUploadingTextLabel = Loc.Localize("Preferences_ShowUploadingTextLabel", "Show Uploading Text");
+        public readonly string ShowUploadingTextTT = Loc.Localize("Preferences_ShowUploadingTextTT", "Display \"Uploading..\" under users uploading files to you.");
+
+        public readonly string TransferWindowLabel = Loc.Localize("Preferences_TransferWindowLabel", "Show Transfer Window");
+        public readonly string TransferWindowTT = Loc.Localize("Preferences_TransferWindowTT", "Mostly for debugging download issues.");
+
+        public readonly string TransferBarsLabel = Loc.Localize("Preferences_TransferBarsLabel", "Show Download Progress");
+        public readonly string TransferBarsTT = Loc.Localize("Preferences_TransferBarsTT", "Show the download progress of pair's mods below them.");
+
+        public readonly string TransferBarTextLabel = Loc.Localize("Preferences_TransferBarTextLabel", "Show Text");
+        public readonly string TransferBarTextTT = Loc.Localize("Preferences_TransferBarTextTT", "Show text on the download progress bars.");
+
+        public readonly string TransferBarHeightTT = Loc.Localize("Preferences_TransferBarHeightTT", "Sets the height of the download progress bars.");
+        public readonly string TransferBarWidthTT = Loc.Localize("Preferences_TransferBarWidthTT", "Sets the width of the download progress bars.");
+
+        // Pairs Section
         public readonly string PreferNicknamesLabel = Loc.Localize("Preferences_PreferNicknamesLabel", "Prefer nicknames for visible pairs");
         public readonly string PreferNicknamesTT = Loc.Localize("Preferences_PreferNicknamesTT", "Displays nicknames instead of character names for paired players within render range.");
 
-        public readonly string ContextMenusLabel = Loc.Localize("Preferences_ShowContextMenusLabel", "Enable right-click context menu for visible pairs");
-        public readonly string ContextMenusTT = Loc.Localize("Preferences_ShowContextMenusTT", "Displays a context menu when right-clicking on a targeted pair." +
-            "--SEP--The context menu provides quick access to pair actions or to view a Profile.");
+        // Might be phased out soon idk..
+        public readonly string ShowVisibleSeparateLabel = Loc.Localize("Preferences_ShowVisibleSeparateLabel", "Show separate Visible group");
+        public readonly string ShowVisibleSeparateTT = Loc.Localize("Preferences_ShowVisibleSeparateTT", "Lists paired players within render range in a separate group.");
+
+        // Might be phased out soon idk..
+        public readonly string ShowOfflineSeparateLabel = Loc.Localize("Preferences_ShowOfflineSeparateLabel", "Show separate Offline group");
+        public readonly string ShowOfflineSeparateTT = Loc.Localize("Preferences_ShowOfflineSeparateTT", "Lists offline paired players in a separate group.");
+
+        public readonly string ContextMenusLabel = Loc.Localize("Preferences_ShowContextMenusLabel", "Enable Context Menus");
+        public readonly string ContextMenusTT = Loc.Localize("Preferences_ShowContextMenusTT", "Right-Clicking your pairs will display additional options from Sundouleia." +
+            "--SEP--The context menu provides quick access to interactions or profile viewing.");
 
         public readonly string FocusTargetLabel = Loc.Localize("Preferences_FocusTargetLabel", "Use FocusTarget over Target");
         public readonly string FocusTargetTT = Loc.Localize("Preferences_FocusTargetTT", "Uses the FocusTarget instead of the Target for identifying pairs." +
@@ -256,15 +306,6 @@ namespace Sundouleia.Localization
 
     public class Accounts
     {
-        public readonly string CharaNameLabel = Loc.Localize("Accounts_CharaNameLabel", "Account Character's Name");
-        public readonly string CharaWorldLabel = Loc.Localize("Accounts_CharaWorldLabel", "Account Character's World");
-        public readonly string CharaKeyLabel = Loc.Localize("Accounts_CharaKeyLabel", "Account Secret Key");
 
-        public readonly string DeleteButtonLabel = Loc.Localize("Accounts_DeleteButtonLabel", "Delete Account");
-        public readonly string DeleteButtonDisabledTT = Loc.Localize("Accounts_DeleteButtonDisabledTT", "Cannot delete this account as it is not yet registered.");
-        public readonly string DeleteButtonTT = Loc.Localize("Accounts_DeleteButtonTT", "Permanently deleting this account from GagSpeak servers." +
-            "--SEP--WARNING: Once an account is deleted, the associated secret key will become unusable." +
-            "--SEP--If you wish to create a new account for the currently logged in character, you will need to obtain a new secret key." +
-            "--SEP--(A confirmation dialog will open upon clicking this button)");
     }
 }
