@@ -491,6 +491,8 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         var computedPaths = _fileDb.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
 
         // Ensure we set and log said computed hashes.
+        // We also group by hash here to ensure we only have one ModdedFile instance per hash, with all game paths it replaces, as we use the hashes as unique identifiers throughout the sync,
+        // and multiple files with different paths and names could have the same contents and thus same hash. For example: fully transparent textures.
         Dictionary<string, ModdedFile> groupedByHash = new(StringComparer.Ordinal);
         foreach (var file in toCompute)
         {
