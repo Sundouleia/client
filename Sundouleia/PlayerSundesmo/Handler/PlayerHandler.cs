@@ -110,7 +110,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     /// <exception cref="ArgumentNullException"></exception>
     public unsafe void ObjectRendered(Character* chara)
     {
-        if (chara is null) throw new ArgumentNullException(nameof(chara));
+        if (chara is null)
+            throw new ArgumentNullException(nameof(chara));
+
+        // Stop any possible timeout tasks, if online.
+        if (Sundesmo.IsOnline)
+            Sundesmo.EndTimeout();
+
         // Set/Update the GameData.
         _player = chara;
         // If the Player NameString was empty, it needs to be initialized.
@@ -235,7 +241,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!IsRendered)
         {
             Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.FullDataReceive, "Downloading but not applying data [NOT-RENDERED]")));
-            Logger.LogWarning("Data received from an object not currently present! If this happens, report / determine why immediately.");
+            Logger.LogTrace($"Data received from {NameString}({Sundesmo.GetNickAliasOrUid()}), who was unrendered. They likely have a higher render distance. Waiting for them to be visible before applying.", LoggerType.PairHandler);
             
             // Update the Mod Replacements with the new changes. (Does not apply them!)
             if (_fileCache.CacheFolderIsValid())
