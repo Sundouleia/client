@@ -48,11 +48,27 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         IsOpen = true;
 
         // Temporarily do this, hopefully we dont always need to.
-        Mediator.Subscribe<FileDownloadStarted>(this, (msg) => _downloads[msg.Player] = msg.Status);
-        Mediator.Subscribe<FileDownloadComplete>(this, (msg) => _downloads.TryRemove(msg.Player, out _));
+        Mediator.Subscribe<FileDownloadStarted>(this, (msg) =>
+        {
+            _logger.LogWarning($"Starting download tracking for {msg.Player.NameString}");
+            _downloads[msg.Player] = msg.Status;
+        });
+        Mediator.Subscribe<FileDownloadComplete>(this, (msg) =>
+        {
+            _logger.LogWarning($"Ending download tracking for {msg.Player.NameString}");
+            _downloads.TryRemove(msg.Player, out _);
+        });
         // For uploads (can configure later as there is not much reason with our new system)
-        Mediator.Subscribe<FileUploading>(this, _ => _uploads[_.Player] = true);
-        Mediator.Subscribe<FileUploaded>(this, (msg) => _uploads.TryRemove(msg.Player, out _));
+        Mediator.Subscribe<FileUploading>(this, _ =>
+        {
+            _logger.LogWarning($"Starting upload tracking for {_.Player.NameString}");
+            _uploads[_.Player] = true; 
+        });
+        Mediator.Subscribe<FileUploaded>(this, (msg) =>
+        {
+            _logger.LogWarning($"Ending upload tracking for {msg.Player.NameString}");
+            _uploads.TryRemove(msg.Player, out _);
+        });
         // For GPose handling.
         Mediator.Subscribe<GPoseStartMessage>(this, _ => IsOpen = false);
         Mediator.Subscribe<GPoseEndMessage>(this, _ => IsOpen = true);
@@ -85,25 +101,23 @@ public class TransferBarUI : WindowMediatorSubscriberBase
 
     private void DrawTransferWindow()
     {
-        if (_fileUploader.CurrentUploads.TotalFiles > 0)
-        {
-            var totalUploads = _fileUploader.CurrentUploads.TotalFiles;
+        var currentUploads = _fileUploader.CurrentUploads.Values.ToList();
+        var totalUploads = currentUploads.Count;
 
-            var totalUploaded = _fileUploader.CurrentUploads.Transferred;
-            var totalToUpload = _fileUploader.CurrentUploads.TotalSize;
+        var totalUploaded = currentUploads.Sum(c => c.Transferred);
+        var totalToUpload = currentUploads.Sum(c => c.TotalSize);
 
-            CkGui.OutlinedFont($"▲", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
-            ImGui.SameLine();
-            var xDistance = ImGui.GetCursorPosX();
-            CkGui.OutlinedFont($"Uploading {totalUploads} files.",
-                ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
-            ImGui.NewLine();
-            ImGui.SameLine(xDistance);
-            CkGui.OutlinedFont($"{SundouleiaEx.ByteToString(totalUploaded, false)}/{SundouleiaEx.ByteToString(totalToUpload)}", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
+        CkGui.OutlinedFont($"▲", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
+        ImGui.SameLine();
+        var xDistance = ImGui.GetCursorPosX();
+        CkGui.OutlinedFont($"Uploading {totalUploads} files.",
+            ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
+        ImGui.NewLine();
+        ImGui.SameLine(xDistance);
+        CkGui.OutlinedFont($"{SundouleiaEx.ByteToString(totalUploaded, false)}/{SundouleiaEx.ByteToString(totalToUpload)}", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
 
-            if (_downloads.Any())
-                ImGui.Separator();
-        }
+        if (_downloads.Any())
+            ImGui.Separator();
     }
 
     private void DrawTransferBars()

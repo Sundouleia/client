@@ -41,14 +41,13 @@ public sealed class RequestsManager
         {
             _incomingRequests.Add(request);
             _logger.LogDebug($"Added incoming request", LoggerType.PairManagement);
-            _mediator.Publish(new RefreshRequestsMessage());
         }
         else if (request.User.UID == MainHub.UID)
         {
             _outgoingRequests.Add(request);
             _logger.LogDebug($"Added outgoing request", LoggerType.PairManagement);
-            _mediator.Publish(new RefreshRequestsMessage());
         }
+        _mediator.Publish(new RefreshRequestsMessage());
     }
 
     public void RemoveRequest(SundesmoRequest request)
@@ -57,13 +56,12 @@ public sealed class RequestsManager
         {
             _incomingRequests.Remove(request);
             _logger.LogDebug($"Removed incoming request", LoggerType.PairManagement);
-            _mediator.Publish(new RefreshRequestsMessage());
         }
         else if (request.User.UID == MainHub.UID)
         {
             _outgoingRequests.Remove(request);
             _logger.LogDebug($"Removed outgoing request", LoggerType.PairManagement);
-            _mediator.Publish(new RefreshRequestsMessage());
         }
+        _mediator.Publish(new RefreshRequestsMessage());
     }
 }

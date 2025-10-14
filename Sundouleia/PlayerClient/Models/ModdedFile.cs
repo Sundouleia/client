@@ -13,6 +13,12 @@ public partial class ModdedFile
         GamePaths = gamePaths.Select(g => g.Replace('\\', '/').ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
         ResolvedPath = filePath.Replace('\\', '/');
     }
+    public ModdedFile(ModdedFile other)
+    {
+        GamePaths = new HashSet<string>(other.GamePaths, StringComparer.Ordinal);
+        ResolvedPath = other.ResolvedPath;
+        Hash = other.Hash;
+    }
 
     public HashSet<string> GamePaths { get; init; }
     public string ResolvedPath { get; init; }

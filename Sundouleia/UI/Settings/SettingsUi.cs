@@ -1,4 +1,5 @@
 using CkCommons.Gui;
+using CkCommons.Gui.Utility;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
@@ -12,6 +13,7 @@ using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Enums;
 
 namespace Sundouleia.Gui;
 
@@ -65,7 +67,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
     }
 
-
     protected override void DrawInternal()
     {
         ImGui.Text(CkLoc.Settings.OptionalPlugins);
@@ -113,13 +114,20 @@ public class SettingsUi : WindowMediatorSubscriberBase
             {
                 if (ImGui.BeginTabItem(CkLoc.Settings.TabGeneral))
                 {
-                    DrawGlobalSettings();
+                    DrawMainGeneric();
+                    ImGui.Separator();
+                    DrawMainRadar();
+                    ImGui.Separator();
+                    DrawMainExports();
                     ImGui.EndTabItem();
                 }
                 if (ImGui.BeginTabItem(CkLoc.Settings.TabPreferences))
                 {
-                    DrawBasicPreferences();
-                    DrawNotificationPreferences();
+                    DrawPrefsDownloads();
+                    ImGui.Separator();
+                    DrawPrefsSundesmos();
+                    ImGui.Separator();
+                    DrawPrefsNotify();
                     ImGui.EndTabItem();
                 }
             }
@@ -146,62 +154,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
     }
 
-    private void DrawGlobalSettings()
+    private void DrawMainGeneric()
     {
-        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderRadar, UiFontService.UidFont);
-        var sendPings = _mainConfig.Current.RadarSendPings;
-        var showDtr = _mainConfig.Current.RadarNearbyDtr;
-        var showDtrUnread = _mainConfig.Current.RadarChatUnreadDtr;
-        var joinChats = _mainConfig.Current.RadarJoinChats;
-        var chatUnreadBubble = _mainConfig.Current.RadarShowUnreadBubble;
-
-        if (ImGui.Checkbox("Send Radar Pings", ref sendPings))
-        {
-            _mainConfig.Current.RadarSendPings = sendPings;
-            _mainConfig.Save();
-        }
-        CkGui.HelpText("Show up on other user's radar that are in your area!" +
-            "--SEP--Users will not know your location or anything, just that you are present.");
-
-        if (ImGui.Checkbox("Show Radar DTR", ref showDtr))
-        {
-            _mainConfig.Current.RadarNearbyDtr = showDtr;
-            _mainConfig.Save();
-        }
-        CkGui.HelpText("Add the DTR entry for the radar, showing you how many other users are in your local territory.");
-
-
-        if (ImGui.Checkbox("Join Radar Chats", ref joinChats))
-        {
-            _mainConfig.Current.RadarJoinChats = joinChats;
-            _mainConfig.Save();
-        }
-        CkGui.HelpText("Automatically join the chat channels created by the radar when you enter a new area.");
-
-        if (ImGui.Checkbox("Show Chat Unread DTR", ref showDtrUnread))
-        {
-            _mainConfig.Current.RadarChatUnreadDtr = showDtrUnread;
-            _mainConfig.Save();
-        }
-        CkGui.HelpText("If you have unread chat messages from your local radar's chat, change the DTR entries color!");
-
-        if (ImGui.Checkbox("Show Unread Chat Bubble", ref chatUnreadBubble))
-        {
-            _mainConfig.Current.RadarShowUnreadBubble = chatUnreadBubble;
-            _mainConfig.Save();
-        }
-        CkGui.HelpText("Toggles the visibility of the unread message bubble in the main UI.");
-
-
-        ImGui.Separator();
-        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderUi, UiFontService.UidFont);
-        var openOnLaunch = _mainConfig.Current.OpenUiOnStartup;
+        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderGeneric, UiFontService.UidFont);
+        var autoOpen = _mainConfig.Current.OpenUiOnStartup;
         var showProfiles = _mainConfig.Current.ShowProfiles;
-        var popOutDelay = _mainConfig.Current.ProfileDelay;
+        var profileDelay = _mainConfig.Current.ProfileDelay;
+        var allowNsfw = _mainConfig.Current.AllowNSFW;
 
-        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.ShowMainUiOnStartLabel, ref openOnLaunch))
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.ShowMainUiOnStartLabel, ref autoOpen))
         {
-            _mainConfig.Current.OpenUiOnStartup = openOnLaunch;
+            _mainConfig.Current.OpenUiOnStartup = autoOpen;
             _mainConfig.Save();
         }
         CkGui.HelpText(CkLoc.Settings.MainOptions.ShowMainUiOnStartTT);
@@ -214,23 +177,202 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         CkGui.HelpText(CkLoc.Settings.MainOptions.ShowProfilesTT);
 
-        using (ImRaii.Disabled(!showProfiles))
+        using var dis = ImRaii.Disabled(!showProfiles);
+        using var ident = ImRaii.PushIndent();
+        
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowNSFWLabel, ref allowNsfw))
         {
-            ImGui.Indent();
-            ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
-            if (ImGui.SliderFloat(CkLoc.Settings.MainOptions.ProfileDelayLabel, ref popOutDelay, 0.3f, 5))
+            _mainConfig.Current.AllowNSFW = allowNsfw;
+            _mainConfig.Save();
+        }
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowNSFWTT);
+
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+        if (ImGui.SliderFloat("##Profile-Delay", ref profileDelay, 0.3f, 5, $"%.1f {CkLoc.Settings.MainOptions.ProfileDelayLabel}"))
+        {
+            _mainConfig.Current.ProfileDelay = profileDelay;
+            _mainConfig.Save();
+        }
+        CkGui.HelpText(CkLoc.Settings.MainOptions.ProfileDelayTT);
+    }
+
+    private void DrawMainRadar()
+    {
+        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderRadar, UiFontService.UidFont);
+        var sendPings = _mainConfig.Current.RadarSendPings;
+        var nearbyDtr = _mainConfig.Current.RadarNearbyDtr;
+        var joinChats = _mainConfig.Current.RadarJoinChats;
+        var chatUnreadDtr = _mainConfig.Current.RadarChatUnreadDtr;
+        var showUnreadBubble = _mainConfig.Current.RadarShowUnreadBubble;
+
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarSendPingsLabel, ref sendPings))
+        {
+            _mainConfig.Current.RadarSendPings = sendPings;
+            _mainConfig.Save();
+        }
+        ImUtf8.SameLineInner();
+        CkGui.FramedIconText(FAI.SatelliteDish);
+        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarSendPingsTT, true);
+
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarNearbyDtrLabel, ref nearbyDtr))
+        {
+            _mainConfig.Current.RadarNearbyDtr = nearbyDtr;
+            _mainConfig.Save();
+        }
+        ImUtf8.SameLineInner();
+        CkGui.FramedIconText(FAI.PersonDressBurst);
+        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarNearbyDtrTT, true);
+
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarJoinChatsLabel, ref joinChats))
+        {
+            _mainConfig.Current.RadarJoinChats = joinChats;
+            _mainConfig.Save();
+        }
+        ImUtf8.SameLineInner();
+        CkGui.FramedIconText(FAI.CommentDots);
+        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarJoinChatsTT, true);
+
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarChatUnreadDtrLabel, ref chatUnreadDtr))
+        {
+            _mainConfig.Current.RadarChatUnreadDtr = chatUnreadDtr;
+            _mainConfig.Save();
+        }
+        ImUtf8.SameLineInner();
+        CkGui.FramedIconText(FAI.PersonCircleExclamation);
+        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarChatUnreadDtrTT, true);
+
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleLabel, ref showUnreadBubble))
+        {
+            _mainConfig.Current.RadarShowUnreadBubble = showUnreadBubble;
+            _mainConfig.Save();
+        }
+        ImUtf8.SameLineInner();
+        CkGui.FramedIconText(FAI.Bell);
+        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleTT, true);
+    }
+
+    private void DrawMainExports()
+    {
+        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderExports, UiFontService.UidFont);
+
+        CkGui.ColorTextCentered("TBD - Future Export Options", ImGuiColors.ParsedGold);
+    }
+
+    private void DrawPrefsDownloads()
+    {
+        CkGui.FontText(CkLoc.Settings.Preferences.HeaderDownloads, UiFontService.UidFont);
+        var maxParallelDLs = _mainConfig.Current.MaxParallelDownloads;
+        var dlLimit = _mainConfig.Current.DownloadLimitBytes;
+        var dlSpeedType = _mainConfig.Current.DownloadSpeedType;
+
+        CkGui.FramedIconText(FAI.Gauge);
+        CkGui.TextFrameAlignedInline(CkLoc.Settings.Preferences.DownloadLimitLabel);
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
+        if (ImGui.InputInt("###DownloadSpeedLimit", ref dlLimit))
+        {
+            _mainConfig.Current.DownloadLimitBytes = dlLimit;
+            _mainConfig.Save();
+            Mediator.Publish(new DownloadLimitChangedMessage());
+        }
+        CkGui.AttachToolTip(CkLoc.Settings.Preferences.DownloadLimitTT);
+
+        ImUtf8.SameLineInner();
+        if (CkGuiUtils.EnumCombo("###SpeedType", 50 * ImGuiHelpers.GlobalScale, _mainConfig.Current.DownloadSpeedType, out var newType, s => s.ToName()))
+        {
+            _mainConfig.Current.DownloadSpeedType = newType;
+            _mainConfig.Save();
+            Mediator.Publish(new DownloadLimitChangedMessage());
+        }
+        CkGui.AttachToolTip(CkLoc.Settings.Preferences.DownloadSpeedTypeTT);
+
+        CkGui.FramedIconText(FAI.Download);
+        CkGui.TextFrameAlignedInline(CkLoc.Settings.Preferences.MaxParallelDLsLabel);
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(150 * ImGuiHelpers.GlobalScale);
+        if (ImGui.SliderInt("###Maximum Parallel Downloads", ref maxParallelDLs, 1, 10))
+        {
+            _mainConfig.Current.MaxParallelDownloads = maxParallelDLs;
+            _mainConfig.Save();
+        }
+        CkGui.HelpText(CkLoc.Settings.Preferences.MaxParallelDLsTT);
+
+        var showUploadText = _mainConfig.Current.ShowUploadingText;
+        var transferDebug = _mainConfig.Current.TransferWindow;
+        var progressBars = _mainConfig.Current.TransferBars;
+        var showBarText = _mainConfig.Current.TransferBarText;
+        var barHeight = _mainConfig.Current.TransferBarHeight;
+        var barWidth = _mainConfig.Current.TransferBarWidth;
+
+        if (ImGui.Checkbox(CkLoc.Settings.Preferences.ShowUploadingTextLabel, ref showUploadText))
+        {
+            _mainConfig.Current.ShowUploadingText = showUploadText;
+            _mainConfig.Save();
+        }
+        CkGui.HelpText(CkLoc.Settings.Preferences.ShowUploadingTextTT);
+
+        if (ImGui.Checkbox(CkLoc.Settings.Preferences.TransferWindowLabel, ref transferDebug))
+        {
+            _mainConfig.Current.TransferWindow = transferDebug;
+            _mainConfig.Save();
+            Mediator.Publish(new UiToggleMessage(typeof(TransferBarUI), transferDebug ? ToggleType.Show : ToggleType.Hide));
+        }
+        CkGui.HelpText(CkLoc.Settings.Preferences.TransferWindowTT);
+
+        if (ImGui.Checkbox(CkLoc.Settings.Preferences.TransferBarsLabel, ref progressBars))
+        {
+            _mainConfig.Current.TransferBars = progressBars;
+            _mainConfig.Save();
+        }
+        CkGui.HelpText(CkLoc.Settings.Preferences.TransferBarsTT);
+
+        using var dis = ImRaii.Disabled(!progressBars);
+        using var ident = ImRaii.PushIndent();
+
+        using (ImRaii.Group())
+        {
+            using (ImRaii.Group())
             {
-                _mainConfig.Current.ProfileDelay = popOutDelay;
+                CkGui.FramedIconText(FAI.TextWidth);
+                ImUtf8.SameLineInner();
+                ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
+                if (ImGui.SliderInt("##transfer-width", ref barWidth, 50, 1000))
+                {
+                    _mainConfig.Current.TransferBarWidth = barWidth;
+                    _mainConfig.Save();
+                }
+            }
+            CkGui.AttachToolTip(CkLoc.Settings.Preferences.TransferBarWidthTT);
+
+            CkGui.FrameSeparatorV();
+
+            using (ImRaii.Group())
+            {
+                CkGui.FramedIconText(FAI.TextHeight);
+                ImUtf8.SameLineInner();
+                ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
+                if (ImGui.SliderInt("##transfer-height", ref barHeight, 10, 500))
+                {
+                    _mainConfig.Current.TransferBarHeight = barHeight;
+                    _mainConfig.Save();
+                }
+            }
+            CkGui.AttachToolTip(CkLoc.Settings.Preferences.TransferBarHeightTT);
+
+            CkGui.FrameSeparatorV();
+
+            if (ImGui.Checkbox(CkLoc.Settings.Preferences.TransferBarTextLabel, ref showBarText))
+            {
+                _mainConfig.Current.TransferBarText = showBarText;
                 _mainConfig.Save();
             }
-            CkGui.HelpText(CkLoc.Settings.MainOptions.ProfileDelayTT);
-            ImGui.Unindent();
+            CkGui.HelpText(CkLoc.Settings.Preferences.TransferBarTextTT);
         }
     }
 
-    private void DrawBasicPreferences()
+    private void DrawPrefsSundesmos()
     {
-        CkGui.FontText(CkLoc.Settings.Preferences.HeaderPairPref, UiFontService.UidFont);
+        CkGui.FontText(CkLoc.Settings.Preferences.HeaderPairs, UiFontService.UidFont);
         var nickOverName = _mainConfig.Current.PreferNicknamesOverNames;
         var sepVisibleUsers = _mainConfig.Current.ShowVisibleUsersSeparately;
         var sepOfflineUsers = _mainConfig.Current.ShowOfflineUsersSeparately;
@@ -277,10 +419,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
         CkGui.HelpText(CkLoc.Settings.Preferences.FocusTargetTT);
     }
 
-    private void DrawNotificationPreferences()
+    private void DrawPrefsNotify()
     {
         /* --------------- Separator for moving onto the Notifications Section ----------- */
-        ImGui.Separator();
         CkGui.FontText(CkLoc.Settings.Preferences.HeaderNotifications, UiFontService.UidFont);
         var onlineNotifs = _mainConfig.Current.OnlineNotifications;
         var onlineNotifsNickLimited = _mainConfig.Current.NotifyLimitToNickedPairs;

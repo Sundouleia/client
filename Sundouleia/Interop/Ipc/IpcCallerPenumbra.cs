@@ -250,8 +250,9 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     }
 
     /// <summary>
-    ///     In an ideal world we could efficiency and and remove changed items from a temporary mod, but penumbra's API does
-    ///     not currently allow this. As a result we must reapply everything in bulk. Which sucks, and means we must manage
+    ///     In an ideal world we could efficiency and and remove changed items 
+    ///     from a temporary mod, but penumbra's API does not currently allow this. <para />
+    ///     As a result we must reapply everything in bulk. Which sucks, and means we must manage
     ///     the replacements internally with its own cache until they add support for this.
     /// </summary>
     public async Task ReapplySundesmoMods(Guid collection, Dictionary<string, string> modPaths)
@@ -259,10 +260,6 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         if (!APIAvailable) return;
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            // Likely do not log this here, log it somewhere else, if this sends the full list every time this will get very spammy.
-            foreach (var mod in modPaths)
-                Logger.LogTrace($"[SundesmoTempMods] Change: {mod.Key} => {mod.Value}", LoggerType.IpcPenumbra);
-
             // remove the existing temporary mod
             var retRemove = RemoveTempMod.Invoke(SUNDOULEIA_MOD_PREFIX, collection, 0);
             Logger.LogTrace($"Removed Existing Temp Mod for Collection: {collection}, Success: [{retRemove}]", LoggerType.IpcPenumbra);

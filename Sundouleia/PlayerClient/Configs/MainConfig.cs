@@ -18,14 +18,30 @@ public class ConfigStorage
     public bool InitialScanComplete { get; set; } = false;
     public string CacheFolder { get; set; } = string.Empty;
     public bool CompactCache { get; set; } = true;
-    // Ideally we can remove this if our cleanup function works properly.
-    // Which it should, because if we are using radars it better be lol.
     public double MaxCacheInGiB { get; set; } = 20;
     public string CacheScanComplete { get; set; } = string.Empty;
-    public int MaxParallelDownloads { get; set; } = 10;
+
+    // General
+    public MainMenuTabs.SelectedTab MainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
+    public bool OpenUiOnStartup { get; set; } = true;
+    public bool ShowProfiles { get; set; } = true;
+    public float ProfileDelay { get; set; } = 1.5f;
+    public bool AllowNSFW { get; set; } = false;
+
+    // General - Radar
+    public bool RadarSendPings { get; set; } = false; // If others can send you requests vis context menus.
+    public bool RadarNearbyDtr { get; set; } = true;
+    public bool RadarJoinChats { get; set; } = true;
+    public bool RadarChatUnreadDtr { get; set; } = false;
+    public bool RadarShowUnreadBubble { get; set; } = true;
+
+    // General - Exports
+    public string ExportFolderCDF { get; set; } = string.Empty;
+
+    // Preferences - Downloads
     public int DownloadLimitBytes { get; set; } = 0;
     public DownloadSpeeds DownloadSpeedType { get; set; } = DownloadSpeeds.MBps;
-
+    public int MaxParallelDownloads { get; set; } = 10;
     public bool ShowUploadingText { get; set; } = false;
     public bool TransferWindow { get; set; } = false;
     public bool TransferBars { get; set; } = true;
@@ -33,34 +49,14 @@ public class ConfigStorage
     public int TransferBarHeight { get; set; } = 30;
     public int TransferBarWidth { get; set; } = 250;
 
-    // Used to retain compatibility with existing (M)CDF export logic.
-    public string ExportFolderCDF { get; set; } = string.Empty;
-
-
-    // Radar Preferences
-    public bool RadarSendPings { get; set; } = false; // If others can send you requests vis context menus.
-    public bool RadarNearbyDtr { get; set; } = true;
-    public bool RadarJoinChats { get; set; } = true;
-    public bool RadarChatUnreadDtr { get; set; } = false;
-    public bool RadarShowUnreadBubble { get; set; } = true;
-
-    // UI Options
-    public MainMenuTabs.SelectedTab MainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
-    public bool OpenUiOnStartup { get; set; } = true;
-    public bool ShowProfiles { get; set; } = true;
-    public bool AllowNSFW { get; set; } = false;
-    public float ProfileDelay { get; set; } = 1.5f;
-
-
-    // pair listing preferences. This will have a long overhaul, as preferences
-    // will mean very little once we can make custom group containers.
+    // Preferences - Pairs
     public bool PreferNicknamesOverNames { get; set; } = false;
     public bool ShowVisibleUsersSeparately { get; set; } = true;
     public bool ShowOfflineUsersSeparately { get; set; } = true;
     public bool ShowContextMenus { get; set; } = true;
     public bool FocusTargetOverTarget { get; set; } = false;
 
-    // Notification preferences
+    // Preferences - Notifier
     public bool OnlineNotifications { get; set; } = true;
     public bool NotifyLimitToNickedPairs { get; set; } = false;
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
