@@ -225,9 +225,9 @@ public sealed class FileCacheManager : IHostedService
                     .Replace("\\\\", "\\", StringComparison.Ordinal),
                 StringComparer.OrdinalIgnoreCase);
 
-            _logger.LogDebug($"== Fetching FileCaches by Paths Cleaned Paths ==", LoggerType.FileCache);
+            _logger.LogDebug($"== Fetching FileCaches by Paths Cleaned Paths ==", LoggerType.FileCsv);
             foreach ( var entry in cleanedPaths)
-                _logger.LogDebug($"Key: {entry.Key}, Value: {entry.Value}", LoggerType.FileCache);
+                _logger.LogDebug($"Key: {entry.Key}, Value: {entry.Value}", LoggerType.FileCsv);
 
             // not sure why this isn't merged with the line below, but whatever, basically just constructs the result.
             Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);

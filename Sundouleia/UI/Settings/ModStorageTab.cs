@@ -56,7 +56,7 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
         var rootGenWidth = CkGui.IconTextButtonSize(FAI.FolderPlus, "At Drive Root");
         var rightWidth = penumbraGenWidth + rootGenWidth + ImUtf8.ItemInnerSpacing.X * 2;
 
-        var height = CkStyle.GetFrameRowsHeight(3);
+        var height = CkStyle.TwoRowHeight() + CkGui.GetSeparatorHeight() + CkGui.CalcFontTextSize("A", UiFontService.UidFont).Y;
         if (!hasValidStoragePath) height += ImGui.GetTextLineHeightWithSpacing(); // to display error text.
 
         using (var child = CkRaii.FramedChildPaddedW("Storage", ImGui.GetContentRegionAvail().X, height, 0, CkColor.VibrantPink.Uint(), CkStyle.ChildRoundingLarge()))

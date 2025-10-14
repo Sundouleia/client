@@ -348,7 +348,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
         if (_replacements.Count == 0)
         {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered or has no mod data to apply, skipping mod application.", LoggerType.PairMods);
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] has no mod replacements, skipping mod application.", LoggerType.PairMods);
             return;
         }
         
