@@ -96,7 +96,8 @@ public class ClientDataCache
         // Now iterate through the new hashes. Any that need to be added should be placed in the ToAdd.
         foreach (var mod in moddedState)
         {
-            if (AppliedMods.TryGetValue(mod.Hash, out var file))
+            // Skip unchanged mods. A mod is considered changed, if the set of replaced game paths is different.
+            if (AppliedMods.TryGetValue(mod.Hash, out var file) && file.GamePaths.SetEquals(mod.GamePaths))
                 continue;
             // Add it as new.
             AppliedMods[mod.Hash] = mod;

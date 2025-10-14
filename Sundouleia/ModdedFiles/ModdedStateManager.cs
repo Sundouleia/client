@@ -491,17 +491,32 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         var computedPaths = _fileDb.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
 
         // Ensure we set and log said computed hashes.
+        Dictionary<string, ModdedFile> groupedByHash = new(StringComparer.Ordinal);
         foreach (var file in toCompute)
         {
             ct.ThrowIfCancellationRequested();
             file.Hash = computedPaths[file.ResolvedPath]?.Hash ?? string.Empty;
             Logger.LogDebug($"=> {file} (Hash: {file.Hash})", LoggerType.ResourceMonitor);
+
+            if (!string.IsNullOrEmpty(file.Hash))
+            {
+                if (groupedByHash.TryGetValue(file.Hash, out var existing))
+                {
+                    existing.GamePaths.UnionWith(file.GamePaths);
+                }
+                else
+                    groupedByHash[file.Hash] = file;
+            }
         }
 
         // Finally as a sanity check, remove any invalid file hashes for files that are no longer valid.
         var removed = moddedPaths.RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
         if (removed > 0)
             Logger.LogDebug($"=> Removed {removed} invalid file hashes.", LoggerType.ResourceMonitor);
+
+        // Replace all modded paths with the grouped by hash versions.
+        moddedPaths.RemoveWhere(f => groupedByHash.ContainsKey(f.Hash));
+        moddedPaths.UnionWith(groupedByHash.Values);
 
         // Final throw check.
         ct.ThrowIfCancellationRequested();
