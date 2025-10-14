@@ -13,7 +13,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     private readonly FileTransferService _transferService;
 
     public FileUploader(ILogger<FileUploader> logger, SundouleiaMediator mediator,
-        MainConfig config, FileCacheManager fileDbManager, FileTransferService transferService) 
+        MainConfig config, FileCacheManager fileDbManager, FileTransferService transferService)
         : base(logger, mediator)
     {
         _config = config;
@@ -21,8 +21,8 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
         _transferService = transferService;
     }
 
-    public ConcurrentDictionary<string, FileTransferProgress> CurrentUploads { get; } = []; // update as time does on.
-    public bool IsUploading => CurrentUploads.Count > 0;
+    public FileTransferProgress CurrentUploads { get; } = new(); // update as time does on.
+    public bool IsUploading => CurrentUploads.TotalFiles > 0;
 
     /// <summary>
     ///     Uploads all necessary files via their authorized upload links to the server.
@@ -38,9 +38,9 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
                 Logger.LogWarning($"File {file.Hash} is not cached, skipping upload.");
                 continue;
             }
-            
+
             // If the upload is already being processed, skip over it.
-            if (!CurrentUploads.TryAdd(file.Hash, new FileTransferProgress(0, fileEntity.Size ?? 0)))
+            if (!CurrentUploads.TryAddFile(file.Hash, 0))
             {
                 Logger.LogWarning($"File {file.Hash} is already being uploaded, skipping.");
                 continue;
@@ -60,7 +60,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
             }
             finally
             {
-                CurrentUploads.Remove(file.Hash, out _);
+                CurrentUploads.RemoveFile(file.Hash);
             }
         }
         // Return the uploaded files to transfer.
@@ -74,11 +74,11 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     private async Task UploadFile(VerifiedModFile modFile, FileCacheEntity fileInfo, CancellationToken cancelToken)
     {
         // Construct a new FileTransferProgress tracker to monitor the upload progress.
-        Progress<FileTransferProgress>? progressTracker = new((prog) =>
+        Progress<long>? progressTracker = new((transferredBytes) =>
         {
             try
             {
-                CurrentUploads[modFile.Hash] = prog;
+                CurrentUploads.AddFileProgress(modFile.Hash, transferredBytes);
             }
             catch (Exception ex)
             {

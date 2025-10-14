@@ -22,7 +22,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
     // Change this later to have Sundouleias own flavor and taste, as the original was somewhat bland.
     // Additionally i dislike the way these dictionaries are structured and believe they deserve to be changed.
     private readonly ConcurrentDictionary<PlayerHandler, bool> _uploads = new();
-    private readonly ConcurrentDictionary<PlayerHandler, ConcurrentDictionary<string, FileTransferProgress>> _downloads = new();
+    private readonly ConcurrentDictionary<PlayerHandler, FileTransferProgress> _downloads = new();
 
     public TransferBarUI(ILogger<TransferBarUI> logger, SundouleiaMediator mediator, MainConfig config,
         FileUploader fileUploader) : base(logger, mediator, "##SundouleiaDLs")
@@ -135,8 +135,8 @@ public class TransferBarUI : WindowMediatorSubscriberBase
                 continue;
 
             // Obtain the transfer in bytes.
-            var totalBytes = downloads.Sum(c => c.Value.TotalSize);
-            var transferredBytes = downloads.Sum(c => c.Value.Transferred);
+            var totalBytes = downloads.TotalSize;
+            var transferredBytes = downloads.Transferred;
 
             var maxDlText = $"{SundouleiaEx.ByteToString(totalBytes, addSuffix: false)}/{SundouleiaEx.ByteToString(totalBytes)}";
             var textSize = _config.Current.TransferBarText ? ImGui.CalcTextSize(maxDlText) : new Vector2(10, 10);
@@ -174,7 +174,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
     }
 
     private void DrawUploadingText()
-    { 
+    {
         foreach (var player in _uploads.Select(p => p.Key).ToList())
         {
             // do now show if not rendered.
@@ -207,7 +207,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
     public override bool DrawConditions()
     {
         if (!_config.Current.TransferBars) return false;
-        if (!_downloads.Any() && !_fileUploader.CurrentUploads.Any() && !_uploads.Any()) return false;
+        if (!_downloads.Any() && _fileUploader.CurrentUploads.TotalFiles == 0 && !_uploads.Any()) return false;
         if (!IsOpen) return false;
         return true;
     }
@@ -222,6 +222,6 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         Flags |= ImGuiWindowFlags.NoResize;
 
         var maxHeight = ImGui.GetTextLineHeight() * (_config.Current.MaxParallelDownloads + 3);
-        this.SetBoundaries(new(300, maxHeight), new (300, maxHeight));
+        this.SetBoundaries(new(300, maxHeight), new(300, maxHeight));
     }
 }

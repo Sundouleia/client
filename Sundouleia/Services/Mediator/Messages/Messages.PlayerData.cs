@@ -13,7 +13,8 @@ public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // when de
 public record DownloadLimitChangedMessage : SameThreadMessage;
 public record FileUploading(PlayerHandler Player) : MessageBase;
 public record FileUploaded(PlayerHandler Player) : MessageBase;
-public record FileDownloadStarted(PlayerHandler Player, ConcurrentDictionary<string, FileTransferProgress> Status) : MessageBase;
+public record FileDownloadReady(Guid RequestId) : MessageBase; // Maybe remove this.
+public record FileDownloadStarted(PlayerHandler Player, FileTransferProgress Status) : MessageBase;
 public record FileDownloadComplete(PlayerHandler Player) : MessageBase;
 
 /// <summary>
