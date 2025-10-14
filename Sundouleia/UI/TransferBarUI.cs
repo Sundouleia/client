@@ -50,7 +50,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         // Temporarily do this, hopefully we dont always need to.
         Mediator.Subscribe<FileDownloadStarted>(this, (msg) =>
         {
-            _logger.LogWarning($"Starting download tracking for {msg.Player.NameString}");
+            _logger.LogWarning($"Starting download tracking for {msg.Player.NameString}({msg.Player.Sundesmo.GetNickAliasOrUid()})");
             _downloads[msg.Player] = msg.Status;
         });
         Mediator.Subscribe<FileDownloadComplete>(this, (msg) =>
@@ -101,11 +101,11 @@ public class TransferBarUI : WindowMediatorSubscriberBase
 
     private void DrawTransferWindow()
     {
-        var currentUploads = _fileUploader.CurrentUploads.Values.ToList();
-        var totalUploads = currentUploads.Count;
+        var currentUploads = _fileUploader.CurrentUploads;
+        var totalUploads = currentUploads.TotalFiles;
 
-        var totalUploaded = currentUploads.Sum(c => c.Transferred);
-        var totalToUpload = currentUploads.Sum(c => c.TotalSize);
+        var totalUploaded = currentUploads.Transferred;
+        var totalToUpload = currentUploads.TotalSize;
 
         CkGui.OutlinedFont($"▲", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
         ImGui.SameLine();

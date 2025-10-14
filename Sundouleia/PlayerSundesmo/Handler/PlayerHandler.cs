@@ -101,7 +101,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public unsafe ushort ObjIndex => _player->ObjectIndex;
     public string NameString { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
     public unsafe bool IsRendered => _player != null;
-    public bool HasAlterations => _appearanceData != null;
+    public bool HasAlterations => _appearanceData != null || _replacements.Count is not 0;
 
     /// <summary>
     ///     Fired whenever the character object is rendered in the game world. <para />
@@ -126,6 +126,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Set the NameString and log as rendered.
         NameString = chara->NameString;
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] rendered!", LoggerType.PairHandler);
+
+        // If any alterations existed, reapply them.
+        if (Sundesmo.IsOnline && HasAlterations)
+            ReapplyAlterations().ConfigureAwait(false);
+
         Mediator.Publish(new SundesmoPlayerRendered(this));
         Mediator.Publish(new RefreshWhitelistMessage());
     }
@@ -202,24 +207,30 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).GetAwaiter().GetResult();
     }
 
-    public void ReapplyAlterations()
+    public async Task ReapplyAlterations()
     {
         if (!IsRendered)
             return;
 
+        Logger.LogDebug($"Reapplying all alterations for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        var hasAppearance = _appearanceData is not null;
+        var hasMods = _tempCollection != Guid.Empty && _replacements.Count > 0;
+
         // Reapply appearance alterations, if they exist.
-        if (_appearanceData is not null)
+        if (hasAppearance)
         {
-            ReapplyVisuals().ConfigureAwait(false);
+            await ReapplyVisuals().ConfigureAwait(false);
         }
         // Reapply Mods, if they exist.
-        if (_tempCollection != Guid.Empty && _replacements.Count > 0)
+        if (hasMods)
         {
             _downloader.GetExistingFromCache(_replacements, out var moddedDict, CancellationToken.None);
-            ApplyModData(moddedDict).ConfigureAwait(false);
+            await ApplyModData(moddedDict).ConfigureAwait(false);
         }
+
         // redraw for now, reapply later after glamourer implements methods for reapply.
-        _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        if (hasAppearance || hasMods)
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
     }
 
     // Placeholder stuff for now.

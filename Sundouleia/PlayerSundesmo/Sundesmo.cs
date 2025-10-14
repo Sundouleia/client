@@ -182,10 +182,11 @@ public class Sundesmo : IComparable<Sundesmo>
         IsReloading = false;
 
         // If the sundesmo is not yet rendered upon being marked, check to see if they are visible or not.
-        if (!IsRendered && _watcher.TryGetExisting(_player, out IntPtr playerAddr))
+        var wasRendered = IsRendered;
+        if (!wasRendered && _watcher.TryGetExisting(_player, out IntPtr playerAddr))
         {
             _player.ObjectRendered((Character*)playerAddr);
-            _player.ReapplyAlterations();
+            _player.ReapplyAlterations().ConfigureAwait(false);
         }
 
         // If the player is not rendered, their owned objects should not be.
@@ -195,19 +196,19 @@ public class Sundesmo : IComparable<Sundesmo>
         if (_watcher.TryGetExisting(_mountMinion, out IntPtr mountAddr))
         {
             _mountMinion.ObjectRendered((GameObject*)mountAddr);
-            _mountMinion.ReapplyAlterations();
+            _mountMinion.ReapplyAlterations().ConfigureAwait(false);
         }
 
         if (_watcher.TryGetExisting(_pet, out IntPtr petAddr))
         {
             _pet.ObjectRendered((GameObject*)petAddr);
-            _pet.ReapplyAlterations();
+            _pet.ReapplyAlterations().ConfigureAwait(false);
         }
 
         if (_watcher.TryGetExisting(_companion, out IntPtr compAddr))
         {
             _companion.ObjectRendered((GameObject*)compAddr);
-            _companion.ReapplyAlterations();
+            _companion.ReapplyAlterations().ConfigureAwait(false);
         }
     }
 

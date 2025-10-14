@@ -116,6 +116,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             LastCreatedData.GlamourerState[OwnedObject.Companion] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             LastCreatedData.CPlusState[OwnedObject.Companion] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             // Cache mods.
+            var moddedState = await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false);
+            Logger.LogDebug($"(OnHubConnected) Collected modded state. [{moddedState.Count} Mod Files]", LoggerType.DataDistributor);
             LastCreatedData.ApplyNewModState(await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false));
 
         }
@@ -129,7 +131,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }
 
         // Send off to all visible users after awaiting for any other distribution task to process.
-        Logger.LogInformation("(OnHubConnected) Distributing to visible.", LoggerType.DataDistributor);
+        Logger.LogInformation($"(OnHubConnected) Distributing to visible.", LoggerType.DataDistributor);
         _distributeDataCTS = _distributeDataCTS.SafeCancelRecreate();
         _distributeDataTask = Task.Run(ResendAll, _distributeDataCTS.Token);
     }
@@ -178,6 +180,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             {
                 var modData = LastCreatedData.ToModUpdates();
                 var appearance = LastCreatedData.ToVisualUpdate();
+                Logger.LogDebug($"(ResendAll) Collected [{modData.FilesToAdd.Count} Files to send] | [{modData.HashesToRemove.Count} Files to remove] | {(appearance.HasData() ? "With" : "Without")} Visual Changes", LoggerType.DataDistributor);
                 // Send off update.
                 var res = await _hub.UserPushIpcFull(new(recipients, modData, appearance)).ConfigureAwait(false);
                 Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} newly visible users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);

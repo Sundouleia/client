@@ -3,13 +3,10 @@ using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.Interop;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
-using TerraFX.Interop.Windows;
-using static Lumina.Data.Parsing.Layer.LayerCommon;
 
 namespace Sundouleia.Pairs;
 
@@ -106,6 +103,10 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         _gameObject = obj;
         NameString = obj->NameString;
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}]'s {ObjectType} rendered!", LoggerType.PairHandler);
+
+        // If any alterations existed, reapply them.
+        if (Sundesmo.IsOnline && HasAlterations)
+            ReapplyAlterations().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -133,33 +134,33 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             _tempProfile = Guid.Empty;
         }
 
-        var isValid = !PlayerData.IsZoning && !PlayerData.InCutscene && IsRendered;
+        var isValid = !PlayerData.IsZoning && !PlayerData.InCutscene;
 
         // Revert glamourer based on rendered state.
         if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
         {
-            if (isValid)
+            if (isValid && IsRendered)
                 await _ipc.Glamourer.ReleaseActor(ObjIndex).ConfigureAwait(false);
             else
                 await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
         }
 
-        if (isValid)
+        if (isValid && IsRendered)
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
         // Clear out the alterations data (keep NameString alive so One-Time-Init does not re-fire.)
         _appearanceData = null;
     }
 
-    public void ReapplyAlterations()
+    public async Task ReapplyAlterations()
     {
         // Return if there is no valid appearance data or object is not rendered.
         if (!IsRendered || _appearanceData is null)
             return;
         // Reapply alterations.
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer]))
-            ApplyGlamourer().ConfigureAwait(false);
+            await ApplyGlamourer().ConfigureAwait(false);
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))
-            ApplyCPlus().ConfigureAwait(false);
+            await ApplyCPlus().ConfigureAwait(false);
         // redraw
         _ipc.Penumbra.RedrawGameObject(ObjIndex);
         Logger.LogInformation($"Reapplied ({Sundesmo.GetNickAliasOrUid()})'s alterations.", LoggerType.PairHandler);

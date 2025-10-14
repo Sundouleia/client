@@ -16,7 +16,7 @@ public class DebugTab
         ("Interop / IPC", [ 
             LoggerType.IpcSundouleia, LoggerType.IpcPenumbra, LoggerType.IpcGlamourer, LoggerType.IpcCustomize,
             LoggerType.IpcMoodles, LoggerType.IpcHeels, LoggerType.IpcHonorific, LoggerType.IpcPetNames ]),
-        ("Client Data", [ LoggerType.ResourceMonitor, LoggerType.OwnedObjects, LoggerType.DataDistributor ]),
+        ("Client Data", [ LoggerType.ResourceMonitor, LoggerType.OwnedObjects, LoggerType.DataDistributor, LoggerType.ClientUpdates ]),
         ("File Info", [ 
             LoggerType.FileCache, LoggerType.FileCsv, LoggerType.FileMonitor, LoggerType.PairFileCache,
             LoggerType.FileUploads, LoggerType.FileDownloads, LoggerType.FileService ]),

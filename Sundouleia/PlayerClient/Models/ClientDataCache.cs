@@ -53,7 +53,7 @@ public class ClientDataCache
     }
 
     public ModUpdates ToModUpdates()
-        => new ModUpdates(AppliedMods.Values.Select(m => m.ToModFileDto()).ToList(), AppliedMods.Keys.ToList());
+        => new ModUpdates(AppliedMods.Values.Select(m => m.ToModFileDto()).ToList(), []);
 
     public VisualUpdate ToVisualUpdate()
     {
