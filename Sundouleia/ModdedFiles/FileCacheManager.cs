@@ -38,6 +38,8 @@ public sealed class FileCacheManager : IHostedService
     public int TotalCacheEntities => _fileCaches.Sum(k => k.Value.Count);
     private string CsvBakPath => _fileNames.FileCacheCsv + ".bak";
 
+    public bool CacheFolderIsValid() => _config.HasValidCacheFolderSetup();
+
     /// <summary>
     ///     Creates a new entity to reflect the provided sundouleia file path, if it exists. <para />
     ///     The created entity is then returned, or null if invalid.

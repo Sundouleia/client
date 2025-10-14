@@ -99,9 +99,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         Logger.LogDebug($"UID's in NewVisible are: {string.Join(", ", NewVisibleUsers.Select(x => x.AliasOrUID))}", LoggerType.DataDistributor);
         Logger.LogDebug($"UID's in Limbo are: {string.Join(", ", InLimbo.Select(x => x.AliasOrUID))}", LoggerType.DataDistributor);
 
-        Logger.LogTrace("Awaiting _dataUpdateLock (OnHubConnected)", LoggerType.DataDistributor);
         await _dataUpdateLock.WaitAsync();
-        Logger.LogTrace("Acquired _dataUpdateLock (OnHubConnected)", LoggerType.DataDistributor);
         try
         {
             LastCreatedData.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
@@ -127,19 +125,13 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }
         finally
         {
-            Logger.LogTrace("Releasing _dataUpdateLock (OnHubConnected)", LoggerType.DataDistributor);
             _dataUpdateLock.Release();
         }
 
         // Send off to all visible users after awaiting for any other distribution task to process.
         Logger.LogInformation("(OnHubConnected) Distributing to visible.", LoggerType.DataDistributor);
         _distributeDataCTS = _distributeDataCTS.SafeCancelRecreate();
-        _distributeDataTask = Task.Run(async () =>
-        {
-            var recipients = NewVisibleUsers.ToList();
-            NewVisibleUsers.Clear();
-            await ResendAll(recipients).ConfigureAwait(false);
-        }, _distributeDataCTS.Token);
+        _distributeDataTask = Task.Run(ResendAll, _distributeDataCTS.Token);
     }
 
     // Note that we are going to need some kind of logic for handling the edge cases where user A is receiving a new update and that 
@@ -148,19 +140,12 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         if (NewVisibleUsers.Count is 0) return;
         // If we are zoning or not available, do not process any updates from us.
         if (PlayerData.IsZoning || !PlayerData.Available || !MainHub.IsConnected) return;
-        // Do not process the task if we are currently updating our latest data.
-        if (UpdatingData) return;
         // If we are already distributing data, do not start another distribution.
         if (_distributeDataTask is not null && !_distributeDataTask.IsCompleted) return;
 
         // Process a distribution of full data to the newly visible users and then clear the update.
-        _distributeDataTask = Task.Run(async () =>
-        {
-            Logger.LogInformation("(UpdateCheck) Distributing to new visible.", LoggerType.DataDistributor);
-            var recipients = NewVisibleUsers.ToList();
-            NewVisibleUsers.Clear();
-            await ResendAll(recipients).ConfigureAwait(false);
-        }, _distributeDataCTS.Token);
+        Logger.LogInformation("(UpdateCheck) Distributing to new visible.", LoggerType.DataDistributor);
+        _distributeDataTask = Task.Run(ResendAll, _distributeDataCTS.Token);
     }
 
     /// <summary>
@@ -168,9 +153,12 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     /// </summary>
     private async Task UploadAndPushMissingMods(List<UserData> usersToPushDataTo, List<VerifiedModFile> filesNeedingUpload)
     {
+        // Do not bother uploading if we do not have a properly configured cache.
+        if (!_config.HasValidCacheFolderSetup())
+            return;
+
         // Upload any missing files not yet present on the hub. (We could optionally send a isUploading here but idk)
         Logger.LogDebug($"Uploading {filesNeedingUpload.Count} missing files to server...", LoggerType.DataDistributor);
-
         var uploadedFiles = await _fileUploader.UploadFiles(filesNeedingUpload).ConfigureAwait(false);
         
         Logger.LogDebug($"Uploaded {uploadedFiles.Count}/{filesNeedingUpload.Count} missing files. If any failed, there are integrity issues with your cache!", LoggerType.DataDistributor);
@@ -179,34 +167,28 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     }
 
     #region Cache Updates
-    private async Task ResendAll(List<UserData> recipients)
+    private async Task ResendAll()
     {
-        var modData = new ModUpdates([], []);
-        var appearance = new VisualUpdate();
         try
         {
-            // Apply new changes and store them for sending.
-            Logger.LogTrace($"Awaiting _dataUpdateLock (ResendAll)", LoggerType.DataDistributor);
             await _dataUpdateLock.WaitAsync();
-            Logger.LogTrace($"Acquired _dataUpdateLock (ResendAll)", LoggerType.DataDistributor);
+            var recipients = NewVisibleUsers.ToList();
+            NewVisibleUsers.Clear();
             try
             {
-                modData = LastCreatedData.ToModUpdates();
-                appearance = LastCreatedData.ToVisualUpdate();
+                var modData = LastCreatedData.ToModUpdates();
+                var appearance = LastCreatedData.ToVisualUpdate();
+                // Send off update.
+                var res = await _hub.UserPushIpcFull(new(recipients, modData, appearance)).ConfigureAwait(false);
+                Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} newly visible users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
+                // Handle any missing mods after.
+                if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
+                    _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
             }
             finally
             {
-                Logger.LogTrace($"Releasing _dataUpdateLock (ResendAll)", LoggerType.DataDistributor);
                 _dataUpdateLock.Release();
             }
-
-            // Send off update.
-            var res = await _hub.UserPushIpcFull(new(recipients, modData, appearance)).ConfigureAwait(false);
-            Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} newly visible users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
-
-            // Handle any missing mods after.
-            if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
-                _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -214,163 +196,136 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }
     }
 
-    // if it is a full update we do not care about the changes,
-    // only that the cache is updated prior to the change.
-    public async Task UpdateAndSendAll(Dictionary<OwnedObject, IpcKind> newChanges)
-    {
-        var recipients = SundesmosForUpdatePush;
-        var modChanges = new ModUpdates([], []);
-        var visualChanges = new VisualUpdate();
-        try
-        {
-            // Apply new changes and store them for sending.
-            Logger.LogTrace($"Awaiting _dataUpdateLock (UpdateAndSendAll)", LoggerType.DataDistributor);
-            await _dataUpdateLock.WaitAsync();
-            Logger.LogTrace($"Acquired _dataUpdateLock (UpdateAndSendAll)", LoggerType.DataDistributor);
-            try
-            {
-                modChanges = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
-                visualChanges = await UpdateVisualsInternal(newChanges).ConfigureAwait(false);
-            }
-            finally
-            {
-                Logger.LogTrace($"Releasing _dataUpdateLock (UpdateAndSendAll)", LoggerType.DataDistributor);
-                _dataUpdateLock.Release();
-            }
-
-            // Void data with no changes.
-            if (modChanges.FilesToAdd.Count is 0 && modChanges.HashesToRemove.Count is 0 && !visualChanges.HasData())
-                return;
-
-            // Data changed, clear limbo.
-            InLimbo.Clear();
-
-            // Send off update.
-            var res = await _hub.UserPushIpcFull(new(recipients, modChanges, visualChanges)).ConfigureAwait(false);
-            Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
-
-            // Handle any missing mods after.
-            if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
-                _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error during UpdateAndSendAll: {ex}");
-        }
-    }
-
-    public async Task UpdateAndSendMods()
-    {
-        var recipients = SundesmosForUpdatePush;
-        var modChanges = new ModUpdates([], []);
-        try
-        {
-            Logger.LogTrace($"Awaiting _dataUpdateLock (UpdateAndSendMods)", LoggerType.DataDistributor);
-            await _dataUpdateLock.WaitAsync();
-            Logger.LogTrace($"Acquired _dataUpdateLock (UpdateAndSendMods)", LoggerType.DataDistributor);
-            try
-            {
-                modChanges = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
-            }
-            finally
-            {
-                Logger.LogTrace($"Releasing _dataUpdateLock (UpdateAndSendMods)", LoggerType.DataDistributor);
-                _dataUpdateLock.Release();
-            }
-
-            // Void data with no changes.
-            if (modChanges.FilesToAdd.Count is 0 && modChanges.HashesToRemove.Count is 0)
-                return;
-
-            // Data changed, clear limbo.
-            InLimbo.Clear();
-
-            // Send off update.
-            var res = await _hub.UserPushIpcMods(new(recipients, modChanges)).ConfigureAwait(false);
-            Logger.LogDebug($"Sent PushIpcMods to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
-
-            // Handle any missing mods after.
-            if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
-                _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error during UpdateAndSendMods: {ex}");
-        }
-    }
-
-    public async Task UpdateAndSendVisuals(Dictionary<OwnedObject, IpcKind> newChanges)
-    {
-        var recipients = SundesmosForUpdatePush;
-        var newVisuals = new VisualUpdate();
-        try
-        {
-            // Apply new changes and store them for sending.
-            Logger.LogTrace($"Awaiting _dataUpdateLock (UpdateAndSendVisuals)", LoggerType.DataDistributor);
-            await _dataUpdateLock.WaitAsync();
-            Logger.LogTrace($"Acquired _dataUpdateLock (UpdateAndSendVisuals)", LoggerType.DataDistributor);
-            try
-            {
-                newVisuals = await UpdateVisualsInternal(newChanges).ConfigureAwait(false);
-            }
-            finally
-            {
-                Logger.LogTrace($"Releasing _dataUpdateLock (UpdateAndSendVisuals)", LoggerType.DataDistributor);
-                _dataUpdateLock.Release();
-            }
-
-            // Void data with no changes.
-            if (!newVisuals.HasData())
-                return;
-
-            // Data changed, clear limbo.
-            InLimbo.Clear();
-
-            // Send off update.
-            var res = await _hub.UserPushIpcOther(new(recipients, newVisuals)).ConfigureAwait(false);
-            Logger.LogDebug($"Sent PushIpcOther to {recipients.Count} users.", LoggerType.DataDistributor);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error during UpdateAndSendVisuals: {ex}");
-        }
-    }
-
+    /// <summary>
+    ///     Called with the assumption that mods have not changed.
+    /// </summary>
     public async Task UpdateAndSendSingle(OwnedObject obj, IpcKind type)
     {
         // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
         var recipients = SundesmosForUpdatePush;
-        string? newData = null;
+        // Apply new changes and store them for sending.
+        await _dataUpdateLock.WaitAsync();
         try
         {
-            // Apply new changes and store them for sending.
-            Logger.LogTrace($"Awaiting _dataUpdateLock (UpdateAndSendSingle)", LoggerType.DataDistributor);
-            await _dataUpdateLock.WaitAsync();
-            Logger.LogTrace($"Acquired _dataUpdateLock (UpdateAndSendSingle)", LoggerType.DataDistributor);
-            try
-            {
-                newData = await UpdateCacheSingleInternal(obj, type, LastCreatedData).ConfigureAwait(false);
-            }
-            finally
-            {
-                Logger.LogTrace($"Releasing _dataUpdateLock (UpdateAndSendSingle)", LoggerType.DataDistributor);
-                _dataUpdateLock.Release();
-            }
-
-            // return if no changes occurred.
+            var newData = await UpdateCacheSingleInternal(obj, type, LastCreatedData).ConfigureAwait(false);
             if (string.IsNullOrEmpty(newData))
                 return;
-
             // Data changed, clear limbo.
             InLimbo.Clear();
-
-            // Send off update.
             await _hub.UserPushIpcSingle(new(recipients, obj, type, newData)).ConfigureAwait(false);
+            Logger.LogDebug($"Sent PushIpcSingle to {recipients.Count} users.", LoggerType.DataDistributor);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during UpdateAndSendSingle (UpdateCache): {ex}");
+        }
+        finally
+        {
+            _dataUpdateLock.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Called with the assumption that the modded state could have changed.
+    /// </summary>
+    public async Task CheckStateAndUpdate(Dictionary<OwnedObject, IpcKind> newChanges, IpcKind flattenedChanges)
+    {
+        var changedMods = new ModUpdates([], []);
+        await _dataUpdateLock.WaitAsync();
+        try
+        {
+            var recipients = SundesmosForUpdatePush;
+            if (recipients.Count is 0)
+                return;
+
+            // If mods changed, we need to update the mod state first.
+            changedMods = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
+            if (changedMods.HasChanges)
+            {
+                foreach (var (obj, kinds) in newChanges)
+                    newChanges[obj] |= IpcKind.Mods;
+                flattenedChanges |= IpcKind.Mods;
+            }
+
+            // CONDITION: Only mod updates exist, we should only update mods.
+            if (flattenedChanges == IpcKind.Mods)
+            {
+                await SendModsUpdate(recipients, changedMods).ConfigureAwait(false);
+                return;
+            }
+
+            // Otherwise, update the visuals too.
+            var visualChanges = await UpdateVisualsInternal(newChanges).ConfigureAwait(false);
+            var hasVisualChanges = visualChanges.HasData();
+            
+            // CONDITION: Both had changes.
+            if (changedMods.HasChanges && hasVisualChanges)
+            {
+                await SendFullUpdate(recipients, changedMods, visualChanges).ConfigureAwait(false);
+                return;
+            }
+            // CONDITION: Only visual changes exist, send those.
+            if (!changedMods.HasChanges && hasVisualChanges)
+            {
+                await SendVisualsUpdate(recipients, visualChanges).ConfigureAwait(false);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during CheckStateAndUpdate: {ex}");
+        }
+        finally
+        {
+            _dataUpdateLock.Release();
+        }
+    }
+
+    private async Task SendFullUpdate(List<UserData> recipients, ModUpdates modChanges, VisualUpdate visualChanges)
+    {
+        try
+        {
+            InLimbo.Clear();
+            var res = await _hub.UserPushIpcFull(new(recipients, modChanges, visualChanges)).ConfigureAwait(false);
+            Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
+            // Handle any missing mods after.
+            if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
+                _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during SendFullUpdate: {ex}");
+        }
+    }
+
+    private async Task SendModsUpdate(List<UserData> recipients, ModUpdates modChanges)
+    {
+        try
+        {
+            InLimbo.Clear();
+            var res = await _hub.UserPushIpcMods(new(recipients, modChanges)).ConfigureAwait(false);
+            Logger.LogDebug($"Sent PushIpcMods to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
+            // Handle any missing mods after.
+            if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
+                _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during SendModsUpdate: {ex}");
+        }
+    }
+
+    private async Task SendVisualsUpdate(List<UserData> recipients, VisualUpdate visualChanges)
+    {
+        try
+        {
+            InLimbo.Clear();
+            await _hub.UserPushIpcOther(new(recipients, visualChanges)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcOther to {recipients.Count} users.", LoggerType.DataDistributor);
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error during UpdateAndSendSingle: {ex}");
+            Logger.LogError($"Error during SendVisualsUpdate: {ex}");
         }
     }
 

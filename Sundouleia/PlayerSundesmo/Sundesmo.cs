@@ -9,6 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using OtterGui;
 using Sundouleia.Pairs.Factories;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
@@ -434,5 +435,10 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGuiUtil.DrawFrameColumn(_companion.DataState.OwnerId.ToString());
             }
         }
+
+        _player.DrawDebugInfo();
+        _mountMinion.DrawDebugInfo();
+        _pet.DrawDebugInfo();
+        _companion.DrawDebugInfo();
     }
 }

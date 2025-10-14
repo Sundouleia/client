@@ -56,51 +56,59 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     /// <summary>
     ///     I hate the parameters in this, try to simplify this file to a degree.
     /// </summary>
-    public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<(string GamePath, string? Hash), string> validDict, CancellationToken ct)
+    public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<string, string> moddedDict, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
-        var missing = new List<VerifiedModFile>();
-
-        validDict = [];
-
-        // Something about migration idk find out later.
+        var missing = new ConcurrentBag<VerifiedModFile>();
+        var outputDict = new ConcurrentDictionary<string, string>();
+        moddedDict = [];
+        // Update the csv if the FilePaths extension has changed.
         bool hasMigrationChanges = false;
 
         try
         {
-            // Grab the current expected mod files. For these, we should check in parallel if cached, then place them in the outputDict or missing bag respectively.
-            foreach (var item in replacements.Values.Where(vmf => string.IsNullOrEmpty(vmf.SwappedPath)))
+            // Flatten the current replacements that do not have a file replacement path.
+            var replacementList = replacements.Values.Where(vmf => string.IsNullOrEmpty(vmf.SwappedPath)).ToList();
+            // Run in parallel to speed up download preparation and lookup time.
+            Parallel.ForEach(replacementList, new ParallelOptions()
+            {
+                CancellationToken = ct,
+                MaxDegreeOfParallelism = 4,
+            },
+            (modItem) =>
             {
                 ct.ThrowIfCancellationRequested();
                 // Attempt to locate the path of this file hash in our personal cache
-                if (_dbManager.GetFileCacheByHash(item.Hash) is { } fileCache)
+                if (_dbManager.GetFileCacheByHash(modItem.Hash) is { } fileCache)
                 {
                     // Then attempt to fetch the file information via the resolved FilePath+Extension.
                     // If the FileHash matched, but there was no FileInfo with the extension, we need to migrate it.
                     if (string.IsNullOrEmpty(new FileInfo(fileCache.ResolvedFilepath).Extension))
                     {
                         hasMigrationChanges = true;
-                        fileCache = _dbManager.MigrateFileHashToExtension(fileCache, item.GamePaths[0].Split(".")[^1]);
+                        fileCache = _dbManager.MigrateFileHashToExtension(fileCache, modItem.GamePaths[0].Split(".")[^1]);
                     }
 
-                    // Otherwise append the resolved paths into the modded dictionary. (maybe revise later)
-                    foreach (var gamePath in item.GamePaths)
-                        validDict[(gamePath, item.Hash)] = fileCache.ResolvedFilepath;
+                    // Otherwise, append the game paths to the modded dictionary.
+                    foreach (var gamePath in modItem.GamePaths)
+                        outputDict[gamePath] = fileCache.ResolvedFilepath;
                 }
                 else
                 {
-                    Logger.LogTrace($"Missing file: {item.Hash}", LoggerType.PairFileCache);
-                    missing.Add(item);
+                    Logger.LogTrace($"Missing file: {modItem.Hash}", LoggerType.PairMods);
+                    missing.Add(modItem);
                 }
-            }
+            });
 
-            // Run a second check but for all file swap paths?... Idk honestly, the file swap -vs- no file swap is confusing because it seems to remove all before sending.
+            // Convert the output dictionary into a modded dictionary.
+            moddedDict = outputDict.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
+            // Iterate again to check for any file swaps. These should take precedence in path replacement.
             foreach (var item in replacements.Values.Where(vmf => !string.IsNullOrEmpty(vmf.SwappedPath)).ToList())
             {
                 foreach (var gamePath in item.GamePaths)
                 {
-                    Logger.LogTrace($"Adding file swap for {gamePath}: {item.SwappedPath}");
-                    validDict[(gamePath, item.Hash)] = item.SwappedPath;
+                    Logger.LogTrace($"Adding file swap for {gamePath}: {item.SwappedPath}", LoggerType.PairMods);
+                    moddedDict[gamePath] = item.SwappedPath;
                 }
             }
         }
@@ -114,8 +122,8 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
             _dbManager.WriteOutFullCsv();
 
         sw.Stop();
-        Logger.LogDebug($"ModdedPaths calculated in {sw.ElapsedMilliseconds}ms, missing files: {missing.Count}, total files: {validDict.Count}");
-        return missing;
+        Logger.LogDebug($"ModdedPaths calculated in {sw.ElapsedMilliseconds}ms, missing files: {missing.Count}, total files: {moddedDict.Count}", LoggerType.PairMods);
+        return [..missing];
     }
 
     /// <summary>

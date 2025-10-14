@@ -1,8 +1,13 @@
 using CkCommons;
+using CkCommons.Gui;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI.Files;
@@ -196,13 +201,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!IsRendered)
             return;
 
-        // Reapply the alterations.
+        // Reapply appearance alterations, if they exist.
         if (_appearanceData is not null)
+        {
             ReapplyVisuals().ConfigureAwait(false);
+        }
+        // Reapply Mods, if they exist.
         if (_tempCollection != Guid.Empty && _replacements.Count > 0)
         {
             _downloader.GetExistingFromCache(_replacements, out var moddedDict, CancellationToken.None);
-            ApplyModData(moddedDict.ToDictionary(k => k.Key.GamePath, k => k.Value, StringComparer.Ordinal)).ConfigureAwait(false);
+            ApplyModData(moddedDict).ConfigureAwait(false);
         }
         // redraw for now, reapply later after glamourer implements methods for reapply.
         _ipc.Penumbra.RedrawGameObject(ObjIndex);
@@ -228,8 +236,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.FullDataReceive, "Downloading but not applying data [NOT-RENDERED]")));
             Logger.LogWarning("Data received from an object not currently present! If this happens, report / determine why immediately.");
+            
             // Update the Mod Replacements with the new changes. (Does not apply them!)
-            UpdateReplacements(modData);
+            if (_fileCache.CacheFolderIsValid())
+                UpdateReplacements(modData);
+            
             // Update the appearance data with the new ipc data.
             _appearanceData ??= new();
             _appearanceData.UpdateCache(ipcData);
@@ -249,23 +260,29 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!IpcCallerPenumbra.APIAvailable)
         {
             Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ReceivedDataDeclined, "Penumbra IPC Unavailable.")));
-            Logger.LogDebug("Penumbra IPC is not available, cannot apply mod data.", LoggerType.PairHandler);
+            Logger.LogDebug("Penumbra IPC is not available, cannot apply mod data.", LoggerType.PairMods);
+            return;
+        }
+
+        // Do not process anything if we do not have a valid cache setup.
+        if (!_fileCache.CacheFolderIsValid())
+        {
+            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ReceivedDataDeclined, "File Cache Unavailable.")));
+            Logger.LogDebug("File Cache is not available, cannot apply mod data.", LoggerType.PairMods);
             return;
         }
 
         // Check for any differenced in the modified paths to know what new data we have.
-        Logger.LogDebug($"NewModUpdate is removing {modData.HashesToRemove.Count} files, and adding {modData.FilesToAdd.Count} new files added | WaitingOnMore: {modData.NotAllSent}", LoggerType.PairHandler);
+        Logger.LogDebug($"NewModUpdate is removing {modData.HashesToRemove.Count} files, and adding {modData.FilesToAdd.Count} new files added | WaitingOnMore: {modData.NotAllSent}", LoggerType.PairMods);
 
         UpdateReplacements(modData);
-        Logger.LogTrace("Removing outdated and requested removal files from collection.", LoggerType.PairHandler);
+        Logger.LogTrace("Removing outdated and requested removal files from collection.", LoggerType.PairMods);
 
         // Determine here via checking the FileCache which files we already have the replacement paths for the paths to add.
         // process the download manager here and await its completion or whatever.
         _downloadCTS = _downloadCTS.SafeCancelRecreate();
         var missingFiles = _downloader.GetExistingFromCache(_replacements, out var moddedDict, _downloadCTS.Token);
 
-        // Make this fire-and-forget if we run into more problems than solutions.
-        Logger.LogDebug($"Of the {moddedDict.Count} new paths to add, {missingFiles.Count} were not cached. Downloading remainder uncached if any.", LoggerType.PairHandler);
         // This should only be intended to download new files. Any files existing in the hashes should already be downloaded? Not sure.
         // Would need to look into this later, im too exhausted at the moment.
         // In essence, upon receiving newModData, those should be checked, but afterwards, these hashes and their respective file paths
@@ -279,13 +296,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 // await for the previous download task to complete.
                 if (_downloadTask is not null && !_downloadTask.IsCompleted)
                 {
-                    Logger.LogDebug($"Finishing prior download task for {NameString} ({Sundesmo.GetNickAliasOrUid()}", LoggerType.PairFileCache);
+                    Logger.LogDebug($"Finishing prior download task for {NameString} ({Sundesmo.GetNickAliasOrUid()}", LoggerType.PairMods);
                     await _downloadTask.ConfigureAwait(false);
                 }
 
+                Logger.LogDebug($"Of the {moddedDict.Count} new paths to add, {missingFiles.Count} were not cached.", LoggerType.PairMods);
+
                 // Begin the download task.
                 Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data.")));
-                Logger.LogDebug($"Downloading {missingFiles.Count} files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairHandler);
+                Logger.LogDebug($"Downloading {missingFiles.Count} files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
                 
                 _downloadTask = Task.Run(async () => await _downloader.DownloadFiles(this, missingFiles, _downloadCTS.Token).ConfigureAwait(false), _downloadCTS.Token);
 
@@ -294,7 +313,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 // If we wanted to back out, then back out.
                 if (_downloadCTS.Token.IsCancellationRequested)
                 {
-                    Logger.LogWarning($"Download task for {NameString}({Sundesmo.GetNickAliasOrUid()}) was cancelled, aborting further downloads.", LoggerType.PairHandler);
+                    Logger.LogWarning($"Download task for {NameString}({Sundesmo.GetNickAliasOrUid()}) was cancelled, aborting further downloads.", LoggerType.PairMods);
                     return;
                 }
 
@@ -308,10 +327,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // 4) Append the new data.
         _downloadCTS.Token.ThrowIfCancellationRequested();
-        Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairHandler);
+        Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairMods);
         // 5) Apply the new mod data if rendered.
-        Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
-        await ApplyModData(moddedDict.ToDictionary(k => k.Key.GamePath, k => k.Value, StringComparer.Ordinal)).ConfigureAwait(false);   
+        Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairMods);
+        await ApplyModData(moddedDict).ConfigureAwait(false);   
     }
      
     // Would need a way to retrieve the existing modded dictionary from the file cache or something here, not sure. We shouldnt need to download anything on a reapplication.
@@ -319,21 +338,21 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         if (!IsRendered)
         {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered, skipping mod application.", LoggerType.PairHandler);
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered, skipping mod application.", LoggerType.PairMods);
             return;
         }
         if (_tempCollection == Guid.Empty)
         {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] does not have a temporary collection, skipping mod application.", LoggerType.PairHandler);
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] does not have a temporary collection, skipping mod application.", LoggerType.PairMods);
             return;
         }
         if (_replacements.Count == 0)
         {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered or has no mod data to apply, skipping mod application.", LoggerType.PairHandler);
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered or has no mod data to apply, skipping mod application.", LoggerType.PairMods);
             return;
         }
         
-        Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairHandler);
+        Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
         // Maybe we need to do this for our other objects too? Im not sure, guess we'll find out and stuff.
         await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
         await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);        
@@ -594,5 +613,86 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             NameString = string.Empty;
             unsafe { _player = null; }
         }
+    }
+
+    public void DrawDebugInfo()
+    {
+        using var node = ImRaii.TreeNode($"Alterations##{Sundesmo.UserData.UID}-alterations");
+        if (!node) return;
+
+        DebugAppliedMods();
+        if (_appearanceData is not null)
+            DebugAppearance();
+    }
+
+    private void DebugAppliedMods()
+    {
+        using var node = ImRaii.TreeNode($"Mods##{Sundesmo.UserData.UID}-mod-replacements");
+        if (!node) return;
+
+        using var table = ImRaii.Table("sundesmos-mods-table", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        if (!table) return;
+
+        ImGui.TableSetupColumn("Hash");
+        ImGui.TableSetupColumn("Game Paths");
+        ImGui.TableSetupColumn("Resolved Path");
+        ImGui.TableHeadersRow();
+        foreach (var (hash, mod) in _replacements)
+        {
+            ImGui.TableNextColumn();
+            CkGui.ColorText(hash, ImGuiColors.DalamudViolet);
+            ImGui.TableNextColumn();
+            ImGui.Text(string.Join("\n", mod.GamePaths));
+            ImGui.TableNextColumn();
+            ImGui.Text(mod.SwappedPath);
+        }
+    }
+
+    private void DebugAppearance()
+    {
+        using var node = ImRaii.TreeNode($"Appearance##{Sundesmo.UserData.UID}-appearance");
+        if (!node) return;
+
+        using var table = ImRaii.Table("sundesmo-appearance", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        if (!table) return;
+
+        ImGui.TableSetupColumn("Data Type");
+        ImGui.TableSetupColumn("Data Value", ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableHeadersRow();
+
+        ImGui.TableNextColumn();
+        ImGui.Text("Glamourer");
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData!.Data[IpcKind.Glamourer]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("CPlus");
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData.Data[IpcKind.CPlus]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("ModManips");
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData.Data[IpcKind.ModManips]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("HeelsOffset");
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData.Data[IpcKind.Heels]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("TitleData");
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData.Data[IpcKind.Honorific]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("Moodles");
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData.Data[IpcKind.Moodles]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("PetNames");
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData.Data[IpcKind.PetNames]);
     }
 }

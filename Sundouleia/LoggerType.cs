@@ -23,43 +23,44 @@ public enum LoggerType : long
     // Client Player Object Data
     ResourceMonitor     = 1L << 11,
     OwnedObjects        = 1L << 12,
-    DataDistributor     = 1L << 13,
+    ClientUpdates       = 1L << 13,
+    DataDistributor     = 1L << 14,
 
     // File Info
-    FileCache           = 1L << 14,
-    FileCsv             = 1L << 15,
-    FileMonitor         = 1L << 16,
-    PairFileCache       = 1L << 17,
-    FileUploads         = 1L << 18,
-    FileDownloads       = 1L << 19,
-    FileService         = 1L << 20,
+    FileCache           = 1L << 15,
+    FileCsv             = 1L << 16,
+    FileMonitor         = 1L << 17,
+    PairFileCache       = 1L << 18,
+    FileUploads         = 1L << 19,
+    FileDownloads       = 1L << 20,
+    FileService         = 1L << 21,
 
     // Pair Data (Pair Handling)
-    PairManagement      = 1L << 21, // Adding / removing / updates
-    PairDataTransfer    = 1L << 22, // All Data transfer updates.
-    PairHandler         = 1L << 23, // Anything related to handled pair object.
-    PairMods            = 1L << 24, // Mod info changes.
-    PairAppearance      = 1L << 25, // Appearance info changes.
+    PairManagement      = 1L << 22, // Adding / removing / updates
+    PairDataTransfer    = 1L << 23, // All Data transfer updates.
+    PairHandler         = 1L << 24, // Anything related to handled pair object.
+    PairMods            = 1L << 25, // Mod info changes.
+    PairAppearance      = 1L << 26, // Appearance info changes.
 
     // Radar Logging
-    RadarManagement     = 1L << 26,
-    RadarData           = 1L << 27,
-    RadarChat           = 1L << 28,
+    RadarManagement     = 1L << 27,
+    RadarData           = 1L << 28,
+    RadarChat           = 1L << 29,
 
     // General Services
-    UIManagement        = 1L << 29,
-    Textures            = 1L << 30,
-    DtrBar              = 1L << 31,
-    Profiles            = 1L << 32,
-    Mediator            = 1L << 33,
-    Combos              = 1L << 34,
+    UIManagement        = 1L << 30,
+    Textures            = 1L << 31,
+    DtrBar              = 1L << 32,
+    Profiles            = 1L << 33,
+    Mediator            = 1L << 34,
+    Combos              = 1L << 35,
 
     // WebAPI (SundouleiaHub)
-    ApiCore             = 1L << 35,
-    Callbacks           = 1L << 36,
-    HubFactory          = 1L << 37,
-    Health              = 1L << 38,
-    JwtTokens           = 1L << 39,
+    ApiCore             = 1L << 36,
+    Callbacks           = 1L << 37,
+    HubFactory          = 1L << 38,
+    Health              = 1L << 39,
+    JwtTokens           = 1L << 40,
 
     // All Recommended types.
     Recommended =

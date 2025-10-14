@@ -1,4 +1,8 @@
 using CkCommons;
+using CkCommons.Gui;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.Interop;
@@ -266,6 +270,36 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             // Clear internal data.
             NameString = string.Empty;
             unsafe { _gameObject = null; }
+        }
+    }
+
+    public void DrawDebugInfo()
+    {
+        using var node = ImRaii.TreeNode($"Alterations##{Sundesmo.UserData.UID}-alterations");
+        if (!node) return;
+
+        if (_appearanceData is null)
+            CkGui.ColorText("No Alteration Data", ImGuiColors.DalamudRed);
+        else
+        {
+            using (var table = ImRaii.Table("sundesmo-appearance", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
+            {
+                if (!table) return;
+
+                ImGui.TableSetupColumn("Data Type");
+                ImGui.TableSetupColumn("Data Value", ImGuiTableColumnFlags.WidthStretch);
+                ImGui.TableHeadersRow();
+
+                ImGui.TableNextColumn();
+                ImGui.Text("Glamourer");
+                ImGui.TableNextColumn();
+                ImGui.Text(_appearanceData!.Data[IpcKind.Glamourer]);
+
+                ImGui.TableNextColumn();
+                ImGui.Text("CPlus");
+                ImGui.TableNextColumn();
+                ImGui.Text(_appearanceData.Data[IpcKind.CPlus]);
+            }
         }
     }
 }

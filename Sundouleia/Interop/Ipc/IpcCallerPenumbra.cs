@@ -29,11 +29,11 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     // API Version
     private ApiVersion Version;
     // API Events
-    private readonly EventSubscriber                                        OnInitialized;
-    private readonly EventSubscriber                                        OnDisposed;
-    private readonly EventSubscriber<nint, int>                             OnObjectRedrawn;
-    private readonly EventSubscriber<nint, string, string>                  OnObjectResourcePathResolved;
-    private readonly EventSubscriber<ModSettingChange, Guid, string, bool>  OnModSettingsChanged;
+    private readonly EventSubscriber                                OnInitialized;
+    private readonly EventSubscriber                                OnDisposed;
+    private readonly EventSubscriber<nint, int>                     OnObjectRedrawn;
+    private readonly EventSubscriber<nint, string, string>          OnObjectResourcePathResolved;
+    public EventSubscriber<ModSettingChange, Guid, string, bool>    OnModSettingsChanged;
     // API Getters
     private GetModDirectory             GetModDirectory;       // Retrieves the root mod directory path.
     private GetPlayerMetaManipulations  GetMetaManipulations;  // Obtains the client's mod metadata manipulations.
@@ -84,7 +84,6 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         // API Version.
         Version = new ApiVersion(Svc.PluginInterface);
         // Events
-        OnModSettingsChanged = ModSettingChanged.Subscriber(Svc.PluginInterface, ModSettingsChanged);
         OnObjectResourcePathResolved = GameObjectResourcePathResolved.Subscriber(Svc.PluginInterface, GameObjectResourceLoaded);
         OnObjectRedrawn = GameObjectRedrawn.Subscriber(Svc.PluginInterface, ObjectRedrawn);
         // Getters
@@ -112,7 +111,6 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     {
         base.Dispose(disposing);
 
-        OnModSettingsChanged.Dispose();
         OnObjectResourcePathResolved.Dispose();
         OnDisposed.Dispose();
         OnInitialized.Dispose();
@@ -152,22 +150,6 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         {
             ModDirectory = value;
             Mediator.Publish(new PenumbraDirectoryChanged(ModDirectory));
-        }
-    }
-
-    /// <summary>
-    ///     Fired whenever we change the settings or state of a mod in penumbra. <para />
-    ///     This is useful because while GameObjectResourceLoaded informs us of 
-    ///     every modded path loaded in, when things are unloaded, it does not inform us of this. <para />
-    ///     It would be ideal if we had other alternative API calls to bind this to for a cleaner approach.
-    /// </summary>
-    /// <remarks> This will fire multiple times, one for each collection, if multiple collections are linked to it.</remarks>
-    private void ModSettingsChanged(ModSettingChange change, Guid collectionId, string modDir, bool inherited)
-    {
-        if (change is ModSettingChange.EnableState)
-        {
-            Logger.LogTrace($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]", LoggerType.IpcPenumbra);
-            Mediator.Publish(new PenumbraSettingsChanged());
         }
     }
 

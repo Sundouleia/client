@@ -3,6 +3,8 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using Glamourer.Api.Enums;
 using Glamourer.Api.IpcSubscribers;
+using Penumbra.Api.Enums;
+using Penumbra.Api.IpcSubscribers;
 using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
@@ -43,10 +45,9 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _watcher = watcher;
         _distributor = distributor;
 
-        // For whenever a setting in our mod path changes. Helps us know when we are about to get a flood of resource loads from penumbra, or when to check what is still present or not.
-        // That being said, this is somewhat wierd to have given it will always be out of sync?
-        Mediator.Subscribe<PenumbraSettingsChanged>(this, _ => OnModSettingsChanged());
-
+        Mediator.Subscribe<TransientResourceLoaded>(this, _ => OnModdedResourceLoaded());
+        
+        _ipc.Penumbra.OnModSettingsChanged = ModSettingChanged.Subscriber(Svc.PluginInterface, OnModSettingChanged);
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
         _ipc.Glamourer.OnStateChanged.Enable();
         _ipc.CustomizePlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
@@ -69,6 +70,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
             _debounceCTS.SafeCancelDispose();
         }
 
+        _ipc.Penumbra.OnModSettingsChanged?.Dispose();
         _ipc.Glamourer.OnStateChanged?.Disable();
         _ipc.Glamourer.OnStateChanged?.Dispose();
         _ipc.CustomizePlus.OnProfileUpdate.Unsubscribe(OnCPlusProfileUpdate);
@@ -112,7 +114,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _debounceTask = Task.Run(async () =>
         {
             // await for the processed debounce time, or until cancelled.
-            Logger.LogTrace($"Waiting for debounce time of {GetDebounceTime()}ms");
+            Logger.LogTrace($"Waiting for debounce time of {GetDebounceTime()}ms", LoggerType.ClientUpdates);
             await Task.Delay(GetDebounceTime(), _debounceCTS.Token).ConfigureAwait(false);
             // snapshot the changes dictionary and clear after.
             var pendingSnapshot = new Dictionary<OwnedObject, IpcKind>(_pendingUpdates);
@@ -124,39 +126,25 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
 
             // If there is only a single thing to update, send that over.
             var modUpdate = allPendingSnapshot.HasAny(IpcKind.Mods);
-            var isSingle = pendingSnapshot.Count is 1 && SundouleiaEx.IsSingleFlagSet((byte)allPendingSnapshot);
-            try
+            var isSingle = !modUpdate && pendingSnapshot.Count is 1 && SundouleiaEx.IsSingleFlagSet((byte)allPendingSnapshot);
+
+            // If the change was single and it was not glamourer, we can just send single.
+            if (isSingle && allPendingSnapshot != IpcKind.Glamourer)
             {
-                // Debug mod changes for now.
-                switch (modUpdate, isSingle)
-                {
-                    case (true, false):
-                        Logger.LogDebug($"Processing full Mod update for {pendingSnapshot.Count} objects.");
-                        await _distributor.UpdateAndSendAll(pendingSnapshot).ConfigureAwait(false);
-                        break;
-                    case (true, true):
-                        Logger.LogDebug($"Processing single Mod update for {pendingSnapshot.Keys.First()}.");
-                        await _distributor.UpdateAndSendMods().ConfigureAwait(false);
-                        break;
-                    case (false, false):
-                        Logger.LogDebug($"Processing partial update ({allPendingSnapshot}) for {pendingSnapshot.Count} objects.");
-                        await _distributor.UpdateAndSendVisuals(pendingSnapshot).ConfigureAwait(false);
-                        break;
-                    case (false, true):
-                        Logger.LogDebug($"Processing single partial update ({allPendingSnapshot}) for {pendingSnapshot.Keys.First()}.");
-                        await _distributor.UpdateAndSendSingle(pendingSnapshot.Keys.First(), allPendingSnapshot).ConfigureAwait(false);
-                        break;
-                }
+                Logger.LogDebug($"Processing single update ({allPendingSnapshot}) for {pendingSnapshot.Keys.First()}.", LoggerType.ClientUpdates);
+                await _distributor.UpdateAndSendSingle(pendingSnapshot.Keys.First(), allPendingSnapshot).ConfigureAwait(false);
+                return;
             }
-            catch (OperationCanceledException) { }
-            catch (Exception ex) { Logger.LogCritical($"Error during ClientUpdate Process: {ex}"); }
+            // Otherwise, we should process it with the assumption that the modded state could have at any point changed.
+            Logger.LogDebug($"Processing full update for {pendingSnapshot.Count} owned objects.", LoggerType.ClientUpdates);
+            await _distributor.CheckStateAndUpdate(pendingSnapshot, allPendingSnapshot).ConfigureAwait(false);
         }, _debounceCTS.Token);
     }
 
     private void AddPendingUpdate(OwnedObject type, IpcKind kind)
     {
         _debounceCTS = _debounceCTS.SafeCancelRecreate();
-        Logger.LogTrace($"Detected update for {type} ({kind})");
+        Logger.LogTrace($"Detected update for {type} ({kind})", LoggerType.ClientUpdates);
         if (_pendingUpdates.ContainsKey(type))
             _pendingUpdates[type] |= kind;
         else
@@ -170,11 +158,42 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _allPendingUpdates = IpcKind.None;
     }
 
-    private void OnModSettingsChanged()
+    private void OnModdedResourceLoaded()
     {
-        // could have changed on any collection, for any mod. To be safe, run a mod check on all owned objects.
-        foreach (var (addr, type) in _watcher.WatchedTypes)
-            AddPendingUpdate(type, IpcKind.Mods);
+        if (_watcher.WatchedPlayerAddr == IntPtr.Zero) return;
+        AddPendingUpdate(OwnedObject.Player, IpcKind.Mods);
+    }
+
+    /// <summary>
+    ///     Fired whenever we change the settings or state of a mod in penumbra. <para />
+    ///     This is useful because while GameObjectResourceLoaded informs us of 
+    ///     every modded path loaded in, when things are unloaded, it does not inform us of this. <para />
+    ///     It would be ideal if we had other alternative API calls to bind this to for a cleaner approach.
+    /// </summary>
+    /// <remarks> This will fire multiple times, one for each collection, if multiple collections are linked to it.</remarks>
+    private void OnModSettingChanged(ModSettingChange change, Guid collectionId, string modDir, bool inherited)
+    {
+        // We dont really know all of our owned objects collections are, so until we have a way to track this,
+        // we can't really filter out to only allow owned collections.
+        // However, that would be a mess anyways, as summoning various minions each with their own
+        // collections would be cancerous to monitor.
+
+        // If mod options changed, they could have effected something that we are wearing, so pass a mod update.
+        if (change is ModSettingChange.EnableState && _watcher.WatchedPlayerAddr != IntPtr.Zero)
+        {
+            Logger.LogTrace($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]", LoggerType.IpcPenumbra);
+            foreach (var (addr, type) in _watcher.WatchedTypes)
+                AddPendingUpdate(type, IpcKind.Mods);
+            // Could make this for all owned objects but whatever.
+        }
+
+        // If the change was an edited state change, then our mod manipulation string was modified.
+        // (If we run into issues where you can change metadata without mods changing, (somehow bypassing redrawing) we can update them here.
+        if (change is ModSettingChange.Edited && _watcher.WatchedPlayerAddr != IntPtr.Zero)
+        {
+            Logger.LogTrace($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]", LoggerType.IpcPenumbra);
+            AddPendingUpdate(OwnedObject.Player, IpcKind.ModManips);
+        }
     }
 
     // Fired within the framework thread.

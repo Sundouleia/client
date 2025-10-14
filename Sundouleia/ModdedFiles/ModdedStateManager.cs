@@ -201,7 +201,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         filePath = filePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
         var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
 
-        // ignore duplicates.
+        // vanilla, only process modded.
         if (string.Equals(filePath, replacedGamePath, StringComparison.OrdinalIgnoreCase))
             return;
 
