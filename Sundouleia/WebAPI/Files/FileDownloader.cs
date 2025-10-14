@@ -17,6 +17,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     private readonly FileCacheManager _dbManager;
     private readonly FileTransferService _transferService;
 
+    private readonly Lock _activeDownloadStreamsLock = new();
     private readonly List<ThrottledStream> _activeDownloadStreams;
     private readonly ConcurrentDictionary<PlayerHandler, FileTransferProgress> _downloadStatus;
 
@@ -38,16 +39,22 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
 
             var newLimit = _transferService.DownloadLimitPerSlot();
             Logger.LogTrace($"Setting new Download Speed Limit to {newLimit}");
-            foreach (var stream in _activeDownloadStreams)
-                stream.BandwidthLimit = newLimit;
+            lock (_activeDownloadStreamsLock)
+            {
+                foreach (var stream in _activeDownloadStreams)
+                    stream.BandwidthLimit = newLimit;
+            }
         });
     }
 
     protected override void Dispose(bool disposing)
     {
         ClearDownloadStatus();
-        foreach (var stream in _activeDownloadStreams.ToList())
-            Generic.Safe(stream.Dispose);
+        lock (_activeDownloadStreamsLock)
+        {
+            foreach (var stream in _activeDownloadStreams.ToList())
+                Generic.Safe(stream.Dispose);
+        }
         base.Dispose(disposing);
     }
 
@@ -185,7 +192,8 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
                 // set up throttled stream for download
                 using var downloadStream = await downloadResponse.Content.ReadAsStreamAsync(cancelToken).ConfigureAwait(false);
                 using var throttledStream = new ThrottledStream(downloadStream, _transferService.DownloadLimitPerSlot());
-                _activeDownloadStreams.Add(throttledStream);
+                lock (_activeDownloadStreamsLock)
+                    _activeDownloadStreams.Add(throttledStream);
 
                 try
                 {
@@ -210,7 +218,8 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
                 }
                 finally
                 {
-                    _activeDownloadStreams.Remove(throttledStream);
+                    lock (_activeDownloadStreamsLock)
+                        _activeDownloadStreams.Remove(throttledStream);
                 }
             }
             catch (OperationCanceledException)
