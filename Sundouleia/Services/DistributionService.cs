@@ -339,7 +339,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     private async Task<VisualUpdate> UpdateVisualsInternal(Dictionary<OwnedObject, IpcKind> changes)
     {
-        var changedData = LastCreatedData.DeepClone();
+        var changedData = new ClientDataCache(LastCreatedData);
         // process the tasks for each object in parallel.
         var tasks = new List<Task>();
         foreach (var (obj, kinds) in changes)

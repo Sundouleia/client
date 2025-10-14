@@ -40,6 +40,18 @@ public class ClientDataCache
         };
     }
 
+    public ClientDataCache(ClientDataCache other)
+    {
+        AppliedMods = other.AppliedMods.ToDictionary(kvp => kvp.Key, kvp => new ModdedFile(kvp.Value));
+        GlamourerState = new ConcurrentDictionary<OwnedObject, string>(other.GlamourerState);
+        CPlusState = new ConcurrentDictionary<OwnedObject, string>(other.CPlusState);
+        ModManips = other.ModManips;
+        HeelsOffset = other.HeelsOffset;
+        TitleData = other.TitleData;
+        Moodles = other.Moodles;
+        PetNames = other.PetNames;
+    }
+
     public ModUpdates ToModUpdates()
         => new ModUpdates(AppliedMods.Values.Select(m => m.ToModFileDto()).ToList(), AppliedMods.Keys.ToList());
 
@@ -85,13 +97,9 @@ public class ClientDataCache
         var toRemove = new List<string>();
 
         // First determine which files are removed based on the most currentState.
-        var currentHashes = moddedState.Select(m => m.Hash);
-        var keysToRemove = AppliedMods.Keys.Except(currentHashes).ToList();
-        foreach (var hash in keysToRemove)
-        {
+        toRemove.AddRange(AppliedMods.Keys.Except(moddedState.Select(m => m.Hash)).ToList());
+        foreach (var hash in toRemove)
             AppliedMods.Remove(hash, out _);
-            toRemove.Add(hash);
-        }
 
         // Now iterate through the new hashes. Any that need to be added should be placed in the ToAdd.
         foreach (var mod in moddedState)
