@@ -9,7 +9,6 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using OtterGui;
 using Sundouleia.Pairs.Factories;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
@@ -112,17 +111,17 @@ public class Sundesmo : IComparable<Sundesmo>
     // Reapply all existing data to all rendered objects.
     public void ReapplyAlterations()
     {
-        _player.ReapplyAlterations();
-        _mountMinion.ReapplyAlterations();
-        _pet.ReapplyAlterations();
-        _companion.ReapplyAlterations();
+        _player.ReapplyAlterations().ConfigureAwait(false);
+        _mountMinion.ReapplyAlterations().ConfigureAwait(false);
+        _pet.ReapplyAlterations().ConfigureAwait(false);
+        _companion.ReapplyAlterations().ConfigureAwait(false);
     }
 
     // Tinker with async / no async later.
-    public async void ApplyFullData(NewModUpdates newModData, VisualUpdate newIpc)
+    public async Task ApplyFullData(NewModUpdates newModData, VisualUpdate newIpc)
     {
         if (newIpc.PlayerChanges != null)
-            _player.UpdateAndApplyFullData(newModData, newIpc.PlayerChanges);
+            await _player.UpdateAndApplyFullData(newModData, newIpc.PlayerChanges);
 
         if (newIpc.MinionMountChanges != null)
             await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
@@ -135,12 +134,12 @@ public class Sundesmo : IComparable<Sundesmo>
     }
 
     public async void ApplyModData(NewModUpdates newModData)
-        => await _player.UpdateAndApplyModData(newModData);
+        => await _player.UpdateAndApplyModData(newModData, true);
 
     public async void ApplyIpcData(VisualUpdate newIpc)
     {
         if (newIpc.PlayerChanges is not null)
-            await _player.ApplyIpcData(newIpc.PlayerChanges);
+            await _player.ApplyIpcData(newIpc.PlayerChanges, true);
 
         if (newIpc.MinionMountChanges is not null)
             await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
@@ -347,18 +346,21 @@ public class Sundesmo : IComparable<Sundesmo>
         using var node = ImRaii.TreeNode($"Visible Info##{UserData.UID}-visible");
         if (!node) return;
 
-        using (var t = ImRaii.Table("##debug-visible" + UserData.UID, 9, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        using (var t = ImRaii.Table("##debug-visible" + UserData.UID, 12, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
             if (!t) return;
             ImGui.TableSetupColumn("OwnedObject");
             ImGui.TableSetupColumn("Rendered?");
             ImGui.TableSetupColumn("Name");
-            ImGui.TableSetupColumn("OwnerValid");
             ImGui.TableSetupColumn("Address");
             ImGui.TableSetupColumn("ObjectIdx");
             ImGui.TableSetupColumn("EntityId");
             ImGui.TableSetupColumn("ObjectId");
             ImGui.TableSetupColumn("ParentId");
+            ImGui.TableSetupColumn("DrawObjValid");
+            ImGui.TableSetupColumn("RenderFlags");
+            ImGui.TableSetupColumn("MdlInSlot");
+            ImGui.TableSetupColumn("MdlFilesInSlot");
             ImGui.TableHeadersRow();
             // Handle Player.
             ImGuiUtil.DrawFrameColumn("Player");
@@ -367,18 +369,30 @@ public class Sundesmo : IComparable<Sundesmo>
             ImGuiUtil.DrawFrameColumn(PlayerName);
             if (IsRendered)
             {
-                ImGui.TableNextColumn(); // Skip Owner Valid.
                 ImGui.TableNextColumn();
                 CkGui.ColorText($"{PlayerAddress:X}", ImGuiColors.TankBlue);
                 ImGuiUtil.DrawFrameColumn(_player.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(PlayerEntityId.ToString());
                 ImGuiUtil.DrawFrameColumn(PlayerObjectId.ToString());
                 ImGuiUtil.DrawFrameColumn("N/A");
+
+                ImGui.TableNextColumn();
+                var drawObjValid = _player.DrawObjAddress != IntPtr.Zero;
+                CkGui.IconText(drawObjValid ? FAI.Check : FAI.Times, drawObjValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+
+                ImGui.TableNextColumn();
+                CkGui.ColorText(_player.RenderFlags.ToString(), ImGuiColors.DalamudGrey2);
+
+                if (drawObjValid)
+                {
+                    ImGui.TableNextColumn();
+                    CkGui.IconText(_player.HasModelInSlotLoaded ? FAI.Check : FAI.Times, _player.HasModelInSlotLoaded ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+                    ImGui.TableNextColumn();
+                    CkGui.IconText(_player.HasModelFilesInSlotLoaded ? FAI.Check : FAI.Times, _player.HasModelFilesInSlotLoaded ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+                }
             }
-            else
-            {
-                ImGui.TableNextRow();
-            }
+            ImGui.TableNextRow();
+            
             // Handle Mount/Minion.
             ImGuiUtil.DrawFrameColumn("Mount/Minion");
             ImGui.TableNextColumn();
@@ -395,10 +409,8 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGuiUtil.DrawFrameColumn(_mountMinion.GameObjectId.ToString());
                 ImGuiUtil.DrawFrameColumn(_mountMinion.DataState.OwnerId.ToString());
             }
-            else
-            {
-                ImGui.TableNextRow();
-            }
+            ImGui.TableNextRow();
+            
             // Handle Pet.
             ImGuiUtil.DrawFrameColumn("Pet");
             ImGui.TableNextColumn();
@@ -415,10 +427,8 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGuiUtil.DrawFrameColumn(_pet.GameObjectId.ToString());
                 ImGuiUtil.DrawFrameColumn(_pet.DataState.OwnerId.ToString());
             }
-            else
-            {
-                ImGui.TableNextRow();
-            }
+            ImGui.TableNextRow();
+
             // Handle Companion.
             ImGuiUtil.DrawFrameColumn("Companion");
             ImGui.TableNextColumn();

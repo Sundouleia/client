@@ -4,6 +4,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
@@ -52,9 +53,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // this just creates 'a collection' it does not assign anyone to it yet.
         Mediator.Subscribe<PenumbraInitialized>(this, async _ =>
         {
-            if (_tempCollection == Guid.Empty)
-                _tempCollection = await _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
+            _tempCollection = await _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
         });
+        Mediator.Subscribe<PenumbraDisposed>(this, _ => _tempCollection = Guid.Empty);
 
         // Old subscriber here for class/job change?
         // Old subscribers here for combat/performance start/stop. Reapplies should fix this but yeah can probably just do redraw.
@@ -99,6 +100,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public unsafe ulong EntityId => _player->EntityId;
     public unsafe ulong GameObjectId => _player->GetGameObjectId().ObjectId;
     public unsafe ushort ObjIndex => _player->ObjectIndex;
+    public unsafe IntPtr DrawObjAddress => (nint)_player->DrawObject;
+    public unsafe int RenderFlags => _player->RenderFlags;
+    public unsafe bool HasModelInSlotLoaded => ((CharacterBase*)_player->DrawObject)->HasModelInSlotLoaded != 0;
+    public unsafe bool HasModelFilesInSlotLoaded => ((CharacterBase*)_player->DrawObject)->HasModelFilesInSlotLoaded != 0;
+
     public string NameString { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
     public unsafe bool IsRendered => _player != null;
     public bool HasAlterations => _appearanceData != null || _replacements.Count is not 0;
@@ -149,6 +155,39 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Sundesmo.TriggerTimeoutTask();
         Mediator.Publish(new RefreshWhitelistMessage());
     }
+
+
+    /// <summary>
+    ///     Awaits until the draw object is fully valid for the player.
+    /// </summary>
+    private async Task WaitUntilValidDrawObject()
+    {
+        using var ct = new CancellationTokenSource(10000);
+        while (!ct.IsCancellationRequested)
+        {
+            await Task.Delay(2000).ConfigureAwait(false);
+
+            if (IsObjectLoaded())
+                return;
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not fully loaded yet, waiting...", LoggerType.PairHandler);
+        }
+    }
+
+    /// <summary>
+    ///     There are conditions where an object can be rendered / created, but not drawable, or currently bring drawn. <para />
+    ///     This mainly occurs on login or when transferring between zones, but can also occur during redraws and such.
+    ///     We can get around this by checking for various draw conditions.
+    /// </summary>
+    public unsafe bool IsObjectLoaded()
+    {
+        if (!IsRendered) return false; // Not even rendered, does not exist.
+        if (DrawObjAddress == IntPtr.Zero) return false; // Character object does not exist yet.
+        if (RenderFlags == 2048) return false; // Render Flag for "IsLoading" (2048 == 0b100000000000)
+        if (HasModelInSlotLoaded) return false; // There are models that need to still be loaded into the DrawObject slots.
+        if (HasModelFilesInSlotLoaded) return false; // There are model files that need to still be loaded into the DrawObject slots.
+        return true;
+    }
+
 
     /// <summary>
     ///     Removes all cached alterations from the player and reverts their state. <para />
@@ -204,7 +243,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         });
         
         // Assign the temporary penumbra collection if not already set.
-        _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).GetAwaiter().GetResult();
+        if (_tempCollection != Guid.Empty)
+            _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).GetAwaiter().GetResult();
     }
 
     public async Task ReapplyAlterations()
@@ -212,20 +252,21 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!IsRendered)
             return;
 
-        Logger.LogDebug($"Reapplying all alterations for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        // Begin application.
+        Logger.LogDebug($"ReapplyAlterations called for [{Sundesmo.GetNickAliasOrUid()}] (State: DrawObjValid: {DrawObjAddress != IntPtr.Zero} | RenderFlags: {RenderFlags} | ModelInSlot: {HasModelInSlotLoaded} | ModelFilesInSlot: {HasModelFilesInSlotLoaded})", LoggerType.PairHandler);
         var hasAppearance = _appearanceData is not null;
         var hasMods = _tempCollection != Guid.Empty && _replacements.Count > 0;
 
         // Reapply appearance alterations, if they exist.
         if (hasAppearance)
         {
-            await ReapplyVisuals().ConfigureAwait(false);
+            await ReapplyVisuals(false).ConfigureAwait(false);
         }
         // Reapply Mods, if they exist.
         if (hasMods)
         {
             _downloader.GetExistingFromCache(_replacements, out var moddedDict, CancellationToken.None);
-            await ApplyModData(moddedDict).ConfigureAwait(false);
+            await ApplyModData(moddedDict, false).ConfigureAwait(false);
         }
 
         // redraw for now, reapply later after glamourer implements methods for reapply.
@@ -244,7 +285,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _replacements[file.Hash] = file;
     }
 
-    public void UpdateAndApplyFullData(NewModUpdates modData, IpcDataPlayerUpdate ipcData)
+    public async Task UpdateAndApplyFullData(NewModUpdates modData, IpcDataPlayerUpdate ipcData)
     {
         // 1) Maybe handle something with combat and performance, idk, deal with later.
 
@@ -266,13 +307,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // The old mare transfer bars would technically not work here as we would be both uploading files while downloading current ones at the same time.
 
-        // 3) Player is rendered, so process the ipc & mods.
-        ApplyIpcData(ipcData).ConfigureAwait(false);
-        UpdateAndApplyModData(modData).ConfigureAwait(false);
+        // 3) Player is rendered, so process the ipc & mods (maybe do this in parallel idk)
+        await ApplyIpcData(ipcData, false).ConfigureAwait(false);
+        await UpdateAndApplyModData(modData, false).ConfigureAwait(false);
+
+        if ((ipcData.Updates is not IpcKind.None || modData.HasChanges) && IsRendered)
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
         Logger.LogInformation($"Applied full data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairHandler);
     }
 
-    public async Task UpdateAndApplyModData(NewModUpdates modData)
+    public async Task UpdateAndApplyModData(NewModUpdates modData, bool redraw)
     {
         if (!IpcCallerPenumbra.APIAvailable)
         {
@@ -347,11 +391,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairMods);
         // 5) Apply the new mod data if rendered.
         Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairMods);
-        await ApplyModData(moddedDict).ConfigureAwait(false);   
+        await ApplyModData(moddedDict, redraw).ConfigureAwait(false);   
     }
      
     // Would need a way to retrieve the existing modded dictionary from the file cache or something here, not sure. We shouldnt need to download anything on a reapplication.
-    private async Task ApplyModData(Dictionary<string, string> moddedPaths)
+    private async Task ApplyModData(Dictionary<string, string> moddedPaths, bool redraw)
     {
         if (!IsRendered)
         {
@@ -368,21 +412,25 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] has no mod replacements, skipping mod application.", LoggerType.PairMods);
             return;
         }
-        
+
         Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
         // Maybe we need to do this for our other objects too? Im not sure, guess we'll find out and stuff.
         await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
         await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);        
         // do a reapply here (but need to do a redraw for now)
-        _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        if (redraw)
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
     }
 
-    public async Task ReapplyVisuals()
+    private async Task ReapplyVisuals(bool redraw)
     {
         if (!IsRendered || _appearanceData is null)
             return;
 
+        // Await until valid.
+        await WaitUntilValidDrawObject().ConfigureAwait(false);
         Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        
         var toApply = new List<Task>();
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer]))
             toApply.Add(ApplyGlamourer());
@@ -401,12 +449,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Run in parallel.
         await Task.WhenAll(toApply).ConfigureAwait(false);
         // Redraw if necessary (Glamourer or CPlus)
-        if (_appearanceData.Data.ContainsKey(IpcKind.Glamourer) || _appearanceData.Data.ContainsKey(IpcKind.CPlus))
+        if (_appearanceData.Data.ContainsKey(IpcKind.Glamourer | IpcKind.CPlus) && redraw)
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their visual data reapplied.", LoggerType.PairHandler);
     }
 
-    public async Task ApplyIpcData(IpcDataPlayerUpdate newData)
+    public async Task ApplyIpcData(IpcDataPlayerUpdate newData, bool redraw)
     {
         // 0) Init appearance data if not yet made.
         _appearanceData ??= new();
@@ -418,7 +466,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (changes is 0 || Address == IntPtr.Zero)
             return;
 
-        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] has IPC changes to apply ({changes})", LoggerType.PairHandler);
+        // Await until valid.
+        await WaitUntilValidDrawObject().ConfigureAwait(false);
+        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] has IPC changes to apply ({changes}) (State: DrawObjValid: {DrawObjAddress != IntPtr.Zero} | RenderFlags: {RenderFlags} | ModelInSlot: {HasModelInSlotLoaded} | ModelFilesInSlot: {HasModelFilesInSlotLoaded})", LoggerType.PairHandler);
 
         // 3) Initialize task list to perform all updates in parallel.
         var tasks = new List<Task>();
@@ -434,10 +484,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // Redraw if necessary (Glamourer or CPlus)
-        if (changes.HasAny(IpcKind.Glamourer | IpcKind.CPlus))
+        if (changes.HasAny(IpcKind.Glamourer | IpcKind.CPlus) && redraw)
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
-
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had IPC changes applied ({changes})", LoggerType.PairHandler);
     }
 
     public async Task ApplyIpcSingle(IpcKind kind, string newData)
@@ -450,9 +498,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return;
         
         // 2) Validate render state before applying.
-        if (Address == IntPtr.Zero)
-            return;
-        
+        if (!IsRendered) return;
+
+        // Await until valid.
+        await WaitUntilValidDrawObject().ConfigureAwait(false);
+
         // 3) Apply change.
         var task = kind switch
         {
