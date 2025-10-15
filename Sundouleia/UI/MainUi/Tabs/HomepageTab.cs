@@ -5,6 +5,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -72,10 +73,60 @@ public class HomepageTab
 
         try
         {
-            ImGui.Text($"Player Addr: {_watcher.WatchedPlayerAddr:X}");
-            ImGui.Text($"MountMinion Addr: {_watcher.WatchedMinionMountAddr:X}");
-            ImGui.Text($"Pet Addr: {_watcher.WatchedPetAddr:X}");
-            ImGui.Text($"Companion Addr: {_watcher.WatchedCompanionAddr:X}");
+            unsafe
+            {
+                var game = GameMain.Instance();
+                CkGui.ColorText($"Territory Transition Delay:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->TerritoryTransitionDelay.ToString());
+
+                CkGui.ColorText($"Territory Transition State:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->TerritoryTransitionState.ToString());
+
+                CkGui.ColorText($"Connected To Zone:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->ConnectedToZone ? "Yes" : "No");
+
+                CkGui.ColorText($"Territory Load State:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->TerritoryLoadState.ToString());
+
+                CkGui.ColorText($"Next Territory Type Id:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->NextTerritoryTypeId.ToString());
+
+                CkGui.ColorText($"Current Territory Type Id:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->CurrentTerritoryTypeId.ToString());
+
+                CkGui.ColorText($"Current Territory Intended Use Id:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->CurrentTerritoryIntendedUseId.ToString());
+
+                CkGui.ColorText($"Current Territory Filter Key:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->CurrentTerritoryFilterKey.ToString());
+
+                CkGui.ColorText($"Current Content Finder Condition Id:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->CurrentContentFinderConditionId.ToString());
+
+                CkGui.ColorText($"Transition Territory Type Id:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->TransitionTerritoryTypeId.ToString());
+
+                CkGui.ColorText($"Transition Territory Filter Key:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->TransitionTerritoryFilterKey.ToString());
+
+                CkGui.ColorText($"Current Map Id:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->CurrentMapId.ToString());
+
+                CkGui.ColorText($"Millisecond Counter:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->MilisecondCounter.ToString("F2"));
+
+                CkGui.ColorText($"Runtime Seconds:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->RuntimeSeconds.ToString());
+
+                CkGui.ColorText($"Runtime Seconds Changed:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->RuntimeSecondsChanged ? "Yes" : "No");
+
+                CkGui.ColorText($"Runtime:", ImGuiColors.TankBlue);
+                CkGui.TextInline(game->Runtime.ToString("F2"));
+
+                CkGui.ColorText("In Idle Cam:", ImGuiColors.TankBlue);
+                CkGui.TextInline(GameMain.IsInIdleCam() ? "Yes" : "No");
+            }
         }
         catch (Exception ex)
         {
