@@ -2,7 +2,7 @@ using Dalamud.Interface.ImGuiNotification;
 using Sundouleia.Services.Mediator;
 using Microsoft.AspNetCore.SignalR.Client;
 
-namespace Sundouleia.WebAPI.Utils;
+namespace Sundouleia.Utils;
 public class ForeverRetryPolicy : IRetryPolicy
 {
     private readonly SundouleiaMediator _mediator;

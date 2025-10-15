@@ -1,16 +1,10 @@
 using Blake3;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using System.Security.Cryptography;
 
-namespace Sundouleia.WebAPI.Utils;
+namespace Sundouleia.Utils;
 
-
-/// <summary>
-///     Uses SHA256 and SHA1 Hashing for security and datahashing. <para />
-///     SHA256 is more secure, while SHA1 is faster. <para />
-///     For iterating files, we will process datahashes using SHA1 (40bits) <para />
-///     For hashing secret keys, we will use SHA256 (64bits).
-/// </summary>
 public static class SundouleiaSecurity
 {
     // i think they are just using the player hash to make it more less likely to have the same identifier occur? If so, all of this is useless.
@@ -29,6 +23,12 @@ public static class SundouleiaSecurity
     /// </summary>
     public unsafe static string GetIdentHashByCharacterPtr(nint address)
         => ((Character*)address)->ContentId.ToString().GetHash256();
+
+    /// <summary>
+    ///     Only call this when you are visible.
+    /// </summary>
+    public unsafe static string GetClientIdentHashThreadSafe()
+        => Control.Instance()->LocalPlayer->ContentId.ToString().GetHash256();
 
     /// <summary>
     ///     Only call this when you are visible.

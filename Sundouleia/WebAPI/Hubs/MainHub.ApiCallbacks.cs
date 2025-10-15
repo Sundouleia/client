@@ -165,7 +165,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateFull(IpcUpdateFull dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateFull: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        _sundesmos.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData);
+        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData));
         return Task.CompletedTask;
     }
 
@@ -176,7 +176,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateMods(IpcUpdateMods dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateMods: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        _sundesmos.ReceiveIpcUpdateMods(dto.User, dto.ModData);
+        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateMods(dto.User, dto.ModData));
         return Task.CompletedTask;
     }
 
@@ -188,7 +188,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateOther(IpcUpdateOther dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateOther: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        _sundesmos.ReceiveIpcUpdateOther(dto.User, dto.IpcData);
+        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateOther(dto.User, dto.IpcData));
         return Task.CompletedTask;
     }
 
@@ -199,7 +199,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateSingle(IpcUpdateSingle dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateSingle: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        _sundesmos.ReceiveIpcUpdateSingle(dto.User, dto.ObjType, dto.Type, dto.NewData);
+        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateSingle(dto.User, dto.ObjType, dto.Type, dto.NewData));
         return Task.CompletedTask;
     }
 
@@ -209,7 +209,7 @@ public partial class MainHub
     public Task Callback_SingleChangeGlobal(SingleChangeGlobal dto)
     {
         Logger.LogDebug($"Callback_SingleChangeGlobal: {dto}", LoggerType.Callbacks);
-        // handle permissions later.
+        Generic.Safe(() => _sundesmos.PermChangeGlobal(dto.User, dto.PermName, dto.NewValue));
         return Task.CompletedTask;
     }
 
@@ -219,17 +219,19 @@ public partial class MainHub
     public Task Callback_BulkChangeGlobal(BulkChangeGlobal dto)
     {
         Logger.LogDebug($"Callback_BulkChangeGlobal: {dto}", LoggerType.Callbacks);
-        // Handle better or something idk.
+        Generic.Safe(() => _sundesmos.PermChangeGlobal(dto.User, dto.NewPerms));
         return Task.CompletedTask;
     }
 
     /// <summary>
-    ///     Whenever one of our Sundesmo have updated a permission in their PairPerms.
+    ///     Whenever one of our Sundesmo have updated a permission in their PairPerms. <para />
+    ///     Only ever called when a sundesmo changes their own permissions for our client. <para />
+    ///     <b> THIS IS NOT CALLED WHEN WE CHANGE A PAIRPERM FOR A SUNDESMO. </b>
     /// </summary>
     public Task Callback_SingleChangeUnique(SingleChangeUnique dto)
     {
         Logger.LogDebug($"Callback_SingleChangeUnique: {dto}", LoggerType.Callbacks);
-        // Handle better or something idk.
+        Generic.Safe(() => _sundesmos.PermChangeUniqueOther(dto.User, dto.PermName, dto.NewValue));
         return Task.CompletedTask;
     }
 
@@ -239,7 +241,7 @@ public partial class MainHub
     public Task Callback_BulkChangeUnique(BulkChangeUnique dto)
     {
         Logger.LogDebug($"Callback_BulkChangeUnique: {dto}", LoggerType.Callbacks);
-        // Handle better or something idk.
+        Generic.Safe(() => _sundesmos.PermBulkChangeUnique(dto.User, dto.NewPerms));
         return Task.CompletedTask;
     }
     #endregion Data Update Callbacks
@@ -250,15 +252,17 @@ public partial class MainHub
     ///     Can also fire upon them updating their user info, such as if they
     ///     are sharing their ident for requests or not if already present.
     /// </summary>
-    public Task Callback_RadarAddUpdateUser(OnlineUser dto)
+    public Task Callback_RadarAddUpdateUser(RadarUserInfo dto)
     {
         Logger.LogDebug($"Callback_RadarAddUpdateUser Called", LoggerType.Callbacks);
+        Mediator.Publish(new RadarAddOrUpdateUser(dto));
         return Task.CompletedTask;
     }
 
     public Task Callback_RadarRemoveUser(UserDto dto)
     {
         Logger.LogDebug($"Callback_RadarRemoveUser Called", LoggerType.Callbacks);
+        Mediator.Publish(new RadarRemoveUser(dto.User));
         return Task.CompletedTask;
     }
 
@@ -437,7 +441,7 @@ public partial class MainHub
         _hubConnection!.On(nameof(Callback_BulkChangeUnique), act);
     }
 
-    public void OnRadarAddUpdateUser(Action<OnlineUser> act)
+    public void OnRadarAddUpdateUser(Action<RadarUserInfo> act)
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_RadarAddUpdateUser), act);

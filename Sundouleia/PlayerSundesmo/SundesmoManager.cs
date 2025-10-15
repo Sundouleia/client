@@ -189,11 +189,9 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         // They were found, so refresh any existing profile data.
         Mediator.Publish(new ClearProfileDataMessage(dto.User));
 
-        // If they were already online, we should log a error for this and recreate
-        // (( This should never occur with Sundouleia ))
+        // If they are already online simply recreate the list. This only happens from sudden DC's we cant track.
         if (sundesmo.IsOnline)
         {
-            Logger.LogError($"Sundesmo [{dto.User.AliasOrUID}] is already marked online. Recreating.");
             RecreateLazy();
             return;
         }

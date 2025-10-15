@@ -138,6 +138,7 @@ public static class SundouleiaServiceExtensions
 
         // Player Client
         .AddSingleton<AccountManager>()
+        .AddSingleton<BlockedUserManager>()
         .AddSingleton<RequestsManager>()
 
         // Player User
@@ -150,13 +151,17 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<ProfileService>()
 
         // Distribution
+        .AddSingleton<CharaObjectWatcher>()
         .AddSingleton<ClientUpdateService>()
         .AddSingleton<DistributionService>()
         .AddSingleton<ModdedStateManager>()
         .AddSingleton<PlzNoCrashFrens>()
 
-        // Services
-        .AddSingleton<CharaObjectWatcher>()
+        // Radar
+        .AddSingleton<RadarManager>()
+        .AddSingleton<RadarService>()
+
+        // Misc. Services
         .AddSingleton<CosmeticService>()
         .AddSingleton<DtrBarService>()
         .AddSingleton<NotificationService>()

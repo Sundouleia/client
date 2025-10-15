@@ -1,25 +1,22 @@
-using CkCommons;
 using CkCommons.Gui;
-using CkCommons.Helpers;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
-using Dalamud.Bindings.ImGui;
-using Microsoft.IdentityModel.Tokens;
-using OtterGui;
-using OtterGui.Extensions;
 using Sundouleia.Utils;
-using SundouleiaAPI.Network;
 
 namespace Sundouleia.Gui;
 
 public class DebugStorageUI : WindowMediatorSubscriberBase
 {
-    // Will need to add debuggers for all of our new storage container types in sundouleia here eventually.
-    public DebugStorageUI(ILogger<DebugStorageUI> logger, SundouleiaMediator mediator)
-        : base(logger, mediator, "Config / Storage Debugger")
+    private readonly RadarManager _radar;
+    public DebugStorageUI(ILogger<DebugStorageUI> logger, SundouleiaMediator mediator,
+        RadarManager radar) 
+        : base(logger, mediator, "Storage Debugger")
     {
-        
+        _radar = radar;
+
         IsOpen = false;
         this.SetBoundaries(new(380, 400), ImGui.GetIO().DisplaySize);
     }
@@ -32,33 +29,52 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        // Draw Requests
-        // DrawUserRequests("Incoming Requests", _clientData.ReqPairIncoming);
-        // DrawUserRequests("Outgoing Requests", _clientData.ReqPairOutgoing);
-
-        ImGui.Separator();
-        // Draw loaded config storage data ext.
-        CkGui.CenterColorTextAligned("STORAGE DATA DEBUG WIP", ImGuiColors.DalamudViolet);
+        if (ImGui.CollapsingHeader("Radar Storages"))
+        {
+            // All Users.
+            DrawRadarUsers("All Users", _radar.AllUsers);
+            // Rendered Users.
+            DrawRadarUsers("Rendered Users", _radar.RenderedUsers);
+            // Chatter Users.
+            DrawRadarUsers("Chat Users", _radar.Chatters);
+        }
     }
 
-    private void DrawUserRequests(string treeLabel, IEnumerable<SundesmoRequest> requests)
+    private void DrawIconBoolColumn(bool value)
     {
-        using var node = ImRaii.TreeNode(treeLabel);
+        ImGui.TableNextColumn();
+        CkGui.IconText(value ? FAI.Check : FAI.Times, value ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+    }
+
+    private void DrawRadarUsers(string label, IReadOnlyCollection<RadarUser> radarUsers)
+    {
+        using var node = ImRaii.TreeNode($"{label}##debug-{label}");
         if (!node) return;
 
-        using (ImRaii.Table(treeLabel + "table", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        using (ImRaii.Table($"{label}-debug-table", 7, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
-            ImGuiUtil.DrawTableColumn("User");
-            ImGuiUtil.DrawTableColumn("Recipient User");
-            ImGuiUtil.DrawTableColumn("Creation Time");
-            ImGuiUtil.DrawTableColumn("Attached Message");
-            foreach (var req in requests)
+            ImGui.TableSetupColumn("Anon. Name");
+            ImGui.TableSetupColumn("UnmaskedName");
+            ImGui.TableSetupColumn("IsChatter");
+            ImGui.TableSetupColumn("ValidHash");
+            ImGui.TableSetupColumn("Rendered");
+            ImGui.TableSetupColumn("PcName");
+            ImGui.TableSetupColumn("ObjIdx");
+            ImGui.TableHeadersRow();
+
+            foreach (var user in radarUsers)
             {
-                ImGui.TableNextRow();
-                ImGuiUtil.DrawTableColumn(req.User.UID.ToString());
-                ImGuiUtil.DrawTableColumn(req.Target.UID.ToString());
-                ImGuiUtil.DrawTableColumn(req.CreatedAt.ToString());
-                ImGuiUtil.DrawTableColumn(req.Message.ToString());
+                ImGui.TableNextColumn();
+                CkGui.ColorTextFrameAligned(user.AnonymousName, ImGuiColors.ParsedBlue);
+                ImGui.TableNextColumn();
+                CkGui.TextFrameAligned(user.AliasOrUID);
+                DrawIconBoolColumn(user.IsChatter);
+                DrawIconBoolColumn(!string.IsNullOrEmpty(user.HashedIdent));
+                DrawIconBoolColumn(user.IsValid);
+                ImGui.TableNextColumn();
+                CkGui.TextFrameAligned(user.IsValid ? user.PlayerName : "N/A");
+                ImGui.TableNextColumn();
+                CkGui.TextFrameAligned(user.IsValid ? user.ObjIndex.ToString() : "N/A");
             }
         }
         ImGui.Spacing();

@@ -14,7 +14,7 @@ using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
-using Sundouleia.WebAPI.Utils;
+using Sundouleia.Utils;
 using System.Runtime.Serialization;
 
 namespace Sundouleia.Gui;

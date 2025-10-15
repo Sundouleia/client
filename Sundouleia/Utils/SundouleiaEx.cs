@@ -5,7 +5,7 @@ using Dalamud.Interface.Colors;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Sundouleia.PlayerClient;
 using Sundouleia.WebAPI;
-using Sundouleia.WebAPI.Utils;
+using Sundouleia.Utils;
 
 namespace Sundouleia;
 public static class SundouleiaEx

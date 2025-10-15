@@ -29,9 +29,10 @@ public class ConfigStorage
     public bool AllowNSFW { get; set; } = false;
 
     // General - Radar
-    public bool RadarSendPings { get; set; } = false; // If others can send you requests vis context menus.
-    public bool RadarNearbyDtr { get; set; } = true;
+    public bool RadarEnabled { get; set; } = true;
+    public bool RadarSendPings { get; set; } = true; // If others can send you requests vis context menus.
     public bool RadarJoinChats { get; set; } = true;
+    public bool RadarNearbyDtr { get; set; } = true;
     public bool RadarChatUnreadDtr { get; set; } = false;
     public bool RadarShowUnreadBubble { get; set; } = true;
 

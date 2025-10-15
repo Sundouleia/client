@@ -220,6 +220,9 @@ namespace Sundouleia.Localization
         public readonly string AllowNSFWTT = Loc.Localize("Preferences_AllowNSFWTT", "NSFW profiles are masked when disabled.");
 
         // Radar Options
+        public readonly string RadarEnabledLabel = Loc.Localize("Preferences_RadarEnabledLabel", "Enable Radar");
+        public readonly string RadarEnabledTT = Loc.Localize("Preferences_RadarEnabledTT", "Toggles the radar functionality on or off.");
+
         public readonly string RadarSendPingsLabel = Loc.Localize("Preferences_RadarSendPingsLabel", "Send Pings");
         public readonly string RadarSendPingsTT = Loc.Localize("Preferences_RadarSendPingsTT", "Allow other users in the area to send requests via R-Click -> Examine.");
 

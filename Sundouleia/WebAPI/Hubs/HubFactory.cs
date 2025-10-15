@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI.Utils;
+using Sundouleia.Utils;
 using SundouleiaAPI.Hub;
 
 namespace Sundouleia.WebAPI;

@@ -33,6 +33,3 @@ public record ClosedMessage(Exception? Exception) : SameThreadMessage;
 
 /// <summary> Fires whenever the client has connected to the Sundouleia Hub. </summary>
 public record ConnectedMessage : MessageBase;
-
-/// <summary> For sending Radar Chats. Can be possibly moved out of mediator. </summary>
-public record NewRadarChatMessage(RadarChatMessage Message, bool FromSelf) : MessageBase;

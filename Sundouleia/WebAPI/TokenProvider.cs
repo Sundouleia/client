@@ -3,7 +3,7 @@ using Dalamud.Interface.ImGuiNotification;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI.Utils;
+using Sundouleia.Utils;
 using SundouleiaAPI.Hub;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;

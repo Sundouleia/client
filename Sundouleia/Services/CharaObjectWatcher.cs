@@ -4,7 +4,8 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI.Utils;
+using Sundouleia.Utils;
+using SundouleiaAPI.Network;
 
 namespace Sundouleia.Watchers;
 
@@ -67,6 +68,7 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         WatchedTypes.Clear();
     }
 
+
     /// <summary>
     ///     Determine if the Sundesmo PlayerHandler is currently rendered. <para />
     ///     Intended to help with object initialization via Sundesmo creation.
@@ -76,16 +78,12 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     {
         address = IntPtr.Zero;
 
-        if (handler.IsRendered)
+        if (handler.IsRendered && handler.Address != IntPtr.Zero)
         {
             address = handler.Address;
             return true;
         }
-
-        // Fail if the address already exists.
-        if (handler.Address != IntPtr.Zero)
-            return false;
-
+     
         // Grab the Ident, and then run a check against all rendered characters.
         var sundesmoIdent = handler.Sundesmo.Ident;
         foreach (var addr in RenderedCharas)
@@ -101,6 +99,23 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         }
         return false;
     }
+
+    public bool TryGetExisting(string identToCheck, out IntPtr address)
+    {
+        address = IntPtr.Zero;
+        foreach (var addr in RenderedCharas)
+        {
+            // Check via their hashed ident. If it doesn't match, skip.
+            var charaIdent = SundouleiaSecurity.GetIdentHashByCharacterPtr(addr);
+            if (charaIdent != identToCheck)
+                continue;
+            // Ident match found, so call the handlers object rendered method.
+            address = addr;
+            return true;
+        }
+        return false;
+    }
+
 
     /// <summary>
     ///     Determine if one of the sundesmo's OwnedObjects is currently rendered. <para />
@@ -133,11 +148,11 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     public nint FromOwned(OwnedObject kind)
         => kind switch
         {
-            OwnedObject.Player       => WatchedPlayerAddr,
-            OwnedObject.MinionOrMount=> WatchedMinionMountAddr,
-            OwnedObject.Pet          => WatchedPetAddr,
-            OwnedObject.Companion    => WatchedCompanionAddr,
-            _                        => IntPtr.Zero,
+            OwnedObject.Player => WatchedPlayerAddr,
+            OwnedObject.MinionOrMount => WatchedMinionMountAddr,
+            OwnedObject.Pet => WatchedPetAddr,
+            OwnedObject.Companion => WatchedCompanionAddr,
+            _ => IntPtr.Zero,
         };
 
     private void CollectInitialData()

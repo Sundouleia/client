@@ -35,6 +35,8 @@ public class HomepageTab
             // Make this editor a better UI in the future.
             ("Profile Customizer", FAI.ObjectGroup, () => _mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI)))),
             // ("Group Management", FAI.PeopleGroup, () => _mediator.Publish(new UiToggleMessage(typeof(GroupManagementUI)))),
+            // ("MCDF Exporter", FAI.FileExport, () => _mediator.Publish(new UiToggleMessage(typeof(MCDFExporterUI)))),
+            // ("Optimize Data", FAI.Eye, () => _mediator.Publish(new UiToggleMessage(typeof(OptimizerUI)))),
             // ("Achievements", FAI.Trophy, () => _mediator.Publish(new UiToggleMessage(typeof(AchievementsUI))))
         };
     }

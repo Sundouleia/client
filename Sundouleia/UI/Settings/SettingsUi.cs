@@ -199,16 +199,27 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawMainRadar()
     {
         CkGui.FontText(CkLoc.Settings.MainOptions.HeaderRadar, UiFontService.UidFont);
+        var enabled = _mainConfig.Current.RadarEnabled;
         var sendPings = _mainConfig.Current.RadarSendPings;
         var nearbyDtr = _mainConfig.Current.RadarNearbyDtr;
         var joinChats = _mainConfig.Current.RadarJoinChats;
         var chatUnreadDtr = _mainConfig.Current.RadarChatUnreadDtr;
         var showUnreadBubble = _mainConfig.Current.RadarShowUnreadBubble;
 
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarEnabledLabel, ref enabled))
+        {
+            _mainConfig.Current.RadarEnabled = enabled;
+            _mainConfig.Save();
+            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarEnabled)));
+        }
+
+        using var _ = ImRaii.Disabled(!enabled);
+
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarSendPingsLabel, ref sendPings))
         {
             _mainConfig.Current.RadarSendPings = sendPings;
             _mainConfig.Save();
+            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarSendPings)));
         }
         ImUtf8.SameLineInner();
         CkGui.FramedIconText(FAI.SatelliteDish);
@@ -218,6 +229,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.RadarNearbyDtr = nearbyDtr;
             _mainConfig.Save();
+            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarNearbyDtr)));
         }
         ImUtf8.SameLineInner();
         CkGui.FramedIconText(FAI.PersonDressBurst);
@@ -227,6 +239,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.RadarJoinChats = joinChats;
             _mainConfig.Save();
+            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarJoinChats)));
         }
         ImUtf8.SameLineInner();
         CkGui.FramedIconText(FAI.CommentDots);
@@ -236,6 +249,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.RadarChatUnreadDtr = chatUnreadDtr;
             _mainConfig.Save();
+            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarChatUnreadDtr)));
         }
         ImUtf8.SameLineInner();
         CkGui.FramedIconText(FAI.PersonCircleExclamation);
@@ -245,6 +259,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.RadarShowUnreadBubble = showUnreadBubble;
             _mainConfig.Save();
+            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarShowUnreadBubble)));
         }
         ImUtf8.SameLineInner();
         CkGui.FramedIconText(FAI.Bell);
