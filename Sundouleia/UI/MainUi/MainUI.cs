@@ -181,10 +181,10 @@ public class MainUI : WindowMediatorSubscriberBase
                 _whitelist.DrawWhitelistSection();
                 break;
             case MainMenuTabs.SelectedTab.Radar:
-                _radar.DrawRadarSection();
+                _radar.DrawSection();
                 break;
             case MainMenuTabs.SelectedTab.RadarChat:
-                _radarChat.DrawChatSection();
+                _radarChat.DrawSection();
                 break;
             case MainMenuTabs.SelectedTab.Account:
                 _account.DrawAccountSection();

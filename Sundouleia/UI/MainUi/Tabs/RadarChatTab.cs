@@ -23,7 +23,7 @@ public class RadarChatTab
         _guides = guides;
     }
 
-    public void DrawChatSection()
+    public void DrawSection()
     {
         // Add some CkRichText variant here later.
         ImGuiUtil.Center("Radar Chat ( World X, Territory XX)");

@@ -49,7 +49,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
         using var node = ImRaii.TreeNode($"{label}##debug-{label}");
         if (!node) return;
 
-        using (ImRaii.Table($"{label}-debug-table", 7, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        using (ImRaii.Table($"{label}-debug-table", 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
             ImGui.TableSetupColumn("Anon. Name");
             ImGui.TableSetupColumn("UnmaskedName");

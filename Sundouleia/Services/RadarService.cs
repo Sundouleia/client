@@ -51,6 +51,7 @@ public class RadarService : DisposableMediatorSubscriberBase
     }
 
     public ushort CurrentZone { get; private set; } = 0;
+    public string ZoneName => PlayerContent.GetTerritoryName(CurrentZone);
 
     protected override void Dispose(bool disposing)
     {
