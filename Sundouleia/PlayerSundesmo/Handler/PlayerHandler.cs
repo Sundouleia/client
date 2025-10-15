@@ -165,11 +165,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         using var ct = new CancellationTokenSource(10000);
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(2000).ConfigureAwait(false);
-
             if (IsObjectLoaded())
                 return;
             Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not fully loaded yet, waiting...", LoggerType.PairHandler);
+            await Task.Delay(100).ConfigureAwait(false);
         }
     }
 
@@ -253,7 +252,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return;
 
         // Begin application.
-        Logger.LogDebug($"ReapplyAlterations called for [{Sundesmo.GetNickAliasOrUid()}] (State: DrawObjValid: {DrawObjAddress != IntPtr.Zero} | RenderFlags: {RenderFlags} | ModelInSlot: {HasModelInSlotLoaded} | ModelFilesInSlot: {HasModelFilesInSlotLoaded})", LoggerType.PairHandler);
         var hasAppearance = _appearanceData is not null;
         var hasMods = _tempCollection != Guid.Empty && _replacements.Count > 0;
 
@@ -397,6 +395,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     // Would need a way to retrieve the existing modded dictionary from the file cache or something here, not sure. We shouldnt need to download anything on a reapplication.
     private async Task ApplyModData(Dictionary<string, string> moddedPaths, bool redraw)
     {
+        // Only apply is rendered. Await for this to occur.
+        await SundouleiaEx.WaitForPlayerLoading();
+
         if (!IsRendered)
         {
             Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered, skipping mod application.", LoggerType.PairMods);
@@ -427,10 +428,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!IsRendered || _appearanceData is null)
             return;
 
-        // Await until valid.
-        await WaitUntilValidDrawObject().ConfigureAwait(false);
         Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
-        
+
+        // 3) Only apply is rendered. Await for this to occur.
+        await SundouleiaEx.WaitForPlayerLoading();
+
+        // 4) If appearance is null at this point, return.
+        if (_appearanceData is null || Address == IntPtr.Zero)
+            return;
+
         var toApply = new List<Task>();
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer]))
             toApply.Add(ApplyGlamourer());
@@ -462,13 +468,18 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // 1) Apply changes and get what changed.
         var changes = _appearanceData.UpdateCache(newData);
 
-        // 2) If nothing changed, or not present, return.
-        if (changes is 0 || Address == IntPtr.Zero)
+        // 2) Fail if nothing changed
+        if (changes is 0)
             return;
 
-        // Await until valid.
-        await WaitUntilValidDrawObject().ConfigureAwait(false);
-        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] has IPC changes to apply ({changes}) (State: DrawObjValid: {DrawObjAddress != IntPtr.Zero} | RenderFlags: {RenderFlags} | ModelInSlot: {HasModelInSlotLoaded} | ModelFilesInSlot: {HasModelFilesInSlotLoaded})", LoggerType.PairHandler);
+        // 3) Only apply is rendered. Await for this to occur.
+        await SundouleiaEx.WaitForPlayerLoading();
+
+        // 4) If appearance is null at this point, return.
+        if (_appearanceData is null || Address == IntPtr.Zero)
+            return;
+
+        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] has IPC changes to apply ({changes})", LoggerType.PairHandler);
 
         // 3) Initialize task list to perform all updates in parallel.
         var tasks = new List<Task>();
@@ -498,10 +509,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return;
         
         // 2) Validate render state before applying.
-        if (!IsRendered) return;
+        if (!IsRendered)
+            return;
 
-        // Await until valid.
-        await WaitUntilValidDrawObject().ConfigureAwait(false);
+        // 3) Only apply is rendered. Await for this to occur.
+        await SundouleiaEx.WaitForPlayerLoading();
+
+        // 4) If appearance is null at this point, return.
+        if (_appearanceData is null || Address == IntPtr.Zero)
+            return;
 
         // 3) Apply change.
         var task = kind switch
@@ -526,33 +542,33 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     private async Task ApplyGlamourer()
     {
-        Logger.LogDebug($"Applying glamourer state for {NameString}", LoggerType.PairAppearance);
+        Logger.LogDebug($"Applying glamourer state for {NameString}({Sundesmo.GetNickAliasOrUid()}: [{_appearanceData!.Data[IpcKind.Glamourer]}]", LoggerType.PairAppearance);
         await _ipc.Glamourer.ApplyBase64StateByIdx(ObjIndex, _appearanceData!.Data[IpcKind.Glamourer]).ConfigureAwait(false);
     }
     private async Task ApplyHeels()
     {
-        Logger.LogDebug($"Setting heels offset for {NameString}", LoggerType.PairAppearance);
+        Logger.LogDebug($"Setting heels offset for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{_appearanceData!.Data[IpcKind.Heels]}]", LoggerType.PairAppearance);
         await _ipc.Heels.SetUserOffset(ObjIndex, _appearanceData!.Data[IpcKind.Heels]).ConfigureAwait(false);
     }
     private async Task ApplyHonorific()
     {
-        Logger.LogDebug($"Setting honorific title for {NameString}", LoggerType.PairAppearance);
+        Logger.LogDebug($"Setting honorific title for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{_appearanceData!.Data[IpcKind.Honorific]}]", LoggerType.PairAppearance);
         await _ipc.Honorific.SetTitleAsync(ObjIndex, _appearanceData!.Data[IpcKind.Honorific]).ConfigureAwait(false);
     }
     private async Task ApplyMoodles()
     {
-        Logger.LogDebug($"Setting moodles status for {NameString}", LoggerType.PairAppearance);
+        Logger.LogDebug($"Setting moodles status for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{_appearanceData!.Data[IpcKind.Moodles]}]", LoggerType.PairAppearance);
         await _ipc.Moodles.SetByPtr(Address, _appearanceData!.Data[IpcKind.Moodles]).ConfigureAwait(false);
     }
     private async Task ApplyModManips()
     {
-        Logger.LogDebug($"Setting mod manipulations for {NameString}", LoggerType.PairAppearance);
+        Logger.LogDebug($"Setting mod manipulations for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{_appearanceData!.Data[IpcKind.ModManips]}]", LoggerType.PairAppearance);
         await _ipc.Penumbra.SetSundesmoManipulations(_tempCollection, _appearanceData!.Data[IpcKind.ModManips]).ConfigureAwait(false);
     }
     private async Task ApplyPetNames()
     {
         var nickData = _appearanceData!.Data[IpcKind.PetNames];
-        Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {NameString}", LoggerType.PairAppearance);
+        Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{nickData}]", LoggerType.PairAppearance);
         await _ipc.PetNames.SetNamesByIdx(ObjIndex, _appearanceData!.Data[IpcKind.PetNames]).ConfigureAwait(false);
     }
     private async Task ApplyCPlus()

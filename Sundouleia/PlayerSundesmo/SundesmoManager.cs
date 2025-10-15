@@ -328,7 +328,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod and appearance data!", LoggerType.Callbacks);
-        sundesmo.ApplyFullData(newModData, newIpc);
+        sundesmo.ApplyFullData(newModData, newIpc).ConfigureAwait(false);
     }
 
     // Happens whenever mods should be added or removed.

@@ -75,6 +75,13 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     public bool TryGetExisting(PlayerHandler handler, out IntPtr address)
     {
         address = IntPtr.Zero;
+
+        if (handler.IsRendered)
+        {
+            address = handler.Address;
+            return true;
+        }
+
         // Fail if the address already exists.
         if (handler.Address != IntPtr.Zero)
             return false;

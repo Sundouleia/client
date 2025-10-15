@@ -174,18 +174,22 @@ public class Sundesmo : IComparable<Sundesmo>
         _timeoutCTS.SafeCancel();
         // Set the OnlineUser & update the sundesmo state.
         _onlineUser = dto;
-        // Notify other parts of Sundouleia they are online.
-        var needsFullData = IsReloading || (IsRendered && !_player.HasAlterations);
+
+        var isVisible = _watcher.TryGetExisting(_player, out IntPtr playerAddr);
+        // Notify other parts of Sundouleia they are online, and if we should send them full data.
+        var needsFullData = isVisible && (IsReloading || !_player.HasAlterations);
         _mediator.Publish(new SundesmoOnline(this, needsFullData));
         // Ensure that IsReloading is false (prior to sending that they are online)
         IsReloading = false;
 
-        // If the sundesmo is not yet rendered upon being marked, check to see if they are visible or not.
-        var wasRendered = IsRendered;
-        if (!wasRendered && _watcher.TryGetExisting(_player, out IntPtr playerAddr))
+        // TryGetExisting returns true if already rendered, or if found in the watcher.
+        if (isVisible && playerAddr != IntPtr.Zero)
         {
-            _player.ObjectRendered((Character*)playerAddr);
-            _player.ReapplyAlterations().ConfigureAwait(false);
+            // If not rendered, render them, otherwise, reapply their alterations.
+            if (!IsRendered)
+                _player.ObjectRendered((Character*)playerAddr);
+            else
+                _player.ReapplyAlterations().ConfigureAwait(false);
         }
 
         // If the player is not rendered, their owned objects should not be.
@@ -280,7 +284,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 _mediator.Publish(new SundesmoLeftLimbo(this));
 
                 // Revert all alterations.
-                _logger.LogDebug($"Timeout elapsed for [{PlayerName}] ({GetNickAliasOrUid()}). Disposing data.", UserData.AliasOrUID);
+                _logger.LogDebug($"Timeout elapsed for [{PlayerName}] ({GetNickAliasOrUid()}). Clearing Alterations.", UserData.AliasOrUID);
                 await _player.ClearAlterations(CancellationToken.None).ConfigureAwait(false);
                 await _mountMinion.ClearAlterations().ConfigureAwait(false);
                 await _pet.ClearAlterations().ConfigureAwait(false);

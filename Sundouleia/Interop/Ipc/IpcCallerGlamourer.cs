@@ -128,23 +128,18 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         }).ConfigureAwait(false);
     }
 
-    public async Task ApplyBase64StateByObject(IGameObject obj, string? actorData)
-    {
-        if (!APIAvailable || PlayerData.IsZoning || obj is not ICharacter || string.IsNullOrEmpty(actorData))
-            return;
-        await Svc.Framework.RunOnFrameworkThread(() => ApplyState.Invoke(actorData, obj.ObjectIndex, SUNDOULEIA_LOCK)).ConfigureAwait(false);
-    }
-
     public async Task ApplyBase64StateByIdx(ushort objectIdx, string? actorData)
     {
-        if (!APIAvailable || PlayerData.IsZoning || string.IsNullOrEmpty(actorData)) return;
+        // Had IsZoning before, can add back in if needed, but shouldnt be necessary if we know the obj is valid.
+        if (!APIAvailable || string.IsNullOrEmpty(actorData)) return;
         await Svc.Framework.RunOnFrameworkThread(() => ApplyState.Invoke(actorData, objectIdx, SUNDOULEIA_LOCK)).ConfigureAwait(false);
     }
 
     // Require handler to enforce being called by the SundesmoHandler.
     public async Task ReleaseActor(ushort objIdx)
     {
-        if (!APIAvailable || PlayerData.IsZoning)
+        // Had IsZoning before, can add back in if needed, but shouldnt be nessisary if we know the obj is valid.
+        if (!APIAvailable)
             return;
         
         await Svc.Framework.RunOnFrameworkThread(() =>
@@ -156,7 +151,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
 
     public async Task ReleaseByName(string playerName)
     {
-        if (!APIAvailable || PlayerData.IsZoning)
+        if (!APIAvailable)
             return;
 
         await Svc.Framework.RunOnFrameworkThread(() =>
