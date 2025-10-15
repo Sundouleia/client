@@ -99,19 +99,25 @@ public class RadarService : DisposableMediatorSubscriberBase
 
     public async Task JoinZoneAndAssignUsers(RadarZoneUpdate info)
     {
-        return;
-        var zoneInfo = await _hub.RadarZoneJoin(info).ConfigureAwait(false);
-        if (zoneInfo.ErrorCode is not SundouleiaApiEc.Success || zoneInfo.Value is null)
+        try
         {
-            Logger.LogWarning($"Failed to join radar zone {CurrentZone} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
-            return;
-        }
+            var zoneInfo = await _hub.RadarZoneJoin(info).ConfigureAwait(false);
+            if (zoneInfo.ErrorCode is not SundouleiaApiEc.Success || zoneInfo.Value is null)
+            {
+                Logger.LogWarning($"Failed to join radar zone {CurrentZone} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
+                return;
+            }
 
-        GameDataSvc.WorldData.TryGetValue(info.WorldId, out var worldName);
-        var territoryName = PlayerContent.TerritoryName;
-        Logger.LogInformation($"RadarZone [{worldName} | {territoryName} ({info.TerritoryId})] joined. There are {zoneInfo.Value.CurrentUsers} Sundesmos.", LoggerType.RadarData);
-        foreach (var radarUser in zoneInfo.Value.CurrentUsers.ToList())
-            ResolveUser(radarUser);
+            GameDataSvc.WorldData.TryGetValue(info.WorldId, out var worldName);
+            var territoryName = PlayerContent.TerritoryName;
+            Logger.LogInformation($"RadarZone [{worldName} | {territoryName} ({info.TerritoryId})] joined. There are {zoneInfo.Value.CurrentUsers.Count} other Sundesmos.", LoggerType.RadarData);
+            foreach (var radarUser in zoneInfo.Value.CurrentUsers.ToList())
+                ResolveUser(radarUser);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception occurred while joining radar zone.");
+        }
     }
 
     /// <summary>
@@ -181,18 +187,17 @@ public class RadarService : DisposableMediatorSubscriberBase
     }
 
     // Add or update a user in our radar.
-    private void OnAddOrUpdateUser(RadarUserInfo radarUser)
+    private void OnAddOrUpdateUser(OnlineUser radarUser)
     {
-        // If we do not have this user in the manager, attempt to resolve them.
         if (!_manager.HasUser(radarUser))
         {
-            Logger.LogDebug($"(Radar) AddOrUpdate from [{radarUser.OnlineUser.User.AnonName}] detected, who is not in our manager. Resolving!", LoggerType.RadarData);
+            Logger.LogDebug($"(Radar) AddOrUpdate from [{radarUser.User.AnonName}] detected, who is not in our manager. Resolving!", LoggerType.RadarData);
             ResolveUser(radarUser);
             return;
         }
         // Otherwise, update them.
-        Logger.LogDebug($"(Radar) AddOrUpdate from [{radarUser.OnlineUser.User.AnonName}] detected, updating their state.", LoggerType.RadarData);
-        _manager.UpdateState(radarUser.OnlineUser.User, radarUser.State);
+        Logger.LogDebug($"(Radar) AddOrUpdate from [{radarUser.User.AnonName}] detected, updating their state.", LoggerType.RadarData);
+        _manager.UpdateUserState(radarUser);
     }
 
     // Remove a user completely from our radar.
@@ -202,17 +207,23 @@ public class RadarService : DisposableMediatorSubscriberBase
         _manager.RemoveRadarUser(toRemove);
     }
 
-    private void ResolveUser(RadarUserInfo radarUser)
+    private void ResolveUser(OnlineUser radarUser)
     {
         // Ignore existing users as we have already resolved their current state.
         if (_manager.HasUser(radarUser))
             return;
 
-        // Attempt to resolve them via the watcher.
-        var isValid = _watcher.TryGetExisting(radarUser.State.HashedCID, out IntPtr address);
-        // Regardless of the outcome, append it to the manager list, the address determines validity.
-        Logger.LogDebug($"(Radar) Adding [{radarUser.OnlineUser.User.AnonName}] as a {(isValid ? "Valid":"Invalid")} user.", LoggerType.RadarData);
-        _manager.AddRadarUser(radarUser, address);
-
+        try
+        {
+            // Attempt to resolve them via the watcher.
+            var isValid = _watcher.TryGetExisting(radarUser.Ident, out IntPtr address);
+            // Regardless of the outcome, append it to the manager list, the address determines validity.
+            Logger.LogDebug($"(Radar) Adding [{radarUser.User.AnonName}] as a {(isValid ? "Valid" : "Invalid")} user.", LoggerType.RadarData);
+            _manager.AddRadarUser(radarUser, address);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"Exception occurred while resolving radar user [{radarUser.User.AnonName}]");
+        }
     }
 }

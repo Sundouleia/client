@@ -14,7 +14,6 @@ public sealed class RadarManager
     private readonly CharaObjectWatcher _watcher;
 
     private HashSet<RadarUser> _users = new();
-    private List<RadarUser> _chatters = new();
     private List<RadarUser> _rendered = new();
 
     public RadarManager(ILogger<RadarManager> logger, CharaObjectWatcher watcher)
@@ -24,19 +23,19 @@ public sealed class RadarManager
     }
 
     public IReadOnlyCollection<RadarUser> AllUsers => _users;
-    public IReadOnlyCollection<RadarUser> Chatters => _chatters;
     public IReadOnlyCollection<RadarUser> RenderedUsers => _rendered;
 
-    public bool HasUser(RadarUserInfo user)
-        => _users.Any(u => u.UID == user.OnlineUser.User.UID);
+    public bool HasUser(OnlineUser user)
+        => _users.Any(u => u.UID == user.User.UID);
     public bool IsUserValid(UserData user)
         => _users.FirstOrDefault(u => u.UID == user.UID) is { } match && match.IsValid;
 
     // Add a user, regardless of visibility.
-    public void AddRadarUser(RadarUserInfo user, IntPtr address)
+    public void AddRadarUser(OnlineUser user, IntPtr address)
     {
-        _logger.LogDebug($"Adding radar user {user.OnlineUser.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
+        _logger.LogDebug($"Adding radar user {user.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
         _users.Add(new(user, address));
+        // recreate the rendered list.
         RecreateLists();
     }
 
@@ -45,6 +44,7 @@ public sealed class RadarManager
     {
         _logger.LogDebug($"(Radar) A user was removed.", LoggerType.RadarManagement);
         _users.RemoveWhere(u => u.UID == user.UID);
+        // recreate the rendered list.
         RecreateLists();
     }
 
@@ -55,25 +55,25 @@ public sealed class RadarManager
         // Update visibility.
         _logger.LogDebug($"(Radar) {user.AnonymousName} is now {(address != IntPtr.Zero ? "rendered" : "unrendered")}.", LoggerType.RadarManagement);
         user.BindToAddress(address);
+        // recreate the rendered list.
         RecreateLists();
     }
 
-    public void UpdateState(UserData existing, RadarState newState)
+    public void UpdateUserState(OnlineUser newState)
     {
         // Firstly determine if the user even exists. If they dont, return.
-        if (_users.FirstOrDefault(u => u.UID == existing.UID) is not { } match)
+        if (_users.FirstOrDefault(u => u.UID == newState.User.UID) is not { } match)
             return;        
         // Update their state.
         match.UpdateState(newState);
         
         // If their new hashedIdent changed, check for visibility.
-        if (string.IsNullOrEmpty(match.HashedIdent) || match.IsValid)
-            return;
+        if (!string.IsNullOrEmpty(match.HashedIdent) && match.IsValid)
+            // Try and bind them to an address.
+            if (_watcher.TryGetExisting(match.HashedIdent, out IntPtr foundAddress))
+                match.BindToAddress(foundAddress);
 
-        // Try and bind them to an address.
-        if (_watcher.TryGetExisting(match.HashedIdent, out IntPtr foundAddress))
-            match.BindToAddress(foundAddress);
-
+        // recreate the rendered list.
         RecreateLists();
     }
 
@@ -81,12 +81,10 @@ public sealed class RadarManager
     {
         _logger.LogDebug("Clearing all valid radar users.", LoggerType.RadarManagement);
         _users.Clear();
+        // recreate the rendered list.
         RecreateLists();
     }
 
     private void RecreateLists()
-    {
-        _chatters = _users.Where(u => u.IsChatter).ToList();
-        _rendered = _users.Where(u => u.IsValid).ToList();
-    }
+        => _rendered = _users.Where(u => u.IsValid).ToList();
 }

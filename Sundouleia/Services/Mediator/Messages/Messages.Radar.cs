@@ -16,7 +16,7 @@ public record NewRadarChatMessage(RadarChatMessage Message, bool FromSelf) : Mes
 /// <summary>
 ///     User was either added, or has a state update.
 /// </summary>
-public record RadarAddOrUpdateUser(RadarUserInfo UpdatedUser) : MessageBase;
+public record RadarAddOrUpdateUser(OnlineUser UpdatedUser) : MessageBase;
 
 /// <summary>
 ///     Radar User should be removed.

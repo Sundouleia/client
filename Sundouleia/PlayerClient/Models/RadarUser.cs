@@ -1,30 +1,28 @@
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.PlayerClient;
 
 /// <summary>
 ///     Model representing a valid visible radar user. <para />
-///     Holds data about their Character* ontop of the OnlineUser.
+///     Holds data about their Character* on top of the OnlineUser.
 /// </summary>
 public unsafe class RadarUser
 {
-    private OnlineUser _user;
+    private UserData _user;
     private Character* _player;
 
-    public RadarUser(RadarUserInfo user, IntPtr address)
+    public RadarUser(OnlineUser user, IntPtr address)
     {
-        _user = user.OnlineUser;
-        IsChatter = user.State.UseChat;
-        HashedIdent = user.State.HashedCID;
+        _user = user.User;
+        HashedIdent = user.Ident;
         _player = address != IntPtr.Zero ? (Character*)address : null;
     }
 
-    public string AnonymousName => _user.User.AnonName;
-    public string AliasOrUID => _user.User.AliasOrUID;
-    public string UID => _user.User.UID;
-    public bool IsChatter { get; private set; } = false;
+    public string AnonymousName => _user.AnonName;
+    public string AliasOrUID => _user.AliasOrUID;
+    public string UID => _user.UID;
     public string HashedIdent { get; private set; } = string.Empty;
 
     public bool IsValid => _player is not null;
@@ -38,13 +36,12 @@ public unsafe class RadarUser
     public unsafe ulong GameObjectId => _player->GetGameObjectId().ObjectId;
 
     /// <summary>
-    ///     Properly update the state of a radar user, and their preferences. <para />
-    ///     If the Ident becomes string.Empty, clear visibility.
+    ///     Update the hashedId for this radar user. It will 
+    ///     determine resulting visibility status.
     /// </summary>
-    public void UpdateState(RadarState newState)
+    public void UpdateState(OnlineUser newState)
     {
-        IsChatter = newState.UseChat;
-        HashedIdent = newState.HashedCID;
+        HashedIdent = newState.Ident;
         // If the hashedIdent is string.Empty, clear the player pointer.
         if (string.IsNullOrEmpty(HashedIdent))
             _player = null;

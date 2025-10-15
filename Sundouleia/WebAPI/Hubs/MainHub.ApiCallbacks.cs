@@ -252,7 +252,7 @@ public partial class MainHub
     ///     Can also fire upon them updating their user info, such as if they
     ///     are sharing their ident for requests or not if already present.
     /// </summary>
-    public Task Callback_RadarAddUpdateUser(RadarUserInfo dto)
+    public Task Callback_RadarAddUpdateUser(OnlineUser dto)
     {
         Logger.LogDebug($"Callback_RadarAddUpdateUser Called", LoggerType.Callbacks);
         Mediator.Publish(new RadarAddOrUpdateUser(dto));
@@ -441,7 +441,7 @@ public partial class MainHub
         _hubConnection!.On(nameof(Callback_BulkChangeUnique), act);
     }
 
-    public void OnRadarAddUpdateUser(Action<RadarUserInfo> act)
+    public void OnRadarAddUpdateUser(Action<OnlineUser> act)
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_RadarAddUpdateUser), act);

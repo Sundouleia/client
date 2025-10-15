@@ -35,8 +35,6 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
             DrawRadarUsers("All Users", _radar.AllUsers);
             // Rendered Users.
             DrawRadarUsers("Rendered Users", _radar.RenderedUsers);
-            // Chatter Users.
-            DrawRadarUsers("Chat Users", _radar.Chatters);
         }
     }
 
@@ -55,7 +53,6 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
         {
             ImGui.TableSetupColumn("Anon. Name");
             ImGui.TableSetupColumn("UnmaskedName");
-            ImGui.TableSetupColumn("IsChatter");
             ImGui.TableSetupColumn("ValidHash");
             ImGui.TableSetupColumn("Rendered");
             ImGui.TableSetupColumn("PcName");
@@ -68,7 +65,6 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
                 CkGui.ColorTextFrameAligned(user.AnonymousName, ImGuiColors.ParsedBlue);
                 ImGui.TableNextColumn();
                 CkGui.TextFrameAligned(user.AliasOrUID);
-                DrawIconBoolColumn(user.IsChatter);
                 DrawIconBoolColumn(!string.IsNullOrEmpty(user.HashedIdent));
                 DrawIconBoolColumn(user.IsValid);
                 ImGui.TableNextColumn();
