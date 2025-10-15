@@ -342,54 +342,58 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _downloadCTS = _downloadCTS.SafeCancelRecreate();
         var missingFiles = _downloader.GetExistingFromCache(_replacements, out var moddedDict, _downloadCTS.Token);
 
-        // This should only be intended to download new files. Any files existing in the hashes should already be downloaded? Not sure.
-        // Would need to look into this later, im too exhausted at the moment.
-        // In essence, upon receiving newModData, those should be checked, but afterwards, these hashes and their respective file paths
-        // in the cache should all be valid. If they are not, they should be cleared and reloaded.
-        if (missingFiles.Count > 0)
+        try
         {
-            int attempts = 0;
-
-            while (missingFiles.Count > 0 && attempts++ <= 10 && !_downloadCTS.Token.IsCancellationRequested)
+            // This should only be intended to download new files. Any files existing in the hashes should already be downloaded? Not sure.
+            // Would need to look into this later, im too exhausted at the moment.
+            // In essence, upon receiving newModData, those should be checked, but afterwards, these hashes and their respective file paths
+            // in the cache should all be valid. If they are not, they should be cleared and reloaded.
+            if (missingFiles.Count > 0)
             {
-                // await for the previous download task to complete.
-                if (_downloadTask is not null && !_downloadTask.IsCompleted)
+                int attempts = 0;
+
+                while (missingFiles.Count > 0 && attempts++ <= 10 && !_downloadCTS.Token.IsCancellationRequested)
                 {
-                    Logger.LogDebug($"Finishing prior download task for {NameString} ({Sundesmo.GetNickAliasOrUid()}", LoggerType.PairMods);
+                    // await for the previous download task to complete.
+                    if (_downloadTask is not null && !_downloadTask.IsCompleted)
+                    {
+                        Logger.LogDebug($"Finishing prior download task for {NameString} ({Sundesmo.GetNickAliasOrUid()}", LoggerType.PairMods);
+                        await _downloadTask.ConfigureAwait(false);
+                    }
+
+                    Logger.LogDebug($"Of the {moddedDict.Count} new paths to add, {missingFiles.Count} were not cached.", LoggerType.PairMods);
+
+                    // Begin the download task.
+                    Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data.")));
+                    Logger.LogDebug($"Downloading {missingFiles.Count} files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
+
+                    _downloadTask = Task.Run(async () => await _downloader.DownloadFiles(this, missingFiles, _downloadCTS.Token).ConfigureAwait(false), _downloadCTS.Token);
+
                     await _downloadTask.ConfigureAwait(false);
+
+                    // If we wanted to back out, then back out.
+                    if (_downloadCTS.Token.IsCancellationRequested)
+                    {
+                        Logger.LogWarning($"Download task for {NameString}({Sundesmo.GetNickAliasOrUid()}) was cancelled, aborting further downloads.", LoggerType.PairMods);
+                        return;
+                    }
+
+                    // Now that we have downloaded the files, check again to see which files we still need.
+                    missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _downloadCTS.Token);
+
+                    // Delay 2s between download monitors?
+                    await Task.Delay(TimeSpan.FromSeconds(2), _downloadCTS.Token).ConfigureAwait(false);
                 }
-
-                Logger.LogDebug($"Of the {moddedDict.Count} new paths to add, {missingFiles.Count} were not cached.", LoggerType.PairMods);
-
-                // Begin the download task.
-                Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data.")));
-                Logger.LogDebug($"Downloading {missingFiles.Count} files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
-                
-                _downloadTask = Task.Run(async () => await _downloader.DownloadFiles(this, missingFiles, _downloadCTS.Token).ConfigureAwait(false), _downloadCTS.Token);
-
-                await _downloadTask.ConfigureAwait(false);
-
-                // If we wanted to back out, then back out.
-                if (_downloadCTS.Token.IsCancellationRequested)
-                {
-                    Logger.LogWarning($"Download task for {NameString}({Sundesmo.GetNickAliasOrUid()}) was cancelled, aborting further downloads.", LoggerType.PairMods);
-                    return;
-                }
-
-                // Now that we have downloaded the files, check again to see which files we still need.
-                missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _downloadCTS.Token);
-
-                // Delay 2s between download monitors?
-                await Task.Delay(TimeSpan.FromSeconds(2), _downloadCTS.Token).ConfigureAwait(false);
             }
-        }
 
-        // 4) Append the new data.
-        _downloadCTS.Token.ThrowIfCancellationRequested();
-        Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairMods);
-        // 5) Apply the new mod data if rendered.
-        Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairMods);
-        await ApplyModData(moddedDict, redraw).ConfigureAwait(false);   
+            // 4) Append the new data.
+            _downloadCTS.Token.ThrowIfCancellationRequested();
+            Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairMods);
+            // 5) Apply the new mod data if rendered.
+            Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairMods);
+            await ApplyModData(moddedDict, redraw).ConfigureAwait(false);
+        }
+        catch (TaskCanceledException) { /* Bagagwa */ }
     }
      
     // Would need a way to retrieve the existing modded dictionary from the file cache or something here, not sure. We shouldnt need to download anything on a reapplication.

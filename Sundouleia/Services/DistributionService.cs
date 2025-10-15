@@ -36,16 +36,15 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     private CancellationTokenSource _distributeDataCTS = new();
     private Task? _distributeDataTask;
 
-    // Management for the task involving making an update to our latest data.
-    // If this is ever processing, we should await it prior to distributing data.
-    // This way we make sure that when we do distribute the data, it has the latest information.
-    private readonly SemaphoreSlim _dataUpdateLock = new(1, 1);
     // Should only be modified while the dataUpdateLock is active.
+    private readonly SemaphoreSlim _dataUpdateLock = new(1, 1);
     internal ClientDataCache LastCreatedData { get; private set; } = new();
 
-    // Accessors for the ClientUpdateService
-    public bool UpdatingData => _dataUpdateLock.CurrentCount is 0;
-    public bool DistributingData => _distributionLock.CurrentCount is 0; // only use if we dont want to cancel distributions.
+    /// <summary>
+    ///     If OnHubConnected was sent yet. Helps prevent race condition with <para />
+    ///     Can optimize this later to remove the bool as it likely is not necessary and can be determined.
+    /// </summary>
+    private bool _hubConnectionSent = false;
 
     public DistributionService(
         ILogger<DistributionService> logger,
@@ -85,10 +84,17 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<SundesmoLeftLimbo>(this, msg => InLimbo.Remove(msg.Sundesmo.UserData));
         // Process connections.
         Mediator.Subscribe<ConnectedMessage>(this, _ => OnHubConnected());
-        Mediator.Subscribe<DisconnectedMessage>(this, _ => NewVisibleUsers.Clear());
+        Mediator.Subscribe<DisconnectedMessage>(this, _ =>
+        {
+            NewVisibleUsers.Clear();
+            _hubConnectionSent = false;
+        });
         // Process Update Checking.
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, _ => UpdateCheck());
     }
+
+    public bool UpdatingData => _dataUpdateLock.CurrentCount is 0;
+    public bool DistributingData => _distributionLock.CurrentCount is 0; // only use if we dont want to cancel distributions.
 
     public HashSet<UserData> NewVisibleUsers { get; private set; } = new();
     public HashSet<UserData> InLimbo { get; private set; } = new();
@@ -137,16 +143,23 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // Send off to all visible users after awaiting for any other distribution task to process.
         Logger.LogInformation($"(OnHubConnected) Distributing to visible.", LoggerType.DataDistributor);
         _distributeDataCTS = _distributeDataCTS.SafeCancelRecreate();
-        _distributeDataTask = Task.Run(ResendAll, _distributeDataCTS.Token);
+        _distributeDataTask = Task.Run(async () =>
+        {
+            await ResendAll().ConfigureAwait(false);
+            _hubConnectionSent = true;
+
+        }, _distributeDataCTS.Token);
     }
 
     // Note that we are going to need some kind of logic for handling the edge cases where user A is receiving a new update and that 
     private void UpdateCheck()
     {
         if (NewVisibleUsers.Count is 0) return;
-        // If we are zoning or not available, do not process any updates from us.
-        if (PlayerData.IsZoning || !PlayerData.Available || !MainHub.IsConnected) return;
-        // If we are already distributing data, do not start another distribution.
+        // If we are zoning or not available, fail.
+        if (PlayerData.IsZoning || !PlayerData.Available || !MainHub.IsConnectionDataSynced) return;
+        // If we have no yet processed the connection update, fail.
+        if (!_hubConnectionSent) return;
+        // If we are already distributing data, fail.
         if (_distributeDataTask is not null && !_distributeDataTask.IsCompleted) return;
 
         // Process a distribution of full data to the newly visible users and then clear the update.
