@@ -62,13 +62,16 @@ public partial class MainHub
                 _serverConfigs.Save();
                 _suppressNextNotification = true;
                 // If forcing a hard reconnect, fully unload the client & their sundesmos.
-                await Disconnect(ServerState.Disconnected, true).ConfigureAwait(false);
+                await Disconnect(ServerState.Disconnected, true, true).ConfigureAwait(false);
                 // Clear our token cache between, incase we were banned.
                 _tokenProvider.ResetTokenCache();
                 // Revert full pause status and create a new connection.
                 _serverConfigs.AccountStorage.FullPause = false;
                 _serverConfigs.Save();
                 _suppressNextNotification = true;
+
+                await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+
                 await Connect().ConfigureAwait(false);
             });
         }

@@ -205,7 +205,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                         "Check Sundouleia's main UI to see the error message.", NotificationType.Error));
 
                 // publish a disconnected message and throw an exception.
-                Mediator.Publish(new DisconnectedMessage(false));
+                Mediator.Publish(new DisconnectedMessage(false, false));
                 throw new SundouleiaAuthFailureException(response);
             }
 

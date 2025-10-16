@@ -104,7 +104,7 @@ public partial class MainHub
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
                     Logger.LogWarning("This HTTP Exception was caused by SundouleiaAuthFailure. Message was: " + AuthFailureMessage, LoggerType.ApiCore);
-                    await Disconnect(ServerState.Unauthorized, false).ConfigureAwait(false);
+                    await Disconnect(ServerState.Unauthorized, false, false).ConfigureAwait(false);
                     return; // (Prevent further reconnections)
                 }
 
@@ -112,7 +112,7 @@ public partial class MainHub
                 {
                     // Another HTTP Exception type, so disconnect, then attempt reconnection.
                     Logger.LogWarning("Failed to establish connection, retrying");
-                    await Disconnect(ServerState.Disconnected, false).ConfigureAwait(false);
+                    await Disconnect(ServerState.Disconnected, false, false).ConfigureAwait(false);
                     // Reconnect in 5-20 seconds. (prevents server overload)
                     ServerStatus = ServerState.Reconnecting;
                     await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), connectionToken).ConfigureAwait(false);
@@ -126,7 +126,7 @@ public partial class MainHub
             catch (InvalidOperationException ex)
             {
                 Logger.LogWarning("InvalidOperationException on connection: " + ex.Message);
-                await Disconnect(ServerState.Disconnected, false).ConfigureAwait(false);
+                await Disconnect(ServerState.Disconnected, false, false).ConfigureAwait(false);
                 return; // (Prevent further reconnections)
             }
             catch (Bagagwa ex)
@@ -159,7 +159,7 @@ public partial class MainHub
     ///     all alterations on visible sundesmos, skipping the timeout entirely, or wish to force
     ///     your sundesmos to send you their full data again when they next see you.
     /// </remarks>
-    public async Task Disconnect(ServerState disconnectionReason, bool isUnloading)
+    public async Task Disconnect(ServerState disconnectionReason, bool isHardReconnect, bool isUnloading)
     {
         // if we are unloading the plugin, or performing a hard reset / disconnect, we want to make sure
         // that we both notify our online pairs we are unloading.
@@ -187,7 +187,7 @@ public partial class MainHub
             // Clear the Health check so we stop pinging the server, set Initialized to false, publish a disconnect.
             _apiHooksInitialized = false;
             _hubHealthCTS?.Cancel();
-            Mediator.Publish(new DisconnectedMessage(isUnloading));
+            Mediator.Publish(new DisconnectedMessage(isHardReconnect, isUnloading));
             // set the ConnectionResponse and hub to null.
             _hubConnection = null;
             ConnectionResponse = null;
@@ -204,7 +204,7 @@ public partial class MainHub
     public async Task Reconnect()
     {
         // Disconnect, wait 3 seconds, then connect.
-        await Disconnect(ServerState.Disconnected, false).ConfigureAwait(false);
+        await Disconnect(ServerState.Disconnected, false, false).ConfigureAwait(false);
         await Task.Delay(TimeSpan.FromSeconds(5));
         await Connect().ConfigureAwait(false);
     }
@@ -264,7 +264,7 @@ public partial class MainHub
         {
             Logger.LogInformation("Disposing of SundouleiaHub-Main after obtaining account details.", LoggerType.ApiCore);
             if (_hubConnection is not null && _hubConnection.State is HubConnectionState.Connected)
-                await Disconnect(ServerState.Disconnected, false).ConfigureAwait(false);
+                await Disconnect(ServerState.Disconnected, false, false).ConfigureAwait(false);
         }
     }
 
@@ -338,7 +338,7 @@ public partial class MainHub
             Logger.LogError("Your SecretKey is likely no longer valid for this character and it failed to properly connect." + Environment.NewLine
                 + "This likely means the key no longer exists in the database, you have been banned, or need to make a new one." + Environment.NewLine
                 + "If this key happened to be your primary key and you cannot recover it, contact cordy.");
-            await Disconnect(ServerState.Unauthorized, false).ConfigureAwait(false);
+            await Disconnect(ServerState.Unauthorized, false, false).ConfigureAwait(false);
             return false;
         }
 
@@ -348,7 +348,7 @@ public partial class MainHub
         {
             Mediator.Publish(new NotificationMessage("Client outdated", "Outdated: " + ClientVerString + " - " + ExpectedVerString + "Please keep Sundouleia up-to-date.", NotificationType.Warning));
             Logger.LogInformation("Client Was Outdated in either its API or its Version, Disconnecting.", LoggerType.ApiCore);
-            await Disconnect(ServerState.VersionMisMatch, false).ConfigureAwait(false);
+            await Disconnect(ServerState.VersionMisMatch, false, false).ConfigureAwait(false);
             return false;
         }
 
@@ -454,7 +454,7 @@ public partial class MainHub
         // Log the closure, cancel the health token, and publish that we have been disconnected.
         Logger.LogWarning("SundouleiaHub-Main was Closed by its Hub-Instance");
         _hubHealthCTS?.Cancel();
-        Mediator.Publish(new DisconnectedMessage(false));
+        Mediator.Publish(new DisconnectedMessage(false, false));
         ServerStatus = ServerState.Offline;
         // if an argument for this was passed in, we should provide the reason.
         if (arg is not null)
@@ -505,7 +505,7 @@ public partial class MainHub
             if (ex is not WebSocketException || ex is not TimeoutException)
                 {
                 Logger.LogWarning("Disconnecting from SundouleiaHub-Main after failed reconnection in HubInstanceOnReconnected(). Websocket/Timeout Reason: " + ex);
-                await Disconnect(ServerState.Disconnected, false).ConfigureAwait(false);
+                await Disconnect(ServerState.Disconnected, false, false).ConfigureAwait(false);
             }
             else
             {
