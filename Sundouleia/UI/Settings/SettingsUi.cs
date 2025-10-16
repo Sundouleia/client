@@ -23,12 +23,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
     private readonly MainHub _hub;
     private readonly MainConfig _mainConfig;
-    private readonly AccountManagerTab _accountsTab;
+    private readonly ProfilesTab _accountsTab;
     private readonly DebugTab _debugTab;
     private readonly ModStorageTab _storageTab;
 
     public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, MainHub hub,
-        MainConfig config, AccountManagerTab accounts, DebugTab debug, ModStorageTab storage)
+        MainConfig config, ProfilesTab accounts, DebugTab debug, ModStorageTab storage)
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;

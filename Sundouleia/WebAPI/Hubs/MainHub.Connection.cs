@@ -85,7 +85,8 @@ public partial class MainHub
                 await LoadOnlineSundesmos().ConfigureAwait(false);
                 await LoadRequests().ConfigureAwait(false);
                 // Load in all local data for the current profile.
-                _profiles.SetDataForAccountProfile();
+                // TODO: Update for logged in profile.
+
                 // once data is synchronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;
                 Mediator.Publish(new ConnectedMessage());
@@ -492,8 +493,9 @@ public partial class MainHub
                 ServerStatus = ServerState.Connected;
                 await LoadInitialSundesmos().ConfigureAwait(false);
                 await LoadOnlineSundesmos().ConfigureAwait(false);
-                _profiles.SetDataForAccountProfile();
-                // once data is syncronized, update the serverStatus.
+                // TODO: Update for logged in profile.
+
+                // once data is synchronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;
                 Mediator.Publish(new ConnectedMessage());
             }

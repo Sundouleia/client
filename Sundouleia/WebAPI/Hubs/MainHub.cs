@@ -24,7 +24,6 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private readonly HubFactory _hubFactory;
     private readonly TokenProvider _tokenProvider;
     private readonly ServerConfigManager _serverConfigs;
-    private readonly AccountManager _profiles;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
 
@@ -50,7 +49,6 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         HubFactory hubFactory,
         TokenProvider tokenProvider,
         ServerConfigManager serverConfigs,
-        AccountManager profiles,
         RequestsManager requests,
         SundesmoManager sundesmos)
         : base(logger, mediator)
@@ -58,7 +56,6 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         _hubFactory = hubFactory;
         _tokenProvider = tokenProvider;
         _serverConfigs = serverConfigs;
-        _profiles = profiles;
         _requests = requests;
         _sundesmos = sundesmos;
 

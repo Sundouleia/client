@@ -139,7 +139,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<FileCompactor>()
 
         // Player Client
-        .AddSingleton<AccountManager>()
         .AddSingleton<BlockedUserManager>()
         .AddSingleton<RequestsManager>()
 
@@ -254,7 +253,6 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Settings
         .AddScoped<WindowMediatorSubscriberBase, SettingsUi>()
-        .AddScoped<AccountManagerTab>()
         .AddScoped<DebugTab>()
         .AddScoped<ModStorageTab>()
 
