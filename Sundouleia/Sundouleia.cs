@@ -253,6 +253,7 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Settings
         .AddScoped<WindowMediatorSubscriberBase, SettingsUi>()
+        .AddScoped<ProfilesTab>()
         .AddScoped<DebugTab>()
         .AddScoped<ModStorageTab>()
 
