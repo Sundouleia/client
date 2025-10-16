@@ -1,6 +1,8 @@
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
+using OtterGui.Text;
+using Sundouleia.Pairs;
 using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.Services.Tutorial;
@@ -8,11 +10,14 @@ using Sundouleia.Services.Tutorial;
 namespace Sundouleia.Gui.MainWindow;
 public class RadarTab
 {
+    private readonly SundesmoManager _sundesmos;
     private readonly RadarManager _manager;
     private readonly RadarService _service;
     private readonly TutorialService _guides;
-    public RadarTab(RadarManager manager, RadarService service, TutorialService guides)
+    public RadarTab(SundesmoManager sundesmos, RadarManager manager, RadarService service, 
+        TutorialService guides)
     {
+        _sundesmos = sundesmos;
         _manager = manager;
         _service = service;
         _guides = guides;
@@ -31,8 +36,13 @@ public class RadarTab
         foreach (var radarUser in _manager.AllUsers)
         {
             CkGui.FramedIconText(FAI.UserNinja);
-            CkGui.TextFrameAlignedInline(radarUser.AnonymousName);
-            CkGui.ColorTextInline($" (Valid: {radarUser.IsValid})", radarUser.IsValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+            var name = _sundesmos.TryGetNickAliasOrUid(radarUser.UID, out var nick) ? nick : radarUser.AnonymousName;
+            CkGui.TextFrameAlignedInline(name);
+            CkGui.TextLineSeparatorV();
+            CkGui.TextInline("(Rendered:");
+            ImUtf8.SameLineInner();
+            CkGui.IconText(radarUser.IsValid ? FAI.Check : FAI.Times, radarUser.IsValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+            CkGui.TextInline(")");
         }
     }
 }

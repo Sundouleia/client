@@ -1,4 +1,6 @@
 using CkCommons;
+using Dalamud.Game.Gui.ContextMenu;
+using Dalamud.Game.Text.SeStringHandling;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
 using Sundouleia.Services.Mediator;
@@ -18,15 +20,18 @@ public class RadarService : DisposableMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly MainConfig _config;
+    private readonly RequestsManager _requests;
     private readonly RadarManager _manager;
     private readonly CharaObjectWatcher _watcher;
 
     public RadarService(ILogger<RadarService> logger, SundouleiaMediator mediator,
-        MainHub hub, MainConfig config, RadarManager manager, CharaObjectWatcher watcher)
+        MainHub hub, MainConfig config, RequestsManager requests, RadarManager manager, 
+        CharaObjectWatcher watcher)
         : base(logger, mediator)
     {
         _hub = hub;
         _config = config;
+        _requests = requests;
         _manager = manager;
         _watcher = watcher;
 
@@ -46,6 +51,7 @@ public class RadarService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<DisconnectedMessage>(this, _ => _manager.ClearUsers());
 
         // Listen to zone changes.
+        Svc.ContextMenu.OnMenuOpened += OnRadarContextMenu;
         Svc.ClientState.TerritoryChanged += OnTerritoryChanged;
         Svc.ClientState.Login += OnLogin;
         Svc.ClientState.Logout += OnLogout;
@@ -65,6 +71,46 @@ public class RadarService : DisposableMediatorSubscriberBase
         Svc.ClientState.TerritoryChanged -= OnTerritoryChanged;
         Svc.ClientState.Login -= OnLogin;
         Svc.ClientState.Logout -= OnLogout;
+    }
+
+    private void OnRadarContextMenu(IMenuOpenedArgs args)
+    {
+        if (args.MenuType is ContextMenuType.Inventory) return;
+        if (!_config.Current.ShowContextMenus) return;
+        if (args.Target is not MenuTargetDefault target || target.TargetObjectId == 0) return;
+
+        // Locate the user to display it in.
+        Logger.LogTrace("Context menu opened, checking for radar user.", LoggerType.RadarManagement);
+        foreach (var radarUser in _manager.RenderedUnpairedUsers.ToList())
+        {
+            if (!radarUser.IsValid)
+                continue;
+
+            if (target.TargetObjectId != radarUser.PlayerObjectId)
+                continue;
+
+            Logger.LogDebug($"Context menu target matched radar user {radarUser.AnonymousName}.", LoggerType.RadarManagement);
+            args.AddMenuItem(new MenuItem()
+            {
+                Name = new SeStringBuilder().AddText("Send Temporary Request").Build(),
+                PrefixChar = 'S',
+                PrefixColor = 708,
+                OnClicked = (a) => SendTempRequest(radarUser),
+            });
+        }
+    }
+
+    private async void SendTempRequest(RadarUser user)
+    {
+        var msg = $"Temporary Pair Request from {user.AnonymousName}";
+        var ret = await _hub.UserSendRequest(new(new(user.UID), true, msg)).ConfigureAwait(false);
+        if (ret.ErrorCode is not SundouleiaApiEc.Success)
+        {
+            Logger.LogWarning($"Failed to send temporary pair request to {user.AnonymousName} [{ret.ErrorCode}]", LoggerType.RadarData);
+            return;
+        }
+        Logger.LogInformation($"Temporary pair request sent to {user.AnonymousName}.", LoggerType.RadarData);
+        _requests.AddRequest(ret.Value!);
     }
 
     private async void OnLogin()
@@ -221,6 +267,9 @@ public class RadarService : DisposableMediatorSubscriberBase
     // Add or update a user in our radar.
     private void OnAddOrUpdateUser(OnlineUser radarUser)
     {
+        if (radarUser.User.UID == MainHub.UID)
+            return;
+
         if (!_manager.HasUser(radarUser))
         {
             Logger.LogDebug($"(Radar) AddOrUpdate from [{radarUser.User.AnonName}] detected, who is not in our manager. Resolving!", LoggerType.RadarData);
@@ -241,6 +290,9 @@ public class RadarService : DisposableMediatorSubscriberBase
 
     private void ResolveUser(OnlineUser radarUser)
     {
+        if (radarUser.User.UID == MainHub.UID)
+            return;
+
         // Ignore existing users as we have already resolved their current state.
         if (_manager.HasUser(radarUser))
             return;

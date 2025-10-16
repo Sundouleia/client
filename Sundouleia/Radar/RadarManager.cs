@@ -1,4 +1,13 @@
+using Dalamud.Game.Gui.ContextMenu;
+using Dalamud.Game.Text.SeStringHandling;
+using Lumina.Models.Models;
+using NAudio.Dmo;
+using SixLabors.ImageSharp.ColorSpaces;
+using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
+using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
+using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 
@@ -8,22 +17,30 @@ namespace Sundouleia.Radar;
 ///     Manages the current radar zone and all resolved, valid users. <para />
 ///     identifies players valid for chatting and list display, with additional info.
 /// </summary>
-public sealed class RadarManager
+public sealed class RadarManager : DisposableMediatorSubscriberBase
 {
-    private readonly ILogger<RadarManager> _logger;
+    private readonly MainConfig _config;
+    private readonly SundesmoManager _sundesmos;
     private readonly CharaObjectWatcher _watcher;
 
     private HashSet<RadarUser> _users = new();
     private List<RadarUser> _rendered = new();
+    private List<RadarUser> _renderedUnpaired = new();
 
-    public RadarManager(ILogger<RadarManager> logger, CharaObjectWatcher watcher)
+    public RadarManager(ILogger<RadarManager> logger, SundouleiaMediator mediator,
+        MainConfig config, SundesmoManager sundesmos, CharaObjectWatcher watcher)
+        : base(logger, mediator)
     {
-        _logger = logger;
+        _config = config;
+        _sundesmos = sundesmos;
         _watcher = watcher;
+
+        Mediator.Subscribe<RefreshWhitelistMessage>(this, _ => RecreateLists());
     }
 
     public IReadOnlyCollection<RadarUser> AllUsers => _users;
     public IReadOnlyCollection<RadarUser> RenderedUsers => _rendered;
+    public IReadOnlyCollection<RadarUser> RenderedUnpairedUsers => _renderedUnpaired;
 
     public bool HasUser(OnlineUser user)
         => _users.Any(u => u.UID == user.User.UID);
@@ -33,7 +50,7 @@ public sealed class RadarManager
     // Add a user, regardless of visibility.
     public void AddRadarUser(OnlineUser user, IntPtr address)
     {
-        _logger.LogDebug($"Adding radar user {user.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
+        Logger.LogDebug($"Adding radar user {user.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
         _users.Add(new(user, address));
         // recreate the rendered list.
         RecreateLists();
@@ -42,7 +59,7 @@ public sealed class RadarManager
     // Remove a user, regardless of visibility.
     public void RemoveRadarUser(UserData user)
     {
-        _logger.LogDebug($"(Radar) A user was removed.", LoggerType.RadarManagement);
+        Logger.LogDebug($"(Radar) A user was removed.", LoggerType.RadarManagement);
         _users.RemoveWhere(u => u.UID == user.UID);
         // recreate the rendered list.
         RecreateLists();
@@ -53,7 +70,7 @@ public sealed class RadarManager
         if (_users.FirstOrDefault(u => u.UID == existing.UID) is not { } user)
             return;
         // Update visibility.
-        _logger.LogDebug($"(Radar) {user.AnonymousName} is now {(address != IntPtr.Zero ? "rendered" : "unrendered")}.", LoggerType.RadarManagement);
+        Logger.LogDebug($"(Radar) {user.AnonymousName} is now {(address != IntPtr.Zero ? "rendered" : "unrendered")}.", LoggerType.RadarManagement);
         user.BindToAddress(address);
         // recreate the rendered list.
         RecreateLists();
@@ -68,7 +85,7 @@ public sealed class RadarManager
         match.UpdateState(newState);
         
         // If their new hashedIdent changed, check for visibility.
-        if (!string.IsNullOrEmpty(match.HashedIdent) && match.IsValid)
+        if (!string.IsNullOrEmpty(match.HashedIdent) && !match.IsValid)
             // Try and bind them to an address.
             if (_watcher.TryGetExisting(match.HashedIdent, out IntPtr foundAddress))
                 match.BindToAddress(foundAddress);
@@ -79,12 +96,15 @@ public sealed class RadarManager
 
     public void ClearUsers()
     {
-        _logger.LogDebug("Clearing all valid radar users.", LoggerType.RadarManagement);
+        Logger.LogDebug("Clearing all valid radar users.", LoggerType.RadarManagement);
         _users.Clear();
         // recreate the rendered list.
         RecreateLists();
     }
 
     private void RecreateLists()
-        => _rendered = _users.Where(u => u.IsValid).ToList();
+    {
+        _rendered = _users.Where(u => u.IsValid).ToList();
+        _renderedUnpaired = _rendered.Where(u => !_sundesmos.ContainsSundesmo(u.UID)).ToList();
+    }
 }

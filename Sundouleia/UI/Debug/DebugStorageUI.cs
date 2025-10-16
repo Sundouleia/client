@@ -64,7 +64,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
                 ImGui.TableNextColumn();
                 CkGui.ColorTextFrameAligned(user.AnonymousName, ImGuiColors.ParsedBlue);
                 ImGui.TableNextColumn();
-                CkGui.TextFrameAligned(user.AliasOrUID);
+                CkGui.TextFrameAligned(user.UID);
                 DrawIconBoolColumn(!string.IsNullOrEmpty(user.HashedIdent));
                 DrawIconBoolColumn(user.IsValid);
                 ImGui.TableNextColumn();

@@ -21,7 +21,6 @@ public unsafe class RadarUser
     }
 
     public string AnonymousName => _user.AnonName;
-    public string AliasOrUID => _user.AliasOrUID;
     public string UID => _user.UID;
     public string HashedIdent { get; private set; } = string.Empty;
 
@@ -33,7 +32,7 @@ public unsafe class RadarUser
     public unsafe IntPtr Address => (nint)_player;
     public unsafe ushort ObjIndex => _player->ObjectIndex;
     public unsafe ulong EntityId => _player->EntityId;
-    public unsafe ulong GameObjectId => _player->GetGameObjectId().ObjectId;
+    public unsafe ulong PlayerObjectId => _player->GetGameObjectId().ObjectId;
 
     /// <summary>
     ///     Update the hashedId for this radar user. It will 
