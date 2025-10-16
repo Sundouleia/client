@@ -191,8 +191,10 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
                 downloadResponse.EnsureSuccessStatusCode();
 
                 // get total size for progress tracking
-                var totalSize = downloadResponse.Content.Headers.ContentLength ?? 0;
-                dlStatus.AddOrUpdateFile(modFile.Hash, totalSize);
+                if (downloadResponse.Headers.Contains("X-File-Size") && long.TryParse(downloadResponse.Headers.GetValues("X-File-Size").FirstOrDefault(), out var size))
+                {
+                    dlStatus.AddOrUpdateFile(modFile.Hash, size);
+                }
 
                 // create progress reporter for this player
                 Progress<long> progress = CreateProgressReporter(dlStatus, modFile.Hash);
