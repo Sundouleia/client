@@ -14,9 +14,9 @@ using OtterGui.Text;
 
 namespace Sundouleia.Gui;
 
-public class AccountManagerTab
+public class ProfilesTab
 {
-    private readonly ILogger<AccountManagerTab> _logger;
+    private readonly ILogger<ProfilesTab> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly MainHub _hub;
     private readonly MainConfig _mainConfig;
@@ -26,15 +26,14 @@ public class AccountManagerTab
     private bool DeleteAccountConfirmation = false;
     private int ShowKeyIdx = -1;
     private int EditingIdx = -1;
-    public AccountManagerTab(ILogger<AccountManagerTab> logger, SundouleiaMediator mediator, MainHub hub,
-        MainConfig config, ServerConfigManager serverConfigs, ConfigFileProvider configFiles)
+    public ProfilesTab(ILogger<ProfilesTab> logger, SundouleiaMediator mediator, MainHub hub,
+        MainConfig config, ServerConfigManager serverConfigs)
     {
         _logger = logger;
         _mediator = mediator;
         _hub = hub;
         _mainConfig = config;
         _serverConfigs = serverConfigs;
-        _configFiles = configFiles;
     }
 
     // Right now this is going to be a mess since the authentications are structured differently.

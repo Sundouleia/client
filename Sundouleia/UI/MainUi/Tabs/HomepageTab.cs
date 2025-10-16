@@ -20,15 +20,13 @@ namespace Sundouleia.Gui.MainWindow;
 public class HomepageTab
 {
     private readonly SundouleiaMediator _mediator;
-    private readonly CharaObjectWatcher _watcher;
 
     private int HoveredItemIndex = -1;
     private readonly List<(string Label, FontAwesomeIcon Icon, Action OnClick)> Modules;
 
-    public HomepageTab(SundouleiaMediator mediator, CharaObjectWatcher watcher)
+    public HomepageTab(SundouleiaMediator mediator)
     {
         _mediator = mediator;
-        _watcher = watcher;
         // Define all module information in a single place
         Modules = new List<(string, FontAwesomeIcon, Action)>
         {
@@ -72,70 +70,6 @@ public class HomepageTab
         // if itemGotHovered is false, reset the index.
         if (!itemGotHovered)
             HoveredItemIndex = -1;
-
-        try
-        {
-            unsafe
-            {
-                var game = GameMain.Instance();
-                CkGui.ColorText($"Territory Transition Delay:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->TerritoryTransitionDelay.ToString());
-
-                CkGui.ColorText($"Territory Transition State:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->TerritoryTransitionState.ToString());
-
-                CkGui.ColorText($"Connected To Zone:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->ConnectedToZone ? "Yes" : "No");
-
-                CkGui.ColorText($"Territory Load State:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->TerritoryLoadState.ToString());
-
-                CkGui.ColorText($"Next Territory Type Id:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->NextTerritoryTypeId.ToString());
-
-                CkGui.ColorText($"Current Territory Type Id:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->CurrentTerritoryTypeId.ToString());
-
-                CkGui.ColorText($"Current Territory Intended Use Id:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->CurrentTerritoryIntendedUseId.ToString());
-
-                CkGui.ColorText($"Current Territory Filter Key:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->CurrentTerritoryFilterKey.ToString());
-
-                CkGui.ColorText($"Current Content Finder Condition Id:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->CurrentContentFinderConditionId.ToString());
-
-                CkGui.ColorText($"Transition Territory Type Id:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->TransitionTerritoryTypeId.ToString());
-
-                CkGui.ColorText($"Transition Territory Filter Key:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->TransitionTerritoryFilterKey.ToString());
-
-                CkGui.ColorText($"Current Map Id:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->CurrentMapId.ToString());
-
-                CkGui.ColorText($"Millisecond Counter:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->MilisecondCounter.ToString("F2"));
-
-                CkGui.ColorText($"Runtime Seconds:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->RuntimeSeconds.ToString());
-
-                CkGui.ColorText($"Runtime Seconds Changed:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->RuntimeSecondsChanged ? "Yes" : "No");
-
-                CkGui.ColorText($"Runtime:", ImGuiColors.TankBlue);
-                CkGui.TextInline(game->Runtime.ToString("F2"));
-
-                CkGui.ColorText("In Idle Cam:", ImGuiColors.TankBlue);
-                CkGui.TextInline(GameMain.IsInIdleCam() ? "Yes" : "No");
-            }
-        }
-        catch (Exception ex)
-        {
-            Svc.Logger.Error($"Exception in HomepageTab Draw: {ex}");
-        }
-
-
     }
 
     private bool HomepageSelectable(string label, FontAwesomeIcon icon, Vector2 region, bool hovered = false)
