@@ -1,5 +1,5 @@
-﻿using Sundouleia.PlayerClient;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
+using Sundouleia.PlayerClient;
 
 namespace Sundouleia.ModFiles;
 
@@ -93,13 +93,13 @@ public sealed class FileCompactor
     /// </summary>
     public long GetFileSizeOnDisk(FileInfo fileInfo, bool? isNTFS = null)
     {
-        if (Util.IsWine() || !string.Equals(new DriveInfo(fileInfo.Directory!.Root.FullName).DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase)) 
+        if (Util.IsWine() || !string.Equals(new DriveInfo(fileInfo.Directory!.Root.FullName).DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase))
             return fileInfo.Length;
 
         // Otherwise the true size can vary and we need to calculate it.
         var clusterSize = GetClusterSize(fileInfo);
         // If the cluster size is invalid return the assumed length.
-        if (clusterSize is -1) 
+        if (clusterSize is -1)
             return fileInfo.Length;
         // Otherwise we can get the compressed file size.
         var lowOrderSize = GetCompressedFileSizeW(fileInfo.FullName, out uint highOrderSize);
@@ -115,6 +115,18 @@ public sealed class FileCompactor
     public async Task WriteAllBytesAsync(string filePath, byte[] decompressedFile, CancellationToken token)
     {
         await File.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
+        // If wine or not configured to have a compact cache, then skip compacting.
+        if (Util.IsWine() || !_config.Current.CompactCache)
+            return;
+
+        CompactFile(filePath);
+    }
+
+    /// <summary>
+    ///    Compacts the file at the given path, if configured to do so and supported by the system.
+    /// </summary>
+    public void CompactFileSafe(string filePath)
+    {
         // If wine or not configured to have a compact cache, then skip compacting.
         if (Util.IsWine() || !_config.Current.CompactCache)
             return;
@@ -191,7 +203,7 @@ public sealed class FileCompactor
     /// </summary>
     private int GetClusterSize(FileInfo fi)
     {
-        if (!fi.Exists) 
+        if (!fi.Exists)
             return -1;
 
         var root = fi.Directory?.Root.FullName.ToLower() ?? string.Empty;
