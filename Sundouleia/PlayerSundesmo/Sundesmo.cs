@@ -69,11 +69,12 @@ public class Sundesmo : IComparable<Sundesmo>
     // Internal Helpers
     public bool IsTemporary => UserPair.IsTemp;
     public bool IsOnline => _onlineUser != null;
-    public bool IsRendered => _player.IsRendered; 
+    public bool IsRendered => _player.IsRendered;
     public bool IsPaused => OwnPerms.PauseVisuals;
     public string Ident => _onlineUser?.Ident ?? string.Empty;
     public string PlayerName => _player.NameString;
     public IntPtr PlayerAddress => IsRendered ? _player.Address : IntPtr.Zero;
+    public PlayerHandler PlayerHandler => _player;
 
     /// <summary> Do not call if you are not certain the player is rendered! </summary>
     public ulong PlayerEntityId => _player.EntityId;
@@ -248,7 +249,7 @@ public class Sundesmo : IComparable<Sundesmo>
     {
         _logger.LogDebug($"Disposing data for [{PlayerName}] ({GetNickAliasOrUid()})", UserData.AliasOrUID);
         // Cancel any existing timeout task, and then dispose of all data.
-        _timeoutCTS.SafeCancel();        
+        _timeoutCTS.SafeCancel();
         _player.Dispose();
         _mountMinion.Dispose();
         _pet.Dispose();
@@ -279,7 +280,7 @@ public class Sundesmo : IComparable<Sundesmo>
 
                 // Await for the defined time, then clear the alterations
                 await Task.Delay(TimeSpan.FromSeconds(Constants.SundesmoTimeoutSeconds), _timeoutCTS.Token);
-                
+
                 // Clear regardless of render or not.
                 _mediator.Publish(new SundesmoLeftLimbo(this));
 
@@ -396,7 +397,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 }
             }
             ImGui.TableNextRow();
-            
+
             // Handle Mount/Minion.
             ImGuiUtil.DrawFrameColumn("Mount/Minion");
             ImGui.TableNextColumn();
@@ -414,7 +415,7 @@ public class Sundesmo : IComparable<Sundesmo>
                 ImGuiUtil.DrawFrameColumn(_mountMinion.DataState.OwnerId.ToString());
             }
             ImGui.TableNextRow();
-            
+
             // Handle Pet.
             ImGuiUtil.DrawFrameColumn("Pet");
             ImGui.TableNextColumn();
