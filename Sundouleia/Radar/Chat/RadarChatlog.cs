@@ -8,6 +8,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using OtterGui.Text;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
@@ -35,6 +36,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
     // Private variables that are used by internal methods.
     private bool _emoteSelectionOpened = false;
+    private unsafe bool _isInside => HousingManager.Instance()->IsInside();
 
     // Allow a circular buffer of 1k messages.
     public RadarChatLog(ILogger<RadarChatLog> logger, SundouleiaMediator mediator, MainHub hub,
@@ -345,7 +347,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
     private void SaveChatLog(ushort worldId, ushort zoneId)
     {
-        if (worldId == 0 || zoneId == 0)
+        if (worldId == 0 || zoneId == 0 || _isInside)
             return;
 
         // Capture up to the last 500 messages
@@ -384,11 +386,8 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
     public void LoadTerritoryChatLog(ushort worldId, ushort zoneId)
     {
-        if (worldId == 0 || zoneId == 0)
-        {
-            AddDefaultWelcomeWithLog("Invalid world or zone ID.");
+        if (worldId == 0 || zoneId == 0 || _isInside)
             return;
-        }
 
         var recentFile = GetRecentFile(worldId, zoneId);
         // if the file does not exist, return

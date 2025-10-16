@@ -3,6 +3,7 @@ using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using OtterGui.Text;
 using Sundouleia.Gui.Components;
 using Sundouleia.Radar.Chat;
@@ -28,20 +29,23 @@ public class RadarChatTab
         _guides = guides;
     }
 
-    public void DrawSection()
+    public unsafe void DrawSection()
     {
         var min = ImGui.GetCursorScreenPos();
         var max = min + ImGui.GetContentRegionAvail();
         var col = RadarChatLog.AccessBlocked ? ImGuiColors.DalamudGrey : ImGuiColors.DalamudWhite;
+        var isInside = HousingManager.Instance()->IsInside();
+        var text = isInside ? "Chat Disabled Indoors" : $"Radar Chat - {RadarService.CurrZoneName}";
+
         // Add some CkRichText variant here later.
-        CkGui.FontTextCentered($"Radar Chat - {RadarService.CurrZoneName}", UiFontService.Default150Percent, col);
+        CkGui.FontTextCentered(text, UiFontService.Default150Percent, col);
         ImGui.Separator();
 
         // Restrict drawing the chat if their not verified or blocked from using it.
         var chatTL = ImGui.GetCursorScreenPos();
-
+        var disable = RadarChatLog.AccessBlocked || isInside;
         // if not verified, show the chat, but disable it.
-        _chat.SetDisabledStates(RadarChatLog.AccessBlocked, RadarChatLog.AccessBlocked);
+        _chat.SetDisabledStates(disable, disable);
         DrawChatContents();
 
         // If blocked, draw the warning.
