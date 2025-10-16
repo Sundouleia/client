@@ -43,6 +43,7 @@ public class RadarService : DisposableMediatorSubscriberBase
                 await JoinZoneAndAssignUsers(GetZoneUpdate()).ConfigureAwait(false);
             }
         });
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => _manager.ClearUsers());
 
         // Listen to zone changes.
         Svc.ClientState.TerritoryChanged += OnTerritoryChanged;
