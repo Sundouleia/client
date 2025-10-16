@@ -214,10 +214,14 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
                         // copy from the http stream to temp file with progress tracking
                         await throttledStream.CopyToAsync(fileStream, progress, cancelToken);
                         await fileStream.FlushAsync(cancelToken).ConfigureAwait(false);
-                    };
+                    }
+
                     // move temp file to final location
                     File.Move(tempFilePath, filePath, true);
                     PersistFileToStorage(modFile.Hash, filePath);
+
+                    // compact the file if needed
+                    _compactor.CompactFileSafe(filePath);
 
                     // mark file download as completed
                     dlStatus.MarkFileCompleted(modFile.Hash);
