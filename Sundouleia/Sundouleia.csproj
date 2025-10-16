@@ -3,7 +3,7 @@
     <!--Basic Plugin Definitions-->
     <PropertyGroup>
         <Copyright>Copyright © 2025</Copyright>
-        <Version>0.0.8.3</Version>
+        <Version>0.0.8.4</Version>
         <WarningLevel>4</WarningLevel>
         <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     </PropertyGroup>
@@ -61,6 +61,7 @@
         <EmbeddedResource Include="Localization\fr.json" />
     </ItemGroup>
 </Project>
+
 
 
 
