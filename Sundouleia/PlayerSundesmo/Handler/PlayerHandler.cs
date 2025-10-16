@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
@@ -11,10 +12,9 @@ using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI.Files;
 using Sundouleia.Utils;
+using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
-using System.Xml.Linq;
 
 namespace Sundouleia.Pairs;
 
@@ -34,7 +34,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private Task? _newModsTask;
 
     public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
-        FileCacheManager fileCache, FileDownloader downloads, IpcManager ipc) 
+        FileCacheManager fileCache, FileDownloader downloads, IpcManager ipc)
         : base(logger, mediator)
     {
         Sundesmo = sundesmo;
@@ -224,7 +224,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private void FirstTimeInitialize()
     {
         Logger.LogTrace($"First-Time-Initialize [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
-        
+
         // If we have title data we should apply them when the the client downloads / enables it.
         Mediator.Subscribe<HonorificReady>(this, async _ =>
         {
@@ -232,7 +232,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogTrace($"Applying [{Sundesmo.GetNickAliasOrUid()}]'s cached Honorific title.");
             await _ipc.Honorific.SetTitleAsync(ObjIndex, _appearanceData.Data[IpcKind.Honorific]).ConfigureAwait(false);
         });
-        
+
         // If we have cached petnames data we should apply them when the the client downloads / enables it.
         Mediator.Subscribe<PetNamesReady>(this, async _ =>
         {
@@ -240,7 +240,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogTrace($"Applying [{Sundesmo.GetNickAliasOrUid()}]'s cached Pet Nicknames.");
             await _ipc.PetNames.SetPetNamesByPtr(Address, _appearanceData.Data[IpcKind.PetNames]).ConfigureAwait(false);
         });
-        
+
         // Assign the temporary penumbra collection if not already set.
         if (_tempCollection != Guid.Empty)
             _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).GetAwaiter().GetResult();
@@ -292,20 +292,28 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.FullDataReceive, "Downloading but not applying data [NOT-RENDERED]")));
             Logger.LogTrace($"Data received from {NameString}({Sundesmo.GetNickAliasOrUid()}), who was unrendered. They likely have a higher render distance. Waiting for them to be visible before applying.", LoggerType.PairHandler);
-            
+
             // Update the Mod Replacements with the new changes. (Does not apply them!)
             if (_fileCache.CacheFolderIsValid())
                 UpdateReplacements(modData);
-            
+
             // Update the appearance data with the new ipc data.
             _appearanceData ??= new();
             _appearanceData.UpdateCache(ipcData);
             return;
         }
 
-        // The old mare transfer bars would technically not work here as we would be both uploading files while downloading current ones at the same time.
+        // 3) Set the player as uploading or uploaded, based on NotAllSent flag
+        if (modData.NotAllSent)
+        {
+            Mediator.Publish(new FileUploading(this));
+        }
+        else
+        {
+            Mediator.Publish(new FileUploaded(this));
+        }
 
-        // 3) Player is rendered, so process the ipc & mods (maybe do this in parallel idk)
+        // 4) Player is rendered, so process the ipc & mods (maybe do this in parallel idk)
         await ApplyIpcData(ipcData, false).ConfigureAwait(false);
         await UpdateAndApplyModData(modData, false).ConfigureAwait(false);
 
@@ -395,7 +403,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
         catch (TaskCanceledException) { /* Bagagwa */ }
     }
-     
+
     // Would need a way to retrieve the existing modded dictionary from the file cache or something here, not sure. We shouldnt need to download anything on a reapplication.
     private async Task ApplyModData(Dictionary<string, string> moddedPaths, bool redraw)
     {
@@ -421,7 +429,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
         // Maybe we need to do this for our other objects too? Im not sure, guess we'll find out and stuff.
         await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
-        await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);        
+        await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);
         // do a reapply here (but need to do a redraw for now)
         if (redraw)
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
@@ -511,7 +519,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // 1) Attempt to apply the single change.
         if (!_appearanceData.UpdateCacheSingle(kind, newData))
             return;
-        
+
         // 2) Validate render state before applying.
         if (!IsRendered)
             return;

@@ -62,12 +62,18 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         Mediator.Subscribe<FileUploading>(this, _ =>
         {
             _logger.LogWarning($"Starting upload tracking for {_.Player.NameString}");
-            _uploads[_.Player] = true; 
+            _uploads[_.Player] = true;
         });
         Mediator.Subscribe<FileUploaded>(this, (msg) =>
         {
             _logger.LogWarning($"Ending upload tracking for {msg.Player.NameString}");
             _uploads.TryRemove(msg.Player, out _);
+        });
+        Mediator.Subscribe<SundesmoOffline>(this, (msg) =>
+        {
+            _logger.LogWarning($"Ending all transfer tracking for offline {msg.Sundesmo.PlayerName}");
+            _uploads.TryRemove(msg.Sundesmo.PlayerHandler, out _);
+            _downloads.TryRemove(msg.Sundesmo.PlayerHandler, out _);
         });
         // For GPose handling.
         Mediator.Subscribe<GPoseStartMessage>(this, _ => IsOpen = false);
