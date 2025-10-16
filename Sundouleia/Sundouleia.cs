@@ -211,6 +211,8 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<NickConfig>()
         .AddSingleton<NoCrashFriendsConfig>()
         .AddSingleton<TransientCacheConfig>()
+        // Config Managers / Savers
+        .AddSingleton<AccountManager>()
         .AddSingleton<ServerConfigManager>()
         .AddSingleton<HybridSaveService>();
 
