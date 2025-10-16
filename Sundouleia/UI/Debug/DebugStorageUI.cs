@@ -2,7 +2,7 @@ using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 

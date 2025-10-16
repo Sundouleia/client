@@ -2,7 +2,7 @@ using Sundouleia.Watchers;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 
-namespace Sundouleia.PlayerClient;
+namespace Sundouleia.Radar;
 
 /// <summary>
 ///     Manages the current radar zone and all resolved, valid users. <para />

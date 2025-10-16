@@ -13,6 +13,7 @@ public class ConfigFileProvider : IConfigFileProvider
     public static string AssemblyDirectoryName  => Svc.PluginInterface.AssemblyLocation.DirectoryName ?? string.Empty;
     public static string AssemblyDirectory      => Svc.PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty;
     public static string SundouleiaDirectory    => Svc.PluginInterface.ConfigDirectory.FullName;
+    public static string ChatDirectory      { get; private set; } = string.Empty;
     public static string EventDirectory     { get; private set; } = string.Empty;
     public static string FileSysDirectory   { get; private set; } = string.Empty;
     
@@ -39,9 +40,16 @@ public class ConfigFileProvider : IConfigFileProvider
     // We will need to update how this is handled later.
     public ConfigFileProvider()
     {
+        ChatDirectory = Path.Combine(SundouleiaDirectory, "chatData");
         EventDirectory = Path.Combine(SundouleiaDirectory, "eventlog");
         FileSysDirectory = Path.Combine(SundouleiaDirectory, "filesystem");
 
+        // Ensure directory existence.
+        if (!Directory.Exists(ChatDirectory)) Directory.CreateDirectory(ChatDirectory);
+        if (!Directory.Exists(EventDirectory)) Directory.CreateDirectory(EventDirectory);
+        if (!Directory.Exists(FileSysDirectory)) Directory.CreateDirectory(FileSysDirectory);
+
+        // Configs.
         MainConfig = Path.Combine(SundouleiaDirectory, "config.json");
         TransientCache = Path.Combine(SundouleiaDirectory, "transientcache.json");
         PlzNoCrashFriends = Path.Combine(SundouleiaDirectory, "plznocrashfriends.json");
@@ -49,7 +57,6 @@ public class ConfigFileProvider : IConfigFileProvider
         Favorites = Path.Combine(SundouleiaDirectory, "favorites.json");
         LoadedResources = Path.Combine(SundouleiaDirectory, "loaded-resources.json");
         FileCacheCsv = Path.Combine(SundouleiaDirectory, "filecache.csv");
-
         NicknameConfig = Path.Combine(SundouleiaDirectory, "nicknames.json");
         AccountConfig = Path.Combine(SundouleiaDirectory, "account.json");
 

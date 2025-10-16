@@ -1,5 +1,3 @@
-using System.Net.Http.Headers;
-using System.Reflection;
 using CkCommons;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
@@ -17,6 +15,8 @@ using Sundouleia.ModFiles.Cache;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
+using Sundouleia.Radar.Chat;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Events;
@@ -27,6 +27,8 @@ using Sundouleia.Utils;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
+using System.Net.Http.Headers;
+using System.Reflection;
 using TerraFX.Interop.Windows;
 using static FFXIVClientStructs.FFXIV.Client.UI.Misc.RaptureMacroModule;
 

@@ -1,4 +1,4 @@
-namespace Sundouleia.Utils;
+namespace Sundouleia.Radar.Chat;
 
 // Move over to API for server deserialization.
 public struct SerializableChatLog

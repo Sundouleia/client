@@ -1,7 +1,7 @@
-using CkCommons;
 using CkCommons.Gui;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
-using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.Services.Tutorial;
 
@@ -20,9 +20,9 @@ public class RadarTab
 
     public void DrawSection()
     {
-        CkGui.FontTextCentered($"{PlayerData.CurrentWorld} - Zone {_service.CurrentZone}", UiFontService.UidFont);
-        CkGui.ColorTextCentered($"{_manager.AllUsers} others in the area, {_manager.RenderedUsers} rendered", ImGuiColors.DalamudGrey3);
-        CkGui.Separator();
+        CkGui.FontTextCentered($"{RadarService.CurrWorldName} Radar - Zone {RadarService.CurrZone}", UiFontService.Default150Percent);
+        CkGui.ColorTextCentered($"{RadarService.CurrZoneName} | {_manager.AllUsers.Count} Others | {_manager.RenderedUsers.Count} Rendered", ImGuiColors.DalamudGrey2);
+        ImGui.Separator();
 
         CkGui.TextWrapped("Below is just a rough outline, but will be a list of users by their anonymous " +
             "names, allowing you to send requests, if they permit it.");
@@ -34,9 +34,6 @@ public class RadarTab
             CkGui.TextFrameAlignedInline(radarUser.AnonymousName);
             CkGui.ColorTextInline($" (Valid: {radarUser.IsValid})", radarUser.IsValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
         }
-        
-
-
     }
 }
 

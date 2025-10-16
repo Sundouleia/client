@@ -1,7 +1,7 @@
 using CkCommons.Chat;
 using SundouleiaAPI.Data;
 
-namespace Sundouleia.Utils; 
+namespace Sundouleia.Radar.Chat;
 public record RadarCkChatMessage(UserData UserData, string Name, string Message) 
     : CkChatMessage(Name, Message, DateTime.UtcNow)
 {

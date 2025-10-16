@@ -1,5 +1,6 @@
 using CkCommons;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
@@ -43,27 +44,54 @@ public class RadarService : DisposableMediatorSubscriberBase
             }
         });
 
-        // Set defaults.
-        CurrentZone = PlayerContent.TerritoryID;
         // Listen to zone changes.
         Svc.ClientState.TerritoryChanged += OnTerritoryChanged;
-        Svc.ClientState.Logout += (_, __) => _manager.ClearUsers();
+        Svc.ClientState.Login += OnLogin;
+        Svc.ClientState.Logout += OnLogout;
+
+        if (Svc.ClientState.IsLoggedIn)
+            OnLogin();
     }
 
-    public ushort CurrentZone { get; private set; } = 0;
-    public string ZoneName => PlayerContent.GetTerritoryName(CurrentZone);
+    public static ushort CurrWorld { get; private set; } = 0;
+    public static string CurrWorldName { get; private set; } = string.Empty;
+    public static ushort CurrZone { get; private set; } = 0;
+    public static string CurrZoneName => PlayerContent.GetTerritoryName(CurrZone);
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         Svc.ClientState.TerritoryChanged -= OnTerritoryChanged;
-        Svc.ClientState.Logout -= (_, __) => _manager.ClearUsers();
+        Svc.ClientState.Login -= OnLogin;
+        Svc.ClientState.Logout -= OnLogout;
     }
-     
+
+    private async void OnLogin()
+    {
+        await SundouleiaEx.WaitForPlayerLoading();
+        CurrWorld = PlayerData.CurrentWorldIdInstanced;
+        CurrWorldName = PlayerData.CurrentWorldNameInstanced;
+        CurrZone = PlayerContent.TerritoryIdInstanced;
+        Mediator.Publish(new RadarTerritoryChanged(0, CurrZone));
+    }
+
+    private async void OnLogout(int type, int code)
+    {
+        CurrWorld = 0;
+        CurrWorldName = string.Empty;
+        CurrZone = 0;
+
+        if (!_config.Current.RadarEnabled)
+            return;
+        Logger.LogInformation("User logged out, leaving radar zone and clearing users.", LoggerType.RadarData);
+        await _hub.RadarZoneLeave().ConfigureAwait(false);
+        _manager.ClearUsers();
+    }
+
     private RadarZoneUpdate GetZoneUpdate()
     {
         var world = PlayerData.CurrentWorldIdInstanced;
-        var zone = CurrentZone;
+        var zone = CurrZone;
         var joinChats = _config.Current.RadarJoinChats;
         var hashedCID = _config.Current.RadarSendPings ? SundouleiaSecurity.GetClientIdentHashThreadSafe() : string.Empty;
         return new(world, zone, joinChats, hashedCID);
@@ -75,16 +103,18 @@ public class RadarService : DisposableMediatorSubscriberBase
         if (!Svc.ClientState.IsLoggedIn)
             return;
 
+        Mediator.Publish(new RadarTerritoryChanged(CurrZone, newTerritory));
+
         // If we do not want to send radar updates, then dont.
         if (!_config.Current.RadarEnabled)
         {
-            CurrentZone = newTerritory;
+            CurrZone = newTerritory;
             return;
         }
 
 
-        Logger.LogInformation($"Territory changed from {CurrentZone} to {newTerritory}", LoggerType.RadarData);
-        CurrentZone = newTerritory;
+        Logger.LogInformation($"Territory changed from {CurrZone} to {newTerritory}", LoggerType.RadarData);
+        CurrZone = newTerritory;
 
         // Leave the current radar zone, notifying all users of the disconnect.
         await _hub.RadarZoneLeave().ConfigureAwait(false);
@@ -105,7 +135,7 @@ public class RadarService : DisposableMediatorSubscriberBase
             var zoneInfo = await _hub.RadarZoneJoin(info).ConfigureAwait(false);
             if (zoneInfo.ErrorCode is not SundouleiaApiEc.Success || zoneInfo.Value is null)
             {
-                Logger.LogWarning($"Failed to join radar zone {CurrentZone} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
+                Logger.LogWarning($"Failed to join radar zone {CurrZone} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
                 return;
             }
 

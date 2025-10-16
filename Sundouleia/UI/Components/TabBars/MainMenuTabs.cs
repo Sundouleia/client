@@ -6,11 +6,10 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using OtterGui.Widgets;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar.Chat;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
-using Sundouleia.Utils;
 
 namespace Sundouleia.Gui.Components;
 

@@ -23,3 +23,8 @@ public record RadarAddOrUpdateUser(OnlineUser UpdatedUser) : MessageBase;
 /// </summary>
 /// <param name="User"></param>
 public record RadarRemoveUser(UserData User) : MessageBase;
+
+/// <summary>
+///     Whenever the territory updates.
+/// </summary>
+public record RadarTerritoryChanged(ushort PrevTerritory, ushort NewTerritory) : MessageBase;

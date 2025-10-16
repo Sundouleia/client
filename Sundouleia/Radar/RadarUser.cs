@@ -2,7 +2,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 
-namespace Sundouleia.PlayerClient;
+namespace Sundouleia.Radar;
 
 /// <summary>
 ///     Model representing a valid visible radar user. <para />

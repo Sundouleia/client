@@ -21,16 +21,16 @@ using Sundouleia.WebAPI;
 using SundouleiaAPI.Network;
 using System.Globalization;
 
-namespace Sundouleia.Utils;
+namespace Sundouleia.Radar.Chat;
 public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, IDisposable
 {
-    private static string RecentFile => Path.Combine(ConfigFileProvider.SundouleiaDirectory, "recent-chat.log");
     private static RichTextFilter AllowedTypes = RichTextFilter.Emotes;
 
     private readonly ILogger<RadarChatLog> _logger;
     private readonly MainHub _hub;
     private readonly MainMenuTabs _tabMenu;
     private readonly SundesmoManager _sundesmos;
+    private readonly RadarService _service;
     private readonly TutorialService _guides;
 
     // Private variables that are used by internal methods.
@@ -38,21 +38,19 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
     // Allow a circular buffer of 1k messages.
     public RadarChatLog(ILogger<RadarChatLog> logger, SundouleiaMediator mediator, MainHub hub,
-        MainMenuTabs tabs, SundesmoManager pairs, TutorialService guides) 
+        MainMenuTabs tabs, SundesmoManager sundesmos, RadarService service, TutorialService guides) 
         : base(0, "Radar Chat", 1000)
     {
         _logger = logger;
         Mediator = mediator;
         _hub = hub;
         _tabMenu = tabs;
-        _sundesmos = pairs;
+        _sundesmos = sundesmos;
+        _service = service;
         _guides = guides;
 
-        // Load the chat log from most recent session, if any.
-        LoadTerritoryChatLog();
-
         Mediator.Subscribe<NewRadarChatMessage>(this, msg => AddNetworkMessage(msg.Message, msg.FromSelf));
-        Mediator.Subscribe<MainWindowTabChangeMessage>(this, (msg) =>
+        Mediator.Subscribe<MainWindowTabChangeMessage>(this, msg =>
         {
             if (msg.NewTab is MainMenuTabs.SelectedTab.RadarChat)
             {
@@ -62,15 +60,18 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
                 NewCorbyMsg = false;
             }
         });
+        Mediator.Subscribe<RadarTerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
 
-        // Whenever territory changes we should clear out the log and update World & Territory
+        // Should just end up null or something empty.
+        LoadTerritoryChatLog(RadarService.CurrWorld, RadarService.CurrZone);
     }
 
     public SundouleiaMediator Mediator { get; }
 
-    public static ushort WorldLoc { get; private set; } = 0;
-    public static ushort TerritoryLoc { get; private set; } = 0;
     // Config options cant stop the corby >:3
+    public static bool AccessBlocked => ChatBlocked || NotVerified;
+    public static bool ChatBlocked => !MainHub.Reputation.ChatUsage;
+    public static bool NotVerified => !MainHub.Reputation.IsVerified;
     public static bool NewCorbyMsg { get; private set; } = false;
     public static int NewMsgCount { get; private set; } = 0;
 
@@ -78,8 +79,20 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     {
         Mediator.UnsubscribeAll(this);
         // Save the chat log prior to disposal.
-        SaveChatLog();
+        SaveChatLog(RadarService.CurrWorld, RadarService.CurrZone);
         GC.SuppressFinalize(this);
+    }
+
+    private static string GetRecentFile(ushort worldId, ushort zoneId)
+    {
+        var cfgName = $"{worldId}-{zoneId}-recent-chat.log";
+        return Path.Combine(ConfigFileProvider.ChatDirectory, cfgName);
+    }
+
+    public void SetDisabledStates(bool content, bool input)
+    {
+        disableContent = content;
+        disableInput = input;
     }
 
     public void SetAutoScroll (bool newState)
@@ -91,6 +104,10 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
     private void AddNetworkMessage(RadarChatMessage message, bool fromSelf)
     {
+        // 1) Filter out blocked users here.
+
+
+        // 2) Update the chat contents.
         if (_tabMenu.TabSelection is not MainMenuTabs.SelectedTab.RadarChat)
             NewMsgCount++;
         else
@@ -98,9 +115,6 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
             NewMsgCount = 0;
             NewCorbyMsg = false;
         }
-
-        // 2) Add later here a filter for our blocker list.
-
 
         // 3) Initial assumption of the sender name.
         var finalName = message.Sender.AnonName; // "Anon.User-XXXX"
@@ -122,9 +136,9 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         if (newMsg.Tier is CkVanityTier.ShopKeeper)
         {
             // Apply Cordy's signature color to her name, and also prefix her icon and give all RichText permissions.
-            UserColors[newMsg.UID] = CkColor.CkMistressColor.Vec4();
-            var prefix = $"[img=RequiredImages\\Tier4Icon][rawcolor={CkColor.CkMistressColor.Uint()}]{newMsg.Name}[/rawcolor]: ";
-            Messages.PushBack(newMsg with { Message = $"{prefix} [rawcolor={CkColor.CkMistressText.Uint()}]{newMsg.Message}[/rawcolor]" });
+            UserColors[newMsg.UID] = CkColor.ShopKeeperColor.Vec4();
+            var prefix = $"[img=RequiredImages\\Tier4Icon][rawcolor={CkColor.ShopKeeperColor.Uint()}]{newMsg.Name}[/rawcolor]: ";
+            Messages.PushBack(newMsg with { Message = $"{prefix} [rawcolor={CkColor.ShopKeeperText.Uint()}]{newMsg.Message}[/rawcolor]" });
             unreadSinceScroll++;
             NewCorbyMsg = true;
         }
@@ -173,9 +187,14 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         
 
         ImGui.SetNextItemWidth(width - (CkGui.IconButtonSize(scrollIcon).X + ImGui.GetStyle().ItemInnerSpacing.X) * 3);
-        ImGui.InputTextWithHint($"##ChatInput{Label}{ID}", "type here...", ref previewMessage, 300);
+
+        using (ImRaii.Disabled(disableInput))
+        {
+            ImGui.InputTextWithHint($"##ChatInput{Label}{ID}", "type here...", ref previewMessage, 300);
+        }
+
         // Process submission Prevent losing chat focus after pressing the Enter key.
-        if (ImGui.IsItemFocused() && ImGui.IsKeyPressed(ImGuiKey.Enter))
+        if (!disableInput && ImGui.IsItemFocused() && ImGui.IsKeyPressed(ImGuiKey.Enter))
         {
             shouldFocusChatInput = true;
             _emoteSelectionOpened = false;
@@ -186,24 +205,24 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         ImUtf8.SameLineInner();
         using (ImRaii.PushColor(ImGuiCol.Text, CkColor.VibrantPink.Uint(), _emoteSelectionOpened))
         {
-            if (CkGui.IconButton(FAI.Heart))
+            if (CkGui.IconButton(FAI.Heart, disabled: disableInput))
                 _emoteSelectionOpened = !_emoteSelectionOpened;
         }
-        CkGui.AttachToolTip($"Toggles Quick-Emote selection.");
+        CkGui.AttachToolTip($"Toggles Quick-Emote selection.", disableInput);
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatEmotes, ImGui.GetWindowPos(), ImGui.GetWindowSize());
 
         // Toggle AutoScroll functionality
         ImUtf8.SameLineInner();
-        if (CkGui.IconButton(scrollIcon))
+        if (CkGui.IconButton(scrollIcon, disabled: disableInput))
             DoAutoScroll = !DoAutoScroll;
         CkGui.AttachToolTip($"Toggles AutoScroll (Current: {(DoAutoScroll ? "Enabled" : "Disabled")})");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatScroll, ImGui.GetWindowPos(), ImGui.GetWindowSize());
 
         // draw the popout button
         ImUtf8.SameLineInner();
-        if (CkGui.IconButton(FAI.Expand, disabled: !KeyMonitor.ShiftPressed()))
+        if (CkGui.IconButton(FAI.Expand, disabled: disableInput || !KeyMonitor.ShiftPressed()))
             Mediator.Publish(new UiToggleMessage(typeof(RadarChatPopoutUI)));
-        CkGui.AttachToolTip("Open the Global Chat in a Popout Window--SEP--Hold SHIFT to activate!");
+        CkGui.AttachToolTip("Open a Popout of the Radar Chat!--SEP--Hold SHIFT to activate!");
     }
 
     protected override void DrawPostChatLog(Vector2 inputPosMin)
@@ -265,7 +284,10 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     }
 
     protected override void OnMiddleClick(RadarCkChatMessage message)
-        => Mediator.Publish(new ProfileOpenMessage(message.UserData));
+    {
+        if (disableContent) return;
+        Mediator.Publish(new ProfileOpenMessage(message.UserData));
+    }
 
     protected override void OnSendMessage(string message)
     {
@@ -273,7 +295,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         if (string.IsNullOrWhiteSpace(previewMessage))
             return;
         // Send message to the server
-        _hub.RadarChatMessage(new(MainHub.OwnUserData, WorldLoc, TerritoryLoc, previewMessage)).ConfigureAwait(false);
+        _hub.RadarChatMessage(new(MainHub.OwnUserData, RadarService.CurrWorld, RadarService.CurrZone, previewMessage)).ConfigureAwait(false);
         // Clear preview
         previewMessage = string.Empty;
     }
@@ -308,7 +330,8 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
             if (ImGui.Selectable("Block User") && !isOwnMsg && !isSystemMsg)
             {
                 // probably do extra handling here for updating the blocker list after.
-                UiService.SetUITask(async () => await _hub.Callback_Blocked(new(LastInteractedMsg.UserData)));
+                // TODO:
+                UiService.SetUITask(async () => await _hub.UserBlock(new(LastInteractedMsg.UserData)));
                 ClosePopupAndResetMsg();
             }
         CkGui.AttachToolTip(shiftHeld ? $"Blocks {LastInteractedMsg.Name} permanently." : "Must be holding CTRL+SHIFT to select.");
@@ -320,23 +343,56 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         ImGui.CloseCurrentPopup();
     }
 
-    private void SaveChatLog()
+    private void SaveChatLog(ushort worldId, ushort zoneId)
     {
+        if (worldId == 0 || zoneId == 0)
+            return;
+
         // Capture up to the last 500 messages
         var messagesToSave = Messages.TakeLast(500).ToList();
-        var logToSave = new SerializableChatLog(WorldLoc, TerritoryLoc, TimeCreated, messagesToSave);
+        var logToSave = new SerializableChatLog(worldId, zoneId, TimeCreated, messagesToSave);
 
         // Serialize the item to JSON
-        var json = JsonConvert.SerializeObject(logToSave);
-        var compressed = json.Compress(6);
-        var base64ChatLogData = Convert.ToBase64String(compressed);
-        File.WriteAllText(RecentFile, base64ChatLogData);
+        try
+        {
+            var json = JsonConvert.SerializeObject(logToSave);
+            var compressed = json.Compress(6);
+            var base64ChatLogData = Convert.ToBase64String(compressed);
+            File.WriteAllText(GetRecentFile(worldId, zoneId), base64ChatLogData);
+        }
+        catch (DirectoryNotFoundException) { /* Swallow */ }
+        catch (FileNotFoundException) { /* Swallow */ }
+        catch (Bagagwa ex)
+        {
+            _logger.LogError($"Failed to compress chat log: {ex}");
+        }
     }
 
-    public void LoadTerritoryChatLog()
+    private void ChangeChatLog(ushort prevLoc, ushort newLoc)
     {
+        // Save the current chat log first.
+        SaveChatLog(RadarService.CurrWorld, prevLoc);
+        // Clear the current chat log.
+        Messages.Clear();
+        UserColors.Clear();
+        unreadSinceScroll = 0;
+        NewMsgCount = 0;
+        NewCorbyMsg = false;
+        // Load the new territory chat log.
+        LoadTerritoryChatLog(RadarService.CurrWorld, newLoc);
+    }
+
+    public void LoadTerritoryChatLog(ushort worldId, ushort zoneId)
+    {
+        if (worldId == 0 || zoneId == 0)
+        {
+            AddDefaultWelcomeWithLog("Invalid world or zone ID.");
+            return;
+        }
+
+        var recentFile = GetRecentFile(worldId, zoneId);
         // if the file does not exist, return
-        if (!File.Exists(RecentFile))
+        if (!File.Exists(recentFile))
         {
             AddDefaultWelcomeWithLog("Chat log file does not exist.");
             return;
@@ -348,7 +404,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         var savedChatlog = new SerializableChatLog();
         try
         {
-            var base64logFile = File.ReadAllText(RecentFile);
+            var base64logFile = File.ReadAllText(recentFile);
             var bytes = Convert.FromBase64String(base64logFile);
             var version = bytes[0];
             version = bytes.DecompressToString(out var decompressed);
@@ -358,6 +414,8 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
             if (savedChatlog.Messages.Any(m => m.UserData is null))
                 throw new Exception("One or more user datas are null in the chat log.");
         }
+        catch (DirectoryNotFoundException) { /* Swallow */ }
+        catch (FileNotFoundException) { /* Swallow */ }
         catch (Bagagwa ex)
         {
             AddDefaultWelcomeWithLog("Failed to decompress chat log: " + ex);
@@ -376,7 +434,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         {
             // Cordy is special girl :3
             if (msg.Tier is CkVanityTier.ShopKeeper)
-                UserColors[msg.UID] = CkColor.CkMistressColor.Vec4();
+                UserColors[msg.UID] = CkColor.ShopKeeperColor.Vec4();
             else
                 AssignSenderColor(msg);
 
@@ -389,10 +447,11 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         // On Failed Loads
         void AddDefaultWelcomeWithLog(string logMessage)
         {
+            // Maybe replace with territory intended use later or something.
             _logger.LogWarning(logMessage);
             AddMessage(new(new("System"), "System",
-                "Welcome to the Sundouleia Global Chat![para]" +
-                "Your Name in here is Anonymous to anyone you have not yet added. Feel free to say hi![line]"));
+                $"[color=grey2]Welcome to {RadarService.CurrZoneName}'s Radar Chat! Your Name displays as " +
+                $"[color=yellow]AnonUser-XXXX[/color] to others! Feel free to say hi![/color][line]"));
         }
     }
 }

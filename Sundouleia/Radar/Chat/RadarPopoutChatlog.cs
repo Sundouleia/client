@@ -5,6 +5,7 @@ using CkCommons.Helpers;
 using CkCommons.Raii;
 using CkCommons.RichText;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
@@ -19,10 +20,17 @@ using Sundouleia.WebAPI;
 using SundouleiaAPI.Network;
 using System.Globalization;
 
-namespace Sundouleia.Utils;
+namespace Sundouleia.Radar.Chat;
 public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, IDisposable
 {
-    private static string RecentFile => Path.Combine(ConfigFileProvider.SundouleiaDirectory, "recent-chat.log");
+    private static string RecentFile
+    {
+        get
+        {
+            var cfgName = $"{RadarService.CurrWorld}-{RadarService.CurrZone}-recent-chat.log";
+            return Path.Combine(ConfigFileProvider.ChatDirectory, cfgName);
+        }
+    }
     private static RichTextFilter AllowedTypes = RichTextFilter.Emotes;
 
     private readonly MainHub _hub;
@@ -36,23 +44,39 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         _hub = hub;
         _sundesmos = pairs;
 
-        // Load the chat log from most recent session, if any.
-        LoadTerritoryChatLog();
-
         Mediator.Subscribe<NewRadarChatMessage>(this, msg => AddNetworkMessage(msg.Message, msg.FromSelf));
         Mediator.Subscribe<MainWindowTabChangeMessage>(this, (msg) =>
         {
             if (msg.NewTab is MainMenuTabs.SelectedTab.RadarChat)
                 ShouldScrollToBottom = true;
         });
+        Mediator.Subscribe<RadarTerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
+
+        // Should just end up null or something empty.
+        LoadTerritoryChatLog(RadarService.CurrWorld, RadarService.CurrZone);
     }
 
     public SundouleiaMediator Mediator { get; }
+    public static bool AccessBlocked => ChatBlocked || NotVerified;
+    public static bool ChatBlocked => !MainHub.Reputation.ChatUsage;
+    public static bool NotVerified => !MainHub.Reputation.IsVerified;
 
     void IDisposable.Dispose()
     {
         Mediator.UnsubscribeAll(this);
         GC.SuppressFinalize(this);
+    }
+
+    private static string GetRecentFile(ushort worldId, ushort zoneId)
+    {
+        var cfgName = $"{worldId}-{zoneId}-recent-chat.log";
+        return Path.Combine(ConfigFileProvider.ChatDirectory, cfgName);
+    }
+
+    public void SetDisabledStates(bool content, bool input)
+    {
+        disableContent = content;
+        disableInput = input;
     }
 
     public void SetAutoScroll (bool newState)
@@ -65,8 +89,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
 
     private void AddNetworkMessage(RadarChatMessage message, bool fromSelf)
     {
-        // 1) Add later here a filter for our blocker list.
-
+        // 1) Filter out blocked users here.
 
         // 2) Initial assumption of the sender name.
         var finalName = message.Sender.AnonName; // "Anon.User-XXXX"
@@ -78,7 +101,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         else if (fromSelf)
             finalName = $"{message.Sender.AliasOrUID} ({message.Sender.UID[..4]})";
 
-        // 4) Construct the network message to the RadarCkChatMessage format.
+        // Construct the network message to the RadarCkChatMessage format.
         AddMessage(new RadarCkChatMessage(message.Sender, finalName, message.Message));
     }
 
@@ -87,27 +110,25 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         // Cordy is special girl :3
         if (newMsg.Tier is CkVanityTier.ShopKeeper)
         {
-            // Force set the uid color to her favorite color.
-            UserColors[newMsg.UID] = CkColor.CkMistressColor.Vec4();
-            // allow any rich text tags, as she is a special case.
-            var prefix = $"[img=RequiredImages\\Tier4Icon][rawcolor={CkColor.CkMistressColor.Uint()}]{newMsg.Name}[/rawcolor]: ";
-            Messages.PushBack(newMsg with { Message = prefix + newMsg.Message });
-            unreadSinceScroll++;
+            // Apply Cordy's signature color to her name, and also prefix her icon and give all RichText permissions.
+            UserColors[newMsg.UID] = CkColor.ShopKeeperColor.Vec4();
+            var prefix = $"[img=RequiredImages\\Tier4Icon][rawcolor={CkColor.ShopKeeperColor.Uint()}]{newMsg.Name}[/rawcolor]: ";
+            Messages.PushBack(newMsg with { Message = $"{prefix} [rawcolor={CkColor.ShopKeeperText.Uint()}]{newMsg.Message}[/rawcolor]" });
         }
-        else if (newMsg.UID == "System")
+        // System messages should not inc the unread count.
+        else if (string.Equals(newMsg.UID, "System", StringComparison.OrdinalIgnoreCase))
         {
             // System messages are special, they are not colored.
             var prefix = $"[rawcolor=0xFF0000FF]{newMsg.Name}[/rawcolor]: ";
             Messages.PushBack(newMsg with { Message = prefix + newMsg.Message });
-            unreadSinceScroll++;
         }
         else
         {
-            // Assign the sender color
-            var col = AssignSenderColor(newMsg).ToUint();
-            // strip out the modifiers that are not allowed to prevent chaos in global chat.
+            // Assign color
+            var col = ColorHelpers.RgbaVector4ToUint(AssignSenderColor(newMsg));
+            // strip away CkRichText formatters not permitted. (Prevent chat chaos)
             var sanitizedMsg = CkRichText.StripDisallowedRichTags(newMsg.Message, AllowedTypes);
-            // append special formatting to the start of the message based on supporter type.
+            // Append prefix formatting to supporters.
             var prefix = newMsg.Tier switch
             {
                 CkVanityTier.DistinguishedConnoisseur => $"[img=RequiredImages\\Tier3Icon][rawcolor={col}]{newMsg.Name}[/rawcolor]: ",
@@ -127,7 +148,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         if (newMsg.Tier is CkVanityTier.ShopKeeper)
         {
             // Force set the uid color to her favorite color.
-            UserColors[newMsg.UID] = CkColor.CkMistressColor.Vec4();
+            UserColors[newMsg.UID] = CkColor.ShopKeeperColor.Vec4();
             Messages.PushBack(newMsg);
             unreadSinceScroll++;
         }
@@ -250,7 +271,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         if (string.IsNullOrWhiteSpace(previewMessage))
             return;
         // Send message to the server
-        _hub.RadarChatMessage(new(MainHub.OwnUserData, RadarChatLog.WorldLoc, RadarChatLog.TerritoryLoc, previewMessage)).ConfigureAwait(false);
+        _hub.RadarChatMessage(new(MainHub.OwnUserData, RadarService.CurrWorld, RadarService.CurrZone, previewMessage)).ConfigureAwait(false);
         // Clear preview
         previewMessage = string.Empty;
     }
@@ -297,23 +318,39 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         ImGui.CloseCurrentPopup();
     }
 
-    public void LoadTerritoryChatLog()
+    private void ChangeChatLog(ushort prevLoc, ushort newLoc)
     {
-        // if the file does not exist, return
-        if (!File.Exists(RecentFile))
+        // Clear the current chat log.
+        Messages.Clear();
+        UserColors.Clear();
+        unreadSinceScroll = 0;
+        // Load the new territory chat log.
+        LoadTerritoryChatLog(RadarService.CurrWorld, newLoc);
+    }
+
+    public void LoadTerritoryChatLog(ushort worldId, ushort zoneId)
+    {
+        if (worldId == 0 || zoneId == 0)
         {
-            AddDefaultWelcome();
+            AddDefaultWelcomeWithLog("Invalid world or zone ID.");
+            return;
+        }
+
+        var recentFile = GetRecentFile(worldId, zoneId);
+        // if the file does not exist, return
+        if (!File.Exists(recentFile))
+        {
+            AddDefaultWelcomeWithLog("Chat log file does not exist.");
             return;
         }
 
         // Maybe it exists, but we are not in the same territory. If that is the case we should add the welcome message and return.
         // TODO: handle this.
-
         // Attempt Deserialization.
         var savedChatlog = new SerializableChatLog();
         try
         {
-            var base64logFile = File.ReadAllText(RecentFile);
+            var base64logFile = File.ReadAllText(recentFile);
             var bytes = Convert.FromBase64String(base64logFile);
             var version = bytes[0];
             version = bytes.DecompressToString(out var decompressed);
@@ -323,16 +360,18 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
             if (savedChatlog.Messages.Any(m => m.UserData is null))
                 throw new Exception("One or more user datas are null in the chat log.");
         }
-        catch (Bagagwa)
+        catch (DirectoryNotFoundException) { /* Swallow */ }
+        catch (FileNotFoundException) { /* Swallow */ }
+        catch (Bagagwa ex)
         {
-            AddDefaultWelcome();
+            AddDefaultWelcomeWithLog("Failed to decompress chat log: " + ex);
             return;
         }
 
         // Do not restore if on a different day than the recovered log.
         if (savedChatlog.DateStarted.DayOfYear != DateTime.Now.DayOfYear)
         {
-            AddDefaultWelcome();
+            AddDefaultWelcomeWithLog("Chat log is from a different day. Not restoring.");
             return;
         }
 
@@ -341,7 +380,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         {
             // Cordy is special girl :3
             if (msg.Tier is CkVanityTier.ShopKeeper)
-                UserColors[msg.UID] = CkColor.CkMistressColor.Vec4();
+                UserColors[msg.UID] = CkColor.ShopKeeperColor.Vec4();
             else
                 AssignSenderColor(msg);
 
@@ -350,10 +389,12 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         }
 
         // On Failed Loads
-        void AddDefaultWelcome()
+        void AddDefaultWelcomeWithLog(string logMessage)
         {
-            AddMessage(new(new("System"), "System", "Welcome to the Radar Chat![para]" +
-                "Your Name in here is Anonymous to anyone you have not yet added. Feel free to say hi![line]"));
+            // Maybe replace with territory intended use later or something.
+            AddMessage(new(new("System"), "System",
+                $"[color=grey2]Welcome to {RadarService.CurrZoneName}'s Radar Chat! Your Name displays as " +
+                $"[color=yellow]AnonUser-XXXX[/color] to others! Feel free to say hi![/color][line]"));
         }
     }
 }
