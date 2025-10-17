@@ -202,6 +202,7 @@ namespace Sundouleia.Localization
     public class MainOptions
     {
         public readonly string HeaderGeneric = Loc.Localize("MainOptions_HeaderGeneric", "Generic");
+        public readonly string HeaderGlobalPerms = Loc.Localize("MainOptions_HeaderGlobalPerms", "Global Permissions");
         public readonly string HeaderRadar = Loc.Localize("MainOptions_HeaderRadar", "Radar");
         public readonly string HeaderExports = Loc.Localize("MainOptions_HeaderExports", "Exports");
 
@@ -218,6 +219,16 @@ namespace Sundouleia.Localization
 
         public readonly string AllowNSFWLabel = Loc.Localize("Preferences_AllowNSFWLabel", "Show NSFW Profiles");
         public readonly string AllowNSFWTT = Loc.Localize("Preferences_AllowNSFWTT", "NSFW profiles are masked when disabled.");
+
+        // Global Permissions
+        public readonly string AllowAnimationsLabel = Loc.Localize("Preferences_AllowAnimationsLabel", "Allow Animations By Default");
+        public readonly string AllowAnimationsTT = Loc.Localize("Preferences_AllowAnimationsTT", "The default --COL--Allow Animations--COL-- value to set on new pairs.");
+
+        public readonly string AllowSoundsLabel = Loc.Localize("Preferences_AllowSoundsLabel", "Allow Sounds By Default");
+        public readonly string AllowSoundsTT = Loc.Localize("Preferences_AllowSoundsTT", "The default --COL--Allow SFX/Music--COL-- value to set on new pairs.");
+
+        public readonly string AllowVfxLabel = Loc.Localize("Preferences_AllowVfxLabel", "Allow VFX By Default");
+        public readonly string AllowVfxTT = Loc.Localize("Preferences_AllowVfxTT", "The default --COL--Allow VFX--COL-- value to set on new pairs.");
 
         // Radar Options
         public readonly string RadarEnabledLabel = Loc.Localize("Preferences_RadarEnabledLabel", "Enable Radar");

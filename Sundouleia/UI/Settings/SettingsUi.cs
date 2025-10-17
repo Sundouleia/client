@@ -8,12 +8,16 @@ using OtterGui;
 using OtterGui.Text;
 using Sundouleia.Interop;
 using Sundouleia.Localization;
+using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Enums;
+using SundouleiaAPI.Hub;
+using SundouleiaAPI.Util;
 
 namespace Sundouleia.Gui;
 
@@ -116,6 +120,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 {
                     DrawMainGeneric();
                     ImGui.Separator();
+                    DrawMainGlobals();
+                    ImGui.Separator();
                     DrawMainRadar();
                     ImGui.Separator();
                     DrawMainExports();
@@ -178,22 +184,47 @@ public class SettingsUi : WindowMediatorSubscriberBase
         CkGui.HelpText(CkLoc.Settings.MainOptions.ShowProfilesTT);
 
         using var dis = ImRaii.Disabled(!showProfiles);
-        using var ident = ImRaii.PushIndent();
-        
+        using (ImRaii.PushIndent())
+        {
+            ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+            if (ImGui.SliderFloat("##Profile-Delay", ref profileDelay, 0.3f, 5, $"%.1f {CkLoc.Settings.MainOptions.ProfileDelayLabel}"))
+            {
+                _mainConfig.Current.ProfileDelay = profileDelay;
+                _mainConfig.Save();
+            }
+            CkGui.HelpText(CkLoc.Settings.MainOptions.ProfileDelayTT);
+        }
+
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowNSFWLabel, ref allowNsfw))
         {
             _mainConfig.Current.AllowNSFW = allowNsfw;
             _mainConfig.Save();
         }
         CkGui.HelpText(CkLoc.Settings.MainOptions.AllowNSFWTT);
+    }
 
-        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
-        if (ImGui.SliderFloat("##Profile-Delay", ref profileDelay, 0.3f, 5, $"%.1f {CkLoc.Settings.MainOptions.ProfileDelayLabel}"))
-        {
-            _mainConfig.Current.ProfileDelay = profileDelay;
-            _mainConfig.Save();
-        }
-        CkGui.HelpText(CkLoc.Settings.MainOptions.ProfileDelayTT);
+    private void DrawMainGlobals()
+    {
+        if (!MainHub.IsConnected)
+            return;
+
+        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderGlobalPerms, UiFontService.UidFont);
+        var animationsGlobal = MainHub.GlobalPerms.DefaultAllowAnimations;
+        var soundsGlobal = MainHub.GlobalPerms.DefaultAllowSounds;
+        var vfxGlobal = MainHub.GlobalPerms.DefaultAllowVfx;
+
+
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowAnimationsLabel, ref animationsGlobal, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowAnimations), animationsGlobal));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowAnimationsTT);
+
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowSoundsLabel, ref soundsGlobal, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowSounds), soundsGlobal));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowSoundsTT);
+
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowVfxLabel, ref vfxGlobal, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowVfx), vfxGlobal));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowVfxTT);
     }
 
     private void DrawMainRadar()
@@ -491,5 +522,46 @@ public class SettingsUi : WindowMediatorSubscriberBase
             "--NL----COL--Chat--COL-- prints Error notifications in chat" +
             "--NL----COL--Toast--COL-- shows Error toast notifications in the bottom right corner" +
             "--NL----COL--Both--COL-- shows chat as well as the toast notification", ImGuiColors.ParsedGold);
+    }
+
+    /// <summary>
+    ///     Updates the global permissions on the server. Should be executed as a UIService task to prevent edits while processing.
+    /// </summary>
+    public async Task<bool> ChangeGlobalPerm(string propertyName, bool newValue)
+    {
+        if (MainHub.ConnectionResponse?.GlobalPerms is not { } globals)
+            return false;
+
+        var type = globals.GetType();
+        var property = type.GetProperty(propertyName);
+        if (property is null || !property.CanRead || !property.CanWrite)
+            return false;
+
+        // Initially, Before sending it off, store the current value.
+        var currentValue = property.GetValue(globals);
+
+        try
+        {
+            // Update it before we send off for validation.
+            if (!PropertyChanger.TrySetProperty(globals, propertyName, newValue, out object? finalVal))
+                throw new InvalidOperationException($"Failed to set property {propertyName} in GlobalPerms with value {newValue}.");
+
+            if (finalVal is null)
+                throw new InvalidOperationException($"Property {propertyName} in GlobalPerms, has a finalValue of null.");
+
+            // Now that it is updated client-side, attempt to make the change on the server, and get the hub response.
+            HubResponse response = await _hub.ChangeGlobalPerm(propertyName, (bool)newValue);
+
+            if (response.ErrorCode is not SundouleiaApiEc.Success)
+                throw new InvalidOperationException($"Failed to change {propertyName} to {finalVal}. Reason: {response.ErrorCode}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning($"(Resetting to Previous Value): {ex.Message}");
+            property.SetValue(globals, currentValue);
+            return false;
+        }
+
+        return true;
     }
 }

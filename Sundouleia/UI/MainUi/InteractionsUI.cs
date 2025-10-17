@@ -214,15 +214,6 @@ public class InteractionsUI : WindowMediatorSubscriberBase
         .Add(nameof(PairPerms.AllowVfx), new PermInfo(FAI.PersonBurst, FAI.Ban, "Allowing", "Preventing", "VFX from", false));
 
 
-
-
-//var pauseStateFAI = isPaused ? FAI.EyeSlash : FAI.Eye;
-//var pauseStateText = $"{(isPaused ? "Unpause" : "Pause")} {_dispName}'s Alterations";
-//if (CkGui.IconTextButton(pauseStateFAI, pauseStateText, width, true, UiService.DisableUI))
-//UiService.SetUITask(async () => await ChangeOwnUnique(nameof(PairPerms.PauseVisuals), !isPaused));
-//CkGui.AttachToolTip($"{(!isPaused ? "Pause" : "Resume")} the rendering of {_dispName}'s modded appearance.");
-
-    // TODO: Replace this placeholder fix.
     /// <summary>
     ///     Updates a client's own PairPermission for a defined Sundesmo client-side.
     ///     After the client-side change is made, it requests the change server side.
