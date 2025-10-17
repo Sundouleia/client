@@ -65,7 +65,7 @@ public class ProfilesTab
 
         DrawProfileList(_.InnerRegion.Y);
 
-        ImGui.SameLine();
+        ImUtf8.SameLineInner();
         using (ImRaii.Group())
         {
             var profile = _account.Config.Profiles.GetValueOrDefault(_selectedProfileIdx);

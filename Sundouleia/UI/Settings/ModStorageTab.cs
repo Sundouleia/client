@@ -14,33 +14,39 @@ using Sundouleia.ModFiles.Cache;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.WebAPI.Files;
 using System.Text.RegularExpressions;
+using TerraFX.Interop.DirectX;
 
 namespace Sundouleia.Gui;
 
 public partial class ModStorageTab : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
+    private readonly FileUploader _uploader;
     private readonly FileCompactor _compactor;
     private readonly CacheMonitor _monitor;
     private readonly SundouleiaWatcher _mainWatcher;
     private readonly PenumbraWatcher _penumbraWatcher;
+    private readonly FileTransferService _fileTransfers;
     private readonly UiFileDialogService _dialogService;
 
     // Cache location validators.
     private FilePathValidation _pathValidation = FilePathValidation.Valid;
     private readonly string _rootPath;
     private readonly bool _isLinux;
-    public ModStorageTab(ILogger<ModStorageTab> logger, SundouleiaMediator mediator, MainConfig config, 
-        FileCompactor compactor, CacheMonitor monitor, SundouleiaWatcher mainWatcher, 
-        PenumbraWatcher penumbraWatcher, UiFileDialogService dialogService)
+    public ModStorageTab(ILogger<ModStorageTab> logger, SundouleiaMediator mediator, MainConfig config,
+        FileUploader uploader, FileCompactor compactor, CacheMonitor monitor, SundouleiaWatcher mainWatcher, 
+        PenumbraWatcher penumbraWatcher, FileTransferService fileTransfers, UiFileDialogService dialogService)
         : base(logger, mediator)
     {
         _config = config;
+        _uploader = uploader;
         _compactor = compactor;
         _monitor = monitor;
         _mainWatcher = mainWatcher;
         _penumbraWatcher = penumbraWatcher;
+        _fileTransfers = fileTransfers;
         _dialogService = dialogService;
         _isLinux = Util.IsWine();
         _rootPath = _isLinux ? @"Z:\" : @"C:\";
@@ -280,6 +286,56 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
         // Inform client that the compactor is inaccessible they do not meet the conditions for it.
         if (_isLinux || !_monitor.StorageIsNTFS)
             ImGui.Text("The file compactor is only available on Windows and NTFS drives.");
+
+        ImGui.Separator();
+        DrawTransfers();
+    }
+
+    private void DrawTransfers()
+    {
+        CkGui.FontText("File Transfer Monitor", UiFontService.UidFont);
+
+        var uploads = _uploader.CurrentUploads;
+        CkGui.FramedIconText(FAI.Upload);
+        if (uploads.TotalFiles > 0)
+        {
+            var doneUploads = uploads.FilesCompleted;
+            var totalUploads = uploads.TotalFiles;
+
+            var totalUploaded = uploads.Transferred;
+            var totalToUpload = uploads.TotalSize;
+
+            CkGui.CenterTextAligned($"Uploading {doneUploads}/{totalUploads} Files");
+            CkGui.CenterTextAligned($"Progress: {SundouleiaEx.ByteToString(totalUploaded)}/{SundouleiaEx.ByteToString(totalToUpload)}");
+        }
+        else
+        {
+            CkGui.CenterTextAligned("No uploads in progress");
+        }
+
+        if (TransferBarUI.Downloads.Count <= 0)
+        {
+            CkGui.CenterTextAligned("No downloads in progress");
+            return;
+        }
+        else
+        {
+            foreach (var (pair, pairDLs) in TransferBarUI.Downloads)
+            {
+                using var node = ImRaii.TreeNode($"{pair.NameString}({pair.Sundesmo.GetNickAliasOrUid()}):");
+                if (!node)
+                    continue;
+
+                CkGui.FramedIconText(FAI.Download);
+                var doneDLs = pairDLs.FilesCompleted;
+                var totalDLs = pairDLs.TotalFiles;
+                var totalBytesDLed = pairDLs.Transferred;
+                var totalBytesToDL = pairDLs.TotalSize;
+                CkGui.TextFrameAlignedInline($"Downloading {doneDLs}/{totalDLs} Files");
+                CkGui.FrameSeparatorV();
+                CkGui.TextFrameAlignedInline($"Progress: {SundouleiaEx.ByteToString(totalBytesDLed)}/{SundouleiaEx.ByteToString(totalBytesToDL)}");
+            }
+        }
     }
 
     private void OpenDialogBox()

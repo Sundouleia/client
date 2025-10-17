@@ -131,7 +131,7 @@ public class RadarService : DisposableMediatorSubscriberBase
         if (!_config.Current.RadarEnabled)
             return;
         Logger.LogInformation("User logged out, leaving radar zone and clearing users.", LoggerType.RadarData);
-        await _hub.RadarZoneLeave().ConfigureAwait(false);
+        await Generic.Safe(_hub.RadarZoneLeave).ConfigureAwait(false);
         _manager.ClearUsers();
     }
 

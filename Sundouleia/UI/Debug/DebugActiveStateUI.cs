@@ -1,21 +1,15 @@
-using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using FFXIVClientStructs.FFXIV.Common.Lua;
-using OtterGui;
-using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
-using Sundouleia.Utils;
-using System.Runtime.Serialization;
 
 namespace Sundouleia.Gui;
 
@@ -33,7 +27,6 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         _watcher = watcher;
         _distributor = distributor;
 
-        IsOpen = true;
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
     }
 

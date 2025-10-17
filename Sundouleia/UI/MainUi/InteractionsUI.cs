@@ -1,16 +1,23 @@
+using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Helpers;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
+using OtterGui;
+using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Util;
+using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.MainWindow;
 public class InteractionsUI : WindowMediatorSubscriberBase
@@ -26,16 +33,20 @@ public class InteractionsUI : WindowMediatorSubscriberBase
 
         Mediator.Subscribe<TogglePermissionWindow>(this, msg =>
         {
+            // determine the state that IsOpen will be.
+            if (UserDataComparer.Instance.Equals(msg.Sundesmo.UserData, _sundesmo?.UserData))
+                IsOpen = !IsOpen;
+            else
+                IsOpen = true;
+            // Set the sundesmo to the new one.
             _sundesmo = msg.Sundesmo;
-            IsOpen = _sundesmo is null;
         });
     }
 
     // The current user. Will not draw the window if null.
     private Sundesmo? _sundesmo = null;
     private string _dispName = string.Empty;
-    private float _windowWidth => ImGuiHelpers.GlobalScale * 280f;
-
+    private float _windowWidth => (ImGui.CalcTextSize($"Preventing animations from {_dispName}").X + ImGui.GetFrameHeightWithSpacing()).AddWinPadX();
 
     protected override void PreDrawInternal()
     {
@@ -57,40 +68,159 @@ public class InteractionsUI : WindowMediatorSubscriberBase
     protected override void DrawInternal()
     {
         // Shouldnt even be drawing at all if the sundesmo is null.
-        if (_sundesmo is null)
+        if (_sundesmo is not { } s)
             return;
 
         using var _ = CkRaii.Child("InteractionsUI", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-        var width = ImGui.GetContentRegionAvail().X;
+        var width = _.InnerRegion.X;
+        DrawHeader();
 
-        var isPaused = _sundesmo.IsPaused;
+        DrawCommon(width);
+        ImGui.Separator();
+
+        ImGui.Text("Permissions");
+        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowAnimations), s.OwnPerms.AllowAnimations);
+        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowSounds), s.OwnPerms.AllowSounds);
+        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowVfx), s.OwnPerms.AllowVfx);
+
+        ImGui.Separator();
+
+        ImGui.Text("Pair Options");
+        DrawPairOptions(_.InnerRegion.X);
+    }
+
+    private void DrawHeader()
+    {
+        CkGui.CenterText($"{_dispName}'s Interactions");
+        var width = CkGui.IconSize(FAI.VolumeUp).X + CkGui.IconSize(FAI.Running).X + CkGui.IconSize(FAI.PersonBurst).X + ImUtf8.ItemInnerSpacing.X * 2;
+        CkGui.SetCursorXtoCenter(width);
+
+        var sounds = _sundesmo!.PairPerms.AllowSounds;
+        var anims = _sundesmo.PairPerms.AllowAnimations;
+        var vfx = _sundesmo.PairPerms.AllowVfx;
+
+        CkGui.IconText(FAI.VolumeUp, sounds ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip($"{_dispName} {(sounds ? "can hear your modded SFX/Music." : "disabled your modded SFX/Music.")}");
+        ImUtf8.SameLineInner();
+        CkGui.IconText(FAI.Running, anims ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip($"{_dispName} {(anims ? "can see your modded animations." : "disabled your modded animations.")}");
+        ImUtf8.SameLineInner();
+        CkGui.IconText(FAI.PersonBurst, vfx ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip($"{_dispName} {(vfx ? "can see your modded VFX." : "disabled your modded VFX.")}");
+
+        ImGui.Separator();    
+    }
+
+    private void DrawCommon(float width)
+    {
+        var isPaused = _sundesmo!.IsPaused;
         if (!isPaused)
         {
-            if (CkGui.IconTextButton(FAI.User, "Open Profile", width, true))
+            if (CkGui.IconTextButton(FAI.User, "Open Profile", width, true, UiService.DisableUI))
                 Mediator.Publish(new ProfileOpenMessage(_sundesmo.UserData));
             CkGui.AttachToolTip($"Opens {_dispName}'s profile!");
 
-            if (CkGui.IconTextButton(FAI.ExclamationTriangle, $"Report {_dispName}'s Profile", width, true))
+            if (CkGui.IconTextButton(FAI.ExclamationTriangle, $"Report {_dispName}'s Profile", width, true, UiService.DisableUI))
                 Mediator.Publish(new OpenReportUIMessage(_sundesmo.UserData, ReportKind.Profile));
             CkGui.AttachToolTip($"Snapshot {_dispName}'s Profile and make a report with its state.");
         }
 
-        if (CkGui.IconTextButton(isPaused ? FAI.Play : FAI.Pause, $"{(isPaused ? "Unpause" : "Pause")} {_dispName}", width, true))
-            UiService.SetUITask(async () => await ChangeOwnUnique(nameof(PairPerms.PauseVisuals), !isPaused));
-        CkGui.AttachToolTip(!isPaused ? "Pause" : "Resume" + $"pairing with {_dispName}.");
+        DrawDistinctPermRow(_sundesmo, _dispName, width, nameof(PairPerms.PauseVisuals), isPaused, false, true);
+        CkGui.AttachToolTip($"{(!isPaused ? "Pause" : "Resume")} the rendering of {_dispName}'s modded appearance.");
+    }
 
-        if (_sundesmo.IsRendered)
-        {
-            if (CkGui.IconTextButton(FAI.Sync, "Reload Appearance data", width, true))
-                _sundesmo.ReapplyAlterations();
-            CkGui.AttachToolTip("This reapplies the latest data from Customize+ and Moodles");
-        }
+    private void DrawPairOptions(float width)
+    {
+        using (ImRaii.Disabled(!_sundesmo!.IsTemporary))
+            if (CkGui.IconTextButton(FAI.Link, "Convert To Non-Temporary", width, true, !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
+                _logger.LogInformation("This would convert the temporary pair to a non-temporary pair.");
+        CkGui.AttachToolTip($"Makes a temporary pair non-temporary." +
+            $"--SEP--Can only be done by the temporary pair request accepter.");
 
-        ImGui.Separator();
-        if (CkGui.IconTextButton(FAI.Trash, "Unpair", width, true, !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
+        if (CkGui.IconTextButton(FAI.Trash, $"Remove {_dispName} from your Pairs", width, true, !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
             UiService.SetUITask(async () => await _hub.UserRemovePair(new(_sundesmo.UserData)));
         CkGui.AttachToolTip($"Must hold --COL--CTRL & SHIFT to remove.", color: ImGuiColors.DalamudRed);
     }
+
+    // SundesmoPermissionID
+    private enum SPID
+    {
+        PauseVisuals,
+        AllowAnimations,
+        AllowSounds,
+        AllowVfx,
+    }
+
+    // Modular framework similar to GSpeak but vastly simplified.
+    private void DrawDistinctPermRow(Sundesmo sundesmo, string dispName, float width, string permName, bool current, bool defaultTT = true, bool invertColors = false)
+    {
+        using var col = ImRaii.PushColor(ImGuiCol.Button, 0);
+        var txtData = PermissionData[permName];
+        var pos = ImGui.GetCursorScreenPos();
+        var trueCol = invertColors ? CkColor.TriStateCross.Uint() : CkColor.TriStateCheck.Uint();
+        var falseCol = invertColors ? CkColor.TriStateCheck.Uint() : CkColor.TriStateCross.Uint();
+
+        if (ImGuiUtil.DrawDisabledButton("##pair" + permName, new Vector2(width, ImGui.GetFrameHeight()), string.Empty, UiService.DisableUI))
+        {
+            if (string.IsNullOrEmpty(permName))
+                return;
+
+            UiService.SetUITask(async () =>
+            {
+                if (await ChangeOwnUnique(permName, !current).ConfigureAwait(false))
+                {
+                    _logger.LogInformation($"Successfully changed own permission {permName} to {!current} for {_sundesmo.GetNickAliasOrUid()}.");
+                }
+            });
+        }
+
+        ImGui.SetCursorScreenPos(pos);
+        PrintButtonRichText(txtData, dispName, current, trueCol, falseCol);
+        if (defaultTT)
+            CkGui.AttachToolTip($"Toggle this preference for {_dispName}.");
+
+    }
+
+    private void PrintButtonRichText(PermInfo pdp, string dispName, bool current, uint trueCol, uint falseCol)
+    {
+        using var _ = ImRaii.Group();
+        CkGui.FramedIconText(current ? pdp.TrueFAI : pdp.FalseFAI);
+        ImGui.SameLine(0, 0);
+        if (pdp.CondAfterLabel)
+        {
+            CkGui.TextFrameAligned($" {dispName}");
+            ImGui.SameLine(0, 0);
+            ImGui.Text($" {pdp.Suffix} ");
+            ImGui.SameLine(0, 0);
+            CkGui.ColorTextFrameAligned(current ? pdp.CondTrue : pdp.CondFalse, current ? trueCol : falseCol);
+            ImGui.SameLine(0, 0);
+            ImGui.Text(".");
+        }
+        else
+        {
+            CkGui.ColorTextFrameAligned($" {(current ? pdp.CondTrue : pdp.CondFalse)} ", current ? trueCol : falseCol);
+            ImGui.SameLine(0, 0);
+            ImGui.Text(pdp.Label);
+            ImGui.SameLine(0, 0);
+            ImGui.Text($" {dispName}.");
+        }
+    }
+
+    private record PermInfo(FAI TrueFAI, FAI FalseFAI, string CondTrue, string CondFalse, string Label, bool CondAfterLabel, string Suffix = "");
+    private readonly ImmutableDictionary<string, PermInfo> PermissionData = ImmutableDictionary<string, PermInfo>.Empty
+        .Add(nameof(PairPerms.PauseVisuals), new PermInfo(FAI.Eye, FAI.EyeSlash, "Paused", "Unpaused", string.Empty, true, "is"))
+        .Add(nameof(PairPerms.AllowAnimations), new PermInfo(FAI.Running, FAI.Ban, "Allowing", "Preventing", "animations from", false))
+        .Add(nameof(PairPerms.AllowSounds), new PermInfo(FAI.VolumeUp, FAI.VolumeMute, "Allowing", "Preventing", "sounds from", false))
+        .Add(nameof(PairPerms.AllowVfx), new PermInfo(FAI.PersonBurst, FAI.Ban, "Allowing", "Preventing", "VFX from", false));
+
+
+
+
+//var pauseStateFAI = isPaused ? FAI.EyeSlash : FAI.Eye;
+//var pauseStateText = $"{(isPaused ? "Unpause" : "Pause")} {_dispName}'s Alterations";
+//if (CkGui.IconTextButton(pauseStateFAI, pauseStateText, width, true, UiService.DisableUI))
+//UiService.SetUITask(async () => await ChangeOwnUnique(nameof(PairPerms.PauseVisuals), !isPaused));
+//CkGui.AttachToolTip($"{(!isPaused ? "Pause" : "Resume")} the rendering of {_dispName}'s modded appearance.");
 
     // TODO: Replace this placeholder fix.
     /// <summary>

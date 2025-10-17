@@ -22,7 +22,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
     // Change this later to have Sundouleias own flavor and taste, as the original was somewhat bland.
     // Additionally i dislike the way these dictionaries are structured and believe they deserve to be changed.
     private readonly ConcurrentDictionary<PlayerHandler, bool> _uploads = new();
-    private readonly ConcurrentDictionary<PlayerHandler, FileTransferProgress> _downloads = new();
+    private static readonly ConcurrentDictionary<PlayerHandler, FileTransferProgress> _downloads = new();
 
     public TransferBarUI(ILogger<TransferBarUI> logger, SundouleiaMediator mediator, MainConfig config,
         FileUploader fileUploader) : base(logger, mediator, "##SundouleiaDLs")
@@ -79,6 +79,8 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         Mediator.Subscribe<GPoseStartMessage>(this, _ => IsOpen = false);
         Mediator.Subscribe<GPoseEndMessage>(this, _ => IsOpen = true);
     }
+
+    public static IReadOnlyDictionary<PlayerHandler, FileTransferProgress> Downloads => _downloads;
 
     protected override void PreDrawInternal()
     { }

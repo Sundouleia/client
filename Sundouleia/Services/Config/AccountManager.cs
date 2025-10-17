@@ -18,10 +18,6 @@ public class AccountManager
     private readonly SundouleiaMediator _mediator;
     private readonly AccountConfig _config;
 
-
-    private Dictionary<int, CharaAuthentication> _authByKey = new();
-
-
     public AccountManager(ILogger<AccountManager> logger, SundouleiaMediator mediator, AccountConfig config)
     {
         _logger = logger;

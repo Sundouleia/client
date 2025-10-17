@@ -70,6 +70,8 @@ public class HomepageTab
         // if itemGotHovered is false, reset the index.
         if (!itemGotHovered)
             HoveredItemIndex = -1;
+
+        ImGui.Text($"TriStateCross UInt: {CkColor.TriStateCross.Vec4().ToUint():x8}");
     }
 
     private bool HomepageSelectable(string label, FontAwesomeIcon icon, Vector2 region, bool hovered = false)

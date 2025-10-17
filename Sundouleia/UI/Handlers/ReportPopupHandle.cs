@@ -1,13 +1,19 @@
+using CkCommons;
 using CkCommons.Gui;
+using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using OtterGui;
+using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
+using static FFXIVClientStructs.FFXIV.Client.UI.Misc.GroupPoseModule;
 
 namespace Sundouleia.Gui.Components;
 
@@ -21,7 +27,7 @@ internal class ReportPopupHandler : IPopupHandler
     private string _reportedDisplayName = "User-XXX";
     private string _reportReason = DefaultReportReason;
 
-    private const string DefaultReportReason = "Describe why you are reporting this User here...";
+    private const string DefaultReportReason = "Describe your report here...";
 
     public ReportPopupHandler(MainHub hub, SundesmoManager pairs, ProfileService profiles)
     {
@@ -43,94 +49,105 @@ internal class ReportPopupHandler : IPopupHandler
         var rectMin = drawList.GetClipRectMin();
         var rectMax = drawList.GetClipRectMax();
         var PlateSize = rectMax - rectMin;
+        var frameH = ImUtf8.FrameHeight;
+        var outerPadding = Vector2.One * 12f;
+        var borderSize = Vector2.One * 4;
+        var pfpBorderPos = rectMin + outerPadding;
+        var pfpBorderSize = Vector2.One * 200;
+        var pfpPos = rectMin + Vector2.One * 16f;
+        var pfpSize = Vector2.One * 192;
+        var descPos = pfpBorderPos + new Vector2(0, pfpBorderSize.Y + outerPadding.Y);
+        var descSize = pfpBorderSize with { Y = PlateSize.Y - outerPadding.Y * 3 - pfpBorderSize.Y };
 
         // grab our profile image and draw the baseline.
         var Profile = _profiles.GetProfile(_reportedUser);
         var pfpWrap = Profile.GetAvatarOrDefault();
 
         // draw out the background for the window.
-        if (CosmeticService.TryGetPlateBg(PlateElement.Plate, PlateBG.Default, out var plateBG))
-            drawList.AddDalamudImageRounded(plateBG, rectMin, PlateSize, 30f);
-
+        if (CosmeticService.CoreTextures.Cache[CoreTexture.ReportBg] is { } reportBG)
+            drawList.AddDalamudImageRounded(reportBG, rectMin, PlateSize, 30f);
         // draw out the border on top of that.
-        if (CosmeticService.TryGetPlateBorder(PlateElement.Plate, PlateBorder.Default, out var plateBorder))
-            drawList.AddDalamudImageRounded(plateBorder, rectMin, PlateSize, 20f);
+        if (CosmeticService.CoreTextures.Cache[CoreTexture.ReportBorder] is { } reportBorder)
+            drawList.AddDalamudImageRounded(reportBorder, rectMin, PlateSize, 20f);
 
-        var pfpPos = rectMin + Vector2.One * 16f;
-        drawList.AddDalamudImageRounded(pfpWrap, pfpPos, Vector2.One * 192, 96f, "The Image being Reported");
-
-        // draw out the border for the profile picture
-        if (CosmeticService.TryGetPlateBorder(PlateElement.Avatar, PlateBorder.Default, out var pfpBorder))
-            drawList.AddDalamudImageRounded(pfpBorder, rectMin + Vector2.One* 12f, Vector2.One * 200, 96f);
-
-
-        var btnSize = Vector2.One * 20;
-        var btnPos = rectMin + Vector2.One * 16;
-
-        var closeButtonColor = CloseHovered ? ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)) : ImGui.GetColorU32(ImGuiColors.ParsedPink);
-
-        drawList.AddLine(btnPos, btnPos + btnSize, closeButtonColor, 3);
-        drawList.AddLine(new Vector2(btnPos.X + btnSize.X, btnPos.Y), new Vector2(btnPos.X, btnPos.Y + btnSize.Y), closeButtonColor, 3);
-
-        ImGui.SetCursorScreenPos(btnPos);
-        if (ImGui.InvisibleButton($"CloseButton##ProfileClose" + _reportedDisplayName, btnSize))
-            ImGui.CloseCurrentPopup();
-
-        CloseHovered = ImGui.IsItemHovered();
-
-        // Description Border
-        if (CosmeticService.TryGetPlateBorder(PlateElement.Description, PlateBorder.Default, out var descBorder))
-            drawList.AddDalamudImageRounded(descBorder, rectMin + new Vector2(220, 12), new Vector2(250, 200), 2f);
-
-        ImGui.SetCursorScreenPos(rectMin + new Vector2(235, 24));
-        var desc = Profile.Info.Description;
-        DrawLimitedDescription(desc, ImGuiColors.DalamudWhite, new Vector2(230, 185));
-        CkGui.AttachToolTip("The Description being Reported");
-
-        // Beside it we should draw out the rules.
-        ImGui.SetCursorScreenPos(rectMin + new Vector2(475, 15));
-
+        // Draw out the left group.
         using (ImRaii.Group())
         {
-            CkGui.ColorText("Only Report Pictures if they are:", ImGuiColors.ParsedGold);
-            CkGui.TextWrapped("- Harassing another player. Directly or Indirectly.");
-            CkGui.TextWrapped("- Impersonating another player.");
-            CkGui.TextWrapped("- Displays Content that displays NFSL content.");
-            ImGui.Spacing();
-            CkGui.ColorText("Only Report Descriptions if they are:", ImGuiColors.ParsedGold);
-            CkGui.TextWrapped("- Harassing another player. Directly or Indirectly.");
-            CkGui.TextWrapped("- Used to share topics that dont belong here.");
-            ImGui.Spacing();
-            CkGui.ColorTextWrapped("Miss-use of reporting will result in your account being Timed out.", ImGuiColors.DalamudRed);
+            drawList.AddDalamudImageRounded(pfpWrap, pfpPos, pfpSize, 96f, "The Image being Reported");
+            // draw out the border for the profile picture
+            if (CosmeticService.TryGetPlateBorder(PlateElement.Avatar, PlateBorder.Default, out var pfpBorder))
+                drawList.AddDalamudImageRounded(pfpBorder, pfpBorderPos, pfpBorderSize, 96f);
+
+            // Close Button
+            var btnPos = rectMin + Vector2.One * 16;
+            var btnSize = Vector2.One * 20;
+            var closeButtonColor = CloseHovered ? ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)) : ImGui.GetColorU32(ImGuiColors.ParsedPink);
+            drawList.AddLine(btnPos, btnPos + btnSize, closeButtonColor, 3);
+            drawList.AddLine(new Vector2(btnPos.X + btnSize.X, btnPos.Y), new Vector2(btnPos.X, btnPos.Y + btnSize.Y), closeButtonColor, 3);
+            ImGui.SetCursorScreenPos(btnPos);
+            if (ImGui.InvisibleButton($"CloseButton##ProfileClose" + _reportedDisplayName, btnSize))
+                ImGui.CloseCurrentPopup();
+            CloseHovered = ImGui.IsItemHovered();
+
+            // Below draw out the description.
+            if (CosmeticService.TryGetPlateBorder(PlateElement.Description, PlateBorder.Default, out var descBorder))
+                drawList.AddDalamudImageRounded(descBorder, descPos, descSize, 2f);
+            // The text for it.
+            ImGui.SetCursorScreenPos(descPos + borderSize);
+            var desc = Profile.Info.Description;
+            DrawLimitedDescription(desc, ImGuiColors.DalamudWhite, new Vector2(230, 185));
+            CkGui.AttachToolTip("The Description being Reported");
+
+            ImGui.SetCursorScreenPos(pfpBorderPos);
+            ImGui.Dummy((descPos + descSize) - pfpBorderPos);
         }
 
-        // Draw the gold line split.
-        var reportBoxSize = new Vector2(250 + 192 + ImGui.GetStyle().ItemSpacing.X);
-        drawList.AddDalamudImage(CosmeticService.CoreTextures.Cache[CoreTexture.AchievementLineSplit], rectMin + new Vector2(15, 220), new Vector2(770, 6));
+        var reportBoxPos = pfpBorderPos with { X = pfpBorderPos.X + pfpBorderSize.X + ImUtf8.ItemSpacing.X };
+        ImGui.SetCursorScreenPos(reportBoxPos);
+        ImGui.Dummy(new Vector2(1 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().Y - outerPadding.Y));
+        ImGui.GetWindowDrawList().AddRectFilled(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Border));
+        ImGui.SameLine();
 
-        ImGui.SetCursorScreenPos(rectMin + new Vector2(15, 235));
-        ImGui.InputTextMultiline("##reportReason", ref _reportReason, 500, new Vector2(reportBoxSize.X, 200));
-
-        // draw out the title text for this mark.
-        ImGui.SetCursorScreenPos(rectMin + new Vector2(475, 235));
+        using var rightChild = CkRaii.Child("ReportPlateRight", ImGui.GetContentRegionAvail() - outerPadding);
         using (ImRaii.Group())
         {
-            using (UiFontService.UidFont.Push())
+            using (var __ = CkRaii.Child("ReportBox", new(ImGui.GetContentRegionAvail().X, pfpBorderSize.Y)))
             {
-                CkGui.ColorTextWrapped("We will analyze reports with care. Cordy has been a victum " +
-                "of manipulation and abuse multiple times, and will do her best to ensure her team does not allow " +
-                "predators to exploit this reporting system on you.", ImGuiColors.DalamudWhite2);
+                ImGui.InputTextMultiline("##reportReason", ref _reportReason, 500, new Vector2(__.InnerRegion.X / 2, __.InnerRegion.Y));
+
+                ImGui.SameLine();
+                using (ImRaii.Group())
+                {
+                    CkGui.ColorText("Profiles are reportable if they:", ImGuiColors.ParsedGold);
+                    CkGui.TextWrapped("- Harass another player. Directly or Indirectly.");
+                    CkGui.TextWrapped("- Impersonating another player.");
+                    CkGui.TextWrapped("- Displays NSFW content without being marked for NSFW.");
+                    CkGui.TextWrapped("- Used to share topics that dont belong here.");
+                    ImGui.Spacing();
+                    CkGui.ColorTextWrapped("Miss-use of reporting will result in your account being timed out.", ImGuiColors.DalamudRed);
+                }
             }
 
-            ImGui.Spacing();
+            CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
+            CkGui.FontTextWrapped("The Plugin Author has been victim of abuse in multiple forms. " +
+                "As such, she will ensure her team does not allow predators to exploit this system " +
+                "against you, and so you can feel safer using it.", UiFontService.Default150Percent, ImGuiColors.DalamudGrey);
 
-            CkGui.FontText("Report " + _reportedDisplayName + "?", UiFontService.UidFont, ImGuiColors.ParsedGold);
-            if (CkGui.IconTextButton(FAI.ExclamationTriangle, "Report User", 
-                disabled: _reportReason.IsNullOrWhitespace() || string.Equals(_reportReason, DefaultReportReason, StringComparison.OrdinalIgnoreCase)))
+            using var font = UiFontService.UidFont.Push();
+            // Get the center of this screen.
+            var disableButton = _reportReason.IsNullOrWhitespace() || string.Equals(_reportReason, DefaultReportReason, StringComparison.OrdinalIgnoreCase);
+            var buttonSize = ImGuiHelpers.GetButtonSize($"Report {_reportedDisplayName} To Sundouleia");
+            var buttonOffset = (ImGui.GetContentRegionAvail() - buttonSize) / 2;
+
+            ImGui.SetCursorPos(ImGui.GetCursorPos() + buttonOffset);
+            using (ImRaii.Disabled(disableButton))
             {
-                ImGui.CloseCurrentPopup();
-                var reason = _reportReason;
-                _ = _hub.UserReportProfile(new(_reportedUser, reason));
+                if (ImGui.Button($"Report {_reportedDisplayName} To Sundouleia"))
+                {
+                    ImGui.CloseCurrentPopup();
+                    var reason = _reportReason;
+                    _ = _hub.UserReportProfile(new(_reportedUser, reason));
+                }
             }
         }
     }
