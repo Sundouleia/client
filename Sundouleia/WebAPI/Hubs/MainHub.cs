@@ -34,7 +34,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private static int _expectedApiVersion = 0;
     private static bool _apiHooksInitialized = false;
 
-    private static ConnectionResponse? _connectionResponce = null;
+    private static ConnectionResponse? _connectionResponse = null;
     private static ServerInfoResponse? _serverInfo = null;
 
     // Private accessors (handled within the singleton instance)
@@ -77,14 +77,14 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public static string ExpectedVerString => $"[Server: v{_expectedVersion} (Api {_expectedApiVersion})]";
     public static ConnectionResponse? ConnectionResponse
     {
-        get => _connectionResponce;
+        get => _connectionResponse;
         set
         {
-            _connectionResponce = value;
+            _connectionResponse = value;
             if (value != null)
             {
-                _expectedVersion = _connectionResponce?.CurrentClientVersion ?? new Version(0, 0, 0, 0);
-                _expectedApiVersion = _connectionResponce?.ServerVersion ?? 0;
+                _expectedVersion = _connectionResponse?.CurrentClientVersion ?? new Version(0, 0, 0, 0);
+                _expectedApiVersion = _connectionResponse?.ServerVersion ?? 0;
             }
         }
     }

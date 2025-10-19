@@ -75,7 +75,7 @@ public class AccountTab
         
         // now do one for ko-fi
         ImGui.AlignTextToFramePadding();
-        DrawAccountSettingChild(FAI.Pray, "Support via Patreon", "-If you like my work, you can toss any support here ♥", () =>
+        DrawAccountSettingChild(FAI.Coffee, "Support via Patreon", "-If you like my work, you can toss any support here ♥", () =>
         {
             try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/cw/Sundouleia", UseShellExecute = true }); }
             catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Patreon link. {e.Message}"); }

@@ -219,7 +219,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     ///     The GUID of the created collection to use for later reference in 
     ///     assigning and manipulating the appended mods.
     /// </returns>
-    public async Task<Guid> CreateTempSundesmoCollection(string pairUid)
+    public async Task<Guid> NewSundesmoCollection(string pairUid)
     {
         if (!APIAvailable) return Guid.Empty;
         var name = $"Sundesmo_{pairUid}_Collection";

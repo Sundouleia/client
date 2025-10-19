@@ -1,4 +1,3 @@
-using System.Xml.Linq;
 using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
@@ -6,94 +5,75 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
-using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
-using Sundouleia.PlayerClient;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
+using Sundouleia.Watchers;
 using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
+using System.Xml.Linq;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Pairs;
 
 /// <summary>
-///     Stores information about a pairing (Sundesmo) between 2 users. <para />
-///     Handled a lot differently than what people may be used to seeing from past solutions.
+///     Handles the cached data for a player, and their current rendered status. <para />
+///     The Rendered status should be handled differently from the alterations. <para />
+///     Every pair has their own instance of this data.
 /// </summary>
 public class PlayerHandler : DisposableMediatorSubscriberBase
 {
     private readonly FileCacheManager _fileCache;
     private readonly FileDownloader _downloader;
+    private readonly CharaObjectWatcher _watcher;
     private readonly IpcManager _ipc;
 
+    private CancellationTokenSource _runtimeCTS = new();
     private CancellationTokenSource _downloadCTS = new();
-    private CancellationTokenSource _newModsCTS = new(); // (could maybe conjoin these two?)
     private Task? _downloadTask;
-    private Task? _newModsTask;
-
-    public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
-        FileCacheManager fileCache, FileDownloader downloads, IpcManager ipc)
-        : base(logger, mediator)
-    {
-        Sundesmo = sundesmo;
-
-        _fileCache = fileCache;
-        _downloader = downloads;
-        _ipc = ipc;
-
-        // If penumbra is already initialized create the temp collection here.
-        if (IpcCallerPenumbra.APIAvailable && _tempCollection == Guid.Empty)
-            _tempCollection = _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID).GetAwaiter().GetResult();
-
-        // Maybe do something on zone switch? but not really sure lol. I would personally continue
-        // any existing downloads we have.
-
-        // this just creates 'a collection' it does not assign anyone to it yet.
-        Mediator.Subscribe<PenumbraInitialized>(this, async _ =>
-        {
-            _tempCollection = await _ipc.Penumbra.CreateTempSundesmoCollection(Sundesmo.UserData.UID);
-        });
-        Mediator.Subscribe<PenumbraDisposed>(this, _ => _tempCollection = Guid.Empty);
-
-        // Old subscriber here for class/job change?
-        // Old subscribers here for combat/performance start/stop. Reapplies should fix this but yeah can probably just do redraw.
-
-        unsafe
-        {
-            Mediator.Subscribe<WatchedObjectCreated>(this, msg =>
-            {
-                // do not create if they are not online or already created.
-                if (Address != IntPtr.Zero || !Sundesmo.IsOnline) return;
-                // If the Ident is not valid do not create.
-                if (string.IsNullOrEmpty(Sundesmo.Ident)) return;
-                // If a match can be found, set the player object.
-                if (Sundesmo.Ident == SundouleiaSecurity.GetIdentHashByCharacterPtr(msg.Address))
-                {
-                    Logger.LogDebug($"Matched {Sundesmo.GetNickAliasOrUid()} to a created object @ [{msg.Address:X}]", LoggerType.PairHandler);
-                    ObjectRendered((Character*)msg.Address);
-                }
-            });
-
-            Mediator.Subscribe<WatchedObjectDestroyed>(this, msg =>
-            {
-                if (Address == IntPtr.Zero || msg.Address != Address) return;
-                // Mark the player as unrendered, triggering the timeout.
-                ObjectUnrendered();
-            });
-        }
-    }
 
     public Sundesmo Sundesmo { get; init; }
     private unsafe Character* _player = null;
-
     // cached data for appearance.
     private Guid _tempCollection;
     private Dictionary<string, VerifiedModFile> _replacements = []; // Hash -> VerifiedFile with download link included if necessary.
     private Guid _tempProfile; // CPlus temp profile id.
     private IpcDataPlayerCache? _appearanceData = null;
 
+    public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
+        FileCacheManager fileCache, FileDownloader downloads, CharaObjectWatcher watcher, IpcManager ipc)
+        : base(logger, mediator)
+    {
+        Sundesmo = sundesmo;
+
+        _fileCache = fileCache;
+        _downloader = downloads;
+        _watcher = watcher;
+        _ipc = ipc;
+
+        // Initial collection creation if valid.
+        TryCreateAssignTempCollection().GetAwaiter().GetResult();
+
+        // Listen to Penumbra init & dispose methods to re-assign collections.
+        Mediator.Subscribe<PenumbraInitialized>(this, _ => TryCreateAssignTempCollection().ConfigureAwait(false));
+        Mediator.Subscribe<PenumbraDisposed>(this, _ => _tempCollection = Guid.Empty);
+        Mediator.Subscribe<HonorificReady>(this, async _ =>
+        {
+            if (!IsRendered || string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Honorific])) return;
+            await ApplyHonorific().ConfigureAwait(false);
+        });
+        Mediator.Subscribe<PetNamesReady>(this, async _ =>
+        {
+            if (!IsRendered || string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.PetNames])) return;
+            await ApplyPetNames().ConfigureAwait(false);
+        });
+
+        // Old subscriber here for class/job change?
+        // Old subscribers here for combat/performance start/stop. Reapplies should fix this but yeah can probably just do redraw.
+        Mediator.Subscribe<WatchedObjectCreated>(this, msg => MarkVisibleForAddress(msg.Address));
+        Mediator.Subscribe<WatchedObjectDestroyed>(this, msg => UnrenderPlayer(msg.Address));
+    }
     // Public Accessors.
     public Character DataState { get { unsafe { return *_player; } } }
     public unsafe IntPtr Address => (nint)_player;
@@ -109,63 +89,91 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public unsafe bool IsRendered => _player != null;
     public bool HasAlterations => _appearanceData != null || _replacements.Count is not 0;
 
-    /// <summary>
-    ///     Fired whenever the character object is rendered in the game world. <para />
-    ///     This is not to be linked to the appearance alterations in any shape or form.
-    /// </summary>
-    /// <exception cref="ArgumentNullException"></exception>
-    public unsafe void ObjectRendered(Character* chara)
+    #region Rendering
+    // Initializes Player Rendering for this object if the address matches the OnlineUserIdent.
+    // Called by the Watcher's mediator subscriber. Not intended for public access.
+    // Assumes the passed in address is a visible Character*
+    private void MarkVisibleForAddress(IntPtr address)
     {
-        if (chara is null)
-            throw new ArgumentNullException(nameof(chara));
+        if (!Sundesmo.IsOnline || Address != IntPtr.Zero) return; // Already exists or not online.
+        if (string.IsNullOrEmpty(Sundesmo.Ident)) return; // Must have valid CharaIdent.
+        if (Sundesmo.Ident != SundouleiaSecurity.GetIdentHashByCharacterPtr(address)) return;
 
-        // Stop any possible timeout tasks, if online.
-        if (Sundesmo.IsOnline)
-            Sundesmo.EndTimeout();
+        Logger.LogDebug($"Matched {Sundesmo.GetNickAliasOrUid()} to a created object @ [{address:X}]", LoggerType.PairHandler);
+        MarkRenderedInternal(address);
+    }
 
-        // Set/Update the GameData.
-        _player = chara;
-        // If the Player NameString was empty, it needs to be initialized.
-        if (string.IsNullOrEmpty(NameString))
-            FirstTimeInitialize();
+    // Publicly accessible method to try and identify the address of an online user to mark them as visible.
+    internal async Task SetVisibleIfRendered()
+    {
+        if (!Sundesmo.IsOnline) return; // Must be online.
+        if (string.IsNullOrEmpty(Sundesmo.Ident)) return; // Must have valid CharaIdent.
+        // If already rendered, reapply alterations and return.
+        if (IsRendered)
+        {
+            Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) is already rendered, reapplying alterations.", LoggerType.PairHandler);
+            await ReInitializeInternal().ConfigureAwait(false);
+        }
+        else if (_watcher.TryGetExisting(this, out IntPtr playerAddr))
+        {
+            Logger.LogDebug($"Matched {Sundesmo.GetNickAliasOrUid()} to an existing object @ [{playerAddr:X}]", LoggerType.PairHandler);
+            MarkRenderedInternal(playerAddr);
+        }
+    }
 
-        // Set the NameString and log as rendered.
-        NameString = chara->NameString;
+    private unsafe void MarkRenderedInternal(IntPtr address)
+    {
+        // End Timeouts if running as one of our states became valid again.
+        Sundesmo.EndTimeout();
+        // Set the game data.
+        _player = (Character*)address;
+        NameString = _player->NameString;
+        // Notify other services.
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] rendered!", LoggerType.PairHandler);
-
-        // If any alterations existed, reapply them.
-        if (Sundesmo.IsOnline && HasAlterations)
-            ReapplyAlterations().ConfigureAwait(false);
-
         Mediator.Publish(new SundesmoPlayerRendered(this));
         Mediator.Publish(new RefreshWhitelistMessage());
+        ReInitializeInternal().ConfigureAwait(false);
+    }
+
+    private async Task ReInitializeInternal()
+    {
+        // Create/Assign this ObjectIdx to the Penumbra Temp Collection if necessary.
+        await TryCreateAssignTempCollection().ConfigureAwait(false);
+
+        // If they are online and have alterations, reapply them. Otherwise, exit.
+        if (!Sundesmo.IsOnline || !HasAlterations) 
+            return;
+
+        // Await until we know the player has absolutely finished loading in.
+        await WaitUntilValidDrawObject().ConfigureAwait(false);
+
+        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
+        await ReapplyAlterations().ConfigureAwait(false);
     }
 
     /// <summary>
     ///     Fired whenever the player is unrendered from the game world. <para />
     ///     Not linked to appearance alterations, but does begin its timeout if not set.
     /// </summary>
-    private void ObjectUnrendered()
+    private unsafe void UnrenderPlayer(IntPtr address)
     {
-        if (!IsRendered) return;
+        if (Address == IntPtr.Zero || address != Address)
+            return;
         // Clear the GameData.
-        unsafe { _player = null; }
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] unrendered!", LoggerType.PairHandler);
-        // Inform the sundesmo to begin its timeout for alterations.
+        _player = null;
+        // Temp timeout inform.
         Sundesmo.TriggerTimeoutTask();
+        // Refresh the list to reflect visible state.
+        Logger.LogDebug($"Marking {Sundesmo.GetNickAliasOrUid()} as unrendered @ [{address:X}]", LoggerType.PairHandler);
         Mediator.Publish(new RefreshWhitelistMessage());
     }
 
-
-    /// <summary>
-    ///     Awaits until the draw object is fully valid for the player.
-    /// </summary>
-    private async Task WaitUntilValidDrawObject()
+    private async Task WaitUntilValidDrawObject(CancellationToken timeoutToken = default)
     {
-        using var ct = new CancellationTokenSource(10000);
-        while (!ct.IsCancellationRequested)
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(timeoutToken, _runtimeCTS.Token);
+        while (!cts.IsCancellationRequested)
         {
-            if (IsObjectLoaded())
+            if (!PlayerData.IsZoning && IsObjectLoaded())
                 return;
             Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not fully loaded yet, waiting...", LoggerType.PairHandler);
             await Task.Delay(100).ConfigureAwait(false);
@@ -186,165 +194,284 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (HasModelFilesInSlotLoaded) return false; // There are model files that need to still be loaded into the DrawObject slots.
         return true;
     }
+    #endregion Rendering
 
+    #region Altaration Control
+    // Adds a temporary collection for this handler.
+    private async Task TryCreateAssignTempCollection()
+    {
+        if (!IpcCallerPenumbra.APIAvailable)
+            return;
+        // Create new Collection if we need one.
+        if (_tempCollection == Guid.Empty)
+            _tempCollection = await _ipc.Penumbra.NewSundesmoCollection(Sundesmo.UserData.UID).ConfigureAwait(false);
+        // If we are rendered, assign the collection
+        if (IsRendered)
+            await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
+    }
 
     /// <summary>
-    ///     Removes all cached alterations from the player and reverts their state. <para />
-    ///     Different reverts will occur based on the rendered state.
+    ///     Reverts the rendered alterations on a player. <b> This does not delete the alteration data. </b>
     /// </summary>
-    public async Task ClearAlterations(CancellationToken ct)
+    public async Task RevertRenderedAlterations(CancellationToken ct = default)
     {
-        // Regardless of rendered state, we should revert any C+ Data if we have any.
+        // Revert any C+ Data if we have any.
         if (_tempProfile != Guid.Empty)
         {
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
-
-        // If the player is rendered, await disposal with a set timeout.
+        // Revert based on rendered state.
         if (IsRendered)
-        {
             await RevertAlterations(Sundesmo.GetNickAliasOrUid(), NameString, Address, ObjIndex, ct).ConfigureAwait(false);
-        }
-        else
-        {
-            // Revert any glamourer data by name if not rendered.
-            if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
-                await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
-        }
-
-        // Reverting mods may happen based on state regardless? Not sure.
-
-
-        // Clear out the alterations data (keep NameString alive so One-Time-Init does not re-fire.)
-        _appearanceData = null;
-        _replacements.Clear();
+        else if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
+            await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
     }
 
-    private void FirstTimeInitialize()
+    public async Task RevertAlterations(string aliasOrUid, string name, IntPtr address, ushort objIdx, CancellationToken token)
     {
-        Logger.LogTrace($"First-Time-Initialize [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
-
-        // If we have title data we should apply them when the the client downloads / enables it.
-        Mediator.Subscribe<HonorificReady>(this, async _ =>
+        if (address == IntPtr.Zero)
+            return;
+        // We can care about parallel execution here if we really want to but i dont care atm.
+        await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
+        await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
+        await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
+        await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
+        await _ipc.PetNames.ClearPetNamesByPtr(address).ConfigureAwait(false);
+        if (_tempProfile != Guid.Empty)
         {
-            if (string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Honorific])) return;
-            Logger.LogTrace($"Applying [{Sundesmo.GetNickAliasOrUid()}]'s cached Honorific title.");
-            await _ipc.Honorific.SetTitleAsync(ObjIndex, _appearanceData.Data[IpcKind.Honorific]).ConfigureAwait(false);
-        });
+            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            _tempProfile = Guid.Empty;
+        }
+    }
 
-        // If we have cached petnames data we should apply them when the the client downloads / enables it.
-        Mediator.Subscribe<PetNamesReady>(this, async _ =>
-        {
-            if (string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.PetNames])) return;
-            Logger.LogTrace($"Applying [{Sundesmo.GetNickAliasOrUid()}]'s cached Pet Nicknames.");
-            await _ipc.PetNames.SetPetNamesByPtr(Address, _appearanceData.Data[IpcKind.PetNames]).ConfigureAwait(false);
-        });
+    // Don't entirely need to await this, but its an option we want it i guess.
+    public async Task UpdateAndApplyAlterations(NewModUpdates modChanges, IpcDataPlayerUpdate ipcChanges)
+    {
+        // Update Data.
+        var visualDiff = UpdateDataIpc(ipcChanges);
+        var modDiff = UpdateDataMods(modChanges);
+        // Apply Changes if necessary.
+        await ApplyAlterations(visualDiff, modDiff).ConfigureAwait(false);
+    }
 
-        // Assign the temporary penumbra collection if not already set.
-        if (_tempCollection != Guid.Empty)
-            _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).GetAwaiter().GetResult();
+    public async Task UpdateAndApplyMods(NewModUpdates modChanges)
+    {
+        if (UpdateDataMods(modChanges))
+            await ApplyMods().ConfigureAwait(false);
+    }
+
+    public async Task UpdateAndApplyIpc(IpcDataPlayerUpdate ipcChanges)
+    {
+        var visualDiff = UpdateDataIpc(ipcChanges);
+        if (visualDiff != IpcKind.None)
+            await ApplyVisuals(visualDiff).ConfigureAwait(false);
+    }
+
+    public async Task UpdateAndApplyIpc(IpcKind kind, string newData)
+    {
+        if (UpdateDataIpc(kind, newData))
+            await ApplyVisualsSingle(kind).ConfigureAwait(false);
     }
 
     public async Task ReapplyAlterations()
     {
-        if (!IsRendered)
-            return;
+        var refresh = false;
+        refresh &= await ReapplyVisuals().ConfigureAwait(false);
+        refresh &= await ApplyMods().ConfigureAwait(false);
 
-        // Begin application.
-        var hasAppearance = _appearanceData is not null;
-        var hasMods = _tempCollection != Guid.Empty && _replacements.Count > 0;
-
-        // Reapply appearance alterations, if they exist.
-        if (hasAppearance)
-        {
-            await ReapplyVisuals(false).ConfigureAwait(false);
-        }
-        // Reapply Mods, if they exist.
-        if (hasMods)
-        {
-            _downloader.GetExistingFromCache(_replacements, out var moddedDict, CancellationToken.None);
-            await ApplyModData(moddedDict, false).ConfigureAwait(false);
-        }
-
-        // redraw for now, reapply later after glamourer implements methods for reapply.
-        if (hasAppearance || hasMods)
+        // If either had a change, redraw (reapply in the future)
+        if (refresh)
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
     }
+    #endregion Altaration Control
 
-    // Placeholder stuff for now.
-    private void UpdateReplacements(NewModUpdates newData)
+    #region Alteration Updates
+    private void UpdateDataFull(NewModUpdates modData, IpcDataPlayerUpdate ipcData, out IpcKind visualDiff, out bool modDiff)
+    {
+        visualDiff = UpdateDataIpc(ipcData);
+        modDiff = UpdateDataMods(modData);
+    }
+
+    private bool UpdateDataMods(NewModUpdates modData)
     {
         // Remove all keys to remove.
-        foreach (var hash in newData.HashesToRemove)
+        foreach (var hash in modData.HashesToRemove)
             _replacements.Remove(hash);
         // Add all new files to add.
-        foreach (var file in newData.FilesToAdd)
+        foreach (var file in modData.FilesToAdd)
             _replacements[file.Hash] = file;
+
+        Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data")));
+        Logger.LogTrace($"Mod Data received from {NameString}({Sundesmo.GetNickAliasOrUid()}) [{modData.FilesToAdd.Count} New | {modData.HashesToRemove.Count} ToRemove | {modData.FilesUploading} Uploading", LoggerType.PairHandler);
+
+        // If we do not have any penumbraAPI or file cache, do not attempt downloads.
+        if (!IpcCallerPenumbra.APIAvailable || !_fileCache.CacheFolderIsValid())
+        {
+            Logger.LogDebug("Either Penumbra IPC or File Cache is not available, cannot process mod data.", LoggerType.PairHandler);
+            return modData.HasChanges;
+        }
+        
+        // Set the uploading text based on if we have new files to upload or not.
+        if (modData.FilesUploading > 0)
+            Mediator.Publish(new FilesUploading(this));
+        else
+            Mediator.Publish(new FilesUploaded(this));
+
+        // We should take any new mods to add, and enqueue them to the file downloader.
+        
+        // NOTE: Additionally, we could cancel downloads for any hashes removed, but it is
+        // likely better to download them anyways as they will likely be shown again.
+        // (also the download link is only temporary anyways)
+
+        return modData.HasChanges;
     }
 
-    public async Task UpdateAndApplyFullData(NewModUpdates modData, IpcDataPlayerUpdate ipcData)
+    // Returns the changes applied.
+    private IpcKind UpdateDataIpc(IpcDataPlayerUpdate ipcData)
     {
-        // 1) Maybe handle something with combat and performance, idk, deal with later.
+        _appearanceData ??= new();
+        return _appearanceData.UpdateCache(ipcData);
+    }
 
-        // 2) Need to store all data but not apply if not rendered yet.
+    private bool UpdateDataIpc(IpcKind kind, string newData)
+    {
+        _appearanceData ??= new();
+        return _appearanceData.UpdateCacheSingle(kind, newData);
+    }
+    #endregion Alteration Updates
+
+    #region Alteration Application
+    private async Task ApplyAlterations(IpcKind visualChanges, bool modsChanged)
+    {
+        var refresh = false;
+        if (visualChanges is not IpcKind.None)
+            refresh &= await ApplyVisuals(visualChanges).ConfigureAwait(false);
+        if (modsChanged)
+            refresh &= await ApplyMods().ConfigureAwait(false);
+        
+        // If either had a change, redraw (reapply in the future)
+        if (refresh)
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
+    }
+
+    // True if data was applied, false otherwise. (useful for redraw)
+    private async Task<bool> ApplyMods()
+    {
+        // Sanity checks.
         if (!IsRendered)
         {
-            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.FullDataReceive, "Downloading but not applying data [NOT-RENDERED]")));
-            Logger.LogTrace($"Data received from {NameString}({Sundesmo.GetNickAliasOrUid()}), who was unrendered. They likely have a higher render distance. Waiting for them to be visible before applying.", LoggerType.PairHandler);
-
-            // Update the Mod Replacements with the new changes. (Does not apply them!)
-            if (_fileCache.CacheFolderIsValid())
-                UpdateReplacements(modData);
-
-            // Update the appearance data with the new ipc data.
-            _appearanceData ??= new();
-            _appearanceData.UpdateCache(ipcData);
-            return;
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered, skipping mod application.", LoggerType.PairMods);
+            return false;
         }
-
-        // 3) Set the player as uploading or uploaded, based on NotAllSent flag
-        if (modData.NotAllSent)
+        if (_tempCollection == Guid.Empty)
         {
-            Mediator.Publish(new FileUploading(this));
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] does not have a temporary collection, skipping mod application.", LoggerType.PairMods);
+            return false;
         }
-        else
+        if (_replacements.Count == 0)
         {
-            Mediator.Publish(new FileUploaded(this));
+            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] has no mod replacements, skipping mod application.", LoggerType.PairMods);
+            return false;
         }
 
-        // 4) Player is rendered, so process the ipc & mods (maybe do this in parallel idk)
-        await ApplyIpcData(ipcData, false).ConfigureAwait(false);
-        await UpdateAndApplyModData(modData, false).ConfigureAwait(false);
+        // Get files.
+        var missingFiles = _downloader.GetExistingFromCache(_replacements, out var moddedPaths, _runtimeCTS.Token);
+        
+        // TODO: Await for the downloader to finish downloading the current hashes being designed 
 
-        if ((ipcData.Updates is not IpcKind.None || modData.HasChanges) && IsRendered)
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
-        Logger.LogInformation($"Applied full data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairHandler);
+        // Await for true render.
+        await WaitUntilValidDrawObject().ConfigureAwait(false);
+
+        Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()}) with [{missingFiles.Count}] missing files.", LoggerType.PairMods);
+        await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
+        await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);
+        
+        return moddedPaths.Count > 0;
     }
 
-    public async Task UpdateAndApplyModData(NewModUpdates modData, bool redraw)
+    // True if data was applied, false otherwise. (useful for redraw)
+    private async Task<bool> ApplyVisuals(IpcKind changes)
     {
-        if (!IpcCallerPenumbra.APIAvailable)
+        if (!IsRendered || _appearanceData is null)
+            return false;
+
+        // Await for final render.
+        await WaitUntilValidDrawObject().ConfigureAwait(false);
+
+        Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        var toApply = new List<Task>();
+
+        if (changes.HasAny(IpcKind.Glamourer))  toApply.Add(ApplyGlamourer());
+        if (changes.HasAny(IpcKind.Heels))      toApply.Add(ApplyHeels());
+        if (changes.HasAny(IpcKind.CPlus))      toApply.Add(ApplyCPlus());
+        if (changes.HasAny(IpcKind.Honorific))  toApply.Add(ApplyHonorific());
+        if (changes.HasAny(IpcKind.Moodles))    toApply.Add(ApplyMoodles());
+        if (changes.HasAny(IpcKind.ModManips))  toApply.Add(ApplyModManips());
+        if (changes.HasAny(IpcKind.PetNames))   toApply.Add(ApplyPetNames());
+
+        await Task.WhenAll(toApply).ConfigureAwait(false);
+
+        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their visual data reapplied.", LoggerType.PairHandler);
+        return changes.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips);
+    }
+
+    // True if we should redraw, false otherwise.
+    private async Task<bool> ApplyVisualsSingle(IpcKind kind)
+    {
+        if (!IsRendered || _appearanceData is null)
+            return false;
+
+        // Await for final render.
+        await WaitUntilValidDrawObject().ConfigureAwait(false);
+        
+        // Apply change.
+        var task = kind switch
         {
-            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ReceivedDataDeclined, "Penumbra IPC Unavailable.")));
-            Logger.LogDebug("Penumbra IPC is not available, cannot apply mod data.", LoggerType.PairMods);
-            return;
-        }
+            IpcKind.Glamourer => ApplyGlamourer(),
+            IpcKind.Heels => ApplyHeels(),
+            IpcKind.CPlus => ApplyCPlus(),
+            IpcKind.Honorific => ApplyHonorific(),
+            IpcKind.Moodles => ApplyMoodles(),
+            IpcKind.ModManips => ApplyModManips(),
+            IpcKind.PetNames => ApplyPetNames(),
+            _ => Task.CompletedTask
+        };
+        await task.ConfigureAwait(false);
 
-        // Do not process anything if we do not have a valid cache setup.
-        if (!_fileCache.CacheFolderIsValid())
-        {
-            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ReceivedDataDeclined, "File Cache Unavailable.")));
-            Logger.LogDebug("File Cache is not available, cannot apply mod data.", LoggerType.PairMods);
-            return;
-        }
+        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had a single IPC change ({kind})", LoggerType.PairHandler);
+        return kind.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips);
+    }
 
-        // Check for any differenced in the modified paths to know what new data we have.
-        Logger.LogDebug($"NewModUpdate is removing {modData.HashesToRemove.Count} files, and adding {modData.FilesToAdd.Count} new files added | WaitingOnMore: {modData.NotAllSent}", LoggerType.PairMods);
+    private async Task<bool> ReapplyVisuals()
+    {
+        if (!IsRendered || _appearanceData is null)
+            return false;
 
-        UpdateReplacements(modData);
-        Logger.LogTrace("Removing outdated and requested removal files from collection.", LoggerType.PairMods);
+        await WaitUntilValidDrawObject().ConfigureAwait(false);
+        
+        Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        var toApply = new List<Task>();
+        
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer])) toApply.Add(ApplyGlamourer());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Heels]))     toApply.Add(ApplyHeels());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))     toApply.Add(ApplyCPlus());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Honorific])) toApply.Add(ApplyHonorific());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Moodles]))   toApply.Add(ApplyMoodles());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.ModManips])) toApply.Add(ApplyModManips());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.PetNames]))  toApply.Add(ApplyPetNames());
+        
+        // Run in parallel.
+        await Task.WhenAll(toApply).ConfigureAwait(false);
+        
+        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their visual data reapplied.", LoggerType.PairHandler);
+        return toApply.Count > 0;
+    }
+    #endregion Alteration Application
 
+    // Faze out.
+    private async Task UpdateAndApplyModData(NewModUpdates modData, bool redraw)
+    {
         // Determine here via checking the FileCache which files we already have the replacement paths for the paths to add.
         // process the download manager here and await its completion or whatever.
         _downloadCTS = _downloadCTS.SafeCancelRecreate();
@@ -399,159 +526,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairMods);
             // 5) Apply the new mod data if rendered.
             Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairMods);
-            await ApplyModData(moddedDict, redraw).ConfigureAwait(false);
         }
         catch (TaskCanceledException) { /* Bagagwa */ }
     }
 
-    // Would need a way to retrieve the existing modded dictionary from the file cache or something here, not sure. We shouldnt need to download anything on a reapplication.
-    private async Task ApplyModData(Dictionary<string, string> moddedPaths, bool redraw)
-    {
-        // Only apply is rendered. Await for this to occur.
-        await SundouleiaEx.WaitForPlayerLoading();
-
-        if (!IsRendered)
-        {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered, skipping mod application.", LoggerType.PairMods);
-            return;
-        }
-        if (_tempCollection == Guid.Empty)
-        {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] does not have a temporary collection, skipping mod application.", LoggerType.PairMods);
-            return;
-        }
-        if (_replacements.Count == 0)
-        {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] has no mod replacements, skipping mod application.", LoggerType.PairMods);
-            return;
-        }
-
-        Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
-        // Maybe we need to do this for our other objects too? Im not sure, guess we'll find out and stuff.
-        await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
-        await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);
-        // do a reapply here (but need to do a redraw for now)
-        if (redraw)
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
-    }
-
-    private async Task ReapplyVisuals(bool redraw)
-    {
-        if (!IsRendered || _appearanceData is null)
-            return;
-
-        Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
-
-        // 3) Only apply is rendered. Await for this to occur.
-        await SundouleiaEx.WaitForPlayerLoading();
-
-        // 4) If appearance is null at this point, return.
-        if (_appearanceData is null || Address == IntPtr.Zero)
-            return;
-
-        var toApply = new List<Task>();
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer]))
-            toApply.Add(ApplyGlamourer());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Heels]))
-            toApply.Add(ApplyHeels());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))
-            toApply.Add(ApplyCPlus());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Honorific]))
-            toApply.Add(ApplyHonorific());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Moodles]))
-            toApply.Add(ApplyMoodles());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.ModManips]))
-            toApply.Add(ApplyModManips());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.PetNames]))
-            toApply.Add(ApplyPetNames());
-        // Run in parallel.
-        await Task.WhenAll(toApply).ConfigureAwait(false);
-        // Redraw if necessary (Glamourer or CPlus)
-        if (_appearanceData.Data.ContainsKey(IpcKind.Glamourer | IpcKind.CPlus) && redraw)
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their visual data reapplied.", LoggerType.PairHandler);
-    }
-
-    public async Task ApplyIpcData(IpcDataPlayerUpdate newData, bool redraw)
-    {
-        // 0) Init appearance data if not yet made.
-        _appearanceData ??= new();
-
-        // 1) Apply changes and get what changed.
-        var changes = _appearanceData.UpdateCache(newData);
-
-        // 2) Fail if nothing changed
-        if (changes is 0)
-            return;
-
-        // 3) Only apply is rendered. Await for this to occur.
-        await SundouleiaEx.WaitForPlayerLoading();
-
-        // 4) If appearance is null at this point, return.
-        if (_appearanceData is null || Address == IntPtr.Zero)
-            return;
-
-        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] has IPC changes to apply ({changes})", LoggerType.PairHandler);
-
-        // 3) Initialize task list to perform all updates in parallel.
-        var tasks = new List<Task>();
-        if (changes.HasAny(IpcKind.Glamourer)) tasks.Add(ApplyGlamourer());
-        if (changes.HasAny(IpcKind.Heels)) tasks.Add(ApplyHeels());
-        if (changes.HasAny(IpcKind.CPlus)) tasks.Add(ApplyCPlus());
-        if (changes.HasAny(IpcKind.Honorific)) tasks.Add(ApplyHonorific());
-        if (changes.HasAny(IpcKind.Moodles)) tasks.Add(ApplyMoodles());
-        if (changes.HasAny(IpcKind.ModManips)) tasks.Add(ApplyModManips());
-        if (changes.HasAny(IpcKind.PetNames)) tasks.Add(ApplyPetNames());
-
-        // 4) Process all updates.
-        await Task.WhenAll(tasks).ConfigureAwait(false);
-
-        // Redraw if necessary (Glamourer or CPlus)
-        if (changes.HasAny(IpcKind.Glamourer | IpcKind.CPlus) && redraw)
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
-    }
-
-    public async Task ApplyIpcSingle(IpcKind kind, string newData)
-    {
-        // 0) Init appearance data if not yet made.
-        _appearanceData ??= new();
-
-        // 1) Attempt to apply the single change.
-        if (!_appearanceData.UpdateCacheSingle(kind, newData))
-            return;
-
-        // 2) Validate render state before applying.
-        if (!IsRendered)
-            return;
-
-        // 3) Only apply is rendered. Await for this to occur.
-        await SundouleiaEx.WaitForPlayerLoading();
-
-        // 4) If appearance is null at this point, return.
-        if (_appearanceData is null || Address == IntPtr.Zero)
-            return;
-
-        // 3) Apply change.
-        var task = kind switch
-        {
-            IpcKind.Glamourer => ApplyGlamourer(),
-            IpcKind.Heels => ApplyHeels(),
-            IpcKind.CPlus => ApplyCPlus(),
-            IpcKind.Honorific => ApplyHonorific(),
-            IpcKind.Moodles => ApplyMoodles(),
-            IpcKind.ModManips => ApplyModManips(),
-            IpcKind.PetNames => ApplyPetNames(),
-            _ => Task.CompletedTask
-        };
-        await task.ConfigureAwait(false);
-
-        // Redraw if necessary (Glamourer or CPlus)
-        if (kind is IpcKind.Glamourer or IpcKind.CPlus)
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
-
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had a single IPC change ({kind})", LoggerType.PairHandler);
-    }
-
+    #region Ipc Helpers
     private async Task ApplyGlamourer()
     {
         Logger.LogDebug($"Applying glamourer state for {NameString}({Sundesmo.GetNickAliasOrUid()}: [{_appearanceData!.Data[IpcKind.Glamourer]}]", LoggerType.PairAppearance);
@@ -581,7 +560,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         var nickData = _appearanceData!.Data[IpcKind.PetNames];
         Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{nickData}]", LoggerType.PairAppearance);
-        await _ipc.PetNames.SetNamesByIdx(ObjIndex, _appearanceData!.Data[IpcKind.PetNames]).ConfigureAwait(false);
+        await _ipc.PetNames.SetNamesByIdx(ObjIndex, nickData).ConfigureAwait(false);
     }
     private async Task ApplyCPlus()
     {
@@ -597,44 +576,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _tempProfile = await _ipc.CustomizePlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
         }
     }
-
-    public async Task RevertAlterations(string aliasOrUid, string name, IntPtr address, ushort objIdx, CancellationToken token)
-    {
-        if (address == IntPtr.Zero)
-            return;
-        // We can care about parallel execution here if we really want to but i dont care atm.
-        if (IpcCallerGlamourer.APIAvailable)
-        {
-            Logger.LogTrace($"Reverting {name}({aliasOrUid})'s Actor state", LoggerType.PairHandler);
-            await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
-        }
-        if (IpcCallerHeels.APIAvailable)
-        {
-            Logger.LogTrace($"Restoring {name}({aliasOrUid})'s heels offset.", LoggerType.PairHandler);
-            await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
-        }
-        if (IpcCallerCustomize.APIAvailable && _tempProfile != Guid.Empty)
-        {
-            Logger.LogTrace($"Reverting {name}({aliasOrUid})'s CPlus profile.", LoggerType.PairHandler);
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-            _tempProfile = Guid.Empty;
-        }
-        if (IpcCallerHonorific.APIAvailable)
-        {
-            Logger.LogTrace($"Clearing {name}({aliasOrUid})'s honorific title.", LoggerType.PairHandler);
-            await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
-        }
-        if (IpcCallerMoodles.APIAvailable)
-        {
-            Logger.LogTrace($"Clearing {name}({aliasOrUid})'s moodles status.", LoggerType.PairHandler);
-            await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
-        }
-        if (IpcCallerPetNames.APIAvailable)
-        {
-            Logger.LogTrace($"Clearing {name}({aliasOrUid})'s pet nicknames.", LoggerType.PairHandler);
-            await _ipc.PetNames.ClearPetNamesByPtr(address).ConfigureAwait(false);
-        }
-    }
+    #endregion Ipc Helpers
 
     // NOTE: This can be very prone to crashing or inconsistent states!
     // Please be sure to look into it and verify everything is correct!
@@ -644,7 +586,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // store the name and address to reference removal properly.
         var name = NameString;
         // Stop any actively running tasks.
-        _newModsCTS.SafeCancelDispose();
+        _runtimeCTS.SafeCancelDispose();
         _downloadCTS.SafeCancelDispose();
         // dispose the downloader.
         _downloader.Dispose();

@@ -329,7 +329,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod and appearance data!", LoggerType.Callbacks);
-        sundesmo.ApplyFullData(newModData, newIpc).ConfigureAwait(false);
+        sundesmo.SetFullDataChanges(newModData, newIpc).ConfigureAwait(false);
     }
 
     // Happens whenever mods should be added or removed.
@@ -339,7 +339,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod data!", LoggerType.Callbacks);
-        sundesmo.ApplyModData(newModData);
+        sundesmo.SetModChanges(newModData);
     }
 
     // Happens whenever non-mod visuals are updated.
@@ -349,7 +349,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s appearance data updated!", LoggerType.Callbacks);
-        sundesmo.ApplyIpcData(newIpc);
+        sundesmo.SetIpcChanges(newIpc);
     }
 
     // Happens whenever a single non-mod appearance item is updated.
@@ -359,7 +359,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s [{relatedObject}] updated its [{type}] data!", LoggerType.Callbacks);
-        sundesmo.ApplyIpcSingle(relatedObject, type, newData);
+        sundesmo.SetIpcChanges(relatedObject, type, newData);
     }
 
     // A pair updated one of their global permissions, so handle the change properly.

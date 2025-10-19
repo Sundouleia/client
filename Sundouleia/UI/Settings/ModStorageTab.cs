@@ -313,6 +313,7 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
             CkGui.CenterTextAligned("No uploads in progress");
         }
 
+        CkGui.FramedIconText(FAI.Download);
         if (TransferBarUI.Downloads.Count <= 0)
         {
             CkGui.CenterTextAligned("No downloads in progress");
@@ -320,13 +321,9 @@ public partial class ModStorageTab : DisposableMediatorSubscriberBase
         }
         else
         {
+            CkGui.FramedIconText(FAI.Download);
             foreach (var (pair, pairDLs) in TransferBarUI.Downloads)
             {
-                using var node = ImRaii.TreeNode($"{pair.NameString}({pair.Sundesmo.GetNickAliasOrUid()}):");
-                if (!node)
-                    continue;
-
-                CkGui.FramedIconText(FAI.Download);
                 var doneDLs = pairDLs.FilesCompleted;
                 var totalDLs = pairDLs.TotalFiles;
                 var totalBytesDLed = pairDLs.Transferred;

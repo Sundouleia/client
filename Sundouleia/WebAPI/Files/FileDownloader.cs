@@ -21,6 +21,22 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     private readonly List<ThrottledStream> _activeDownloadStreams;
     private readonly ConcurrentDictionary<PlayerHandler, FileTransferProgress> _downloadStatus;
 
+    // TODO:
+    // ---------
+    // Structure needs to be migrated from a task awaited downloader to some kind of task worker or enqueued downloader.
+    // ---------
+    // 1. Needs a method for sundesmos to enqueue verified mod files for downloads,
+    // this could be awaitable, but should not await the download itself.
+    // 2. Needs a way for the pair to know when all hashes they are currently processing for downloading, are finished downloading.
+    // 2b. This task should be awaitable, with a cancellation token passed in if possible. The token is to help cancel any awaits if multiple
+    // ApplyMods() functions are called in the PlayerHandler, so that we can ensure we are only applying the mods once all downloads are complete.
+    // 2c. Alternatively, we could also remove files from the fileTransferProgress as they are completed or have a way to easily fetch which
+    // hashes are finished downloading and which are not, so we know which mods to add and which to not add when applying, but this could lead to extra work.
+    // 3. DownloadFinished mediator call should update only once all files are downloaded, and should DownloadBegin fired whenever creating a new FileTransferProgress item.
+    // ---------
+    // This can be handled via a ConcurrentQueue or Task worker ConcurrentDictionary, but should account for handling downloads that could be
+    // requested by multiple people (with the same download links to the same data) to avoid duplicate downloads.
+
     public FileDownloader(ILogger<FileDownloader> logger, SundouleiaMediator mediator,
         FileCompactor compactor, FileCacheManager manager, FileTransferService service)
         : base(logger, mediator)
@@ -67,79 +83,6 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     }
 
     /// <summary>
-    ///     I hate the parameters in this, try to simplify this file to a degree.
-    /// </summary>
-    public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<string, string> moddedDict, CancellationToken ct)
-    {
-        var sw = Stopwatch.StartNew();
-        var missing = new ConcurrentBag<VerifiedModFile>();
-        var outputDict = new ConcurrentDictionary<string, string>();
-        moddedDict = [];
-        // Update the csv if the FilePaths extension has changed.
-        bool hasMigrationChanges = false;
-
-        try
-        {
-            // Flatten the current replacements that do not have a file replacement path.
-            var replacementList = replacements.Values.Where(vmf => string.IsNullOrEmpty(vmf.SwappedPath)).ToList();
-            // Run in parallel to speed up download preparation and lookup time.
-            Parallel.ForEach(replacementList, new ParallelOptions()
-            {
-                CancellationToken = ct,
-                MaxDegreeOfParallelism = 4,
-            },
-            (modItem) =>
-            {
-                ct.ThrowIfCancellationRequested();
-                // Attempt to locate the path of this file hash in our personal cache
-                if (_dbManager.GetFileCacheByHash(modItem.Hash) is { } fileCache)
-                {
-                    // Then attempt to fetch the file information via the resolved FilePath+Extension.
-                    // If the FileHash matched, but there was no FileInfo with the extension, we need to migrate it.
-                    if (string.IsNullOrEmpty(new FileInfo(fileCache.ResolvedFilepath).Extension))
-                    {
-                        hasMigrationChanges = true;
-                        fileCache = _dbManager.MigrateFileHashToExtension(fileCache, modItem.GamePaths[0].Split(".")[^1]);
-                    }
-
-                    // Otherwise, append the game paths to the modded dictionary.
-                    foreach (var gamePath in modItem.GamePaths)
-                        outputDict[gamePath] = fileCache.ResolvedFilepath;
-                }
-                else
-                {
-                    Logger.LogTrace($"Missing file: {modItem.Hash}", LoggerType.PairMods);
-                    missing.Add(modItem);
-                }
-            });
-
-            // Convert the output dictionary into a modded dictionary.
-            moddedDict = outputDict.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
-            // Iterate again to check for any file swaps. These should take precedence in path replacement.
-            foreach (var item in replacements.Values.Where(vmf => !string.IsNullOrEmpty(vmf.SwappedPath)).ToList())
-            {
-                foreach (var gamePath in item.GamePaths)
-                {
-                    Logger.LogTrace($"Adding file swap for {gamePath}: {item.SwappedPath}", LoggerType.PairMods);
-                    moddedDict[gamePath] = item.SwappedPath;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error while grabbing existing files from the cache: {ex}");
-        }
-
-        // If there were migration changes we should re-write out the full csv.
-        if (hasMigrationChanges)
-            _dbManager.WriteOutFullCsv();
-
-        sw.Stop();
-        Logger.LogDebug($"ModdedPaths calculated in {sw.ElapsedMilliseconds}ms, missing files: {missing.Count}, total files: {moddedDict.Count}", LoggerType.PairMods);
-        return [.. missing];
-    }
-
-    /// <summary>
     ///     Downloads a batch of files using authorized download links provided by Sundouleia's FileHost.
     /// </summary>
     public async Task DownloadFiles(PlayerHandler handler, List<VerifiedModFile> fileReplacementDto, CancellationToken ct)
@@ -160,7 +103,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
         {
             ClearDownloadStatusForPlayer(handler, fileReplacementDto);
             Mediator.Publish(new FileDownloadComplete(handler));
-        }
+        }    
     }
 
     private async Task DownloadFilesInternal(PlayerHandler handler, List<VerifiedModFile> moddedFiles, CancellationToken ct)
@@ -251,7 +194,6 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
         }).ConfigureAwait(false);
 
         Logger.LogDebug($"Download end: {handler}", LoggerType.FileDownloads);
-
     }
 
     private Progress<long> CreateProgressReporter(FileTransferProgress dlStatus, string hash)
@@ -286,4 +228,79 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
             Logger.LogWarning($"Error creating cache entry: {ex}");
         }
     }
+
+    /// <summary>
+    ///     I hate the parameters in this, try to simplify this file to a degree.
+    /// </summary>
+    public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<string, string> moddedDict, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        var missing = new ConcurrentBag<VerifiedModFile>();
+        var outputDict = new ConcurrentDictionary<string, string>();
+        moddedDict = [];
+        // Update the csv if the FilePaths extension has changed.
+        bool hasMigrationChanges = false;
+
+        try
+        {
+            // Flatten the current replacements that do not have a file replacement path.
+            var replacementList = replacements.Values.Where(vmf => string.IsNullOrEmpty(vmf.SwappedPath)).ToList();
+            // Run in parallel to speed up download preparation and lookup time.
+            Parallel.ForEach(replacementList, new ParallelOptions()
+            {
+                CancellationToken = ct,
+                MaxDegreeOfParallelism = 4,
+            },
+            (modItem) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                // Attempt to locate the path of this file hash in our personal cache
+                if (_dbManager.GetFileCacheByHash(modItem.Hash) is { } fileCache)
+                {
+                    Logger.LogTrace($"Found file in cache: {modItem.Hash} -> {fileCache.ResolvedFilepath}", LoggerType.PairMods);
+                    // Then attempt to fetch the file information via the resolved FilePath+Extension.
+                    // If the FileHash matched, but there was no FileInfo with the extension, we need to migrate it.
+                    if (string.IsNullOrEmpty(new FileInfo(fileCache.ResolvedFilepath).Extension))
+                    {
+                        hasMigrationChanges = true;
+                        fileCache = _dbManager.MigrateFileHashToExtension(fileCache, modItem.GamePaths[0].Split(".")[^1]);
+                    }
+
+                    // Otherwise, append the game paths to the modded dictionary.
+                    foreach (var gamePath in modItem.GamePaths)
+                        outputDict[gamePath] = fileCache.ResolvedFilepath;
+                }
+                else
+                {
+                    Logger.LogTrace($"Missing file: {modItem.Hash}", LoggerType.PairMods);
+                    missing.Add(modItem);
+                }
+            });
+
+            // Convert the output dictionary into a modded dictionary.
+            moddedDict = outputDict.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
+            // Iterate again to check for any file swaps. These should take precedence in path replacement.
+            foreach (var item in replacements.Values.Where(vmf => !string.IsNullOrEmpty(vmf.SwappedPath)).ToList())
+            {
+                foreach (var gamePath in item.GamePaths)
+                {
+                    Logger.LogTrace($"Adding file swap for {gamePath}: {item.SwappedPath}", LoggerType.PairMods);
+                    moddedDict[gamePath] = item.SwappedPath;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error while grabbing existing files from the cache: {ex}");
+        }
+
+        // If there were migration changes we should re-write out the full csv.
+        if (hasMigrationChanges)
+            _dbManager.WriteOutFullCsv();
+
+        sw.Stop();
+        Logger.LogDebug($"ModdedPaths calculated in {sw.ElapsedMilliseconds}ms, missing files: {missing.Count}, total files: {moddedDict.Count}", LoggerType.PairMods);
+        return [.. missing];
+    }
+
 }

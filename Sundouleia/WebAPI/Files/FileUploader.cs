@@ -39,8 +39,9 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
                 continue;
             }
 
+            var fileSize = fileEntity.Size ?? 0;
             // If the upload is already being processed, skip over it.
-            if (!CurrentUploads.TryAddFile(file.Hash, 0))
+            if (!CurrentUploads.TryAddFile(file.Hash, fileSize))
             {
                 Logger.LogWarning($"File {file.Hash} is already being uploaded, skipping.");
                 continue;
@@ -48,7 +49,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
 
             try
             {
-                Logger.LogDebug($"Upload file {file.Hash} [{fileEntity.Size ?? 0}bytes]", LoggerType.FileUploads);
+                Logger.LogDebug($"Upload file {file.Hash} [{fileSize}bytes]", LoggerType.FileUploads);
                 // Attempt to upload the file using the authorized upload link.
                 await UploadFile(file, fileEntity, CancellationToken.None).ConfigureAwait(false);
                 Logger.LogDebug($"Successfully uploaded file {file.Hash}.", LoggerType.FileUploads);

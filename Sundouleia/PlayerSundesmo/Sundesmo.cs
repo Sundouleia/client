@@ -119,10 +119,10 @@ public class Sundesmo : IComparable<Sundesmo>
     }
 
     // Tinker with async / no async later.
-    public async Task ApplyFullData(NewModUpdates newModData, VisualUpdate newIpc)
+    public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc)
     {
         if (newIpc.PlayerChanges != null)
-            await _player.UpdateAndApplyFullData(newModData, newIpc.PlayerChanges);
+            await _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges);
 
         if (newIpc.MinionMountChanges != null)
             await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
@@ -134,29 +134,29 @@ public class Sundesmo : IComparable<Sundesmo>
             await _companion.ApplyIpcData(newIpc.CompanionChanges);
     }
 
-    public async void ApplyModData(NewModUpdates newModData)
-        => await _player.UpdateAndApplyModData(newModData, true);
+    public async void SetModChanges(NewModUpdates newModData)
+        => await _player.UpdateAndApplyMods(newModData);
 
-    public async void ApplyIpcData(VisualUpdate newIpc)
+    public async void SetIpcChanges(VisualUpdate newIpc)
     {
-        if (newIpc.PlayerChanges is not null)
-            await _player.ApplyIpcData(newIpc.PlayerChanges, true);
+        if (newIpc.PlayerChanges != null)
+            await _player.UpdateAndApplyIpc(newIpc.PlayerChanges);
 
-        if (newIpc.MinionMountChanges is not null)
+        if (newIpc.MinionMountChanges != null)
             await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
 
-        if (newIpc.PetChanges is not null)
+        if (newIpc.PetChanges != null)
             await _pet.ApplyIpcData(newIpc.PetChanges);
 
-        if (newIpc.CompanionChanges is not null)
+        if (newIpc.CompanionChanges != null)
             await _companion.ApplyIpcData(newIpc.CompanionChanges);
     }
 
-    public async void ApplyIpcSingle(OwnedObject obj, IpcKind kind, string newData)
+    public async void SetIpcChanges(OwnedObject obj, IpcKind kind, string newData)
     {
         await (obj switch
         {
-            OwnedObject.Player => _player.ApplyIpcSingle(kind, newData),
+            OwnedObject.Player => _player.UpdateAndApplyIpc(kind, newData),
             OwnedObject.MinionOrMount => _mountMinion.ApplyIpcSingle(kind, newData),
             OwnedObject.Pet => _pet.ApplyIpcSingle(kind, newData),
             OwnedObject.Companion => _companion.ApplyIpcSingle(kind, newData),
@@ -164,39 +164,25 @@ public class Sundesmo : IComparable<Sundesmo>
         }).ConfigureAwait(false);
     }
 
-
-    /// <summary>
-    ///     Sets the sundesmo <see cref="OnlineUser"/> data, and updates their <see cref="SundesmoState"/>. <para />
-    ///     TBD...
-    /// </summary>
     public unsafe void MarkOnline(OnlineUser dto)
     {
         // Cancel any existing timeout task.
         _timeoutCTS.SafeCancel();
-        // Set the OnlineUser & update the sundesmo state.
         _onlineUser = dto;
+        _mediator.Publish(new SundesmoOnline(this, IsReloading));
 
-        var isVisible = _watcher.TryGetExisting(_player, out IntPtr playerAddr);
-        // Notify other parts of Sundouleia they are online, and if we should send them full data.
-        var needsFullData = isVisible && (IsReloading || !_player.HasAlterations);
-        _mediator.Publish(new SundesmoOnline(this, needsFullData));
-        // Ensure that IsReloading is false (prior to sending that they are online)
+        // Set IsReloading back to false.
         IsReloading = false;
 
-        // TryGetExisting returns true if already rendered, or if found in the watcher.
-        if (isVisible && playerAddr != IntPtr.Zero)
-        {
-            // If not rendered, render them, otherwise, reapply their alterations.
-            if (!IsRendered)
-                _player.ObjectRendered((Character*)playerAddr);
-            else
-                _player.ReapplyAlterations().ConfigureAwait(false);
-        }
+        // Attempt to set visible if rendered.
+        // This also handles marking them as rendered and reapplication if any exists.
+        _player.SetVisibleIfRendered().ConfigureAwait(false);
 
         // If the player is not rendered, their owned objects should not be.
         if (!IsRendered)
             return;
 
+        // Update these later to handle similar logic as PlayerHandler.
         if (_watcher.TryGetExisting(_mountMinion, out IntPtr mountAddr))
         {
             _mountMinion.ObjectRendered((GameObject*)mountAddr);
@@ -286,7 +272,7 @@ public class Sundesmo : IComparable<Sundesmo>
 
                 // Revert all alterations.
                 _logger.LogDebug($"Timeout elapsed for [{PlayerName}] ({GetNickAliasOrUid()}). Clearing Alterations.", UserData.AliasOrUID);
-                await _player.ClearAlterations(CancellationToken.None).ConfigureAwait(false);
+                await _player.RevertRenderedAlterations().ConfigureAwait(false);
                 await _mountMinion.ClearAlterations().ConfigureAwait(false);
                 await _pet.ClearAlterations().ConfigureAwait(false);
                 await _companion.ClearAlterations().ConfigureAwait(false);

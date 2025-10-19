@@ -59,12 +59,12 @@ public class TransferBarUI : WindowMediatorSubscriberBase
             _downloads.TryRemove(msg.Player, out _);
         });
         // For uploads (can configure later as there is not much reason with our new system)
-        Mediator.Subscribe<FileUploading>(this, _ =>
+        Mediator.Subscribe<FilesUploading>(this, _ =>
         {
             _logger.LogWarning($"Starting upload tracking for {_.Player.NameString}");
             _uploads[_.Player] = true;
         });
-        Mediator.Subscribe<FileUploaded>(this, (msg) =>
+        Mediator.Subscribe<FilesUploaded>(this, (msg) =>
         {
             _logger.LogWarning($"Ending upload tracking for {msg.Player.NameString}");
             _uploads.TryRemove(msg.Player, out _);

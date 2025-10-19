@@ -79,7 +79,7 @@ public class MainUI : WindowMediatorSubscriberBase
         // Default to open if the user desires for it to be open.
         if(_config.Current.OpenUiOnStartup)
             Toggle();
-        // Update the tabmenu selection.
+        // Update the tab menu selection.
         _tabMenu.TabSelection = _config.Current.MainUiTab;
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
@@ -171,9 +171,6 @@ public class MainUI : WindowMediatorSubscriberBase
         // so removed it for now. if we need it later just reference GSpeak.)
         switch (_tabMenu.TabSelection)
         {
-            case MainMenuTabs.SelectedTab.Homepage:
-                _homepage.DrawHomepageSection();
-                break;
             case MainMenuTabs.SelectedTab.Requests:
                 _requestsTab.DrawRequestsSection();
                 break;
@@ -343,7 +340,7 @@ public class MainUI : WindowMediatorSubscriberBase
                 }
             }
             CkGui.AttachToolTip($"{(MainHub.IsConnected ? "Disconnect from" : "Connect to")} {MainHub.MAIN_SERVER_NAME}--SEP--Current Status: {MainHub.ServerStatus}");
-            _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConnectionState, WindowPos, WindowSize, () => _tabMenu.TabSelection = MainMenuTabs.SelectedTab.Homepage);
+            _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConnectionState, WindowPos, WindowSize);
         }
     }
 

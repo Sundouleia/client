@@ -92,13 +92,11 @@ public sealed class IpcCallerPetNames : IIpcCaller
     {
         if (!APIAvailable) return string.Empty;
 
-        Generic.Safe(() =>
+        return Generic.Safe(() =>
         {
-            var localNameData = GetNicknameData.InvokeFunc();
+            string localNameData = GetNicknameData.InvokeFunc();
             return string.IsNullOrEmpty(localNameData) ? string.Empty : localNameData;
-        });
-
-        return string.Empty;
+        }) ?? string.Empty;
     }
 
     public async Task SetPetNamesByPtr(nint charaAddr, string nicknameData)
