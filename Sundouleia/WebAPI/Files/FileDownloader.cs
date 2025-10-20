@@ -1,8 +1,8 @@
 ﻿using CkCommons;
-using K4os.Compression.LZ4.Legacy;
 using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Utils;
 using Sundouleia.WebAPI.Files.Models;
 using SundouleiaAPI.Data;
 
@@ -11,7 +11,7 @@ namespace Sundouleia.WebAPI.Files;
 // Handles downloading files off the sundouleia servers, provided a valid authorized download link.
 // I hope to god i get help digesting how to get this working with progressable file streams and appropriate integration with the new file host because
 // as of right now my brain is fried, and I am tired of making all of this code just to make something a reality for people.
-public partial class FileDownloader : DisposableMediatorSubscriberBase
+public class FileDownloader : DisposableMediatorSubscriberBase
 {
     private readonly FileCompactor _compactor;
     private readonly FileCacheManager _dbManager;
@@ -20,6 +20,11 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     private readonly Lock _activeDownloadStreamsLock = new();
     private readonly List<ThrottledStream> _activeDownloadStreams;
     private readonly ConcurrentDictionary<PlayerHandler, FileTransferProgress> _downloadStatus;
+    private readonly ConcurrentDictionary<PlayerHandler, ConcurrentQueue<Task>> _downloadTasks = new();
+    private readonly TaskDeduplicator<string> _downloadDeduplicator = new();
+    private readonly TaskDeduplicator<PlayerHandler> _waiterDeduplicator = new();
+    private readonly CancellationTokenSource _cancellationTokenSource = new();
+
 
     // TODO:
     // ---------
@@ -65,7 +70,7 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
 
     protected override void Dispose(bool disposing)
     {
-        ClearDownloadStatus();
+        _cancellationTokenSource.Cancel();
         lock (_activeDownloadStreamsLock)
         {
             foreach (var stream in _activeDownloadStreams.ToList())
@@ -73,8 +78,6 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
         }
         base.Dispose(disposing);
     }
-
-    private void ClearDownloadStatus() => _downloadStatus.Clear();
 
     private void ClearDownloadStatusForPlayer(PlayerHandler handler, List<VerifiedModFile> files)
     {
@@ -85,115 +88,152 @@ public partial class FileDownloader : DisposableMediatorSubscriberBase
     /// <summary>
     ///     Downloads a batch of files using authorized download links provided by Sundouleia's FileHost.
     /// </summary>
-    public async Task DownloadFiles(PlayerHandler handler, List<VerifiedModFile> fileReplacementDto, CancellationToken ct)
-    {
-        try
-        {
-            await DownloadFilesInternal(handler, fileReplacementDto, ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            Logger.LogDebug($"Detected cancellation of download for {handler}", LoggerType.FileDownloads);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error during download for {handler}: {ex}");
-        }
-        finally
-        {
-            ClearDownloadStatusForPlayer(handler, fileReplacementDto);
-            Mediator.Publish(new FileDownloadComplete(handler));
-        }    
-    }
-
-    private async Task DownloadFilesInternal(PlayerHandler handler, List<VerifiedModFile> moddedFiles, CancellationToken ct)
+    public void BeginDownloads(PlayerHandler handler, List<VerifiedModFile> moddedFiles)
     {
         // create the progress tracking data for this player
         var dlStatus = _downloadStatus.GetOrAdd(handler, new FileTransferProgress());
-        foreach (var file in moddedFiles)
-            dlStatus.AddOrUpdateFile(file.Hash, 0);
+
+        Logger.LogDebug($"Download begin for: {handler.NameString}", LoggerType.FileDownloads);
+
+        var taskQueue = _downloadTasks.GetOrAdd(handler, new ConcurrentQueue<Task>());
+        foreach (var modFile in moddedFiles)
+        {
+            // register the file for progress tracking
+            dlStatus.AddOrUpdateFile(modFile.Hash, 0);
+
+            // begin or get existing download task
+            Logger.LogDebug($"Enqueuing download task for: {modFile.Hash} for player {handler.NameString}", LoggerType.FileDownloads);
+            taskQueue.Enqueue(_downloadDeduplicator.GetOrBeginTask(modFile.Hash, () =>
+                DownloadFileInternal(dlStatus, modFile, _cancellationTokenSource.Token)));
+        }
 
         // Inform the download UI that there are download(s) starting, passing in the status dictionary.
         Mediator.Publish(new FileDownloadStarted(handler, dlStatus));
 
-        // Begin the parallel downloads, managed via the download slots.
-        await Parallel.ForEachAsync(moddedFiles, new ParallelOptions()
+        // start a waiter task to await all downloads for this player
+        _waiterDeduplicator.GetOrBeginTask(handler, async () =>
         {
-            MaxDegreeOfParallelism = Math.Min(moddedFiles.Count, 10), // 1-10 parallel downloads
-            CancellationToken = ct,
-        },
-        async (modFile, cancelToken) =>
+            Logger.LogDebug($"Starting download waiter for: {handler.NameString}", LoggerType.FileDownloads);
+
+            // This is the only place we dequeue tasks (thanks to _waiterDeduplicator), which makes this combination of IsEmpty + TryDequeue safe.
+            while (!taskQueue.IsEmpty)
+            {
+                if (taskQueue.TryDequeue(out var downloadTask))
+                {
+                    try
+                    {
+                        await downloadTask.ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error in download task for {handler.NameString}: {ex}", LoggerType.FileDownloads);
+                    }
+                }
+                else
+                {
+                    Logger.LogWarning($"Failed to dequeue download task for: {handler.NameString}", LoggerType.FileDownloads);
+                }
+            }
+
+            Logger.LogDebug($"All downloads completed for: {handler.NameString}", LoggerType.FileDownloads);
+            ClearDownloadStatusForPlayer(handler, moddedFiles);
+            Mediator.Publish(new FileDownloadComplete(handler));
+        });
+    }
+
+    /// <summary>
+	///    Waits for all downloads for the specified player to complete.
+	/// </summary>
+	/// <param name="handler"></param>
+	/// <returns></returns>
+    public Task WaitForDownloadsToComplete(PlayerHandler handler)
+    {
+        if (_waiterDeduplicator.TryGetTask(handler, out var task))
+            return task;
+        return Task.CompletedTask;
+    }
+
+    private async Task DownloadFileInternal(FileTransferProgress dlStatus, VerifiedModFile modFile, CancellationToken cancelToken)
+    {
+        try
         {
+            // await for an available download slot
+            await _transferService.WaitForDownloadSlotAsync(cancelToken).ConfigureAwait(false);
+
+            // check for cancellation, as download slot wait could be long depending on the number and size of requested downloads
+            cancelToken.ThrowIfCancellationRequested();
+            Logger.LogDebug($"Download start: {modFile.Hash}", LoggerType.FileDownloads);
+
+            // download the file via transfer service
+            var downloadResponse = await _transferService.SendRequestAsync(HttpMethod.Get, new Uri(modFile.Link), cancelToken, HttpCompletionOption.ResponseHeadersRead);
+            downloadResponse.EnsureSuccessStatusCode();
+
+            // get total size for progress tracking
+            if (downloadResponse.Headers.Contains("X-File-Size") && long.TryParse(downloadResponse.Headers.GetValues("X-File-Size").FirstOrDefault(), out var size))
+            {
+                dlStatus.AddOrUpdateFile(modFile.Hash, size);
+            }
+
+            // create progress reporter for this player
+            Progress<long> progress = CreateProgressReporter(dlStatus, modFile.Hash);
+
+            // set up throttled stream for download
+            using var downloadStream = await downloadResponse.Content.ReadAsStreamAsync(cancelToken).ConfigureAwait(false);
+            using var throttledStream = new ThrottledStream(downloadStream, _transferService.DownloadLimitPerSlot());
+            lock (_activeDownloadStreamsLock)
+                _activeDownloadStreams.Add(throttledStream);
+
+            // this try block exists to ensure we always remove the stream from active downloads
             try
             {
-                // await for an available download slot
-                await _transferService.WaitForDownloadSlotAsync(cancelToken).ConfigureAwait(false);
+                // download to temp file first, then move to final location
+                var fileExtension = modFile.GamePaths[0].Split(".")[^1]; // maybe pass extension in the (Verified)ModFile dto:s?
+                var filePath = _dbManager.GetCacheFilePath(modFile.Hash, fileExtension);
+                var tempFilePath = filePath + ".part";
 
-                // download the file via transfer service
-                var downloadResponse = await _transferService.SendRequestAsync(HttpMethod.Get, new Uri(modFile.Link), cancelToken, HttpCompletionOption.ResponseHeadersRead);
-                downloadResponse.EnsureSuccessStatusCode();
+                // clean up any existing temp file that could be left over, if the game crashed or was closed mid-download
+                if (File.Exists(tempFilePath))
+                    File.Delete(tempFilePath);
 
-                // get total size for progress tracking
-                if (downloadResponse.Headers.Contains("X-File-Size") && long.TryParse(downloadResponse.Headers.GetValues("X-File-Size").FirstOrDefault(), out var size))
+                using (var fileStream = File.Create(tempFilePath))
                 {
-                    dlStatus.AddOrUpdateFile(modFile.Hash, size);
+                    // copy from the http stream to temp file with progress tracking
+                    await throttledStream.CopyToAsync(fileStream, progress, cancelToken);
+                    await fileStream.FlushAsync(cancelToken).ConfigureAwait(false);
                 }
 
-                // create progress reporter for this player
-                Progress<long> progress = CreateProgressReporter(dlStatus, modFile.Hash);
+                // move temp file to final location
+                File.Move(tempFilePath, filePath, true);
+                PersistFileToStorage(modFile.Hash, filePath);
 
-                // set up throttled stream for download
-                using var downloadStream = await downloadResponse.Content.ReadAsStreamAsync(cancelToken).ConfigureAwait(false);
-                using var throttledStream = new ThrottledStream(downloadStream, _transferService.DownloadLimitPerSlot());
-                lock (_activeDownloadStreamsLock)
-                    _activeDownloadStreams.Add(throttledStream);
+                // compact the file if needed
+                _compactor.CompactFileSafe(filePath);
 
-                try
-                {
-                    // download to temp file first, then move to final location
-                    var fileExtension = modFile.GamePaths[0].Split(".")[^1]; // maybe pass extension in the (Verified)ModFile dto:s?
-                    var filePath = _dbManager.GetCacheFilePath(modFile.Hash, fileExtension);
-                    var tempFilePath = filePath + ".part";
-                    using (var fileStream = File.Create(tempFilePath))
-                    {
-                        // copy from the http stream to temp file with progress tracking
-                        await throttledStream.CopyToAsync(fileStream, progress, cancelToken);
-                        await fileStream.FlushAsync(cancelToken).ConfigureAwait(false);
-                    }
-
-                    // move temp file to final location
-                    File.Move(tempFilePath, filePath, true);
-                    PersistFileToStorage(modFile.Hash, filePath);
-
-                    // compact the file if needed
-                    _compactor.CompactFileSafe(filePath);
-
-                    // mark file download as completed
-                    dlStatus.MarkFileCompleted(modFile.Hash);
-                    Logger.LogDebug($"Downloaded file {modFile.Hash} to {filePath}", LoggerType.FileDownloads);
-                }
-                finally
-                {
-                    lock (_activeDownloadStreamsLock)
-                        _activeDownloadStreams.Remove(throttledStream);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                Logger.LogDebug($"Detected cancellation of download for {modFile.Hash}", LoggerType.FileDownloads);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Error during download of {modFile.Hash}: {ex}");
-                return;
+                // mark file download as completed
+                dlStatus.MarkFileCompleted(modFile.Hash);
+                Logger.LogDebug($"Downloaded file {modFile.Hash} to {filePath}", LoggerType.FileDownloads);
             }
             finally
             {
-                _transferService.ReleaseDownloadSlot();
+                lock (_activeDownloadStreamsLock)
+                    _activeDownloadStreams.Remove(throttledStream);
             }
-        }).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogDebug($"Detected cancellation of download for {modFile.Hash}", LoggerType.FileDownloads);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during download of {modFile.Hash}: {ex}", LoggerType.FileDownloads);
+            return;
+        }
+        finally
+        {
+            _transferService.ReleaseDownloadSlot();
+        }
 
-        Logger.LogDebug($"Download end: {handler}", LoggerType.FileDownloads);
+        Logger.LogDebug($"Download end: {modFile.Hash}", LoggerType.FileDownloads);
     }
 
     private Progress<long> CreateProgressReporter(FileTransferProgress dlStatus, string hash)
