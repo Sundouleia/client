@@ -40,7 +40,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
                 return;
 
             var newLimit = _transferService.DownloadLimitPerSlot();
-            Logger.LogTrace($"Setting new Download Speed Limit to {newLimit}");
+            // Logger.LogTrace($"Setting new Download Speed Limit to {newLimit}");
             lock (_activeDownloadStreamsLock)
             {
                 foreach (var stream in _activeDownloadStreams)

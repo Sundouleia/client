@@ -4,7 +4,7 @@ namespace Sundouleia.ModFiles.Cache;
 
 // Might be possible to split this up into different files but we will see.
 // I personally would prefer it since this looks a bit messy.
-public sealed class SundouleiaWatcher
+public sealed class SundouleiaWatcher : IDisposable
 {
     private readonly ILogger<SundouleiaWatcher> _logger;
     private readonly MainConfig _config;
