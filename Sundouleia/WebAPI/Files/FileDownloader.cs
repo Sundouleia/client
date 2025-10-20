@@ -71,13 +71,22 @@ public class FileDownloader : DisposableMediatorSubscriberBase
     /// </summary>
     public void BeginDownloads(PlayerHandler handler, List<VerifiedModFile> moddedFiles)
     {
+        // obtain the missing files from the fileCacheManager.
+        var missingFiles = _dbManager.MissingHashes(moddedFiles);
+
+        // if there is nothing to download, skip this process.
+        if (!missingFiles.Any())
+            return;
+
+        Logger.LogDebug($"Enqueuing {missingFiles.Count()} files for download for {handler.NameString}({handler.Sundesmo.GetNickAliasOrUid()})", LoggerType.FileDownloads);
+
         // create the progress tracking data for this player
         var dlStatus = _downloadStatus.GetOrAdd(handler, new FileTransferProgress());
 
         Logger.LogDebug($"Download begin for: {handler.NameString}", LoggerType.FileDownloads);
 
         var taskQueue = _downloadTasks.GetOrAdd(handler, new ConcurrentQueue<Task>());
-        foreach (var modFile in moddedFiles)
+        foreach (var modFile in missingFiles)
         {
             // register the file for progress tracking
             dlStatus.AddOrUpdateFile(modFile.Hash, 0);
@@ -325,5 +334,4 @@ public class FileDownloader : DisposableMediatorSubscriberBase
         Logger.LogDebug($"ModdedPaths calculated in {sw.ElapsedMilliseconds}ms, missing files: {missing.Count}, total files: {moddedDict.Count}", LoggerType.PairMods);
         return [.. missing];
     }
-
 }

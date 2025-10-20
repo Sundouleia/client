@@ -175,7 +175,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             if (!PlayerData.IsZoning && IsObjectLoaded())
                 return;
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not fully loaded yet, waiting...", LoggerType.PairHandler);
             await Task.Delay(100).ConfigureAwait(false);
         }
     }
@@ -257,8 +256,14 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     public async Task UpdateAndApplyMods(NewModUpdates modChanges)
     {
-        if (UpdateDataMods(modChanges))
-            await ApplyMods().ConfigureAwait(false);
+        // Return if the update had no changes.
+        if (!UpdateDataMods(modChanges))
+            return;
+        // Otherwise apply the changes. If we should redraw, do so.
+        bool redraw = await ApplyMods().ConfigureAwait(false);
+        // Redraw if visible.
+        if (redraw && IsRendered)
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
     }
 
     public async Task UpdateAndApplyIpc(IpcDataPlayerUpdate ipcChanges)
@@ -276,12 +281,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     public async Task ReapplyAlterations()
     {
+        if (!IsRendered)
+            return;
+
         var refresh = false;
         refresh &= await ReapplyVisuals().ConfigureAwait(false);
         refresh &= await ApplyMods().ConfigureAwait(false);
 
         // If either had a change, redraw (reapply in the future)
-        if (refresh)
+        if (refresh && IsRendered)
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
     }
     #endregion Altaration Control
@@ -303,7 +311,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _replacements[file.Hash] = file;
 
         Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data")));
-        Logger.LogTrace($"Mod Data received from {NameString}({Sundesmo.GetNickAliasOrUid()}) [{modData.FilesToAdd.Count} New | {modData.HashesToRemove.Count} ToRemove | {modData.FilesUploading} Uploading", LoggerType.PairHandler);
+        Logger.LogTrace($"Mod Data received from {NameString}({Sundesmo.GetNickAliasOrUid()}) [{modData.FilesToAdd.Count} New | {modData.HashesToRemove.Count} ToRemove | {modData.FilesUploading} Uploading]", LoggerType.PairHandler);
 
         // If we do not have any penumbraAPI or file cache, do not attempt downloads.
         if (!IpcCallerPenumbra.APIAvailable || !_fileCache.CacheFolderIsValid())
@@ -320,8 +328,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // We should take any new mods to add, and enqueue them to the file downloader.
         _downloader.BeginDownloads(this, modData.FilesToAdd);
-        Logger.LogDebug($"Enqueued {modData.FilesToAdd.Count} files for download for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
-
         return modData.HasChanges;
     }
 
@@ -344,13 +350,17 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         var refresh = false;
         if (visualChanges is not IpcKind.None)
-            refresh &= await ApplyVisuals(visualChanges).ConfigureAwait(false);
+            refresh |= await ApplyVisuals(visualChanges).ConfigureAwait(false);
         if (modsChanged)
-            refresh &= await ApplyMods().ConfigureAwait(false);
-        
+            refresh |= await ApplyMods().ConfigureAwait(false);
+
+        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their alterations applied. (Visual Changes: {visualChanges}, Mod Changes: {modsChanged})", LoggerType.PairHandler);
         // If either had a change, redraw (reapply in the future)
         if (refresh)
+        {
+            Logger.LogDebug($"Redrawing [{Sundesmo.GetNickAliasOrUid()}] due to alteration changes.", LoggerType.PairHandler);
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        }
     }
 
     // True if data was applied, false otherwise. (useful for redraw)
@@ -537,46 +547,46 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     #region Ipc Helpers
     private async Task ApplyGlamourer()
     {
-        Logger.LogDebug($"Applying glamourer state for {NameString}({Sundesmo.GetNickAliasOrUid()}: [{_appearanceData!.Data[IpcKind.Glamourer]}]", LoggerType.PairAppearance);
+        Logger.LogDebug($"Applying glamourer state for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
         await _ipc.Glamourer.ApplyBase64StateByIdx(ObjIndex, _appearanceData!.Data[IpcKind.Glamourer]).ConfigureAwait(false);
     }
     private async Task ApplyHeels()
     {
-        Logger.LogDebug($"Setting heels offset for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{_appearanceData!.Data[IpcKind.Heels]}]", LoggerType.PairAppearance);
+        Logger.LogDebug($"Setting heels offset for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
         await _ipc.Heels.SetUserOffset(ObjIndex, _appearanceData!.Data[IpcKind.Heels]).ConfigureAwait(false);
     }
     private async Task ApplyHonorific()
     {
-        Logger.LogDebug($"Setting honorific title for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{_appearanceData!.Data[IpcKind.Honorific]}]", LoggerType.PairAppearance);
+        Logger.LogDebug($"Setting honorific title for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
         await _ipc.Honorific.SetTitleAsync(ObjIndex, _appearanceData!.Data[IpcKind.Honorific]).ConfigureAwait(false);
     }
     private async Task ApplyMoodles()
     {
-        Logger.LogDebug($"Setting moodles status for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{_appearanceData!.Data[IpcKind.Moodles]}]", LoggerType.PairAppearance);
+        Logger.LogDebug($"Setting moodles status for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
         await _ipc.Moodles.SetByPtr(Address, _appearanceData!.Data[IpcKind.Moodles]).ConfigureAwait(false);
     }
     private async Task ApplyModManips()
     {
-        Logger.LogDebug($"Setting mod manipulations for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{_appearanceData!.Data[IpcKind.ModManips]}]", LoggerType.PairAppearance);
+        Logger.LogDebug($"Setting mod manipulations for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
         await _ipc.Penumbra.SetSundesmoManipulations(_tempCollection, _appearanceData!.Data[IpcKind.ModManips]).ConfigureAwait(false);
     }
     private async Task ApplyPetNames()
     {
         var nickData = _appearanceData!.Data[IpcKind.PetNames];
-        Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {NameString}({Sundesmo.GetNickAliasOrUid()}): [{nickData}]", LoggerType.PairAppearance);
+        Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
         await _ipc.PetNames.SetNamesByIdx(ObjIndex, nickData).ConfigureAwait(false);
     }
     private async Task ApplyCPlus()
     {
         if (string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.CPlus]) && _tempProfile != Guid.Empty)
         {
-            Logger.LogDebug($"Reverting CPlus profile for {NameString}", LoggerType.PairAppearance);
+            Logger.LogDebug($"Reverting CPlus profile {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
         else
         {
-            Logger.LogDebug($"Applying CPlus profile for {NameString}", LoggerType.PairAppearance);
+            Logger.LogDebug($"Applying CPlus profile {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
             _tempProfile = await _ipc.CustomizePlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
         }
     }
@@ -585,28 +595,26 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        // store the name and address to reference removal properly.
-        var name = NameString;
         // Stop any actively running tasks.
         _runtimeCTS.SafeCancelDispose();
         _dlWaiterCTS.SafeCancelDispose();
         // If they were valid before, parse out the event message for their disposal.
-        if (!string.IsNullOrEmpty(name))
+        if (!string.IsNullOrEmpty(NameString))
         {
-            Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
-            Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Disposed")));
+            Logger.LogDebug($"Disposing {NameString}({Sundesmo.GetNickAliasOrUid()}) @ [{Address:X}]", LoggerType.PairHandler);
+            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.Disposed, "Disposed")));
         }
 
         // Do not dispose if the framework is unloading!
         // (means we are shutting down the game and cannot transmit calls to other ipcs without causing fatal errors!)
         if (Svc.Framework.IsFrameworkUnloading)
         {
-            Logger.LogWarning($"Framework is unloading, skipping disposal for {name}({Sundesmo.GetNickAliasOrUid()})");
+            Logger.LogWarning($"Framework is unloading, skipping disposal for {NameString}({Sundesmo.GetNickAliasOrUid()})");
             return;
         }
 
         // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
-        _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), name).ConfigureAwait(false);
+        _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), NameString).ConfigureAwait(false);
     }
 
     /// <summary>

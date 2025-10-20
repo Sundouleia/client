@@ -48,28 +48,12 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         IsOpen = true;
 
         // Temporarily do this, hopefully we dont always need to.
-        Mediator.Subscribe<FileDownloadStarted>(this, (msg) =>
-        {
-            _logger.LogWarning($"Starting download tracking for {msg.Player.NameString}({msg.Player.Sundesmo.GetNickAliasOrUid()})");
-            _downloads[msg.Player] = msg.Status;
-        });
-        Mediator.Subscribe<FileDownloadComplete>(this, (msg) =>
-        {
-            _logger.LogWarning($"Ending download tracking for {msg.Player.NameString}");
-            _downloads.TryRemove(msg.Player, out _);
-        });
+        Mediator.Subscribe<FileDownloadStarted>(this, (msg) => _downloads[msg.Player] = msg.Status);
+        Mediator.Subscribe<FileDownloadComplete>(this, (msg) => _downloads.TryRemove(msg.Player, out _));
         // For uploads (can configure later as there is not much reason with our new system)
-        Mediator.Subscribe<FilesUploading>(this, _ =>
-        {
-            _logger.LogWarning($"Starting upload tracking for {_.Player.NameString}");
-            _uploads[_.Player] = true;
-        });
-        Mediator.Subscribe<FilesUploaded>(this, (msg) =>
-        {
-            _logger.LogWarning($"Ending upload tracking for {msg.Player.NameString}");
-            _uploads.TryRemove(msg.Player, out _);
-        });
-        Mediator.Subscribe<SundesmoOffline>(this, (msg) =>
+        Mediator.Subscribe<FilesUploading>(this, _ => _uploads[_.Player] = true);
+        Mediator.Subscribe<FilesUploaded>(this, (msg) => _uploads.TryRemove(msg.Player, out _));
+        Mediator.Subscribe<SundesmoOffline>(this, (msg) => 
         {
             _logger.LogWarning($"Ending all transfer tracking for offline {msg.Sundesmo.PlayerName}");
             _uploads.TryRemove(msg.Sundesmo.PlayerHandler, out _);

@@ -6,6 +6,7 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
+using SundouleiaAPI.Data;
 using System.Globalization;
 
 namespace Sundouleia.ModFiles;
@@ -170,6 +171,18 @@ public sealed class FileCacheManager : IHostedService
         var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
         return (fileHash, LZ4Wrapper.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
             (int)new FileInfo(fileCache).Length));
+    }
+
+    /// <returns>
+    ///     Returns the verified mod files who's hashes are not currently cached in the manager.
+    /// </returns>
+    public IEnumerable<VerifiedModFile> MissingHashes(IEnumerable<VerifiedModFile> modFiles)
+    {
+        foreach (var f in modFiles)
+        {
+            if (!_fileCaches.ContainsKey(f.Hash))
+                yield return f;
+        }
     }
 
     /// <summary>
