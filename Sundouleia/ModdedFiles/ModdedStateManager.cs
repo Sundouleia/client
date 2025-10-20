@@ -483,7 +483,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         ct.ThrowIfCancellationRequested();
 
         // All remaining paths that are not file-swaps come from modded game files that need to be sent over sundouleia servers.
-        // To authorize them we need their 40 character SHA1 computed hashes from their file data.
+        // To authorize them we need their 64 character BLAKE3 computed hashes from their file data.
         var toCompute = moddedPaths.Where(f => !f.IsFileSwap).ToArray();
         Logger.LogDebug($"Computing hashes for {toCompute.Length} files.", LoggerType.ResourceMonitor);
 

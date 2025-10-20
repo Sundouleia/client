@@ -154,7 +154,7 @@ public sealed class FileCompactor
         // Ignore files smaller than the 8KB cluster size (Compacting these is irrelevant)
         if (oldSize < Math.Max(clusterSize, 8 * 1024))
         {
-            _logger.LogDebug($"File {filePath} is smaller than cluster size ({clusterSize}), ignoring");
+            _logger.LogDebug($"File {filePath} is smaller than cluster size ({clusterSize}), ignoring", LoggerType.FileCompactor);
             return;
         }
 
@@ -164,16 +164,16 @@ public sealed class FileCompactor
             // XPRESS8K is one of many compression algorithms supported by windows for NTFS drives.
             // While used internally by windows for file creations, we can also make use of it to leverage
             // reduced file sizes on disk for our modded file cache, helping prevent bloat / overload overtime.
-            _logger.LogDebug($"Compacting file to XPRESS8K: {filePath}");
+            _logger.LogDebug($"Compacting file to XPRESS8K: {filePath}", LoggerType.FileCompactor);
             // Use WindowsOverlayFilter API to compress the format at file system level.
             WOFCompressFile(filePath);
             // Determine the new size on the disk after compression is applied, and log results.
             var newSize = GetFileSizeOnDisk(fi);
-            _logger.LogDebug($"Compressed {filePath}: {{{oldSize}b}} => {{{newSize}b}}");
+            _logger.LogDebug($"Compressed {filePath}: {{{oldSize}b}} => {{{newSize}b}}", LoggerType.FileCompactor);
         }
         else
         {
-            _logger.LogDebug($"File {filePath} already compressed");
+            _logger.LogDebug($"File {filePath} already compressed", LoggerType.FileCompactor);
         }
     }
 
@@ -182,7 +182,7 @@ public sealed class FileCompactor
     /// </summary>
     private void DecompressFile(string path)
     {
-        _logger.LogDebug($"Removing compression from {path}");
+        _logger.LogDebug($"Removing compression from {path}", LoggerType.FileCompactor);
         try
         {
             // Use DeviceIoControl to remove the external backing (decompress) the file.
@@ -213,12 +213,12 @@ public sealed class FileCompactor
         if (_clusterSizes.TryGetValue(root, out int value))
             return value;
 
-        _logger.LogDebug($"Getting Cluster Size for {fi.FullName}, (Root: {root})");
+        _logger.LogDebug($"Getting Cluster Size for {fi.FullName}, (Root: {root})", LoggerType.FileCompactor);
         if (GetDiskFreeSpaceW(root, out uint sectorsPerCluster, out uint bytesPerSector, out _, out _) is 0)
             return -1;
 
         _clusterSizes[root] = (int)(sectorsPerCluster * bytesPerSector);
-        _logger.LogDebug($"Determined Cluster Size for root {root}: {_clusterSizes[root]}");
+        _logger.LogDebug($"Determined Cluster Size for root {root}: {_clusterSizes[root]}", LoggerType.FileCompactor);
         return _clusterSizes[root];
     }
 

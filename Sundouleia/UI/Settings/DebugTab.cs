@@ -18,8 +18,8 @@ public class DebugTab
             LoggerType.IpcMoodles, LoggerType.IpcHeels, LoggerType.IpcHonorific, LoggerType.IpcPetNames ]),
         ("Client Data", [ LoggerType.ResourceMonitor, LoggerType.OwnedObjects, LoggerType.DataDistributor, LoggerType.ClientUpdates ]),
         ("File Info", [ 
-            LoggerType.FileCache, LoggerType.FileCsv, LoggerType.FileMonitor, LoggerType.PairFileCache,
-            LoggerType.FileUploads, LoggerType.FileDownloads, LoggerType.FileService ]),
+            LoggerType.FileCache, LoggerType.FileCsv, LoggerType.FileMonitor, LoggerType.FileCompactor,
+            LoggerType.FileWatcher, LoggerType.FileUploads, LoggerType.FileDownloads, LoggerType.FileService ]),
         ("Pair Data", [
             LoggerType.PairManagement, LoggerType.PairDataTransfer, LoggerType.PairHandler, LoggerType.PairMods, 
             LoggerType.PairAppearance ]),

@@ -132,12 +132,12 @@ public class FileTransferService : DisposableMediatorSubscriberBase
         {
             // read the content, converted to JsonContent, as a string. Await the result for the response.
             var content = await ((JsonContent)reqMsg.Content).ReadAsStringAsync().ConfigureAwait(false);
-            Logger.LogDebug($"Sending {reqMsg.Method} to {reqMsg.RequestUri} (Content: {content})");
+            Logger.LogDebug($"Sending {reqMsg.Method} to {reqMsg.RequestUri} (Content: {content})", LoggerType.FileService);
         }
         else
         {
             // at least log what method we are sending off to the URI thingy.
-            Logger.LogDebug($"Sending {reqMsg.Method} to {reqMsg.RequestUri}");
+            Logger.LogDebug($"Sending {reqMsg.Method} to {reqMsg.RequestUri}", LoggerType.FileService);
         }
 
         try

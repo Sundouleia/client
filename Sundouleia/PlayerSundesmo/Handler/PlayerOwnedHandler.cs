@@ -235,10 +235,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         var name = NameString;
         // If they were valid before, parse out the event message for their disposal.
         if (!string.IsNullOrWhiteSpace(name))
-        {
-            Logger.LogDebug($"Disposing [{name}] @ [{Address:X}]", LoggerType.PairHandler);
             Mediator.Publish(new EventMessage(new(name, Sundesmo.UserData.UID, DataEventType.Disposed, "Owned Object Disposed")));
-        }
 
         // Do not dispose if the framework is unloading!
         // (means we are shutting down the game and cannot transmit calls to other ipcs without causing fatal errors!)
@@ -260,7 +257,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         try
         {
             await ClearAlterations().ConfigureAwait(false);
-            Logger.LogInformation($"Reverted {name}({nickAliasOrUid}) on shutdown.", LoggerType.PairHandler);
         }
         catch (Exception ex)
         {

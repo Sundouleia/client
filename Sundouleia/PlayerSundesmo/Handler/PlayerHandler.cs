@@ -30,8 +30,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private readonly IpcManager _ipc;
 
     private CancellationTokenSource _runtimeCTS = new();
-    private CancellationTokenSource _downloadCTS = new();
-    private Task? _downloadTask;
+    private CancellationTokenSource _dlWaiterCTS = new();
+    private Task? _dlWaiterTask;
 
     public Sundesmo Sundesmo { get; init; }
     private unsafe Character* _player = null;
@@ -319,10 +319,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Mediator.Publish(new FilesUploaded(this));
 
         // We should take any new mods to add, and enqueue them to the file downloader.
-        
-        // NOTE: Additionally, we could cancel downloads for any hashes removed, but it is
-        // likely better to download them anyways as they will likely be shown again.
-        // (also the download link is only temporary anyways)
+        _downloader.BeginDownloads(this, modData.FilesToAdd);
+        Logger.LogDebug($"Enqueued {modData.FilesToAdd.Count} files for download for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
 
         return modData.HasChanges;
     }
@@ -375,19 +373,86 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return false;
         }
 
-        // Get files.
-        var missingFiles = _downloader.GetExistingFromCache(_replacements, out var moddedPaths, _runtimeCTS.Token);
+        // Await for the mods to finish downloading (or until interrupted)
+        var moddedPaths = await WaitForModDownloads().ConfigureAwait(false);
         
-        // TODO: Await for the downloader to finish downloading the current hashes being designed 
-
         // Await for true render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
 
-        Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()}) with [{missingFiles.Count}] missing files.", LoggerType.PairMods);
+        Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()}) with [{moddedPaths.Count}] modded paths.", LoggerType.PairMods);
         await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
         await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);
         
         return moddedPaths.Count > 0;
+    }
+
+    /// <summary>
+    ///     Awaits for all mod downloads to complete. <para />
+    ///     If this function is called again while one is still running, 
+    ///     halts it and returns partial progress.
+    /// </summary>
+    /// <returns> The Modded Dictionary to apply. </returns>
+    private async Task<Dictionary<string, string>> WaitForModDownloads()
+    {
+        // Interrupt any previous download waiters to enforce partial application.
+        _dlWaiterCTS = _dlWaiterCTS.SafeCancelRecreate();
+
+        // Grab the current files from the fileCacheCSV.
+        Logger.LogDebug($"Checking cache for existing files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
+        var missingFiles = _downloader.GetExistingFromCache(_replacements, out var moddedDict, _runtimeCTS.Token);
+
+        // Track attempts. Begin downloading the missing files, if any, until all are gone.
+        // If at any point this process is interrupted, leave the white loop.
+        try
+        {
+            int attempts = 0;
+            while (missingFiles.Count > 0 && attempts++ <= 10 && !_dlWaiterCTS.Token.IsCancellationRequested)
+            {
+                // Await for the current task to finish, if any is assigned.
+                if (_dlWaiterTask != null && !_dlWaiterTask.IsCompleted)
+                {
+                    Logger.LogDebug($"Finishing prior download task for {NameString} ({Sundesmo.GetNickAliasOrUid()}", LoggerType.PairMods);
+                    await _dlWaiterTask.ConfigureAwait(false);
+                }
+
+                // Begin the download task.
+                Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data.")));
+                Logger.LogDebug($"Downloading {missingFiles.Count} files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
+
+                _dlWaiterTask = Task.Run(async () => await _downloader.WaitForDownloadsToComplete(this), _dlWaiterCTS.Token);
+
+                // Await for the task to finish. (This will occur immediately if cancelled halfway through)
+                await _dlWaiterTask.ConfigureAwait(false);
+
+                // If the cancel token was requested, break out.
+                if (_dlWaiterCTS.Token.IsCancellationRequested)
+                {
+                    Logger.LogWarning($"Downloader interrupted with new mod update for {NameString}({Sundesmo.GetNickAliasOrUid()}), setting PARTIAL application.", LoggerType.PairMods);
+                    break;
+                }
+
+                // Recheck missing files.
+                missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _dlWaiterCTS.Token);
+
+                // Delay ~2s with ±15–20% random jitter to avoid synchronized polling
+                var jitter = 0.15 + Random.Shared.NextDouble() * 0.05; // 0.15..0.20
+                if (Random.Shared.Next(2) == 0) jitter = -jitter;
+                var delay = TimeSpan.FromSeconds(2 * (1 + jitter));
+                await Task.Delay(delay, _dlWaiterCTS.Token).ConfigureAwait(false);
+            }
+
+            _dlWaiterCTS.Token.ThrowIfCancellationRequested();
+
+            Logger.LogDebug($"Missing files downloaded, applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
+        }
+        catch (TaskCanceledException)
+        {
+            // Grab final partial progress.
+            missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _runtimeCTS.Token);
+        }
+
+        // Return the modded dictionary to apply.
+        return moddedDict;
     }
 
     // True if data was applied, false otherwise. (useful for redraw)
@@ -469,67 +534,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     }
     #endregion Alteration Application
 
-    // Faze out.
-    private async Task UpdateAndApplyModData(NewModUpdates modData, bool redraw)
-    {
-        // Determine here via checking the FileCache which files we already have the replacement paths for the paths to add.
-        // process the download manager here and await its completion or whatever.
-        _downloadCTS = _downloadCTS.SafeCancelRecreate();
-        var missingFiles = _downloader.GetExistingFromCache(_replacements, out var moddedDict, _downloadCTS.Token);
-
-        try
-        {
-            // This should only be intended to download new files. Any files existing in the hashes should already be downloaded? Not sure.
-            // Would need to look into this later, im too exhausted at the moment.
-            // In essence, upon receiving newModData, those should be checked, but afterwards, these hashes and their respective file paths
-            // in the cache should all be valid. If they are not, they should be cleared and reloaded.
-            if (missingFiles.Count > 0)
-            {
-                int attempts = 0;
-
-                while (missingFiles.Count > 0 && attempts++ <= 10 && !_downloadCTS.Token.IsCancellationRequested)
-                {
-                    // await for the previous download task to complete.
-                    if (_downloadTask is not null && !_downloadTask.IsCompleted)
-                    {
-                        Logger.LogDebug($"Finishing prior download task for {NameString} ({Sundesmo.GetNickAliasOrUid()}", LoggerType.PairMods);
-                        await _downloadTask.ConfigureAwait(false);
-                    }
-
-                    Logger.LogDebug($"Of the {moddedDict.Count} new paths to add, {missingFiles.Count} were not cached.", LoggerType.PairMods);
-
-                    // Begin the download task.
-                    Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data.")));
-                    Logger.LogDebug($"Downloading {missingFiles.Count} files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
-
-                    _downloadTask = Task.Run(async () => await _downloader.DownloadFiles(this, missingFiles, _downloadCTS.Token).ConfigureAwait(false), _downloadCTS.Token);
-
-                    await _downloadTask.ConfigureAwait(false);
-
-                    // If we wanted to back out, then back out.
-                    if (_downloadCTS.Token.IsCancellationRequested)
-                    {
-                        Logger.LogWarning($"Download task for {NameString}({Sundesmo.GetNickAliasOrUid()}) was cancelled, aborting further downloads.", LoggerType.PairMods);
-                        return;
-                    }
-
-                    // Now that we have downloaded the files, check again to see which files we still need.
-                    missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _downloadCTS.Token);
-
-                    // Delay 2s between download monitors?
-                    await Task.Delay(TimeSpan.FromSeconds(2), _downloadCTS.Token).ConfigureAwait(false);
-                }
-            }
-
-            // 4) Append the new data.
-            _downloadCTS.Token.ThrowIfCancellationRequested();
-            Logger.LogDebug("Missing files downloaded, setting updated IPC and reapplying.", LoggerType.PairMods);
-            // 5) Apply the new mod data if rendered.
-            Logger.LogInformation($"Updated mod data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairMods);
-        }
-        catch (TaskCanceledException) { /* Bagagwa */ }
-    }
-
     #region Ipc Helpers
     private async Task ApplyGlamourer()
     {
@@ -578,8 +582,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     }
     #endregion Ipc Helpers
 
-    // NOTE: This can be very prone to crashing or inconsistent states!
-    // Please be sure to look into it and verify everything is correct!
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
@@ -587,9 +589,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         var name = NameString;
         // Stop any actively running tasks.
         _runtimeCTS.SafeCancelDispose();
-        _downloadCTS.SafeCancelDispose();
-        // dispose the downloader.
-        _downloader.Dispose();
+        _dlWaiterCTS.SafeCancelDispose();
         // If they were valid before, parse out the event message for their disposal.
         if (!string.IsNullOrEmpty(name))
         {

@@ -9,8 +9,6 @@ using SundouleiaAPI.Data;
 namespace Sundouleia.WebAPI.Files;
 
 // Handles downloading files off the sundouleia servers, provided a valid authorized download link.
-// I hope to god i get help digesting how to get this working with progressable file streams and appropriate integration with the new file host because
-// as of right now my brain is fried, and I am tired of making all of this code just to make something a reality for people.
 public class FileDownloader : DisposableMediatorSubscriberBase
 {
     private readonly FileCompactor _compactor;
@@ -23,24 +21,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
     private readonly ConcurrentDictionary<PlayerHandler, ConcurrentQueue<Task>> _downloadTasks = new();
     private readonly TaskDeduplicator<string> _downloadDeduplicator = new();
     private readonly TaskDeduplicator<PlayerHandler> _waiterDeduplicator = new();
-    private readonly CancellationTokenSource _cancellationTokenSource = new();
-
-
-    // TODO:
-    // ---------
-    // Structure needs to be migrated from a task awaited downloader to some kind of task worker or enqueued downloader.
-    // ---------
-    // 1. Needs a method for sundesmos to enqueue verified mod files for downloads,
-    // this could be awaitable, but should not await the download itself.
-    // 2. Needs a way for the pair to know when all hashes they are currently processing for downloading, are finished downloading.
-    // 2b. This task should be awaitable, with a cancellation token passed in if possible. The token is to help cancel any awaits if multiple
-    // ApplyMods() functions are called in the PlayerHandler, so that we can ensure we are only applying the mods once all downloads are complete.
-    // 2c. Alternatively, we could also remove files from the fileTransferProgress as they are completed or have a way to easily fetch which
-    // hashes are finished downloading and which are not, so we know which mods to add and which to not add when applying, but this could lead to extra work.
-    // 3. DownloadFinished mediator call should update only once all files are downloaded, and should DownloadBegin fired whenever creating a new FileTransferProgress item.
-    // ---------
-    // This can be handled via a ConcurrentQueue or Task worker ConcurrentDictionary, but should account for handling downloads that could be
-    // requested by multiple people (with the same download links to the same data) to avoid duplicate downloads.
+    private readonly CancellationTokenSource _downloadCTS = new();
 
     public FileDownloader(ILogger<FileDownloader> logger, SundouleiaMediator mediator,
         FileCompactor compactor, FileCacheManager manager, FileTransferService service)
@@ -70,7 +51,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
 
     protected override void Dispose(bool disposing)
     {
-        _cancellationTokenSource.Cancel();
+        _downloadCTS.SafeCancel();
         lock (_activeDownloadStreamsLock)
         {
             foreach (var stream in _activeDownloadStreams.ToList())
@@ -104,7 +85,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
             // begin or get existing download task
             Logger.LogDebug($"Enqueuing download task for: {modFile.Hash} for player {handler.NameString}", LoggerType.FileDownloads);
             taskQueue.Enqueue(_downloadDeduplicator.GetOrBeginTask(modFile.Hash, () =>
-                DownloadFileInternal(dlStatus, modFile, _cancellationTokenSource.Token)));
+                DownloadFileInternal(dlStatus, modFile, _downloadCTS.Token)));
         }
 
         // Inform the download UI that there are download(s) starting, passing in the status dictionary.
@@ -270,7 +251,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
     }
 
     /// <summary>
-    ///     I hate the parameters in this, try to simplify this file to a degree.
+    ///     Grab the modded dictionary of replacements from the list of verified files that we currently have downloaded and cached.
     /// </summary>
     public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<string, string> moddedDict, CancellationToken ct)
     {
@@ -297,7 +278,9 @@ public class FileDownloader : DisposableMediatorSubscriberBase
                 // Attempt to locate the path of this file hash in our personal cache
                 if (_dbManager.GetFileCacheByHash(modItem.Hash) is { } fileCache)
                 {
-                    Logger.LogTrace($"Found file in cache: {modItem.Hash} -> {fileCache.ResolvedFilepath}", LoggerType.PairMods);
+                    // This spams logs if left on.
+                    // Logger.LogTrace($"Found file in cache: {modItem.Hash} -> {fileCache.ResolvedFilepath}", LoggerType.PairMods);
+                    
                     // Then attempt to fetch the file information via the resolved FilePath+Extension.
                     // If the FileHash matched, but there was no FileInfo with the extension, we need to migrate it.
                     if (string.IsNullOrEmpty(new FileInfo(fileCache.ResolvedFilepath).Extension))

@@ -289,9 +289,9 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             .AsParallel()
             .Where(f =>
             {
-                // Ensure that our files have the exact 40 character hash in the filename. Any other files should not be accepted.
+                // Ensure that our files have the exact 64 character hash in the filename. Any other files should not be accepted.
                 var val = f.Split('\\')[^1];
-                return val.Length == 40 || (val.Split('.').FirstOrDefault()?.Length ?? 0) == 40;
+                return val.Length == Constants.Blake3HashLength || (val.Split('.').FirstOrDefault()?.Length ?? 0) == Constants.Blake3HashLength;
             });
 
         if (ct.IsCancellationRequested)
