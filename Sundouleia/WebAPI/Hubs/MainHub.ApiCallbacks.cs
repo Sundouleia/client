@@ -180,7 +180,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateMods(IpcUpdateMods dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateMods: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateMods(dto.User, dto.ModData));
+        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateMods(dto.User, dto.ModData, dto.ManipString));
         return Task.CompletedTask;
     }
 
