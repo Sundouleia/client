@@ -253,6 +253,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             changedMods = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
             if (changedMods.HasChanges)
             {
+                Logger.LogDebug($"ModChanges had changes: {changedMods.FilesToAdd.Count} Files to add, {changedMods.HashesToRemove.Count} Hashes to remove.", LoggerType.DataDistributor);
                 foreach (var (obj, kinds) in newChanges)
                     newChanges[obj] |= IpcKind.Mods;
                 flattenedChanges |= IpcKind.Mods;
@@ -261,7 +262,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             // CONDITION: Only mod updates exist, we should only update mods.
             if (flattenedChanges == IpcKind.Mods)
             {
-                await SendModsUpdate(recipients, changedMods).ConfigureAwait(false);
+                // Send mods if we had changes to the mods, otherwise try to send single.
+                if (changedMods.HasChanges)
+                    await SendModsUpdate(recipients, changedMods).ConfigureAwait(false);
                 return;
             }
 

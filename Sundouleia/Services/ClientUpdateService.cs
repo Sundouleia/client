@@ -136,7 +136,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
                 return;
             }
             // Otherwise, we should process it with the assumption that the modded state could have at any point changed.
-            Logger.LogDebug($"Processing full update for {pendingSnapshot.Count} owned objects.", LoggerType.ClientUpdates);
+            Logger.LogDebug($"Processing CheckStateAndUpdate for {pendingSnapshot.Count} owned objects.", LoggerType.ClientUpdates);
             await _distributor.CheckStateAndUpdate(pendingSnapshot, allPendingSnapshot).ConfigureAwait(false);
         }, _debounceCTS.Token);
     }
@@ -179,7 +179,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         // collections would be cancerous to monitor.
 
         // If mod options changed, they could have effected something that we are wearing, so pass a mod update.
-        if (change is ModSettingChange.EnableState && _watcher.WatchedPlayerAddr != IntPtr.Zero)
+        if (change is (ModSettingChange.EnableState | ModSettingChange.Setting) && _watcher.WatchedPlayerAddr != IntPtr.Zero)
         {
             Logger.LogTrace($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]", LoggerType.IpcPenumbra);
             foreach (var (addr, type) in _watcher.WatchedTypes)

@@ -112,6 +112,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (IsRendered)
         {
             Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) is already rendered, reapplying alterations.", LoggerType.PairHandler);
+            Mediator.Publish(new SundesmoPlayerRendered(this));
+            Mediator.Publish(new RefreshWhitelistMessage());
             await ReInitializeInternal().ConfigureAwait(false);
         }
         else if (_watcher.TryGetExisting(this, out IntPtr playerAddr))
