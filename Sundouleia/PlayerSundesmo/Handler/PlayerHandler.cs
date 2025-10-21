@@ -256,43 +256,43 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         await ApplyAlterations(visualDiff, modDiff).ConfigureAwait(false);
     }
 
-    public async Task UpdateAndApplyMods(NewModUpdates modChanges)
+    public async Task UpdateAndApplyMods(NewModUpdates modChanges, string manipString)
     {
-        // Return if the update had no changes.
-        if (!UpdateDataMods(modChanges))
-            return;
-        // Otherwise apply the changes. If we should redraw, do so.
-        bool redraw = await ApplyMods().ConfigureAwait(false);
-        // Redraw if visible.
-        if (redraw && IsRendered)
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        bool needsRedraw = false;
+        // Update the manipString, and apply if changes occurred.
+        if (!string.IsNullOrEmpty(manipString))
+            if (UpdateDataIpc(IpcKind.ModManips, manipString))
+                needsRedraw |= await ApplyVisualsSingle(IpcKind.ModManips).ConfigureAwait(false);
+
+        // Update the mod data, and apply if changes occurred.
+        if (UpdateDataMods(modChanges))
+            needsRedraw |= await ApplyMods().ConfigureAwait(false);
+
+        ConditionalRedraw(needsRedraw);
     }
 
     public async Task UpdateAndApplyIpc(IpcDataPlayerUpdate ipcChanges)
     {
         var visualDiff = UpdateDataIpc(ipcChanges);
-        if (visualDiff != IpcKind.None)
-            await ApplyVisuals(visualDiff).ConfigureAwait(false);
+        if (visualDiff is IpcKind.None)
+            return;
+        // Apply changes.
+        ConditionalRedraw(await ApplyVisuals(visualDiff).ConfigureAwait(false));
     }
 
     public async Task UpdateAndApplyIpc(IpcKind kind, string newData)
     {
-        if (UpdateDataIpc(kind, newData))
-            await ApplyVisualsSingle(kind).ConfigureAwait(false);
+        if (!UpdateDataIpc(kind, newData))
+            return;
+        // Apply changes.
+        ConditionalRedraw(await ApplyVisualsSingle(kind).ConfigureAwait(false));
     }
-
     public async Task ReapplyAlterations()
     {
-        if (!IsRendered)
-            return;
-
-        var refresh = false;
-        refresh &= await ReapplyVisuals().ConfigureAwait(false);
-        refresh &= await ApplyMods().ConfigureAwait(false);
-
-        // If either had a change, redraw (reapply in the future)
-        if (refresh && IsRendered)
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        // Apply changes, then redraw if necessary.
+        bool visualRedrawNeeded = await ReapplyVisuals().ConfigureAwait(false);
+        bool modRedrawNeeded = await ApplyMods().ConfigureAwait(false);
+        ConditionalRedraw(visualRedrawNeeded || modRedrawNeeded);
     }
     #endregion Altaration Control
 
@@ -357,12 +357,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             refresh |= await ApplyMods().ConfigureAwait(false);
 
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their alterations applied. (Visual Changes: {visualChanges}, Mod Changes: {modsChanged})", LoggerType.PairHandler);
-        // If either had a change, redraw (reapply in the future)
-        if (refresh)
-        {
-            Logger.LogDebug($"Redrawing [{Sundesmo.GetNickAliasOrUid()}] due to alteration changes.", LoggerType.PairHandler);
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
-        }
+        ConditionalRedraw(refresh);
     }
 
     // True if data was applied, false otherwise. (useful for redraw)
@@ -590,6 +585,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             Logger.LogDebug($"Applying CPlus profile {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
             _tempProfile = await _ipc.CustomizePlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
+        }
+    }
+
+    public void ConditionalRedraw(bool condition)
+    {
+        if (condition && IsRendered)
+        {
+            Logger.LogDebug($"Redrawing [{Sundesmo.GetNickAliasOrUid()}] due to alteration changes.", LoggerType.PairHandler);
+            _ipc.Penumbra.RedrawGameObject(ObjIndex);
         }
     }
     #endregion Ipc Helpers

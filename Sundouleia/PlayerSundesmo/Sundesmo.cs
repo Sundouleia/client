@@ -134,8 +134,8 @@ public class Sundesmo : IComparable<Sundesmo>
             await _companion.ApplyIpcData(newIpc.CompanionChanges);
     }
 
-    public async void SetModChanges(NewModUpdates newModData)
-        => await _player.UpdateAndApplyMods(newModData);
+    public async void SetModChanges(NewModUpdates newModData, string manipString)
+        => await _player.UpdateAndApplyMods(newModData, manipString);
 
     public async void SetIpcChanges(VisualUpdate newIpc)
     {

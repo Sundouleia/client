@@ -333,13 +333,13 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     }
 
     // Happens whenever mods should be added or removed.
-    public void ReceiveIpcUpdateMods(UserData target, NewModUpdates newModData)
+    public void ReceiveIpcUpdateMods(UserData target, NewModUpdates newModData, string manipString)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod data!", LoggerType.Callbacks);
-        sundesmo.SetModChanges(newModData);
+        sundesmo.SetModChanges(newModData, manipString);
     }
 
     // Happens whenever non-mod visuals are updated.

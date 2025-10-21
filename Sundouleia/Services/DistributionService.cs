@@ -171,8 +171,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         Logger.LogDebug($"Uploading {filesNeedingUpload.Count} missing files to server...", LoggerType.DataDistributor);
         var uploadedFiles = await _fileUploader.UploadFiles(filesNeedingUpload).ConfigureAwait(false);
         
-        Logger.LogDebug($"Uploaded {uploadedFiles.Count}/{filesNeedingUpload.Count} missing files. If any failed, there are integrity issues with your cache!", LoggerType.DataDistributor);
-        await _hub.UserPushIpcMods(new PushIpcMods(usersToPushDataTo, new(uploadedFiles, []))).ConfigureAwait(false);
+        Logger.LogDebug($"Uploaded {uploadedFiles.Count}/{filesNeedingUpload.Count} missing files.", LoggerType.DataDistributor);
+        // Empty manip string for now, change later if this has problems!
+        await _hub.UserPushIpcMods(new PushIpcMods(usersToPushDataTo, new(uploadedFiles, []), string.Empty)).ConfigureAwait(false);
         Logger.LogDebug($"Sent PushIpcMods out to {usersToPushDataTo.Count} users after uploading missing files.", LoggerType.DataDistributor);
     }
 
@@ -241,34 +242,52 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     /// </summary>
     public async Task CheckStateAndUpdate(Dictionary<OwnedObject, IpcKind> newChanges, IpcKind flattenedChanges)
     {
-        var changedMods = new ModUpdates([], []);
+        // Create initial assumptions.
+        ModUpdates changedMods = new([], []);
+        bool manipStrDiff = false;
+
+        // Wait for data update to be free.
         await _dataUpdateLock.WaitAsync();
         try
         {
+            // Grab recipients.
             var recipients = SundesmosForUpdatePush;
             if (recipients.Count is 0)
                 return;
 
-            // If mods changed, we need to update the mod state first.
-            changedMods = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
-            if (changedMods.HasChanges)
+            // If flattened changes include Glamourer, or Mods, check manipulations & modded state.
+            if (flattenedChanges.HasAny(IpcKind.Glamourer | IpcKind.Mods))
             {
-                Logger.LogDebug($"ModChanges had changes: {changedMods.FilesToAdd.Count} Files to add, {changedMods.HashesToRemove.Count} Hashes to remove.", LoggerType.DataDistributor);
-                foreach (var (obj, kinds) in newChanges)
-                    newChanges[obj] |= IpcKind.Mods;
-                flattenedChanges |= IpcKind.Mods;
+                // If manipulations changed, add it to the total changes changes.
+                if(LastCreatedData.ApplySingleIpc(OwnedObject.Player, IpcKind.ModManips, _ipc.Penumbra.GetMetaManipulationsString()))
+                {
+                    manipStrDiff = true;
+                    // Update newChanges to help with visual updates.
+                    newChanges[OwnedObject.Player] |= IpcKind.ModManips;
+                }
+                
+                // It is also possible that the mods could have changed if a glamourer of mod change occurred.
+                // We need to update the mod state first.
+                changedMods = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
+                // If the mods had changed, we need to ensure we send off the mods.
+                if (changedMods.HasChanges)
+                {
+                    Logger.LogDebug($"Mods had changes: [{changedMods.FilesToAdd.Count} Added | {changedMods.HashesToRemove.Count} Removed]", LoggerType.DataDistributor);
+                    newChanges[OwnedObject.Player] |= IpcKind.Mods;
+                    flattenedChanges |= IpcKind.Mods;
+                }
             }
 
-            // CONDITION: Only mod updates exist, we should only update mods.
-            if (flattenedChanges == IpcKind.Mods)
+            // CONDITION 1: Only mod updates exist, and mods have changes.
+            if (flattenedChanges is IpcKind.Mods)
             {
-                // Send mods if we had changes to the mods, otherwise try to send single.
+                // Only send if we had changed.
                 if (changedMods.HasChanges)
-                    await SendModsUpdate(recipients, changedMods).ConfigureAwait(false);
+                    await SendModsUpdate(recipients, changedMods, manipStrDiff).ConfigureAwait(false);
                 return;
             }
 
-            // Otherwise, update the visuals too.
+            // Update visuals, if it is a full or too.
             var visualChanges = await UpdateVisualsInternal(newChanges).ConfigureAwait(false);
             var hasVisualChanges = visualChanges.HasData();
             
@@ -312,12 +331,13 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task SendModsUpdate(List<UserData> recipients, ModUpdates modChanges)
+    private async Task SendModsUpdate(List<UserData> recipients, ModUpdates modChanges, bool newManipulations)
     {
         try
         {
             InLimbo.Clear();
-            var res = await _hub.UserPushIpcMods(new(recipients, modChanges)).ConfigureAwait(false);
+            string manipStr = newManipulations ? LastCreatedData.ModManips : string.Empty;
+            var res = await _hub.UserPushIpcMods(new(recipients, modChanges, manipStr)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcMods to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
             // Handle any missing mods after.
             if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
