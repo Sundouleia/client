@@ -13,6 +13,7 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Hub;
 
 namespace Sundouleia.Gui.Profiles;
 
@@ -231,6 +232,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
         {
             CkGui.FontText("Image Editor", UiFontService.UidFont);
             ImGui.Separator();
+            CkGui.ColorText("Adjustments may crash your game atm! (WIP)", ImGuiColors.DalamudRed);
             if (_croppedImageData != null)
             {
                 var cropXref = _cropX;
@@ -310,8 +312,21 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
         }
         try
         {
-            UiService.SetUITask(async () => await _hub.UserUpdateProfilePicture(new(Convert.ToBase64String(_croppedImageData))));
-            _logger.LogInformation("Image Sent to server successfully.");
+            UiService.SetUITask(async () =>
+            {
+                if (await _hub.UserUpdateProfilePicture(new(Convert.ToBase64String(_croppedImageData))) is { } res)
+                {
+                    if (res.ErrorCode is SundouleiaApiEc.Success)
+                    {
+                        _logger.LogInformation("Image Sent to server successfully.");
+                        Mediator.Publish(new ClearProfileDataMessage(MainHub.OwnUserData));
+                    }
+                    else
+                    {
+                        _logger.LogError($"Failed to send image to server: {res.ErrorCode}");
+                    }
+                }
+            });
         }
         catch (Bagagwa ex)
         {

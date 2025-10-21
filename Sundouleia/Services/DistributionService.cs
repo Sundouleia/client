@@ -288,17 +288,19 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             }
 
             // Update visuals, if it is a full or too.
-            var visualChanges = await UpdateVisualsInternal(newChanges).ConfigureAwait(false);
-            var hasVisualChanges = visualChanges.HasData();
+            var visualChanges = await UpdateVisualsInternal(newChanges, manipStrDiff).ConfigureAwait(false);
+
+            // No changed occurred, abort.
+            if (!visualChanges.HasData())
+                return;
             
             // CONDITION: Both had changes.
-            if (changedMods.HasChanges && hasVisualChanges)
+            if (changedMods.HasChanges)
             {
                 await SendFullUpdate(recipients, changedMods, visualChanges).ConfigureAwait(false);
                 return;
             }
-            // CONDITION: Only visual changes exist, send those.
-            if (!changedMods.HasChanges && hasVisualChanges)
+            else
             {
                 await SendVisualsUpdate(recipients, visualChanges).ConfigureAwait(false);
                 return;
@@ -338,7 +340,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             InLimbo.Clear();
             string manipStr = newManipulations ? LastCreatedData.ModManips : string.Empty;
             var res = await _hub.UserPushIpcMods(new(recipients, modChanges, manipStr)).ConfigureAwait(false);
-            Logger.LogDebug($"Sent PushIpcMods to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
+            Logger.LogDebug($"Sent PushIpcMods to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading. [HadManipChange?: {newManipulations}]", LoggerType.DataDistributor);
             // Handle any missing mods after.
             if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
                 _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
@@ -371,7 +373,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         return LastCreatedData.ApplyNewModState(currentState);
     }
 
-    private async Task<VisualUpdate> UpdateVisualsInternal(Dictionary<OwnedObject, IpcKind> changes)
+    private async Task<VisualUpdate> UpdateVisualsInternal(Dictionary<OwnedObject, IpcKind> changes, bool forceManips)
     {
         var changedData = new ClientDataCache(LastCreatedData);
         // process the tasks for each object in parallel.
@@ -383,7 +385,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }
         // Execute in parallel.
         await Task.WhenAll(tasks).ConfigureAwait(false);
-        return LastCreatedData.ApplyAllIpc(changedData);
+        return LastCreatedData.ApplyAllIpc(changedData, forceManips);
     }
 
     private async Task UpdateDataCache(OwnedObject obj, IpcKind toUpdate, ClientDataCache data)
@@ -393,7 +395,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
         if (obj is not OwnedObject.Player) return;
 
+        // Special case, update regardless if the manips is an included change.
         if (toUpdate.HasAny(IpcKind.ModManips)) data.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
+        
         if (toUpdate.HasAny(IpcKind.Heels)) data.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Moodles)) data.Moodles = await _ipc.Moodles.GetOwn().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Honorific)) data.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;

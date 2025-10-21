@@ -63,7 +63,7 @@ public class DrawSundesmoRequest
         CkGui.FramedIconText(FAI.QuestionCircle, ImGuiColors.DalamudYellow);
         var timeLeft = _entry.TimeLeft();
         var displayText = $"Expires in {timeLeft.Days}d {timeLeft.Hours}h {timeLeft.Minutes}m.";
-        if (_entry.Message.Length > 0) displayText += $" --SEP----COL--Message: --COL--{_entry.Message}";
+        if (_entry.Details.Message.Length > 0) displayText += $" --SEP----COL--Message: --COL--{_entry.Details.Message}";
         CkGui.AttachToolTip(displayText, color: ImGuiColors.TankBlue);
         ImGui.SameLine();
     }

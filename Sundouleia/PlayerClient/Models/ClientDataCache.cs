@@ -151,17 +151,18 @@ public class ClientDataCache
         };
 
     /// <summary>
-    ///     Applies all data from another cache onto this one, returning the full visual update.
+    ///     Applies all data from another cache onto this one, returning the full visual update. <para />
+    ///     <b> If Manips are included, </b>
     /// </summary>
     /// <returns> The visual update reflecting all IPC-related changes for all differences. </returns>
-    public VisualUpdate ApplyAllIpc(ClientDataCache other)
+    public VisualUpdate ApplyAllIpc(ClientDataCache other, bool forceManips)
     {
         var playerBuilder = new IpcUpdateBuilder();
         var minionMountBuilder = new IpcUpdateBuilder();
         var petBuilder = new IpcUpdateBuilder();
         var companionBuilder = new IpcUpdateBuilder();
 
-        if (ModManips != other.ModManips)
+        if ((ModManips != other.ModManips) || forceManips)
         {
             ModManips = other.ModManips;
             playerBuilder.WithManips(ModManips);

@@ -102,6 +102,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         RecreateLists();
     }
 
+    // maybe change overtime to regenerate with updated status on pair state?
     private void RecreateLists()
     {
         _rendered = _users.Where(u => u.IsValid).ToList();

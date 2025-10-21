@@ -14,6 +14,9 @@ public class RadarTab
     private readonly RadarManager _manager;
     private readonly RadarService _service;
     private readonly TutorialService _guides;
+    
+    private RadarUser? _userForRequest = null;
+
     public RadarTab(SundesmoManager sundesmos, RadarManager manager, RadarService service, 
         TutorialService guides)
     {
@@ -44,6 +47,20 @@ public class RadarTab
             CkGui.IconText(radarUser.IsValid ? FAI.Check : FAI.Times, radarUser.IsValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
             CkGui.TextInline(")");
         }
+    }
+
+    private void DrawUnpairedUser(RadarUser unpairedUser)
+    {
+
+    }
+
+    private void DrawNormalUser(RadarUser user)
+    {
+
+    }
+
+    private void DrawRequestDrafter(RadarUser user)
+    {
     }
 }
 

@@ -4,11 +4,14 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Microsoft.IdentityModel.Tokens;
+using OtterGui.Text;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data;
+using SundouleiaAPI.Hub;
 
 namespace Sundouleia.Gui.Profiles;
 
@@ -20,7 +23,7 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
 
     public ProfileEditorUI(ILogger<ProfileEditorUI> logger, SundouleiaMediator mediator, 
         MainHub hub, ProfileService service, TutorialService guides)
-        : base(logger, mediator, "Profile Editor###KP_EditorUI")
+        : base(logger, mediator, "Profile Editor###SundouleiaProfile_EditorUI")
     {
         _hub = hub;
         _service = service;
@@ -73,6 +76,20 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
             profile.Info.IsNSFW = isNsfw;
         CkGui.AttachToolTip("Your profile can be reported if the avatar or description is NSFW while this option is disabled." +
             "--SEP--If it is checked, you can post NSFW content just fine.");
+
+        ImUtf8.SameLineInner();
+        if (CkGui.IconTextButton(FAI.Edit, "Image Editor"))
+            Mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor)));
+        CkGui.AttachToolTip("Open the Avatar Image Editor to customize your profile picture further!");
+
+        ImUtf8.SameLineInner();
+        if (CkGui.IconButton(FAI.Save))
+            UiService.SetUITask(async () =>
+            {
+                if (await _hub.UserUpdateProfileContent(profile.Info) is { } res && res.ErrorCode is SundouleiaApiEc.Success)
+                    Mediator.Publish(new ClearProfileDataMessage(MainHub.OwnUserData));
+            });
+        CkGui.AttachToolTip("Updates your stored profile with latest information");
 
         // Post the image over to the right.
         drawList.AddDalamudImageRounded(profile.GetAvatarOrDefault(), pos, new(232f), 116f, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)));
