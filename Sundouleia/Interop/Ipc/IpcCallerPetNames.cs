@@ -155,7 +155,6 @@ public sealed class IpcCallerPetNames : IIpcCaller
     public async Task ClearPetNamesByIdx(ushort objectIdx)
     {
         if (!APIAvailable) return;
-        _logger.LogWarning($"Requesting Clear of Pet Nicknames for Object Index {objectIdx}");
         await Svc.Framework.RunOnFrameworkThread(() => ClearNicknameData.InvokeAction(objectIdx)).ConfigureAwait(false);
     }
 }
