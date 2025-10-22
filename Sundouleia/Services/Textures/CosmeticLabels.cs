@@ -47,6 +47,7 @@ public static class CosmeticLabels
         { CoreTexture.Tier3Icon, "RequiredImages\\Tier3Icon.png" },
         { CoreTexture.Tier4Icon, "RequiredImages\\Tier4Icon.png" },
         { CoreTexture.TierBoosterIcon, "RequiredImages\\TierBoosterIcon.png" },
+        { CoreTexture.WelcomeOverlay, "RequiredImages\\welcomeOverlay.png" },
     };
 
     public static readonly Dictionary<string, string> CosmeticTextures = InitializeCosmeticTextures();

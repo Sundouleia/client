@@ -1,12 +1,8 @@
 using CkCommons;
-using Sundouleia.Gui.Components;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
-using Sundouleia.WebAPI;
-using SundouleiaAPI.Network;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Sundouleia.Services.Configs;
+namespace Sundouleia.PlayerClient;
 
 /// <summary> 
 ///     Config Management for all Server related configs in one, including
@@ -29,6 +25,8 @@ public class AccountManager
 
     public void SaveConfig() => _config.Save();
 
+    public bool HasValidProfile() => Config.Profiles.Count > 0;
+
     public bool TryGetAuthForPlayer([NotNullWhen(true)] out CharaAuthentication auth)
     {
         // fetch the cid of our current player.
@@ -44,6 +42,18 @@ public class AccountManager
         auth = match;
         UpdateAuthForNameAndWorldChange(cid);
         return true;
+    }
+
+    public bool TryGetMainProfile([NotNullWhen(true)] out AccountProfile profile)
+    {
+        if (Config.Profiles.Values.FirstOrDefault(p => p.IsPrimary) is { } primary)
+        {
+            profile = primary;
+            return true;
+        }
+        // Otherwise, ret null and false.
+        profile = null!;
+        return false;
     }
 
 

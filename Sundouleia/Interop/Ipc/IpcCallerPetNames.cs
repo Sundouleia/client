@@ -152,13 +152,10 @@ public sealed class IpcCallerPetNames : IIpcCaller
         });
     }
 
-    public async Task ClearPetNamesByIdx(PlayerHandler handler)
+    public async Task ClearPetNamesByIdx(ushort objectIdx)
     {
-        if (!APIAvailable || handler.Address == IntPtr.Zero) return;
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            _logger.LogTrace($"Clearing Nicknames from {handler.NameString}'s pets!");
-            ClearNicknameData.InvokeAction(handler.ObjIndex);
-        }).ConfigureAwait(false);
+        if (!APIAvailable) return;
+        _logger.LogWarning($"Requesting Clear of Pet Nicknames for Object Index {objectIdx}");
+        await Svc.Framework.RunOnFrameworkThread(() => ClearNicknameData.InvokeAction(objectIdx)).ConfigureAwait(false);
     }
 }

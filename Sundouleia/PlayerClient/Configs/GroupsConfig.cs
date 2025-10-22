@@ -14,6 +14,10 @@ public class SundesmoGroup
 {
     public FAI Icon { get; set; } = FAI.User;
     public string Label { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public uint IconColor { get; set; } = 0xFFFFFFFF;
+    public uint LabelColor { get; set; } = 0xFFFFFFFF;
+    public bool ShowOffline { get; set; } = true;
     public List<string> LinkedUids { get; set; } = new();
 }
 

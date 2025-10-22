@@ -238,7 +238,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
         await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
         await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
-        await _ipc.PetNames.ClearPetNamesByPtr(address).ConfigureAwait(false);
+        await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
         if (_tempProfile != Guid.Empty)
         {
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
@@ -380,11 +380,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return false;
         }
 
-        // Await for the mods to finish downloading (or until interrupted)
+        // Wait for the mods to finish downloading (this can be interrupted by new mod data)
         var moddedPaths = await WaitForModDownloads().ConfigureAwait(false);
-        
+
         // Await for true render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
+
+        // Sanity Check.
+        if (_runtimeCTS.Token.IsCancellationRequested)
+            return false;
 
         Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()}) with [{moddedPaths.Count}] modded paths.", LoggerType.PairMods);
         await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
@@ -454,7 +458,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
         catch (TaskCanceledException)
         {
-            // Grab final partial progress.
+            // Grab final partial progress. This could happen during unloading, so catch ObjectDisposedException as well.
             missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _runtimeCTS.Token);
         }
 
@@ -470,6 +474,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // Await for final render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
+
+        // Sanity Check.
+        if (_runtimeCTS.Token.IsCancellationRequested)
+            return false;
 
         Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
         var toApply = new List<Task>();
@@ -496,7 +504,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // Await for final render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
-        
+
+        // Sanity Check.
+        if (_runtimeCTS.Token.IsCancellationRequested)
+            return false;
+
         // Apply change.
         var task = kind switch
         {
@@ -602,8 +614,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         base.Dispose(disposing);
         // Stop any actively running tasks.
-        _runtimeCTS.SafeCancelDispose();
         _dlWaiterCTS.SafeCancelDispose();
+        // Cancel any tasks depending on runtime. (Do not dispose)
+        _runtimeCTS.SafeCancel();
         // If they were valid before, parse out the event message for their disposal.
         if (!string.IsNullOrEmpty(NameString))
         {
@@ -647,7 +660,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
                 using var timeoutCTS = new CancellationTokenSource();
                 timeoutCTS.CancelAfter(TimeSpan.FromSeconds(30));
-                await RevertAlterations(nickAliasOrUid, name, Address, ObjIndex, timeoutCTS.Token).ConfigureAwait(false);
+                await RevertAlterations(nickAliasOrUid, name, Address, ObjIndex, timeoutCTS.Token);
             }
         }
         catch (Exception ex)

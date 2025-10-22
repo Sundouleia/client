@@ -8,14 +8,12 @@ using OtterGui;
 using OtterGui.Text;
 using Sundouleia.Interop;
 using Sundouleia.Localization;
-using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data.Permissions;
-using SundouleiaAPI.Enums;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Util;
 
@@ -29,17 +27,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly MainConfig _mainConfig;
     private readonly ProfilesTab _accountsTab;
     private readonly DebugTab _debugTab;
-    private readonly ModStorageTab _storageTab;
+    private readonly UiFileCacheShared _fileCacheShared;
 
     public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, MainHub hub,
-        MainConfig config, ProfilesTab accounts, DebugTab debug, ModStorageTab storage)
+        MainConfig config, ProfilesTab accounts, DebugTab debug, UiFileCacheShared fileCacheShared)
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;
         _mainConfig = config;
         _accountsTab = accounts;
         _debugTab = debug;
-        _storageTab = storage;
+        _fileCacheShared = fileCacheShared;
 
         Flags = WFlags.NoScrollbar;
         this.PinningClickthroughFalse();
@@ -146,7 +144,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
             if (ImGui.BeginTabItem(CkLoc.Settings.TabStorage))
             {
-                _storageTab.DrawModStorage();
+                _fileCacheShared.DrawFileCacheStorageBox();
+                ImGui.Separator();
+                _fileCacheShared.DrawCacheMonitoring(true, true, true);
+                ImGui.Separator();
+                _fileCacheShared.DrawFileCompactor(true);
+                ImGui.Separator();
+                _fileCacheShared.DrawTransfers();
                 ImGui.EndTabItem();
             }
 

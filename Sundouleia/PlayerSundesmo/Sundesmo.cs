@@ -188,6 +188,10 @@ public class Sundesmo : IComparable<Sundesmo>
             _mountMinion.ObjectRendered((GameObject*)mountAddr);
             _mountMinion.ReapplyAlterations().ConfigureAwait(false);
         }
+        else
+        {
+            _logger.LogWarning("Mount Not Rendered!");
+        }
 
         if (_watcher.TryGetExisting(_pet, out IntPtr petAddr))
         {
@@ -392,8 +396,6 @@ public class Sundesmo : IComparable<Sundesmo>
             if (_mountMinion.IsRendered)
             {
                 ImGui.TableNextColumn();
-                CkGui.IconText(_mountMinion.IsOwnerValid ? FAI.Check : FAI.Times, _mountMinion.IsOwnerValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-                ImGui.TableNextColumn();
                 CkGui.ColorText($"{_mountMinion.Address:X}", ImGuiColors.TankBlue);
                 ImGuiUtil.DrawFrameColumn(_mountMinion.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(_mountMinion.EntityId.ToString());
@@ -410,8 +412,6 @@ public class Sundesmo : IComparable<Sundesmo>
             if (_pet.IsRendered)
             {
                 ImGui.TableNextColumn();
-                CkGui.IconText(_pet.IsOwnerValid ? FAI.Check : FAI.Times, _pet.IsOwnerValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-                ImGui.TableNextColumn();
                 CkGui.ColorText($"{_pet.Address:X}", ImGuiColors.TankBlue);
                 ImGuiUtil.DrawFrameColumn(_pet.ObjIndex.ToString());
                 ImGuiUtil.DrawFrameColumn(_pet.EntityId.ToString());
@@ -427,8 +427,6 @@ public class Sundesmo : IComparable<Sundesmo>
             ImGuiUtil.DrawFrameColumn(_companion.NameString);
             if (_companion.IsRendered)
             {
-                ImGui.TableNextColumn();
-                CkGui.IconText(_companion.IsOwnerValid ? FAI.Check : FAI.Times, _companion.IsOwnerValid ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
                 ImGui.TableNextColumn();
                 CkGui.ColorText($"{_companion.Address:X}", ImGuiColors.TankBlue);
                 ImGuiUtil.DrawFrameColumn(_companion.ObjIndex.ToString());

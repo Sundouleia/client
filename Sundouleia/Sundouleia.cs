@@ -224,6 +224,7 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Components
         .AddScoped<ProfileHelper>()
+        .AddScoped<UiFileCacheShared>()
 
         // Scoped Factories
         .AddScoped<DrawEntityFactory>()
@@ -258,7 +259,6 @@ public static class SundouleiaServiceExtensions
         .AddScoped<WindowMediatorSubscriberBase, SettingsUi>()
         .AddScoped<ProfilesTab>()
         .AddScoped<DebugTab>()
-        .AddScoped<ModStorageTab>()
 
         // Scoped Misc
         .AddScoped<WindowMediatorSubscriberBase, TransferBarUI>()

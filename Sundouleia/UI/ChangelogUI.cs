@@ -5,8 +5,8 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Gui.Components;
 using Sundouleia.PlayerClient;
 using Dalamud.Bindings.ImGui;
-namespace Sundouleia.Gui;
 
+namespace Sundouleia.Gui;
 internal class ChangelogUI : WindowMediatorSubscriberBase
 {
     private readonly MainConfig _config;

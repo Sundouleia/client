@@ -3,13 +3,16 @@ using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles.Cache;
 using Sundouleia.PlayerClient;
+using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.WebAPI;
 using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModFiles;
 
 public sealed class CacheMonitor : DisposableMediatorSubscriberBase
 {
+    private readonly MainHub _hub;
     private readonly MainConfig _config;
     private readonly FileCompactor _compactor;
     private readonly FileCacheManager _fileDbManager;
@@ -22,11 +25,12 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     private TimeSpan _lastScanTime = TimeSpan.Zero;
     private TimeSpan _lastCacheWriteTime = TimeSpan.Zero;
 
-    public CacheMonitor(ILogger<CacheMonitor> logger, SundouleiaMediator mediator, MainConfig config,
-        FileCompactor fileCompactor, FileCacheManager fileDbManager,
+    public CacheMonitor(ILogger<CacheMonitor> logger, SundouleiaMediator mediator, MainHub hub,
+        MainConfig config, FileCompactor fileCompactor, FileCacheManager fileDbManager, 
         SundouleiaWatcher mainWatcher, PenumbraWatcher penumbraWatcher)
         : base(logger, mediator)
     {
+        _hub = hub;
         _config = config;
         _compactor = fileCompactor;
         _fileDbManager = fileDbManager;
@@ -475,6 +479,8 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             // start the respective watchers up again.
             _mainWatcher.StartWatcher(_config.Current.CacheFolder);
             _penumbraWatcher.StartWatcher(penumbraDir);
+
+            _ = _hub.Reconnect(DisconnectIntent.Reload).ConfigureAwait(false);
         }
     }
 }

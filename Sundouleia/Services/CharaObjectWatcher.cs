@@ -130,19 +130,27 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
             return false;
 
         // Get the known addresses of the type we are looking for.
-        var known = handler.ObjectType is OwnedObject.Companion ? RenderedCompanions : RenderedCharas;
         var parentId = handler.Sundesmo.PlayerEntityId;
 
         // Check against all known addresses.
-        foreach (var addr in known)
+        foreach (var addr in RenderedCharas)
         {
-            if (((GameObject*)addr)->OwnerId != parentId)
+            if (!IsMatch(addr))
                 continue;
-
+            // Match found, set address and return true.
             address = addr;
             return true;
         }
         return false;
+
+        bool IsMatch(nint addr)
+            => handler.ObjectType switch
+            {
+                OwnedObject.MinionOrMount => handler.Sundesmo.IsMountMinionAddress(addr),
+                OwnedObject.Pet => handler.Sundesmo.IsPetAddress(addr),
+                OwnedObject.Companion => handler.Sundesmo.IsCompanionAddress(addr),
+                _ => false,
+            };
     }
 
     public nint FromOwned(OwnedObject kind)

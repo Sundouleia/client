@@ -133,7 +133,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         Logger.LogInformation("MainHub is stopping. Closing down SundouleiaHub-Main!", LoggerType.ApiCore);
         _hubHealthCTS?.Cancel();
         // Notify of unloading upon halting the plugin.
-        await Disconnect(ServerState.Disconnected, false, true).ConfigureAwait(false);
+        await Disconnect(ServerState.Disconnected, DisconnectIntent.LogoutShutdown).ConfigureAwait(false);
         _hubConnectionCTS?.Cancel();
         return;
     }
@@ -152,7 +152,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     {
         Logger.LogInformation("Stopping connection on logout", LoggerType.ApiCore);
         // as we are changing characters, we should fully unload any chara's we have data on.
-        await Disconnect(ServerState.Disconnected, false, true).ConfigureAwait(false);
+        await Disconnect(ServerState.Disconnected, DisconnectIntent.LogoutShutdown).ConfigureAwait(false);
         // switch the server state to offline.
         ServerStatus = ServerState.Offline;
     }

@@ -42,7 +42,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<ConnectedMessage>(this, _ => OnClientConnected());
         Mediator.Subscribe<ReconnectedMessage>(this, _ => OnClientConnected());
-        Mediator.Subscribe<DisconnectedMessage>(this, _ => OnClientDisconnected(_.WasHardDisconnect, _.Unloading));
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => OnClientDisconnected(_.Intent));
 
         Mediator.Subscribe<CutsceneEndMessage>(this, _ => ReapplyAlterations());
         Mediator.Subscribe<TargetSundesmoMessage>(this, (msg) => TargetSundesmo(msg.Sundesmo));
@@ -136,18 +136,18 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     ///     Mark all sundesmos as offline upon a disconnection, ensuring that everyone follows the 
     ///     same timeout flow.
     /// </summary>
-    public void OnClientDisconnected(bool wasHardDisconnect, bool unloading)
+    public void OnClientDisconnected(DisconnectIntent intent)
     {
         Logger.LogInformation("Client disconnected, marking all sundesmos as offline.", LoggerType.PairManagement);
         // If a hard disconnect, dispose of the data after.
         Parallel.ForEach(_allSundesmos, s =>
         {
-            if (wasHardDisconnect)
+            if ((int)intent > 1)
                 s.Value.MarkForUnload();
 
             s.Value.MarkOffline();
             // If it was a hard disconnect, we should dispose of the data.
-            if (unloading)
+            if (intent is DisconnectIntent.LogoutShutdown)
                 s.Value.DisposeData();
         });
         // Recreate the lazy list.

@@ -21,20 +21,59 @@ namespace Sundouleia.Localization
     #region Intro
     public class Intro
     {
-        public ToS ToS { get; set; } = new();
-        public Register Register { get; set; } = new();
+        public Welcome Welcome { get; set; } = new();
+        public About About { get; set; } = new();
+        public Usage Usage { get; set; } = new();
+        public FileCache FileCache { get; set; } = new();
+        public AccountGen AccountGen { get; set; } = new();
     }
 
-    // Get to Last.
-    public class ToS
+    public class Welcome
     {
-        public readonly string Title = Loc.Localize("ToS_Title", "ACTUAL LABEL HERE");
+        public readonly string Label = Loc.Localize("Welcome_Label", "Welcome");
+        public readonly string Header = Loc.Localize("Welcome_Header", "Welcome to Sundouleia!");
+        public readonly string Pronunciation = Loc.Localize("Welcome_Pronunciation", "(Sun-dull-ee-uh)");
+        public readonly string HeaderPara = Loc.Localize("Welcome_HeaderPara", "aaa");
+        public readonly string NextPageHint = Loc.Localize("Welcome_NextPageHint", "aaaa");
+
+        public readonly string SubHeader1 = Loc.Localize("Welcome_SubHeader1", "Features:");
+        public readonly string BulletProfiles = Loc.Localize("Welcome_BulletProfiles", "Profiles");
+        public readonly string ProfileBullet1 = Loc.Localize("Welcome_ProfileBullet1", "aaaa");
+        public readonly string ProfileBullet2 = Loc.Localize("Welcome_ProfileBullet2", "aaaa");
+        public readonly string ProfileBullet3 = Loc.Localize("Welcome_ProfileBullet3", "aaaa");
+        public readonly string ProfileBullet4 = Loc.Localize("Welcome_ProfileBullet4", "aaaa");
+
+        public readonly string BulletRequests = Loc.Localize("Welcome_BulletRequests", "Pair Requesting");
+        public readonly string RequestsBullet1 = Loc.Localize("Welcome_RequestsBullet1", "aaaa");
+        public readonly string RequestsBullet2 = Loc.Localize("Welcome_RequestsBullet2", "aaaa");
+        public readonly string RequestsBullet3 = Loc.Localize("Welcome_RequestsBullet3", "aaaa");
+
+        public readonly string BulletRadar = Loc.Localize("Welcome_BulletRadar", "Radar System");
+        public readonly string RadarBullet1 = Loc.Localize("Welcome_RadarBullet1", "aaaa");
+        public readonly string RadarBullet2 = Loc.Localize("Welcome_RadarBullet2", "aaaa");
+        public readonly string RadarBullet3 = Loc.Localize("Welcome_RadarBullet3", "aaaa");
+
+        // you get it.
     }
 
-    // Get to Last.
-    public class Register
+    public class About
     {
-        public readonly string Title = Loc.Localize("Register_Title", "ACTUAL LABEL HERE");
+
+    }
+
+    public class Usage
+    {
+
+    }
+
+    public class FileCache
+    {
+
+    }
+
+    public class AccountGen
+    {
+
     }
     #endregion Intro
 

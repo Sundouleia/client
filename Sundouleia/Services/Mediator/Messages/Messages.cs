@@ -20,7 +20,7 @@ public record NotificationMessage(string Title, string Message, NotificationType
 public record EventMessage(DataEvent Event) : MessageBase;
 
 /// <summary> Fires whenever the client is disconnected from the Sundouleia Hub. </summary>
-public record DisconnectedMessage(bool WasHardDisconnect, bool Unloading) : SameThreadMessage;
+public record DisconnectedMessage(DisconnectIntent Intent) : SameThreadMessage;
 
 /// <summary> Fires whenever the client is attempting to reconnect to the Sundouleia Hub. </summary>
 public record ReconnectingMessage(Exception? Exception) : SameThreadMessage;
