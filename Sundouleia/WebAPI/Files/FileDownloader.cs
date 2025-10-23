@@ -74,14 +74,19 @@ public class FileDownloader : DisposableMediatorSubscriberBase
         // obtain the missing files from the fileCacheManager.
         var missingFiles = _dbManager.MissingHashes(moddedFiles);
 
+        // create the progress tracking data for this player
+        var dlStatus = _downloadStatus.GetOrAdd(handler, new FileTransferProgress());
+
+        // filter out files that are already being downloaded for this player, as tracking is done per player and
+        // the previous download continues in the background. This can happen, if the player sends another sync
+        // containing the same files while the previous download is still ongoing, for example after teleporting to a new zone as a party.
+        missingFiles = missingFiles.Where(mf => !dlStatus.IsFileTransferActive(mf.Hash));
+
         // if there is nothing to download, skip this process.
         if (!missingFiles.Any())
             return;
 
         Logger.LogDebug($"Enqueuing {missingFiles.Count()} files for download for {handler.NameString}({handler.Sundesmo.GetNickAliasOrUid()})", LoggerType.FileDownloads);
-
-        // create the progress tracking data for this player
-        var dlStatus = _downloadStatus.GetOrAdd(handler, new FileTransferProgress());
 
         Logger.LogDebug($"Download begin for: {handler.NameString}", LoggerType.FileDownloads);
 
@@ -289,7 +294,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
                 {
                     // This spams logs if left on.
                     // Logger.LogTrace($"Found file in cache: {modItem.Hash} -> {fileCache.ResolvedFilepath}", LoggerType.PairMods);
-                    
+
                     // Then attempt to fetch the file information via the resolved FilePath+Extension.
                     // If the FileHash matched, but there was no FileInfo with the extension, we need to migrate it.
                     if (string.IsNullOrEmpty(new FileInfo(fileCache.ResolvedFilepath).Extension))
