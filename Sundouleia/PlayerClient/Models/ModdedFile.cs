@@ -30,7 +30,7 @@ public partial class ModdedFile
         => new ModFile(Hash, GamePaths.ToArray(), IsFileSwap ? ResolvedPath : string.Empty);
 
     public override string ToString()
-        => $"HasReplacement:{HasFileReplacement},IsFileSwap:{IsFileSwap} - {string.Join(",", GamePaths)} => {ResolvedPath}";
+        => $"{(HasFileReplacement ? "Replaces" : "NoReplace")} | {(IsFileSwap ? "FileSwap" : "NoSwap")} | {string.Join(",", GamePaths)} => {ResolvedPath}";
 
     [GeneratedRegex(@"^[a-zA-Z]:(/|\\)", RegexOptions.ECMAScript)]
     private static partial Regex LocalPathRegex();

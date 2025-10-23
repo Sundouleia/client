@@ -23,14 +23,11 @@ using Sundouleia.Services.Events;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.Services.Tutorial;
-using Sundouleia.Utils;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
 using System.Net.Http.Headers;
 using System.Reflection;
-using TerraFX.Interop.Windows;
-using static FFXIVClientStructs.FFXIV.Client.UI.Misc.RaptureMacroModule;
 
 namespace Sundouleia;
 
@@ -204,13 +201,14 @@ public static class SundouleiaServiceExtensions
 
     public static IServiceCollection AddSundouleiaConfigs(this IServiceCollection services)
     => services
-        .AddSingleton<AccountConfig>()
-        .AddSingleton<ConfigFileProvider>()
-        .AddSingleton<GroupsConfig>()
         .AddSingleton<MainConfig>()
+        .AddSingleton<GroupsConfig>()
         .AddSingleton<NickConfig>()
+        .AddSingleton<FavoritesConfig>()
+        .AddSingleton<AccountConfig>()
         .AddSingleton<NoCrashFriendsConfig>()
         .AddSingleton<TransientCacheConfig>()
+        .AddSingleton<ConfigFileProvider>()
         // Config Managers / Savers
         .AddSingleton<AccountManager>()
         .AddSingleton<ServerConfigManager>()
@@ -246,6 +244,11 @@ public static class SundouleiaServiceExtensions
         .AddScoped<RadarChatTab>()
         .AddScoped<AccountTab>()
 
+        // Scoped Modules
+        .AddScoped<WindowMediatorSubscriberBase, GroupsUI>()
+        .AddScoped<GroupsSelector>()
+        .AddScoped<WindowMediatorSubscriberBase, TransferBarUI>()
+        .AddScoped<WindowMediatorSubscriberBase, RadarChatPopoutUI>()
 
         // Scoped UI (Achievements)
         .AddScoped<AchievementTabs>()
@@ -261,10 +264,8 @@ public static class SundouleiaServiceExtensions
         .AddScoped<DebugTab>()
 
         // Scoped Misc
-        .AddScoped<WindowMediatorSubscriberBase, TransferBarUI>()
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
         .AddScoped<WindowMediatorSubscriberBase, ChangelogUI>()
-        .AddScoped<WindowMediatorSubscriberBase, RadarChatPopoutUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugStorageUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugPersonalDataUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugActiveStateUI>()

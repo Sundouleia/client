@@ -169,7 +169,7 @@ public partial class MainHub
     public Task Callback_IpcUpdateFull(IpcUpdateFull dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateFull: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData));
+        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData, dto.IsInitialData));
         return Task.CompletedTask;
     }
 

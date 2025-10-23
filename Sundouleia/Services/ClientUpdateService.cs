@@ -45,8 +45,9 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _watcher = watcher;
         _distributor = distributor;
 
-        Mediator.Subscribe<TransientResourceLoaded>(this, _ => OnModdedResourceLoaded());
-        
+        Mediator.Subscribe<TransientResourceLoaded>(this, _ => OnTransientResourceLoaded(_.Object));
+        Mediator.Subscribe<ModelRelatedResourceLoaded>(this, _ => OnModelRelatedResourceLoaded(_.Object));
+
         _ipc.Penumbra.OnModSettingsChanged = ModSettingChanged.Subscriber(Svc.PluginInterface, OnModSettingChanged);
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
         _ipc.Glamourer.OnStateChanged.Enable();
@@ -158,10 +159,16 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _allPendingUpdates = IpcKind.None;
     }
 
-    private void OnModdedResourceLoaded()
+    private void OnModelRelatedResourceLoaded(OwnedObject ownedObj)
     {
-        if (_watcher.WatchedPlayerAddr == IntPtr.Zero) return;
-        AddPendingUpdate(OwnedObject.Player, IpcKind.Mods);
+        if (!_watcher.WatchedTypes.Values.Contains(ownedObj)) return;
+        AddPendingUpdate(ownedObj, IpcKind.Mods);
+    }
+
+    private void OnTransientResourceLoaded(OwnedObject ownedObj)
+    {
+        if (!_watcher.WatchedTypes.Values.Contains(ownedObj)) return;
+        AddPendingUpdate(ownedObj, IpcKind.Mods);
     }
 
     /// <summary>

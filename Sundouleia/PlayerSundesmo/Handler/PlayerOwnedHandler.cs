@@ -167,7 +167,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     }
 
     // Thankfully only ever need to worry about CPlus and glamourer here!.
-    public async Task ApplyIpcData(IpcDataUpdate newIpc)
+    public async Task ApplyIpcData(IpcDataUpdate newIpc, bool isInitialData)
     {
         // 0) Set initial data if none present.
         _appearanceData ??= new();

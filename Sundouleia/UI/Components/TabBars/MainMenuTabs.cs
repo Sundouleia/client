@@ -17,6 +17,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
 {
     public enum SelectedTab
     {
+        Homepage,
         Requests,
         Whitelist,
         Radar,
@@ -43,8 +44,8 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         _config = config;
         TabSelection = _config.Current.MainUiTab;
 
-        //AddDrawButton(FontAwesomeIcon.Home, SelectedTab.Homepage, "Homepage",
-        //    () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Homepage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.Whitelist));
+        AddDrawButton(FontAwesomeIcon.Home, SelectedTab.Homepage, "Homepage",
+            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Homepage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.Whitelist));
 
         AddDrawButton(FontAwesomeIcon.Inbox, SelectedTab.Requests, "Incoming / Outgoing Requests",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize()));

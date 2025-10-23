@@ -1,11 +1,15 @@
 using CkCommons;
+using CkCommons.Raii;
 using Dalamud.Hooking;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using SundouleiaAPI.Network;
+using System.Diagnostics.CodeAnalysis;
+using static Lumina.Data.Parsing.Layer.LayerCommon;
 
 namespace Sundouleia.Watchers;
 
@@ -15,7 +19,7 @@ namespace Sundouleia.Watchers;
 ///     This allows us to cache an address that we can guarantee will always be the current 
 ///     valid state without checking every tick. <para />
 /// </summary>
-public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
+public class CharaObjectWatcher : DisposableMediatorSubscriberBase
 {
     internal Hook<Character.Delegates.OnInitialize> OnCharaInitializeHook;
     internal Hook<Character.Delegates.Dtor> OnCharaDestroyHook;
@@ -23,14 +27,16 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     internal Hook<Companion.Delegates.OnInitialize> OnCompanionInitializeHook;
     internal Hook<Companion.Delegates.Terminate> OnCompanionTerminateHook;
 
-    public CharaObjectWatcher(ILogger<CharaObjectWatcher> logger, SundouleiaMediator mediator)
+    private readonly CancellationTokenSource _runtimeCTS = new();
+
+    public unsafe CharaObjectWatcher(ILogger<CharaObjectWatcher> logger, SundouleiaMediator mediator)
         : base(logger, mediator)
     {
         OnCharaInitializeHook = Svc.Hook.HookFromAddress<Character.Delegates.OnInitialize>((nint)Character.StaticVirtualTablePointer->OnInitialize, InitializeCharacter);
         OnCharaTerminateHook = Svc.Hook.HookFromAddress<Character.Delegates.Terminate>((nint)Character.StaticVirtualTablePointer->Terminate, TerminateCharacter);
         OnCharaDestroyHook = Svc.Hook.HookFromAddress<Character.Delegates.Dtor>((nint)Character.StaticVirtualTablePointer->Dtor, DestroyCharacter);
-        OnCompanionInitializeHook = Svc.Hook.HookFromAddress<Companion.Delegates.OnInitialize>((nint)Companion.StaticVirtualTablePointer->OnInitialize, InitializeCompanion);
-        OnCompanionTerminateHook = Svc.Hook.HookFromAddress<Companion.Delegates.Terminate>((nint)Companion.StaticVirtualTablePointer->Terminate, TerminateCompanion);
+        //OnCompanionInitializeHook = Svc.Hook.HookFromAddress<Companion.Delegates.OnInitialize>((nint)Companion.StaticVirtualTablePointer->OnInitialize, InitializeCompanion);
+        //OnCompanionTerminateHook = Svc.Hook.HookFromAddress<Companion.Delegates.Terminate>((nint)Companion.StaticVirtualTablePointer->Terminate, TerminateCompanion);
 
         OnCharaInitializeHook.SafeEnable();
         OnCharaTerminateHook.SafeEnable();
@@ -57,6 +63,9 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+        // Cancel, but do not dispose, the token.
+        _runtimeCTS.SafeCancel();
+
         OnCharaInitializeHook?.Dispose();
         OnCharaTerminateHook?.Dispose();
         OnCharaDestroyHook?.Dispose();
@@ -163,7 +172,7 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
             _ => IntPtr.Zero,
         };
 
-    private void CollectInitialData()
+    private unsafe void CollectInitialData()
     {
         var objManager = GameObjectManager.Instance();
         for (var i = 0; i < 200; i++)
@@ -181,7 +190,7 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     ///     wishing to detect created objects. <para />
     ///     Doing so will ensure any final lines are processed prior to the address invalidating.
     /// </summary>
-    private void NewCharacterRendered(GameObject* chara)
+    private unsafe void NewCharacterRendered(GameObject* chara)
     {
         Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}");
         var address = (nint)chara;
@@ -215,7 +224,7 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
         }
     }
 
-    private void CharacterRemoved(GameObject* chara)
+    private unsafe void CharacterRemoved(GameObject* chara)
     {
         Logger.LogDebug($"Character Removed: {(nint)chara:X} - {chara->GetName()}");
         var address = (nint)chara;
@@ -248,36 +257,36 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
 
     // Best to leave this for logging mostly, and debug why we should include later.
     // Causes a lot of duplicate additions as they can be called at the same time.
-    private void NewCompanionRendered(Companion* companion)
-    {
-        //Logger.LogDebug($"New Companion Rendered: {(nint)companion:X} - {companion->NameString}");
-        var address = (nint)companion;
-        //if (OwnedObjects.PlayerAddress != IntPtr.Zero && companion->ObjectKind == ObjectKind.BattleNpc && companion->OwnerId == OwnedObjects.PlayerObject->EntityId)
-        //{
-        //    AddOwnedObject(OwnedObject.Companion, address);
-        //    WatchedCompanionAddr = address;
-        //}
-        // if it doesn't exist already
-        RenderedCompanions.Add(address);
-        // Mediator.Publish(new WatchedObjectCreated(address));
-    }
+    //private void NewCompanionRendered(Companion* companion)
+    //{
+    //    Logger.LogDebug($"New Companion Rendered: {(nint)companion:X} - {companion->NameString}");
+    //    var address = (nint)companion;
+    //    if (OwnedObjects.PlayerAddress != IntPtr.Zero && companion->ObjectKind == ObjectKind.BattleNpc && companion->OwnerId == OwnedObjects.PlayerObject->EntityId)
+    //    {
+    //        AddOwnedObject(OwnedObject.Companion, address);
+    //        WatchedCompanionAddr = address;
+    //    }
+    //    // if it doesn't exist already
+    //    RenderedCompanions.Add(address);
+    //    Mediator.Publish(new WatchedObjectCreated(address));
+    //}
     // Best to leave this for logging mostly, and debug why we should include later.
     // Causes a lot of duplicate additions as they can be called at the same time.
-    private void CompanionRemoved(Companion* companion)
-    {
-        //Logger.LogDebug($"Companion Removed: {(nint)companion:X} - {companion->NameString}");
-        var address = (nint)companion;
-        //if (OwnedObjects.PlayerAddress != IntPtr.Zero && address == WatchedCompanionAddr)
-        //{
-        //    RemoveOwnedObject(OwnedObject.Companion, address);
-        //    WatchedCompanionAddr = IntPtr.Zero;
-        //}
-        //else
-        //{
-        RenderedCompanions.Remove(address);
-        // Mediator.Publish(new WatchedObjectDestroyed(address));
-        //}
-    }
+    //private void CompanionRemoved(Companion* companion)
+    //{
+    //    //Logger.LogDebug($"Companion Removed: {(nint)companion:X} - {companion->NameString}");
+    //    var address = (nint)companion;
+    //    if (OwnedObjects.PlayerAddress != IntPtr.Zero && address == WatchedCompanionAddr)
+    //    {
+    //        RemoveOwnedObject(OwnedObject.Companion, address);
+    //        WatchedCompanionAddr = IntPtr.Zero;
+    //    }
+    //    else
+    //    {
+    //        RenderedCompanions.Remove(address);
+    //        Mediator.Publish(new WatchedObjectDestroyed(address));
+    //    }
+    //}
 
     private void AddOwnedObject(OwnedObject kind, nint address)
     {
@@ -294,38 +303,103 @@ public unsafe class CharaObjectWatcher : DisposableMediatorSubscriberBase
     }
 
     // Init with original first, than handle so it is present in our other lookups.
-    private void InitializeCharacter(Character* chara)
+    private unsafe void InitializeCharacter(Character* chara)
     {
         try { OnCharaInitializeHook!.OriginalDisposeSafe(chara); }
         catch (Exception e) { Logger.LogError($"Error: {e}"); }
         Svc.Framework.Run(() => NewCharacterRendered((GameObject*)chara));
     }
 
-    private void TerminateCharacter(Character* chara)
+    private unsafe void TerminateCharacter(Character* chara)
     {
         CharacterRemoved((GameObject*)chara);
         try { OnCharaTerminateHook!.OriginalDisposeSafe(chara); }
         catch (Exception e) { Logger.LogError($"Error: {e}"); }
     }
 
-    private GameObject* DestroyCharacter(Character* chara, byte freeMemory)
+    private unsafe GameObject* DestroyCharacter(Character* chara, byte freeMemory)
     {
         CharacterRemoved((GameObject*)chara);
         try { return OnCharaDestroyHook!.OriginalDisposeSafe(chara, freeMemory); }
         catch (Exception e) { Logger.LogError($"Error: {e}"); return null; }
     }
 
-    private void InitializeCompanion(Companion* companion)
+    //private void InitializeCompanion(Companion* companion)
+    //{
+    //    try { OnCompanionInitializeHook!.OriginalDisposeSafe(companion); }
+    //    catch (Exception e) { Logger.LogError($"Error: {e}"); }
+    //    Svc.Framework.Run(() => NewCompanionRendered(companion));
+    //}
+
+    //private void TerminateCompanion(Companion* companion)
+    //{
+    //    CompanionRemoved(companion);
+    //    try { OnCompanionTerminateHook!.OriginalDisposeSafe(companion); }
+    //    catch (Exception e) { Logger.LogError($"Error: {e}"); }
+    //}
+
+    public unsafe bool TryFindOwnedObjectByIdx(ushort objectIdx, [MaybeNullWhen(false)] out OwnedObject ownedObject)
     {
-        try { OnCompanionInitializeHook!.OriginalDisposeSafe(companion); }
-        catch (Exception e) { Logger.LogError($"Error: {e}"); }
-        Svc.Framework.Run(() => NewCompanionRendered(companion));
+        unsafe
+        {
+            if (WatchedPlayerAddr != IntPtr.Zero && ((GameObject*)WatchedPlayerAddr)->ObjectIndex == objectIdx)
+            {
+                ownedObject = OwnedObject.Player;
+                return true;
+            }
+            else if (WatchedMinionMountAddr != IntPtr.Zero && ((GameObject*)WatchedMinionMountAddr)->ObjectIndex == objectIdx)
+            {
+                ownedObject = OwnedObject.MinionOrMount;
+                return true;
+            }
+            else if (WatchedPetAddr != IntPtr.Zero && ((GameObject*)WatchedPetAddr)->ObjectIndex == objectIdx)
+            {
+                ownedObject = OwnedObject.Pet;
+                return true;
+            }
+            else if (WatchedCompanionAddr != IntPtr.Zero && ((GameObject*)WatchedCompanionAddr)->ObjectIndex == objectIdx)
+            {
+                ownedObject = OwnedObject.Companion;
+                return true;
+            }
+        }
+        ownedObject = default;
+        return false;
     }
 
-    private void TerminateCompanion(Companion* companion)
+    public async Task WaitForFullyLoadedGameObject(IntPtr address, CancellationToken timeoutToken = default)
     {
-        CompanionRemoved(companion);
-        try { OnCompanionTerminateHook!.OriginalDisposeSafe(companion); }
-        catch (Exception e) { Logger.LogError($"Error: {e}"); }
+        if (address == IntPtr.Zero) throw new ArgumentException("Address cannot be null.", nameof(address));
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(timeoutToken, _runtimeCTS.Token);
+        while (!cts.IsCancellationRequested)
+        {
+            // Yes, our clients loading state also impacts anyone else's loading. (that or we are faster than dalamud's object table)
+            if (!PlayerData.IsZoning && IsObjectLoaded(address))
+                return;
+            await Task.Delay(100).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     There are conditions where an object can be rendered / created, but not drawable, or currently bring drawn. <para />
+    ///     This mainly occurs on login or when transferring between zones, but can also occur during redraws and such.
+    ///     We can get around this by checking for various draw conditions.
+    /// </summary>
+    public unsafe bool IsObjectLoaded(IntPtr gameObjectAddress)
+    {
+        var gameObj = (GameObject*)gameObjectAddress;
+        // Invalid address.
+        if (gameObjectAddress == IntPtr.Zero) return false;
+        // DrawObject does not exist yet.
+        if ((IntPtr)gameObj->DrawObject == IntPtr.Zero) return false;
+        // RenderFlags are marked as 'still loading'.
+        if (gameObj->RenderFlags == 2048) return false;
+        // There are models loaded into slots, still being applied.
+        if(((CharacterBase*)gameObj->DrawObject)->HasModelInSlotLoaded != 0) return false;
+        // There are model files loaded into slots, still being applied.
+        if (((CharacterBase*)gameObj->DrawObject)->HasModelFilesInSlotLoaded != 0) return false;
+        // Object is fully loaded.
+        return true;
     }
 }

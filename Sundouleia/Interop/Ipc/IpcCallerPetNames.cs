@@ -3,6 +3,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Ipc;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
+using System.Threading.Tasks;
 
 namespace Sundouleia.Interop;
 
@@ -88,73 +89,29 @@ public sealed class IpcCallerPetNames : IIpcCaller
         _mediator.Publish(new PetNamesDataChanged(newData));
     }
 
+    // Pet nicknames runs all of their calls on the framework thread,
+    // so we can call anywhere and it will work.
+
     public string GetPetNicknames()
     {
         if (!APIAvailable) return string.Empty;
-
-        return Generic.Safe(() =>
-        {
-            string localNameData = GetNicknameData.InvokeFunc();
-            return string.IsNullOrEmpty(localNameData) ? string.Empty : localNameData;
-        }) ?? string.Empty;
+        return GetNicknameData.InvokeFunc() ?? string.Empty;
     }
 
-    public async Task SetPetNamesByPtr(nint charaAddr, string nicknameData)
+    public void SetNamesByIdx(ushort objIdx, string nicknameData)
     {
         if (!APIAvailable) return;
-
-        await Generic.Safe(async () =>
-        {
-            await Svc.Framework.RunOnFrameworkThread(() =>
-            {
-                // If the data is empty, clear the nicknames.
-                if (!string.IsNullOrEmpty(nicknameData))
-                {
-                    _logger.LogTrace($"Applying updates to your Pets!");
-                    SetNicknameData.InvokeAction(nicknameData);
-                }
-                else
-                {
-                    if (Svc.Objects.CreateObjectReference(charaAddr) is not { } o || o is not IPlayerCharacter)
-                        return;
-                    _logger.LogTrace($"Clearing Nicknames from {o.Name}'s pets!");
-                    ClearNicknameData.InvokeAction(o.ObjectIndex);
-                }
-            }).ConfigureAwait(false);
-        });
-    }
-
-    public async Task SetNamesByIdx(ushort objIdx, string nicknameData)
-    {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            if (!string.IsNullOrEmpty(nicknameData))
-                SetNicknameData.InvokeAction(nicknameData);
-            else
-                ClearNicknameData.InvokeAction(objIdx);
-        }).ConfigureAwait(false);
-    }
-
-    public async Task ClearPetNamesByPtr(nint charaAddr)
-    {
-        if (!APIAvailable) return;
-
-        await Generic.Safe(async () =>
-        {
-            await Svc.Framework.RunOnFrameworkThread(() =>
-            {
-                if (Svc.Objects.CreateObjectReference(charaAddr) is not { } o || o is not IPlayerCharacter)
-                    return;
-                _logger.LogTrace($"Clearing Nicknames from {o.Name}'s pets!");
-                ClearNicknameData.InvokeAction(o.ObjectIndex);
-            }).ConfigureAwait(false);
-        });
+        
+        if (!string.IsNullOrEmpty(nicknameData))
+            SetNicknameData.InvokeAction(nicknameData);
+        else
+            ClearNicknameData.InvokeAction(objIdx);
     }
 
     public async Task ClearPetNamesByIdx(ushort objectIdx)
     {
         if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => ClearNicknameData.InvokeAction(objectIdx)).ConfigureAwait(false);
+        _logger.LogDebug("Clearing Pet Names for ObjectIdx {ObjectIdx}", objectIdx);
+        await Svc.Framework.RunOnFrameworkThread(() => ClearNicknameData.InvokeAction(objectIdx));
     }
 }

@@ -24,7 +24,7 @@ public class InteractionsUI : WindowMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     public InteractionsUI(ILogger<InteractionsUI> logger, SundouleiaMediator mediator, MainHub hub)
-        : base(logger, mediator, $"InteractionsUI")
+        : base(logger, mediator, "Interactions###Sundouleia_InteractionsUI")
     {
         _hub = hub;
 

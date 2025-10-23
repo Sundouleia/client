@@ -323,13 +323,13 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
     #region Updates
     // Should happen only on initial loads.
-    public void ReceiveIpcUpdateFull(UserData target, NewModUpdates newModData, VisualUpdate newIpc)
+    public void ReceiveIpcUpdateFull(UserData target, NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod and appearance data!", LoggerType.Callbacks);
-        sundesmo.SetFullDataChanges(newModData, newIpc).ConfigureAwait(false);
+        sundesmo.SetFullDataChanges(newModData, newIpc, isInitialData).ConfigureAwait(false);
     }
 
     // Happens whenever mods should be added or removed.

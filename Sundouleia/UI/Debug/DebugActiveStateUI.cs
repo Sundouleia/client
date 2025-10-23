@@ -68,7 +68,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         using var node = ImRaii.TreeNode($"Distribution CharaDataCache##chara-data-cache-info");
         if (!node) return;
 
-        var dataCache = _distributor.LastCreatedData;
+        var dataCache = DistributionService.LastCreatedData;
         DebugAppliedMods(dataCache);
         DebugDataCachePlayer(dataCache);
         DebugDataCacheNonPlayer(dataCache, OwnedObject.MinionOrMount);

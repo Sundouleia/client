@@ -38,7 +38,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     // Should only be modified while the dataUpdateLock is active.
     private readonly SemaphoreSlim _dataUpdateLock = new(1, 1);
-    internal ClientDataCache LastCreatedData { get; private set; } = new();
+    internal static ClientDataCache LastCreatedData { get; private set; } = new();
 
     /// <summary>
     ///     If OnHubConnected was sent yet. Helps prevent race condition with <para />
@@ -191,7 +191,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 var appearance = LastCreatedData.ToVisualUpdate();
                 Logger.LogDebug($"(ResendAll) Collected [{modData.FilesToAdd.Count} Files to send] | [{modData.HashesToRemove.Count} Files to remove] | {(appearance.HasData() ? "With" : "Without")} Visual Changes", LoggerType.DataDistributor);
                 // Send off update.
-                var res = await _hub.UserPushIpcFull(new(recipients, modData, appearance)).ConfigureAwait(false);
+                var res = await _hub.UserPushIpcFull(new(recipients, modData, appearance, true)).ConfigureAwait(false);
                 Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} newly visible users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
                 // Handle any missing mods after.
                 if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
@@ -276,6 +276,10 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                     newChanges[OwnedObject.Player] |= IpcKind.Mods;
                     flattenedChanges |= IpcKind.Mods;
                 }
+                else
+                {
+                    Logger.LogDebug("Mods have no changes.", LoggerType.DataDistributor);
+                }
             }
 
             // CONDITION 1: Only mod updates exist, and mods have changes.
@@ -321,7 +325,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         try
         {
             InLimbo.Clear();
-            var res = await _hub.UserPushIpcFull(new(recipients, modChanges, visualChanges)).ConfigureAwait(false);
+            var res = await _hub.UserPushIpcFull(new(recipients, modChanges, visualChanges, false)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
             // Handle any missing mods after.
             if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)

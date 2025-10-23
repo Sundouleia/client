@@ -1,8 +1,5 @@
-using CkCommons;
-using CkCommons.Widgets;
+using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
@@ -14,7 +11,7 @@ public class GroupsUI : WindowMediatorSubscriberBase
     private readonly GroupsSelector _selector;
     private readonly TutorialService _guides;
     public GroupsUI(ILogger<GroupsUI> logger, SundouleiaMediator mediator, GroupsSelector selector,
-        TutorialService guides) : base(logger, mediator, "Group Manager")
+        TutorialService guides) : base(logger, mediator, "Group Manager###Sundouleia_GroupUI")
     {
         _selector = selector;
         _guides = guides;

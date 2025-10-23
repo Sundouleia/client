@@ -13,10 +13,12 @@ public class DebugTab
     private static readonly (string Label, LoggerType[] Flags)[] FlagGroups =
     {
         ("Achievements", [ LoggerType.Achievements, LoggerType.AchievementEvents, LoggerType.AchievementInfo ]),
-        ("Interop / IPC", [ 
+        ("Interop / IPC", [
             LoggerType.IpcSundouleia, LoggerType.IpcPenumbra, LoggerType.IpcGlamourer, LoggerType.IpcCustomize,
             LoggerType.IpcMoodles, LoggerType.IpcHeels, LoggerType.IpcHonorific, LoggerType.IpcPetNames ]),
-        ("Client Data", [ LoggerType.ResourceMonitor, LoggerType.OwnedObjects, LoggerType.DataDistributor, LoggerType.ClientUpdates ]),
+        ("Client Data", [ 
+            LoggerType.ResourceMonitor, LoggerType.PlayerMods, LoggerType.MinionMods, LoggerType.PetMods,
+            LoggerType.CompanionMods, LoggerType.OwnedObjects, LoggerType.DataDistributor, LoggerType.ClientUpdates ]),
         ("File Info", [ 
             LoggerType.FileCache, LoggerType.FileCsv, LoggerType.FileMonitor, LoggerType.FileCompactor,
             LoggerType.FileWatcher, LoggerType.FileUploads, LoggerType.FileDownloads, LoggerType.FileService ]),

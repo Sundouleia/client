@@ -32,7 +32,7 @@ public class HomepageTab
         {
             // Make this editor a better UI in the future.
             ("Profile Customizer", FAI.ObjectGroup, () => _mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI)))),
-            // ("Group Management", FAI.PeopleGroup, () => _mediator.Publish(new UiToggleMessage(typeof(GroupManagementUI)))),
+            ("Group Management", FAI.PeopleGroup, () => _mediator.Publish(new UiToggleMessage(typeof(GroupsUI)))),
             // ("MCDF Exporter", FAI.FileExport, () => _mediator.Publish(new UiToggleMessage(typeof(MCDFExporterUI)))),
             // ("Optimize Data", FAI.Eye, () => _mediator.Publish(new UiToggleMessage(typeof(OptimizerUI)))),
             // ("Achievements", FAI.Trophy, () => _mediator.Publish(new UiToggleMessage(typeof(AchievementsUI))))
@@ -70,8 +70,6 @@ public class HomepageTab
         // if itemGotHovered is false, reset the index.
         if (!itemGotHovered)
             HoveredItemIndex = -1;
-
-        ImGui.Text($"TriStateCross UInt: {CkColor.TriStateCross.Vec4().ToUint():x8}");
     }
 
     private bool HomepageSelectable(string label, FontAwesomeIcon icon, Vector2 region, bool hovered = false)

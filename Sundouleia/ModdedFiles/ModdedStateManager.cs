@@ -6,13 +6,16 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using Microsoft.IdentityModel.Tokens;
 using OtterGui;
+using Penumbra.Api.IpcSubscribers;
 using Sundouleia.Interop;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using SundouleiaAPI.Data;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModFiles;
 
@@ -102,7 +105,9 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
 
         // Tells us whenever any resource, from any source, is loaded by anything. I wish i could avoid needing to detour this,
         // but there is not much I can do about that.
-        Mediator.Subscribe<PenumbraResourceLoaded>(this, _ => OnPenumbraLoadedResource(_.Address, _.GamePath, _.ReplacePath));
+
+        _ipc.Penumbra.OnObjectResourcePathResolved = GameObjectResourcePathResolved.Subscriber(Svc.PluginInterface, OnPenumbraLoadedResource);
+        _ipc.Penumbra.OnObjectRedrawn = GameObjectRedrawn.Subscriber(Svc.PluginInterface, OnObjectRedrawn);
 
         // Need to make sure we get the correct key for our current logged in player.
         Svc.Framework.Update += OnTick;
@@ -132,6 +137,8 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         }
     }
 
+    private ConcurrentDictionary<OwnedObject, HashSet<string>> OwnedModelRelatedFiles { get; } = new();
+
     // Fully transient resources for each owned client object.
     private ConcurrentDictionary<OwnedObject, HashSet<string>> TransientResources { get; } = new();
 
@@ -139,9 +146,13 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     {
         base.Dispose(disposing);
 
+        _ipc.Penumbra.OnObjectRedrawn?.Dispose();
+        _ipc.Penumbra.OnObjectResourcePathResolved?.Dispose();
+
         Svc.Framework.Update -= OnTick;
         Svc.ClientState.Login -= OnLogin;
         Svc.ClientState.ClassJobChanged -= OnJobChange;
+        OwnedModelRelatedFiles.Clear();
         TransientResources.Clear();
         PersistentTransients.Clear();
     }
@@ -175,22 +186,43 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         PersistentTransients[OwnedObject.Pet] = [.. petSpecificData ?? []];
     }
 
+    private void OnObjectRedrawn(IntPtr address, int objectIdx)
+    {
+        Logger.LogDebug($"Object at Idx [{objectIdx}] Redrawn.", LoggerType.IpcPenumbra);
+        Mediator.Publish(new PenumbraObjectRedrawn(address, objectIdx));
+
+        // If the address is not from any of our watched addresses, immediately ignore it.
+        if (!_watcher.CurrentOwned.Contains(address))
+            return;
+
+        // Clear the distinct resources for this owned object.
+        var objKind = _watcher.WatchedTypes[address];
+        if (OwnedModelRelatedFiles.TryRemove(objKind, out _))
+            Logger.LogTrace($"Cleared Distinct Model-Related Files for {{{objKind}}} on Redraw.", LoggerType.ResourceMonitor);
+    }
+
     // Mod Enabled? -> (Item Updates via Auto-Reload Gear ? [It will be in next OnScreenResourceFetch] : [Not on actor so dont care])
-    // Mod Disabled? -> (Item updates via Auto-Reload Gear ? [Wont be in next OnScreenResolurceFetch, so dont care] : [Still on you, so no change or need to send])
+    // Mod Disabled? -> (Item updates via Auto-Reload Gear ? [Wont be in next OnScreenResourceFetch, so dont care] : [Still on you, so no change or need to send])
     /// <summary>
-    ///     Intentionally ignores .mdl, .tex, .mtrl files. See above for reason as to why this occurs. <para />
-    ///     Is primarily for handling non-player model related resources, thing effects, animations, sounds, ext.
+    ///     An event firing every time an objects resource path is resolved. <para />
+    ///     This occurs a LOT. And should be handled with care!. <para />
+    ///     We use this to fetch the changes in data that GetPlayerOnScreenActorPaths fails to obtain. <para />
     /// </summary>
     private void OnPenumbraLoadedResource(IntPtr address, string gamePath, string filePath)
     {
+        // If the address is not from any of our watched addresses, immediately ignore it.
+        if (!_watcher.CurrentOwned.Contains(address))
+            return;
+
         // we know at this point that this is a loaded resource path for one of our game objects.
-        var objKind = _watcher.WatchedTypes[address]; // if this fails something is going fundementally wrong with the code.
+        var objKind = _watcher.WatchedTypes[address]; // if this fails something is going fundamentally wrong with the code.
 
         // ignore files already processed this frame
         if (_cachedHandledPaths.Contains(gamePath))
             return;
 
-        lock (_cacheAdditionLock) _cachedHandledPaths.Add(gamePath); 
+        lock (_cacheAdditionLock)
+            _cachedHandledPaths.Add(gamePath);
 
         // ==== SANITIZE DATA ====
         // replace individual mtrl stuff (Some penumbra mtrl paths return paths with | in them for formatting reasons)
@@ -205,62 +237,63 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         if (string.Equals(filePath, replacedGamePath, StringComparison.OrdinalIgnoreCase))
             return;
 
-        // ignore files to not handle (this includes .mdl, .tex, and .mtrl files [which makes me curious what purpose the | filter served?)
-        if (!Constants.HandledExtensions.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
+        // Handle Mdl/Mtrl/Tex files to detect new mod changes.
+        // Can possibly compare this with the cached client data state, idk.
+        if (Constants.MdlMtrlTexExtensions.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
         {
-            // not a type we want to handle, so add it to the list of handled paths (so we skip it?... idk) (seems lazy, but will revise later)
-            lock (_cacheAdditionLock)
-                _cachedHandledPaths.Add(gamePath);
-            return;
+            var ownedModelRelated = OwnedModelRelatedFiles.GetOrAdd(objKind, new HashSet<string>(StringComparer.Ordinal));
+            // Get if we already have this path as a transient resource.
+            if (ownedModelRelated.Contains(replacedGamePath)) return;
+            // We got a new value, so add it.
+            Logger.LogTrace($"Loaded New Distinct Mdl/Mtrl/Tex Resource {{{objKind}}} @ {gamePath} => {filePath}", LoggerType.ResourceMonitor);
+            if (ownedModelRelated.Add(replacedGamePath))
+            {
+                Logger.LogDebug($"Distinct Mdl/Mtrl/Tex Resource Added [{replacedGamePath}] => [{filePath}]", LoggerType.ResourceMonitor);
+                Mediator.Publish(new ModelRelatedResourceLoaded(objKind));
+            }
         }
-        // ==== END SANITIZE DATA ====
 
-        Logger.LogTrace($"Distinct TransientResourceLoad {{{objKind}}} @ {gamePath} => {filePath}", LoggerType.ResourceMonitor);
+        // ignore files to not handle (this includes .mdl, .tex, and .mtrl files [which makes me curious what purpose the | filter served?)
+        if (Constants.HandledExtensions.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
+            HandleDistinctTransient(address, objKind, gamePath, filePath, replacedGamePath);
+    }
+
+    private CancellationTokenSource _transientCTS = new();
+    private void HandleDistinctTransient(nint address, OwnedObject objKind, string gamePath, string filePath, string replacedGamePath)
+    {
         var transients = TransientResources.GetOrAdd(objKind, new HashSet<string>(StringComparer.Ordinal));
         // Get if we already have this path as a transient resource.
         if (transients.Contains(replacedGamePath))
             return;
 
+        Logger.LogTrace($"Distinct Transient Loaded {{{objKind}}} @ {gamePath} => {filePath}", LoggerType.ResourceMonitor);
+
         // Leverage the HashSet property of values to avoid a selectMany statement and run an O(1) check with contains for each owned object.
         if (PersistentTransients.Values.Any(set => set.Contains(gamePath, StringComparer.OrdinalIgnoreCase)))
             return;
-        
         // If it was added, we should log and send a transient changed message.
         if (transients.Add(replacedGamePath))
         {
             Logger.LogDebug($"Distinct Transient Added [{replacedGamePath}] => [{filePath}]", LoggerType.ResourceMonitor);
-            SendTransients(address, objKind);
+            _ = Task.Run(async () =>
+            {
+                _transientCTS = _transientCTS.SafeCancelRecreate();
+                // This feels like a band-aid fix for something that could be solved better.
+                await Task.Delay(TimeSpan.FromSeconds(3), _transientCTS.Token).ConfigureAwait(false);
+                foreach (var kvp in TransientResources)
+                    if (TransientResources.TryGetValue(kvp.Key, out var values) && values.Any())
+                        Mediator.Publish(new TransientResourceLoaded(kvp.Key));
+            });
         }
     }
 
-    // It is possible that we could be just spamming between outfits or jobs or whatever. In this case it is a good idea
-    // to put a debouncer on the transient sender to avoid any unessisary calculations where possible.
-    private CancellationTokenSource _sendTransientCts = new();
-    private void SendTransients(nint address, OwnedObject obj)
-    {
-        // Hold 5s, then send off the transient resources changed event for all transient resources.
-        _ = Task.Run(async () =>
-        {
-            _sendTransientCts = _sendTransientCts.SafeCancelRecreate();
-            var token = _sendTransientCts.Token;
-            await Task.Delay(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
-
-            foreach (var kvp in TransientResources)
-            {
-                if (TransientResources.TryGetValue(obj, out var values) && values.Any())
-                {
-                    Logger.LogTrace($"Sending Transients for {obj}", LoggerType.ResourceMonitor);
-                    Mediator.Publish(new TransientResourceLoaded(obj));
-                }
-            }
-        });
-    }
 
     // Death
     public void RemoveUnmoddedPersistentTransients(OwnedObject obj, List<ModdedFile>? replacements = null)
     {
         if (!PersistentTransients.TryGetValue(obj, out HashSet<string>? value))
             return;
+
         // If null is passed in, clear everything inside.
         if (replacements is null)
         {
@@ -348,37 +381,41 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     /// </summary>
     public HashSet<string> ClearTransientsAndGetPersistents(OwnedObject obj, List<string> list)
     {
-        // Attempt to retrieve the transient resources caught for this owned object.
-        if (TransientResources.TryGetValue(obj, out var set))
+        // Skip clear process if no transient resources exist for this owned object.
+        if (list.Count > 0)
         {
-            // Remove all paths that match any of the paths in the list.
-            int removed = set.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
-            Logger.LogDebug($"Removed {removed} previously existing transient paths", LoggerType.ResourceMonitor);
-        }
-
-        // We should also remove any PersistentTransients that have these paths as well, if present. (Only do this for the Player object)
-        bool reloadSemiTransient = false;
-        if (obj is OwnedObject.Player && PersistentTransients.TryGetValue(obj, out var semiset))
-        {
-            foreach (var file in semiset.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
+            // Attempt to retrieve the transient resources caught for this owned object.
+            if (TransientResources.TryGetValue(obj, out var set))
             {
-                Logger.LogTrace($"Removing From SemiTransient: {file}", LoggerType.ResourceMonitor);
-                _cacheConfig.RemovePath(CurrentClientKey, obj, file);
+                // Remove all paths that match any of the paths in the list.
+                int removed = set.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
+                Logger.LogDebug($"Removed {removed} previously existing transient paths", LoggerType.ResourceMonitor);
             }
 
-            int removed = semiset.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
-            Logger.LogDebug($"Removed {removed} previously existing PersistentTransient paths", LoggerType.ResourceMonitor);
-            // if any were removed we should reload the persistent transient paths.
-            if (removed > 0)
+            // We should also remove any PersistentTransients that have these paths as well, if present. (Only do this for the Player object)
+            bool reloadSemiTransient = false;
+            if (obj is OwnedObject.Player && PersistentTransients.TryGetValue(obj, out var semiset))
             {
-                reloadSemiTransient = true;
-                Logger.LogTrace("Saving transient.json from ClearTransientPaths", LoggerType.ResourceMonitor);
-                _cacheConfig.Save();
-            }
-        }
+                foreach (var file in semiset.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
+                {
+                    Logger.LogTrace($"Removing From SemiTransient: {file}", LoggerType.ResourceMonitor);
+                    _cacheConfig.RemovePath(CurrentClientKey, obj, file);
+                }
 
-        if (reloadSemiTransient)
-            _persistentTransients = null;
+                int removed = semiset.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
+                Logger.LogDebug($"Removed {removed} previously existing PersistentTransient paths", LoggerType.ResourceMonitor);
+                // if any were removed we should reload the persistent transient paths.
+                if (removed > 0)
+                {
+                    reloadSemiTransient = true;
+                    Logger.LogTrace("Saving transient.json from ClearTransientPaths", LoggerType.ResourceMonitor);
+                    _cacheConfig.Save();
+                }
+            }
+
+            if (reloadSemiTransient)
+                _persistentTransients = null;
+        }
 
         // Any remaining transients that survived this should now become PersistentTransients.
         PersistTransients(obj);
@@ -430,8 +467,41 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
             return new HashSet<ModdedFile>(ModdedFileComparer.Instance);
         }
 
+        // Grab all of our owned object paths.
+        // Obtain our current on-screen actor state.
+        if (await _ipc.Penumbra.GetClientOnScreenResourcePaths().ConfigureAwait(false) is not { } clientOnScreenPaths)
+            throw new InvalidOperationException("Penumbra returned null data");
+
+        // var tasks = new List<Task<HashSet<ModdedFile>>>();
+        var moddedFiles = new HashSet<ModdedFile>(ModdedFileComparer.Instance);
+        // Iterate through each of the client-actor-onscreen-paths and process them.
+
+        var sw = Stopwatch.StartNew();
+        Logger.LogDebug($"Processing {clientOnScreenPaths.Keys.Count} owned object modded states in parallel.", LoggerType.ResourceMonitor);
+        // if we really want optimizations we can run this in parallel however we will need a unique instance for each of the owned object transients!
+        foreach (var (ownedObjectIdx, onScreenPaths) in clientOnScreenPaths)
+        {
+            // If this somehow triggers false we managed to unrender the object between the ipc call and now (same ms) which would be insane, but is possible.
+            if (!_watcher.TryFindOwnedObjectByIdx(ownedObjectIdx, out var ownedObject))
+                continue;
+
+            if (ownedObject is OwnedObject.Player)
+                moddedFiles.UnionWith(await CollectPlayerModdedState(onScreenPaths, ct));
+            else
+                moddedFiles.UnionWith(await CollectOtherModdedState(ownedObject, onScreenPaths, ct));
+        }
+
+        sw.Stop();
+        Logger.LogDebug($"Processed owned object modded states in {sw.ElapsedMilliseconds}ms.", LoggerType.ResourceMonitor);
+
+        // return all paths.
+        return moddedFiles;
+    }
+
+    private async Task<HashSet<ModdedFile>> CollectPlayerModdedState(Dictionary<string, HashSet<string>> onScreenPaths, CancellationToken ct)
+    {
         // await until we are present and visible.
-        await SundouleiaEx.WaitForPlayerLoading().ConfigureAwait(false);
+        await _watcher.WaitForFullyLoadedGameObject(_watcher.WatchedPlayerAddr, ct).ConfigureAwait(false);
 
         ct.ThrowIfCancellationRequested();
 
@@ -440,72 +510,116 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         Dictionary<string, List<ushort>>? boneIndices;
         unsafe { boneIndices = _noCrashPlz.GetSkeletonBoneIndices((GameObject*)_watcher.WatchedPlayerAddr); }
 
-        // Obtain our current on-screen actor state.
-        if (await _ipc.Penumbra.GetCharacterResourcePathData(0).ConfigureAwait(false) is not { } onScreenPaths)
-            throw new InvalidOperationException("Penumbra returned null data");
+        // Set the file replacements to all currently visible paths on our player data, where they are modded.
+        var moddedPaths = new HashSet<ModdedFile>(onScreenPaths.Select(c => new ModdedFile([.. c.Value], c.Key)), ModdedFileComparer.Instance).Where(p => p.HasFileReplacement).ToHashSet();
+        // Remove unsupported filetypes.
+        moddedPaths.RemoveWhere(c => c.GamePaths.Any(g => !Constants.ValidExtensions.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
+
+        // Run the internal process.
+        moddedPaths = await GetModdedStateInternal(OwnedObject.Player, moddedPaths, ct, LoggerType.PlayerMods);
+
+        // Helps ensure we are not going to send files that will crash people yippee
+        var invalidHashes = await _noCrashPlz.VerifyPlayerAnimationBones(boneIndices, moddedPaths, ct).ConfigureAwait(false);
+        // Remove any invalid hashes from the persistent transients if any.
+        foreach (var invalid in invalidHashes)
+            RemoveTransient(OwnedObject.Player, invalid);
+
+        return moddedPaths;
+    }
+
+    private async Task<HashSet<ModdedFile>> CollectOtherModdedState(OwnedObject obj, Dictionary<string, HashSet<string>> onScreenPaths, CancellationToken ct)
+    {
+        await _watcher.WaitForFullyLoadedGameObject(_watcher.FromOwned(obj), ct).ConfigureAwait(false);
+
+        ct.ThrowIfCancellationRequested();
 
         // Set the file replacements to all currently visible paths on our player data, where they are modded.
         var moddedPaths = new HashSet<ModdedFile>(onScreenPaths.Select(c => new ModdedFile([.. c.Value], c.Key)), ModdedFileComparer.Instance).Where(p => p.HasFileReplacement).ToHashSet();
         // Remove unsupported filetypes.
         moddedPaths.RemoveWhere(c => c.GamePaths.Any(g => !Constants.ValidExtensions.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
 
+        return await GetModdedStateInternal(obj, moddedPaths, ct, obj switch
+        {
+            OwnedObject.MinionOrMount => LoggerType.MinionMods,
+            OwnedObject.Pet => LoggerType.PetMods,
+            OwnedObject.Companion => LoggerType.CompanionMods,
+            _ => LoggerType.ResourceMonitor
+        });
+    }
+
+    private async Task<HashSet<ModdedFile>> GetModdedStateInternal(OwnedObject obj, HashSet<ModdedFile> moddedPaths, CancellationToken ct, LoggerType loggerType)
+    {
         // If we wished to abort then abort.
         ct.ThrowIfCancellationRequested();
 
-        // Log the remaining files. (without checking for transients.
-        Logger.LogTrace("== Static Replacements ==", LoggerType.ResourceMonitor);
+        // Log the remaining files. (without checking for transients)
+        Logger.LogTrace($"== Static {obj} Replacements ==", loggerType);
         foreach (var replacement in moddedPaths.OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
         {
-            Logger.LogTrace($"=> {replacement}", LoggerType.ResourceMonitor);
+            Logger.LogTrace($"{obj} => {replacement}", loggerType);
             ct.ThrowIfCancellationRequested();
         }
 
-        // At this point we would want to add any pet resources as transient resources, then clear them from this list
-        // (right now this is only grabbing from the player object, but should be grabbing from all other objects simultaneously if possible)
+        // Pets are special cases. For things like summoner, then keep ALL file replacements alive at ALL times, to prevent redraws
+        // occurring all of the time on every summon.
+        if (obj is OwnedObject.Pet)
+        {
+            foreach (var item in moddedPaths.Where(mp => mp.HasFileReplacement).SelectMany(p => p.GamePaths))
+            {
+                if (AddTransient(OwnedObject.Pet, item))
+                    Logger.LogDebug($"Marking Static {item} for Pet as Transient", loggerType);
+            }
 
+            // Now that all the static replacements have been made transient, bomb all other modded paths.
+            Logger.LogTrace($"Clearing {moddedPaths.Count} static paths for Pet.", loggerType);
+            moddedPaths.Clear();
+        }
 
-        // Removes any resources caught from fetching the on-screen actor resources from that which loaded as transient (glowing armor vfx ext)
-        // any remaining transients for this OwnedObject are marked as PersistentTransients and returned.
-        var persistents = ClearTransientsAndGetPersistents(OwnedObject.Player, moddedPaths.SelectMany(c => c.GamePaths).ToList());
+        // Since all modded paths were bombed, there is nothing to remove from transients, making them all persistent transients.
+        var persistents = ClearTransientsAndGetPersistents(obj, moddedPaths.SelectMany(c => c.GamePaths).ToList());
 
-        // For these paths, get their file replacement objects.
+        // Resolve the persistent transients from penumbra.
+        // (could maybe avoid this call too if we just get the subset of .Where(mp => mp.HasFileReplacement) ? Can look into later)
         var resolvedTransientPaths = await GetFileReplacementsFromPaths(persistents).ConfigureAwait(false);
-        Logger.LogTrace("== Transient Replacements ==", LoggerType.ResourceMonitor);
+
+        // Append all resolved transient paths to the modded paths.
+        Logger.LogTrace($"== Transient {obj} Replacements ==", loggerType);
         foreach (var replacement in resolvedTransientPaths.Select(c => new ModdedFile([.. c.Value], c.Key)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
         {
-            Logger.LogTrace($"=> {replacement}", LoggerType.ResourceMonitor);
+            Logger.LogTrace($"{obj} => {replacement}", loggerType);
             moddedPaths.Add(replacement);
         }
 
-        RemoveUnmoddedPersistentTransients(OwnedObject.Player, [.. moddedPaths]);
+        // Since moddedPaths has contents again, we should remove any unmodded. 
+        RemoveUnmoddedPersistentTransients(obj, [.. moddedPaths]);
+
         // obtain the final moddedFiles to send that is the result.
         moddedPaths = new HashSet<ModdedFile>(moddedPaths.Where(p => p.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), ModdedFileComparer.Instance);
         ct.ThrowIfCancellationRequested();
 
         // All remaining paths that are not file-swaps come from modded game files that need to be sent over sundouleia servers.
-        // To authorize them we need their 64 character BLAKE3 computed hashes from their file data.
+        // To authorize them we need their BLAKE3 file hashes from their file data.
         var toCompute = moddedPaths.Where(f => !f.IsFileSwap).ToArray();
-        Logger.LogDebug($"Computing hashes for {toCompute.Length} files.", LoggerType.ResourceMonitor);
+        Logger.LogDebug($"Computing hashes for {toCompute.Length} files.", loggerType);
 
         // Grab these hashes via the FileCacheEntity.
         var computedPaths = _fileDb.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
 
         // Ensure we set and log said computed hashes.
-        // We also group by hash here to ensure we only have one ModdedFile instance per hash, with all game paths it replaces, as we use the hashes as unique identifiers throughout the sync,
-        // and multiple files with different paths and names could have the same contents and thus same hash. For example: fully transparent textures.
+        // We also group by hash here to ensure we only have one ModdedFile instance per hash, with all game paths it replaces,
+        // as we use the hashes as unique identifiers throughout the sync, and multiple files with different paths and names
+        // could have the same contents and thus same hash. For example: fully transparent textures.
         Dictionary<string, ModdedFile> groupedByHash = new(StringComparer.Ordinal);
         foreach (var file in toCompute)
         {
             ct.ThrowIfCancellationRequested();
             file.Hash = computedPaths[file.ResolvedPath]?.Hash ?? string.Empty;
-            Logger.LogDebug($"=> {file} (Hash: {file.Hash})", LoggerType.ResourceMonitor);
+            Logger.LogDebug($"=> {file} (Hash: {file.Hash})", loggerType);
 
             if (!string.IsNullOrEmpty(file.Hash))
             {
                 if (groupedByHash.TryGetValue(file.Hash, out var existing))
-                {
                     existing.GamePaths.UnionWith(file.GamePaths);
-                }
                 else
                     groupedByHash[file.Hash] = file;
             }
@@ -514,25 +628,18 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         // Finally as a sanity check, remove any invalid file hashes for files that are no longer valid.
         var removed = moddedPaths.RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
         if (removed > 0)
-            Logger.LogDebug($"=> Removed {removed} invalid file hashes.", LoggerType.ResourceMonitor);
+            Logger.LogDebug($"=> Removed {removed} invalid file hashes.", loggerType);
 
         // Replace all modded paths with the grouped by hash versions.
         moddedPaths.RemoveWhere(f => groupedByHash.ContainsKey(f.Hash));
         moddedPaths.UnionWith(groupedByHash.Values);
 
-        // Final throw check.
         ct.ThrowIfCancellationRequested();
-        // This is original if (OwnedObject is OwnedObject.Player), can fix later.
-        if (true)
-        {
-            // Helps ensure we are not going to send files that will crash people yippee
-            var invalidHashes = await _noCrashPlz.VerifyPlayerAnimationBones(boneIndices, moddedPaths, ct).ConfigureAwait(false);
-            // Remove any invalid hashes from the persistent transients if any.
-            foreach (var invalid in invalidHashes)
-                RemoveTransient(OwnedObject.Player, invalid);
-        }
+
         return moddedPaths;
     }
+
+
 
     /// <summary>
     ///     Obtains the file replacements for the set of given paths that have forward and reverse resolve.

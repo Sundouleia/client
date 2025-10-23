@@ -1,4 +1,5 @@
 using SundouleiaAPI.Data;
+using System.Linq;
 
 namespace Sundouleia.PlayerClient;
 
@@ -23,13 +24,12 @@ public class ClientDataCache
 
     public ClientDataCache()
     {
-        // Ensure default keys for all owned objects.
         GlamourerState = new ConcurrentDictionary<OwnedObject, string>
         {
             [OwnedObject.Player] = string.Empty,
             [OwnedObject.MinionOrMount] = string.Empty,
-            [OwnedObject.Companion] = string.Empty,
-            [OwnedObject.Pet] = string.Empty
+            [OwnedObject.Pet] = string.Empty,
+            [OwnedObject.Companion] = string.Empty
         };
         CPlusState = new ConcurrentDictionary<OwnedObject, string>
         {
@@ -42,7 +42,7 @@ public class ClientDataCache
 
     public ClientDataCache(ClientDataCache other)
     {
-        AppliedMods = other.AppliedMods.ToDictionary(kvp => kvp.Key, kvp => new ModdedFile(kvp.Value));
+        // Deep-copy the HashSet<ModdedFile> values.
         GlamourerState = new ConcurrentDictionary<OwnedObject, string>(other.GlamourerState);
         CPlusState = new ConcurrentDictionary<OwnedObject, string>(other.CPlusState);
         ModManips = other.ModManips;
@@ -87,10 +87,6 @@ public class ClientDataCache
         };
     }
 
-    /// <summary>
-    ///     Applies the new modded state to the clientDataCache. <para />
-    ///     All new additions are marked in toAdd, all old ones are placed in hashes to remove.
-    /// </summary>
     public ModUpdates ApplyNewModState(HashSet<ModdedFile> moddedState)
     {
         var toAdd = new List<ModFile>();
@@ -111,9 +107,30 @@ public class ClientDataCache
             AppliedMods[mod.Hash] = mod;
             toAdd.Add(mod.ToModFileDto());
         }
-
         return new ModUpdates(toAdd, toRemove);
     }
+
+    /// <summary>
+    ///     Applies the new modded state to the clientDataCache. <para />
+    ///     All new additions are marked in toAdd, all old ones are placed in hashes to remove.
+    /// </summary>
+    //public ModUpdates ApplyNewModState(OwnedObject ownedObj, HashSet<ModdedFile> moddedState)
+    //{
+    //    var current = AppliedMods[ownedObj];
+
+    //    // First determine which files are removed based on the most currentState.
+    //    var toRemove = current.Except(moddedState, ModdedFileHashComparer.Instance).Select(mf => mf.Hash).ToList();
+    //    // Remove them from the dictionary where the hashes are different.
+    //    current.RemoveWhere(mf => toRemove.Contains(mf.Hash));
+
+    //    // get the items to add by running (if we run into issues create new HashSet<ModdedFile> with the proper comparer here.)
+    //    var toAddFiles = moddedState.Except(current, ModdedFileComparer.Instance);
+
+    //    // Union the files to add with the current set.
+    //    current.UnionWith(toAddFiles);
+
+    //    return new ModUpdates(toAddFiles.Select(a => a.ToModFileDto()).ToList(), toRemove);
+    //}
 
     public bool ApplySingleIpc(OwnedObject obj, IpcKind kind, string data)
     {

@@ -1,12 +1,7 @@
-using MessagePack;
 using Sundouleia.PlayerClient;
-using SundouleiaAPI.Enums;
 
 namespace SundouleiaAPI.Data;
 
-/// <summary>
-///     Mostly borrowed from Mare's FileReplacement object for its efficient hashset comparisons and optimized data lookups.
-/// </summary>
 public class ModdedFileComparer : IEqualityComparer<ModdedFile>
 {
     private static readonly ModdedFileComparer _instance = new();
@@ -39,6 +34,38 @@ public class ModdedFileComparer : IEqualityComparer<ModdedFile>
         }
 
         return true;
+    }
+
+    private static int GetOrderIndependentHashCode<T>(IEnumerable<T> source) where T : notnull
+    {
+        int hash = 0;
+        foreach (T element in source)
+        {
+            hash = unchecked(hash +
+                EqualityComparer<T>.Default.GetHashCode(element));
+        }
+        return hash;
+    }
+}
+
+public class ModdedFileHashComparer : IEqualityComparer<ModdedFile>
+{
+    private static readonly ModdedFileHashComparer _instance = new();
+
+    private ModdedFileHashComparer()
+    { }
+
+    public static ModdedFileHashComparer Instance => _instance;
+
+    public bool Equals(ModdedFile? x, ModdedFile? y)
+    {
+        if (x == null || y == null) return false;
+        return x.Hash.Equals(y.Hash);
+    }
+
+    public int GetHashCode(ModdedFile obj)
+    {
+        return HashCode.Combine(obj.ResolvedPath.GetHashCode(StringComparison.OrdinalIgnoreCase), GetOrderIndependentHashCode(obj.GamePaths));
     }
 
     private static int GetOrderIndependentHashCode<T>(IEnumerable<T> source) where T : notnull

@@ -119,19 +119,19 @@ public class Sundesmo : IComparable<Sundesmo>
     }
 
     // Tinker with async / no async later.
-    public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc)
+    public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
         if (newIpc.PlayerChanges != null)
-            await _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges);
+            await _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges, isInitialData);
 
         if (newIpc.MinionMountChanges != null)
-            await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
+            await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges, isInitialData);
 
         if (newIpc.PetChanges != null)
-            await _pet.ApplyIpcData(newIpc.PetChanges);
+            await _pet.ApplyIpcData(newIpc.PetChanges, isInitialData);
 
         if (newIpc.CompanionChanges != null)
-            await _companion.ApplyIpcData(newIpc.CompanionChanges);
+            await _companion.ApplyIpcData(newIpc.CompanionChanges, isInitialData);
     }
 
     public async void SetModChanges(NewModUpdates newModData, string manipString)
@@ -143,13 +143,13 @@ public class Sundesmo : IComparable<Sundesmo>
             await _player.UpdateAndApplyIpc(newIpc.PlayerChanges);
 
         if (newIpc.MinionMountChanges != null)
-            await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges);
+            await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges, false);
 
         if (newIpc.PetChanges != null)
-            await _pet.ApplyIpcData(newIpc.PetChanges);
+            await _pet.ApplyIpcData(newIpc.PetChanges, false);
 
         if (newIpc.CompanionChanges != null)
-            await _companion.ApplyIpcData(newIpc.CompanionChanges);
+            await _companion.ApplyIpcData(newIpc.CompanionChanges, false);
     }
 
     public async void SetIpcChanges(OwnedObject obj, IpcKind kind, string newData)

@@ -7,6 +7,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
+using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
@@ -170,6 +171,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Mediator.Publish(new RefreshWhitelistMessage());
     }
 
+    // Faze out as we move to watcher.
     private async Task WaitUntilValidDrawObject(CancellationToken timeoutToken = default)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(timeoutToken, _runtimeCTS.Token);
@@ -234,11 +236,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (address == IntPtr.Zero)
             return;
         // We can care about parallel execution here if we really want to but i dont care atm.
+        _ipc.PetNames.ClearPetNamesByIdx(objIdx);
         await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
         await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
         await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
         await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
-        await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
         if (_tempProfile != Guid.Empty)
         {
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
@@ -247,8 +249,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     }
 
     // Don't entirely need to await this, but its an option we want it i guess.
-    public async Task UpdateAndApplyAlterations(NewModUpdates modChanges, IpcDataPlayerUpdate ipcChanges)
+    public async Task UpdateAndApplyAlterations(NewModUpdates modChanges, IpcDataPlayerUpdate ipcChanges, bool isInitialData)
     {
+        // If initial data, clear replacements and appearance data.
+        if (isInitialData)
+        {
+            _replacements.Clear();
+            _appearanceData = null;
+        }
+
         // Update Data.
         var visualDiff = UpdateDataIpc(ipcChanges);
         var modDiff = UpdateDataMods(modChanges);
@@ -579,11 +588,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Logger.LogDebug($"Setting mod manipulations for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
         await _ipc.Penumbra.SetSundesmoManipulations(_tempCollection, _appearanceData!.Data[IpcKind.ModManips]).ConfigureAwait(false);
     }
-    private async Task ApplyPetNames()
+    private Task ApplyPetNames()
     {
         var nickData = _appearanceData!.Data[IpcKind.PetNames];
         Logger.LogDebug($"{(string.IsNullOrEmpty(nickData) ? "Clearing" : "Setting")} pet nicknames for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
-        await _ipc.PetNames.SetNamesByIdx(ObjIndex, nickData).ConfigureAwait(false);
+        _ipc.PetNames.SetNamesByIdx(ObjIndex, nickData);
+        return Task.CompletedTask;
     }
     private async Task ApplyCPlus()
     {
@@ -613,6 +623,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+        IntPtr addr = IsRendered ? Address : IntPtr.Zero;
+        ushort objIdx = IsRendered ? ObjIndex : (ushort)0;
+
         // Stop any actively running tasks.
         _dlWaiterCTS.SafeCancelDispose();
         // Cancel any tasks depending on runtime. (Do not dispose)
@@ -632,14 +645,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return;
         }
 
+        _ipc.PetNames.ClearPetNamesByIdx(objIdx);
+
         // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
-        _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), NameString).ConfigureAwait(false);
+        _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), NameString, addr, objIdx).ConfigureAwait(false);
     }
 
     /// <summary>
     ///     What to fire whenever called on application shutdown instead of the normal disposal method.
     /// </summary>
-    private async Task SafeRevertOnDisposal(string nickAliasOrUid, string name)
+    private async Task SafeRevertOnDisposal(string nickAliasOrUid, string name, IntPtr address, ushort objIdx)
     {
         try
         {
@@ -660,7 +675,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
                 using var timeoutCTS = new CancellationTokenSource();
                 timeoutCTS.CancelAfter(TimeSpan.FromSeconds(30));
-                await RevertAlterations(nickAliasOrUid, name, Address, ObjIndex, timeoutCTS.Token);
+                await RevertAlterations(nickAliasOrUid, name, address, objIdx, timeoutCTS.Token);
             }
         }
         catch (Exception ex)
@@ -717,46 +732,68 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         using var node = ImRaii.TreeNode($"Appearance##{Sundesmo.UserData.UID}-appearance-player");
         if (!node) return;
 
-        using var table = ImRaii.Table("sundesmo-appearance", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
+        using var table = ImRaii.Table("sundesmo-appearance", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
         if (!table) return;
 
         ImGui.TableSetupColumn("Data Type");
+        ImGui.TableSetupColumn("Reapply Test");
         ImGui.TableSetupColumn("Data Value", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableHeadersRow();
 
         ImGui.TableNextColumn();
         ImGui.Text("Glamourer");
         ImGui.TableNextColumn();
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]), id: $"{Sundesmo.UserData.UID}-glamourer-reapply"))
+            UiService.SetUITask(ApplyGlamourer);
+        ImGui.TableNextColumn();
         ImGui.Text(_appearanceData!.Data[IpcKind.Glamourer]);
 
         ImGui.TableNextColumn();
         ImGui.Text("CPlus");
         ImGui.TableNextColumn();
-        ImGui.Text(_appearanceData.Data[IpcKind.CPlus]);
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.CPlus]), id: $"{Sundesmo.UserData.UID}-cplus-reapply"))
+            UiService.SetUITask(ApplyCPlus);
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData!.Data[IpcKind.CPlus]);
 
         ImGui.TableNextColumn();
         ImGui.Text("ModManips");
         ImGui.TableNextColumn();
-        ImGui.Text(_appearanceData.Data[IpcKind.ModManips]);
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.ModManips]), id: $"{Sundesmo.UserData.UID}-manips-reapply"))
+            UiService.SetUITask(ApplyModManips);
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData!.Data[IpcKind.ModManips]);
 
         ImGui.TableNextColumn();
         ImGui.Text("HeelsOffset");
         ImGui.TableNextColumn();
-        ImGui.Text(_appearanceData.Data[IpcKind.Heels]);
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Heels]), id: $"{Sundesmo.UserData.UID}-heels-reapply"))
+            UiService.SetUITask(ApplyHeels);
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData!.Data[IpcKind.Heels]);
 
         ImGui.TableNextColumn();
         ImGui.Text("TitleData");
         ImGui.TableNextColumn();
-        ImGui.Text(_appearanceData.Data[IpcKind.Honorific]);
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Honorific]), id: $"{Sundesmo.UserData.UID}-honorific-reapply"))
+            UiService.SetUITask(ApplyHonorific);
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData!.Data[IpcKind.Honorific]);
 
         ImGui.TableNextColumn();
         ImGui.Text("Moodles");
         ImGui.TableNextColumn();
-        ImGui.Text(_appearanceData.Data[IpcKind.Moodles]);
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Moodles]), id: $"{Sundesmo.UserData.UID}-moodles-reapply"))
+            UiService.SetUITask(ApplyMoodles);
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData!.Data[IpcKind.Moodles]);
 
         ImGui.TableNextColumn();
         ImGui.Text("PetNames");
         ImGui.TableNextColumn();
-        ImGui.Text(_appearanceData.Data[IpcKind.PetNames]);
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.PetNames]), id: $"{Sundesmo.UserData.UID}-pet-reapply"))
+            UiService.SetUITask(_ipc.PetNames.ClearPetNamesByIdx(ObjIndex));
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData!.Data[IpcKind.PetNames]);
     }
 }

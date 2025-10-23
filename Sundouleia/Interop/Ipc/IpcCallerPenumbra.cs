@@ -31,12 +31,13 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     // API Events
     private readonly EventSubscriber                                OnInitialized;
     private readonly EventSubscriber                                OnDisposed;
-    private readonly EventSubscriber<nint, int>                     OnObjectRedrawn;
-    private readonly EventSubscriber<nint, string, string>          OnObjectResourcePathResolved;
+    public EventSubscriber<nint, int>                               OnObjectRedrawn;
+    public EventSubscriber<nint, string, string>                    OnObjectResourcePathResolved;
     public EventSubscriber<ModSettingChange, Guid, string, bool>    OnModSettingsChanged;
     // API Getters
     private GetModDirectory             GetModDirectory;       // Retrieves the root mod directory path.
     private GetPlayerMetaManipulations  GetMetaManipulations;  // Obtains the client's mod metadata manipulations.
+    private GetPlayerResourcePaths      GetPlayerResourcePaths;// Obtain all client's player, mount/minion, pet, and companion resource paths.
     private GetGameObjectResourcePaths  GetObjectResourcePaths;
 
     // API Enactors
@@ -83,12 +84,10 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
 
         // API Version.
         Version = new ApiVersion(Svc.PluginInterface);
-        // Events
-        OnObjectResourcePathResolved = GameObjectResourcePathResolved.Subscriber(Svc.PluginInterface, GameObjectResourceLoaded);
-        OnObjectRedrawn = GameObjectRedrawn.Subscriber(Svc.PluginInterface, ObjectRedrawn);
         // Getters
         GetMetaManipulations = new GetPlayerMetaManipulations(Svc.PluginInterface);
         GetModDirectory = new GetModDirectory(Svc.PluginInterface);
+        GetPlayerResourcePaths = new GetPlayerResourcePaths(Svc.PluginInterface);
         GetObjectResourcePaths = new GetGameObjectResourcePaths(Svc.PluginInterface);
         // Enactors
         CreateTempCollection = new CreateTemporaryCollection(Svc.PluginInterface);
@@ -110,11 +109,8 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-
-        OnObjectResourcePathResolved.Dispose();
         OnDisposed.Dispose();
         OnInitialized.Dispose();
-        OnObjectRedrawn.Dispose();
     }
 
     public void CheckAPI()
@@ -153,24 +149,6 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         }
     }
 
-    /// <summary>
-    ///     An event firing every time an objects resource path is resolved. <para />
-    ///     This occurs a LOT. And should be handled with care!. <para />
-    ///     We use this to fetch the changes in data that <see cref="GetCharacterResourcePathData(ushort)"/> fails to obtain. <para />
-    /// </summary>
-    private unsafe void GameObjectResourceLoaded(IntPtr address, string gamePath, string resolvedPath)
-    {
-        // If the address is not from any of our watched addresses, immidiately ignore it.
-        if (!_watcher.CurrentOwned.Contains(address))
-            return;
-        Mediator.Publish(new PenumbraResourceLoaded(address, gamePath, resolvedPath));
-    }
-
-    private void ObjectRedrawn(IntPtr objectAddress, int objectTableIndex)
-    {
-        // We can do something here when the object is the client player (0), but unknown yet.
-    }
-
     /// <summary> 
     ///     Redraws the actor at <paramref name="objectIdx"/>.
     /// </summary>
@@ -185,6 +163,21 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     /// </summary>
     public string GetMetaManipulationsString()
         => APIAvailable ? GetMetaManipulations.Invoke() : string.Empty;
+
+    /// <summary>
+    ///     Similar to <see cref="GetCharacterResourcePathData(ushort)"/>, but for all on-screen actors. <para />
+    ///     Assumes you know the object indexes of the currently owned on-screen actors.
+    /// </summary>
+    public async Task<Dictionary<ushort, Dictionary<string, HashSet<string>>>> GetClientOnScreenResourcePaths()
+    {
+        if (!APIAvailable) return new Dictionary<ushort, Dictionary<string, HashSet<string>>>();
+        return await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            Logger.LogDebug($"Calling: GetPlayerResourcePaths", LoggerType.IpcPenumbra);
+            return GetPlayerResourcePaths.Invoke();
+        }).ConfigureAwait(false);
+
+    }
 
     /// <summary>
     ///     Get the game object resource path dictionary for the <paramref name="objIdx"/>. <para />
@@ -202,7 +195,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
 
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            Logger.LogTrace($"Calling: GetGameObjectResourcePaths for ObjectIdx [{objIdx}]", LoggerType.IpcPenumbra);
+            Logger.LogDebug($"Calling: GetGameObjectResourcePaths for ObjectIdx [{objIdx}]", LoggerType.IpcPenumbra);
             return GetObjectResourcePaths.Invoke(objIdx)[0];
         }).ConfigureAwait(false);
     }

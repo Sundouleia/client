@@ -46,7 +46,7 @@ public class MainUI : WindowMediatorSubscriberBase
         ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
         SundesmoManager pairs, TutorialService guides, HomepageTab home, WhitelistTab whitelist, 
         RequestsTab requestsTab, RadarTab radar, RadarChatTab chat, AccountTab account) 
-        : base(logger, mediator, "###MainUI")
+        : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
         _serverConfigs = serverConfigs;
@@ -171,6 +171,9 @@ public class MainUI : WindowMediatorSubscriberBase
         // so removed it for now. if we need it later just reference GSpeak.)
         switch (_tabMenu.TabSelection)
         {
+            case MainMenuTabs.SelectedTab.Homepage:
+                _homepage.DrawHomepageSection();
+                break;
             case MainMenuTabs.SelectedTab.Requests:
                 _requestsTab.DrawRequestsSection();
                 break;

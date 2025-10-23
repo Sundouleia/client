@@ -5,7 +5,7 @@ namespace Sundouleia.Services.Mediator;
 // Useful for IPC-Updates, but may also become irrelevant once we get proper watchers / services / listeners hooked up for changes.
 public record PenumbraInitialized : MessageBase;
 public record PenumbraDirectoryChanged(string? NewDirectory) : MessageBase;
-public record PenumbraResourceLoaded(IntPtr Address, string GamePath, string ReplacePath) : SameThreadMessage;
+public record PenumbraObjectRedrawn(IntPtr Address, int ObjectIdx) : SameThreadMessage;
 public record PenumbraDisposed : MessageBase;
 
 public record GlamourerChanged(IntPtr Address) : MessageBase; // Only sent for CLIENT Glamourer changes
@@ -26,4 +26,5 @@ public record PetNamesDataChanged(string NicknamesData) : MessageBase;
 public record MoodlesReady : MessageBase;
 public record MoodlesChanged(IntPtr Address) : MessageBase;
 
+public record ModelRelatedResourceLoaded(OwnedObject Object) : MessageBase;
 public record TransientResourceLoaded(OwnedObject Object) : MessageBase;
