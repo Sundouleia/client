@@ -366,12 +366,15 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
             _cacheConfig.Save();
         }
 
-        Logger.LogDebug($"Removing remaining {resources.Count} transient resources", LoggerType.ResourceMonitor);
-        foreach (var file in resources)
-            Logger.LogTrace($"Removing {file} from TransientResources", LoggerType.ResourceMonitor);
+        if (resources.Count > 0)
+        {
+            // Bomb the remaining.
+            Logger.LogDebug($"Removing remaining {resources.Count} transient resources", LoggerType.ResourceMonitor);
+            foreach (var file in resources)
+                Logger.LogTrace($"Removing {file} from TransientResources", LoggerType.ResourceMonitor);
 
-        // Bomb the remaining.
-        TransientResources[obj].Clear();
+            TransientResources[obj].Clear();
+        }
     }
 
     /// <summary>
@@ -493,6 +496,14 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
 
         sw.Stop();
         Logger.LogDebug($"Processed owned object modded states in {sw.ElapsedMilliseconds}ms.", LoggerType.ResourceMonitor);
+
+        Logger.LogTrace($"== Final Replacements ==", LoggerType.ResourceMonitor);
+        foreach (var replacement in moddedFiles.OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
+        {
+            Logger.LogTrace($" => {replacement}", LoggerType.ResourceMonitor);
+            ct.ThrowIfCancellationRequested();
+        }
+
 
         // return all paths.
         return moddedFiles;

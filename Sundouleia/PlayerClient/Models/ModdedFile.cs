@@ -4,7 +4,11 @@ using System.Text.RegularExpressions;
 namespace Sundouleia.PlayerClient;
 
 /// <summary>
-///     Client-Side representation of a modded file, with additional helpers for transient file comparisons.
+///     Primarily intended to help with efficient modded state calculations, 
+///     ensuring it holds the correct state for updates. <para />
+///     
+///     These files are only used for collecting mod information and being 
+///     stored in the ClientDataCache. They are not used elsewhere.
 /// </summary>
 public partial class ModdedFile
 {

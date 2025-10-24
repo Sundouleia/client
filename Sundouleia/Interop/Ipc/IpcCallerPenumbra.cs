@@ -154,6 +154,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     /// </summary>
     public void RedrawGameObject(ushort objectIdx)
     {
+        if (!APIAvailable) return;
         Logger.LogTrace($"Redrawing actor at ObjectIdx [{objectIdx}]", LoggerType.IpcPenumbra);
         RedrawObject.Invoke(objectIdx, RedrawType.Redraw);
     }
