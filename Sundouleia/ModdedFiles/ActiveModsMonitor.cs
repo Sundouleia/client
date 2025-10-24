@@ -1,34 +1,30 @@
-﻿using CkCommons;
-using CkCommons.Gui;
-using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility.Raii;
-using Dalamud.Plugin.Services;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using FFXIVClientStructs.FFXIV.Client.System.Framework;
-using Microsoft.IdentityModel.Tokens;
-using OtterGui;
-using Penumbra.Api.IpcSubscribers;
-using Sundouleia.Interop;
+﻿using Sundouleia.Interop;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
-using SundouleiaAPI.Data;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModFiles;
 
 /// <summary>
-///     Processes changes to transient data, and tracks persistent data, along with on-screen data, 
-///     to calculate the client's current modded state. <para />
-///     Maybe rename to something shorter idk.
+///     Intended to monitor all applied changes for mods in a collection, including inheritance changes. <para />
+///     This helps us keep track of what mods are currently used, and what replacements for them are currently active, 
+///     allowing us to get additional data from them such as their type, file extensions, etc. <para />
+///     
+///     This will effectively allow us to have a cached state of penumbra effective changes from the cache, so that we
+///     can create a monitored state of loaded resources on the player and their owned objects. <para />
+///     
+///     This is accomplished by tracking the loaded resources / player resource paths and player resource path calls.
+///     When these paths are passed into the monitor, we mark them in our ActiveInSession cache (separate cache) <para />
+///     
+///     Every time a mod setting changes with the enabled state or setting state changed, we fetch the resolved files from the CollectionCache,
+///     and update our ActiveInSession cache accordingly so any files no longer active are removed. <para />
+///     
+///     Monitoring the state from penumbra will also allow us to view extended information about these files, so we can add/remove/update
+///     based on what kind of replacement it is (gear, vfx, animation, emote, etc.) <para />
 /// </summary>
 public sealed class ActiveModsMonitor : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
-    private readonly TransientCacheConfig _cacheConfig;
     private readonly PlzNoCrashFrens _noCrashPlz;
     private readonly FileCacheManager _fileDb;
     private readonly IpcManager _ipc;
@@ -47,7 +43,9 @@ public sealed class ActiveModsMonitor : DisposableMediatorSubscriberBase
     // - CollectionCache holds cached changes including inheritance from other collections, and is a reliable final source.
     // - CollectionCache references CollectionCacheManager, and holds a CollectionModData, for references.
     // 
-
+    // TODO RESEARCH:
+    // - Find where we can relate the CollectionCache.ResolvedFiles and CollectionCache.ModData to correlate to the retrieved retrieved changed item paths of a mod.
+    // - How to determine when these are updated (ModSettingChanged maybe) or possibly a new event for it.
 
     // RESOLVE ROUTE:
     // 1) Player changes a mod setting / mod state.
@@ -125,5 +123,7 @@ public sealed class ActiveModsMonitor : DisposableMediatorSubscriberBase
     //
     // 14c) During AddMod, it will retrieve the mod's FileRedirections and pass them all into the function AddFile(path, file, mod), one at a time.
     //      In this method, if the file fails path redirection validation, or redirection is not supported, the file is not added.
+    //
+    // 15) CollectionCache.ResolvedFiles is now updated, and our ActiveModsMonitor can retrieve the current state from here.
 
 }
