@@ -42,5 +42,5 @@ public class SundesmoHandlerFactory
     ///     This create method in the pair handler factory will create a new owned object handler.
     /// </summary>
     public PlayerOwnedHandler Create(OwnedObject type, Sundesmo sundesmo)
-        => new(type, sundesmo, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _ipc);
+        => new(type, sundesmo, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _ipc, _watcher);
 }

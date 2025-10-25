@@ -6,7 +6,9 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using OtterGui;
 using Sundouleia.Gui.Profiles;
+using Sundouleia.Interop;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
@@ -27,6 +29,7 @@ public class HomepageTab
     public HomepageTab(SundouleiaMediator mediator)
     {
         _mediator = mediator;
+
         // Define all module information in a single place
         Modules = new List<(string, FontAwesomeIcon, Action)>
         {

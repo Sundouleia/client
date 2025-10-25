@@ -3,6 +3,7 @@ using Dalamud.Interface.ImGuiNotification;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
 using Penumbra.Api.IpcSubscribers;
+using Sundouleia.ModFiles;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
@@ -62,12 +63,8 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     // and reapply the actor.
     // -> This way by the time it is done uploading everything our other items should have had time to build and can upload in unison.
 
-    private readonly CharaObjectWatcher _watcher;
-
-    public IpcCallerPenumbra(ILogger<IpcCallerPenumbra> logger, SundouleiaMediator mediator,
-        CharaObjectWatcher watcher) : base(logger, mediator)
+    public IpcCallerPenumbra(ILogger<IpcCallerPenumbra> logger, SundouleiaMediator mediator) : base(logger, mediator)
     {
-        _watcher = watcher;
 
         OnInitialized = Initialized.Subscriber(Svc.PluginInterface, () =>
         {
@@ -85,8 +82,8 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         // API Version.
         Version = new ApiVersion(Svc.PluginInterface);
         // Getters
-        GetMetaManipulations = new GetPlayerMetaManipulations(Svc.PluginInterface);
         GetModDirectory = new GetModDirectory(Svc.PluginInterface);
+        GetMetaManipulations = new GetPlayerMetaManipulations(Svc.PluginInterface);
         GetPlayerResourcePaths = new GetPlayerResourcePaths(Svc.PluginInterface);
         GetObjectResourcePaths = new GetGameObjectResourcePaths(Svc.PluginInterface);
         // Enactors
@@ -158,8 +155,8 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         Logger.LogTrace($"Redrawing actor at ObjectIdx [{objectIdx}]", LoggerType.IpcPenumbra);
         RedrawObject.Invoke(objectIdx, RedrawType.Redraw);
     }
-    
-    /// <summary>
+
+        /// <summary>
     ///     Any metadata manipulations applied by mods condensed into a nice base64 string.
     /// </summary>
     public string GetMetaManipulationsString()

@@ -6,16 +6,20 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Microsoft.IdentityModel.Tokens;
 using OtterGui;
 using Penumbra.Api.IpcSubscribers;
 using Sundouleia.Interop;
+using Sundouleia.Localization;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using SundouleiaAPI.Data;
 using TerraFX.Interop.Windows;
+using static FFXIVClientStructs.FFXIV.Component.GUI.AtkTimer.Delegates;
+using static Lumina.Data.Files.ScdFile;
 
 namespace Sundouleia.ModFiles;
 
@@ -663,7 +667,14 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         // track our resolved paths.
         Dictionary<string, List<string>> resolvedPaths = new(StringComparer.Ordinal);
 
-        // grab them from penumbra. (causes a 20ms delay becuz ipc life)
+        // grab them from penumbra.
+        // If the mod is no longer enabled, it will return a FileSwap path instead of a modded path.
+        //
+        // === Example === 
+        // With Yippee Mod disabled:
+        // => chara/human/c0801/animation/a0001/bt_common/emote/welcome.pap : chara/human/c0801/animation/a0001/bt_common/emote/welcome.pap
+        // With Yippee Mod enabled:
+        // => c:\ffxivmodding\penumbra\yippeewelcome\chara\human\c0801\animation\a0001\bt_common\emote\welcome.pap : chara/human/c0801/animation/a0001/bt_common/emote/welcome.pap
         var (forward, reverse) = await _ipc.Penumbra.ResolveModPaths(forwardPaths, reversePaths).ConfigureAwait(false);
         for (int i = 0; i < forwardPaths.Length; i++)
         {
@@ -686,6 +697,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         Logger.LogTrace("== Resolved Paths ==", LoggerType.ResourceMonitor);
         foreach (var kvp in resolvedPaths.OrderBy(k => k.Key, StringComparer.Ordinal))
             Logger.LogTrace($"=> {kvp.Key} : {string.Join(", ", kvp.Value)}", LoggerType.ResourceMonitor);
+        
         return resolvedPaths.ToDictionary(k => k.Key, k => k.Value.ToArray(), StringComparer.OrdinalIgnoreCase).AsReadOnly();
     }
 

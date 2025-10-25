@@ -1,5 +1,11 @@
 using CkCommons.Gui;
+using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
+using OtterGui;
+using Sundouleia.Interop;
+using Sundouleia.ModFiles;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
@@ -9,11 +15,14 @@ namespace Sundouleia.Gui;
 public class GroupsUI : WindowMediatorSubscriberBase
 {
     private readonly GroupsSelector _selector;
+    private readonly IpcCallerPenumbra _ipc;
     private readonly TutorialService _guides;
     public GroupsUI(ILogger<GroupsUI> logger, SundouleiaMediator mediator, GroupsSelector selector,
-        TutorialService guides) : base(logger, mediator, "Group Manager###Sundouleia_GroupUI")
+        IpcCallerPenumbra ipc, TutorialService guides) 
+        : base(logger, mediator, "Group Manager###Sundouleia_GroupUI")
     {
         _selector = selector;
+        _ipc = ipc;
         _guides = guides;
 
         this.PinningClickthroughFalse();
@@ -23,7 +32,6 @@ public class GroupsUI : WindowMediatorSubscriberBase
             .Build();
     }
 
-    private bool ThemePushed = false;
     protected override void PreDrawInternal()
     { }
 
@@ -32,6 +40,5 @@ public class GroupsUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-
     }
 }

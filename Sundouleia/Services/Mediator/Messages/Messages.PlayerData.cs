@@ -17,6 +17,16 @@ public record FileDownloadStarted(PlayerHandler Player, FileTransferProgress Sta
 public record FileDownloadComplete(PlayerHandler Player) : MessageBase;
 
 /// <summary>
+///     Whenever a CLIENT OWNED OBJECT is created.
+/// </summary>
+public record OwnedObjectCreated(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
+
+/// <summary>
+///     Whenever a CLIENT OWNED OBJECT is destroyed.
+/// </summary>
+public record OwnedObjectDestroyed(OwnedObject Kind, IntPtr Address) : SameThreadMessage;
+
+/// <summary>
 ///     Whenever a NON-CLIENT OWNED OBJECT is created. Intended for Sundesmos.
 /// </summary>
 public record WatchedObjectCreated(IntPtr Address) : SameThreadMessage;

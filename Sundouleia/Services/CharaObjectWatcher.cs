@@ -190,7 +190,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     ///     wishing to detect created objects. <para />
     ///     Doing so will ensure any final lines are processed prior to the address invalidating.
     /// </summary>
-    private unsafe void NewCharacterRendered(GameObject* chara)
+    private unsafe void  NewCharacterRendered(GameObject* chara)
     {
         Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}");
         var address = (nint)chara;
@@ -291,15 +291,21 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     private void AddOwnedObject(OwnedObject kind, nint address)
     {
         Logger.LogDebug($"OwnedObject Rendered: {kind} - {address:X}");
-        WatchedTypes.AddOrUpdate(address, kind, (_, __) => kind);
-        CurrentOwned.Add(address);
+        if (WatchedTypes.TryAdd(address, kind))
+        {
+            CurrentOwned.Add(address);
+            Mediator.Publish(new OwnedObjectCreated(kind, address));
+        }
     }
 
     private void RemoveOwnedObject(OwnedObject kind, nint address)
     {
         Logger.LogDebug($"OwnedObject Removed: {kind} - {address:X}");
-        WatchedTypes.TryRemove(address, out _);
-        CurrentOwned.Remove(address);
+        if (WatchedTypes.TryRemove(address, out _))
+        {
+            CurrentOwned.Remove(address);
+            Mediator.Publish(new OwnedObjectDestroyed(kind, address));
+        }
     }
 
     // Init with original first, than handle so it is present in our other lookups.

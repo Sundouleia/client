@@ -57,7 +57,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         TryCreateAssignTempCollection().GetAwaiter().GetResult();
 
         // Listen to Penumbra init & dispose methods to re-assign collections.
-        Mediator.Subscribe<PenumbraInitialized>(this, _ => TryCreateAssignTempCollection().ConfigureAwait(false));
+        Mediator.Subscribe<PenumbraInitialized>(this, async _ =>
+        {
+            // Create / Assign the temp collection.
+            await TryCreateAssignTempCollection().ConfigureAwait(false);
+            // If there is replacement data, reapply it.
+            if (IsRendered && _replacements.Count > 0)
+                await ApplyMods().ConfigureAwait(false);
+        });
+
         Mediator.Subscribe<PenumbraDisposed>(this, _ => _tempCollection = Guid.Empty);
         Mediator.Subscribe<HonorificReady>(this, async _ =>
         {
@@ -70,8 +78,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await ApplyPetNames().ConfigureAwait(false);
         });
 
-        // Old subscriber here for class/job change?
-        // Old subscribers here for combat/performance start/stop. Reapplies should fix this but yeah can probably just do redraw.
         Mediator.Subscribe<WatchedObjectCreated>(this, msg => MarkVisibleForAddress(msg.Address));
         Mediator.Subscribe<WatchedObjectDestroyed>(this, msg => UnrenderPlayer(msg.Address));
     }
@@ -208,6 +214,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Create new Collection if we need one.
         if (_tempCollection == Guid.Empty)
             _tempCollection = await _ipc.Penumbra.NewSundesmoCollection(Sundesmo.UserData.UID).ConfigureAwait(false);
+
         // If we are rendered, assign the collection
         if (IsRendered)
             await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
@@ -236,7 +243,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (address == IntPtr.Zero)
             return;
         // We can care about parallel execution here if we really want to but i dont care atm.
-        _ipc.PetNames.ClearPetNamesByIdx(objIdx);
+        await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
         await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
         await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
         await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
@@ -644,8 +651,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogWarning($"Framework is unloading, skipping disposal for {NameString}({Sundesmo.GetNickAliasOrUid()})");
             return;
         }
-
-        _ipc.PetNames.ClearPetNamesByIdx(objIdx);
 
         // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
         _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), NameString, addr, objIdx).ConfigureAwait(false);

@@ -243,7 +243,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     public async Task CheckStateAndUpdate(Dictionary<OwnedObject, IpcKind> newChanges, IpcKind flattenedChanges)
     {
         // Create initial assumptions.
-        ModUpdates changedMods = new([], []);
+        VisualUpdate changedVisuals = VisualUpdate.Empty;
+        ModUpdates changedMods = ModUpdates.Empty;
         bool manipStrDiff = false;
 
         // Wait for data update to be free.
@@ -276,37 +277,34 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                     newChanges[OwnedObject.Player] |= IpcKind.Mods;
                     flattenedChanges |= IpcKind.Mods;
                 }
-                else
-                {
-                    Logger.LogDebug("Mods have no changes.", LoggerType.DataDistributor);
-                }
             }
 
-            // CONDITION 1: Only mod updates exist, and mods have changes.
-            if (flattenedChanges is IpcKind.Mods)
+            // Collect the new flattened changes. Note that it is possible to have more than just mods, after a mods change.
+            Logger.LogDebug($"Flattened Changes: {flattenedChanges}", LoggerType.DataDistributor);
+
+            // If the flattened changes requires we check the visual state, then do so.
+            if (flattenedChanges is not IpcKind.Mods)
+                changedVisuals = await UpdateVisualsInternal(newChanges, manipStrDiff).ConfigureAwait(false);
+
+            // MODS CONDITION - Flattened changes could be just Mods, or both but with a failed visual check.
+            if (flattenedChanges is IpcKind.Mods || (!changedVisuals.HasData() && changedMods.HasChanges))
             {
-                // Only send if we had changed.
-                if (changedMods.HasChanges)
-                    await SendModsUpdate(recipients, changedMods, manipStrDiff).ConfigureAwait(false);
+                await SendModsUpdate(recipients, changedMods, manipStrDiff).ConfigureAwait(false);
                 return;
             }
 
-            // Update visuals, if it is a full or too.
-            var visualChanges = await UpdateVisualsInternal(newChanges, manipStrDiff).ConfigureAwait(false);
-
-            // No changed occurred, abort.
-            if (!visualChanges.HasData())
-                return;
-            
-            // CONDITION: Both had changes.
+            // FULL UPDATE CONDITION: Both results were valid.
             if (changedMods.HasChanges)
             {
-                await SendFullUpdate(recipients, changedMods, visualChanges).ConfigureAwait(false);
+                Logger.LogWarning($"CheckStateAndUpdate found both mod and visual changes to send to {recipients.Count} users.", LoggerType.DataDistributor);
+                await SendFullUpdate(recipients, changedMods, changedVisuals).ConfigureAwait(false);
                 return;
             }
+            // VISUALS CONDITION: Only visual changes.
             else
             {
-                await SendVisualsUpdate(recipients, visualChanges).ConfigureAwait(false);
+                Logger.LogWarning($"CheckStateAndUpdate found only visual changes to send to {recipients.Count} users.", LoggerType.DataDistributor);
+                await SendVisualsUpdate(recipients, changedVisuals).ConfigureAwait(false);
                 return;
             }
         }

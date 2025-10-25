@@ -125,13 +125,13 @@ public class Sundesmo : IComparable<Sundesmo>
             await _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges, isInitialData);
 
         if (newIpc.MinionMountChanges != null)
-            await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges, isInitialData);
+            await _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, isInitialData);
 
         if (newIpc.PetChanges != null)
-            await _pet.ApplyIpcData(newIpc.PetChanges, isInitialData);
+            await _pet.UpdateAndApplyIpc(newIpc.PetChanges, isInitialData);
 
         if (newIpc.CompanionChanges != null)
-            await _companion.ApplyIpcData(newIpc.CompanionChanges, isInitialData);
+            await _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, isInitialData);
     }
 
     public async void SetModChanges(NewModUpdates newModData, string manipString)
@@ -143,13 +143,13 @@ public class Sundesmo : IComparable<Sundesmo>
             await _player.UpdateAndApplyIpc(newIpc.PlayerChanges);
 
         if (newIpc.MinionMountChanges != null)
-            await _mountMinion.ApplyIpcData(newIpc.MinionMountChanges, false);
+            await _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, false);
 
         if (newIpc.PetChanges != null)
-            await _pet.ApplyIpcData(newIpc.PetChanges, false);
+            await _pet.UpdateAndApplyIpc(newIpc.PetChanges, false);
 
         if (newIpc.CompanionChanges != null)
-            await _companion.ApplyIpcData(newIpc.CompanionChanges, false);
+            await _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, false);
     }
 
     public async void SetIpcChanges(OwnedObject obj, IpcKind kind, string newData)
@@ -157,16 +157,15 @@ public class Sundesmo : IComparable<Sundesmo>
         await (obj switch
         {
             OwnedObject.Player => _player.UpdateAndApplyIpc(kind, newData),
-            OwnedObject.MinionOrMount => _mountMinion.ApplyIpcSingle(kind, newData),
-            OwnedObject.Pet => _pet.ApplyIpcSingle(kind, newData),
-            OwnedObject.Companion => _companion.ApplyIpcSingle(kind, newData),
+            OwnedObject.MinionOrMount => _mountMinion.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.Pet => _pet.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.Companion => _companion.UpdateAndApplyIpc(kind, newData),
             _ => Task.CompletedTask,
         }).ConfigureAwait(false);
     }
 
     public unsafe void MarkOnline(OnlineUser dto)
     {
-        // Cancel any existing timeout task.
         _timeoutCTS.SafeCancel();
         _onlineUser = dto;
         _mediator.Publish(new SundesmoOnline(this, IsReloading));
@@ -182,28 +181,9 @@ public class Sundesmo : IComparable<Sundesmo>
         if (!IsRendered)
             return;
 
-        // Update these later to handle similar logic as PlayerHandler.
-        if (_watcher.TryGetExisting(_mountMinion, out IntPtr mountAddr))
-        {
-            _mountMinion.ObjectRendered((GameObject*)mountAddr);
-            _mountMinion.ReapplyAlterations().ConfigureAwait(false);
-        }
-        else
-        {
-            _logger.LogWarning("Mount Not Rendered!");
-        }
-
-        if (_watcher.TryGetExisting(_pet, out IntPtr petAddr))
-        {
-            _pet.ObjectRendered((GameObject*)petAddr);
-            _pet.ReapplyAlterations().ConfigureAwait(false);
-        }
-
-        if (_watcher.TryGetExisting(_companion, out IntPtr compAddr))
-        {
-            _companion.ObjectRendered((GameObject*)compAddr);
-            _companion.ReapplyAlterations().ConfigureAwait(false);
-        }
+        _mountMinion.SetVisibleIfRendered().ConfigureAwait(false);
+        _pet.SetVisibleIfRendered().ConfigureAwait(false);
+        _companion.SetVisibleIfRendered().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -277,9 +257,9 @@ public class Sundesmo : IComparable<Sundesmo>
                 // Revert all alterations.
                 _logger.LogDebug($"Timeout elapsed for [{PlayerName}] ({GetNickAliasOrUid()}). Clearing Alterations.", UserData.AliasOrUID);
                 await _player.RevertRenderedAlterations().ConfigureAwait(false);
-                await _mountMinion.ClearAlterations().ConfigureAwait(false);
-                await _pet.ClearAlterations().ConfigureAwait(false);
-                await _companion.ClearAlterations().ConfigureAwait(false);
+                await _mountMinion.RevertRenderedAlterations().ConfigureAwait(false);
+                await _pet.RevertRenderedAlterations().ConfigureAwait(false);
+                await _companion.RevertRenderedAlterations().ConfigureAwait(false);
             }
             catch (TaskCanceledException)
             {
