@@ -60,22 +60,27 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     // Find a way to improve this soon, right now it is a little messy.
     private void DrawSearchFilter()
     {
-        var enumWidth = ImGui.CalcTextSize("Groups").X + ImUtf8.FramePadding.X * 2 + ImUtf8.ItemInnerSpacing.X * 2;
-        var buttonWidth = _viewMode is ViewMode.Groups ? CkGui.IconButtonSize(FAI.Filter).X : 0f;
+        var enumWidth = ImGui.CalcTextSize("Groups").X + ImUtf8.FramePadding.X * 2 + ImUtf8.ItemInnerSpacing.X;
         
         var filter = _drawFolders.Filter;
-        if (FancySearchBar.Draw("SundesmoSearch", ImGui.GetContentRegionAvail().X - enumWidth, "_filter..", ref filter, 128, buttonWidth, DrawFilterButton))
-            _drawFolders.Filter = filter;
+        if (_viewMode is ViewMode.Groups)
+        {
+            var buttonWidth = _viewMode is ViewMode.Groups ? CkGui.IconButtonSize(FAI.Filter).X : 0f;
+            if (FancySearchBar.Draw("SundesmoSearch", ImGui.GetContentRegionAvail().X - enumWidth, "filter..", ref filter, 128, buttonWidth, DrawFilterButton))
+                _drawFolders.Filter = filter;
+        }
+        else
+        {
+            if (FancySearchBar.Draw("SundesmoSearch", ImGui.GetContentRegionAvail().X - enumWidth, "filter..", ref filter, 128))
+                _drawFolders.Filter = filter;
+        }
 
-        ImGui.SameLine();
+        ImUtf8.SameLineInner();
         if (CkGuiUtils.EnumCombo("##pair_view_type", ImGui.GetContentRegionAvail().X, _viewMode, out var newMode, Enum.GetValues<ViewMode>(), flags: CFlags.NoArrowButton))
             _viewMode = newMode;
 
         void DrawFilterButton()
         {
-            if (_viewMode is not ViewMode.Groups)
-                return;
-
             var pressed = CkGui.IconButton(FAI.Filter, inPopup: true);
             var popupDrawPos = ImGui.GetItemRectMin() + new Vector2(ImGui.GetItemRectSize().X, 0);
             CkGui.AttachToolTip("Arrange Group display order and visibility.");
