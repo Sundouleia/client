@@ -7,6 +7,7 @@ public class GroupsStorage
 {
     public HashSet<string> OpenedDefaultFolders { get; set; } = new(StringComparer.Ordinal);
     public HashSet<string> OpenedGroupFolders { get; set; } = new(StringComparer.Ordinal);
+    // could maybe revise this by comparing as a HashSet with a comparer override that goes by label.
     public List<SundesmoGroup> Groups { get; set; } = new();
 }
 
@@ -17,8 +18,9 @@ public class SundesmoGroup
     public string Description { get; set; } = string.Empty;
     public uint IconColor { get; set; } = 0xFFFFFFFF;
     public uint LabelColor { get; set; } = 0xFFFFFFFF;
+    public uint DescriptionColor { get; set; } = 0xFFFFFFFF;
     public bool ShowOffline { get; set; } = true;
-    public List<string> LinkedUids { get; set; } = new();
+    public HashSet<string> LinkedUids { get; set; } = new();
 }
 
 public class GroupsConfig : IHybridSavable

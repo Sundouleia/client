@@ -6,6 +6,7 @@ using Dalamud.Interface.Utility;
 using OtterGui.Classes;
 using OtterGui.Raii;
 using OtterGui.Text;
+using OtterGui.Text.EndObjects;
 
 // Credit to OtterGui for the original implementation.
 namespace Sundouleia.CustomCombos;
@@ -41,6 +42,7 @@ public abstract class CkFilterComboGallery<T>
     protected CkFilterComboGallery(IReadOnlyList<T> items, Vector2 itemSize, ILogger log)
     {
         Items = items;
+        ItemSize = itemSize;
         Log = log;
         _available = [];
     }
@@ -225,10 +227,7 @@ public abstract class CkFilterComboGallery<T>
         // A child for the items, so that the filter remains visible.
         // Height is based on default combo height minus the filter input.
         var finalHeight = galleryHeight - ImGui.GetFrameHeight() - ImGui.GetStyle().WindowPadding.Y;
-        using var _ = CkRaii.Child("ChildGallery", new Vector2(innerWidth, finalHeight), wFlags: WFlags.NoScrollbar);
-        // Silly scaling :)
-        using var indent = ImRaii.PushIndent(ImGuiHelpers.GlobalScale);
-        
+        using var _ = CkRaii.Child("ChildGallery", new Vector2(innerWidth, finalHeight), wFlags: WFlags.NoScrollbar);      
         // Shift the scroll to the location of the item.
         if (_setScroll)
             ImGui.SetScrollFromPosY(_lastSelection * ItemSize.Y - ImGui.GetScrollY());
@@ -240,7 +239,7 @@ public abstract class CkFilterComboGallery<T>
     {
         var obj = Items[globalIdx];
         var name = ToString(obj);
-        return ImGui.Selectable(name, selected);
+        return ImGui.Button (name, ItemSize);
     }
 
     private void DrawItemInternal(int globalIdx, int localIdx)

@@ -15,7 +15,7 @@ using SundouleiaAPI.Network;
 namespace Sundouleia.Gui.Components;
 
 // Will likely remove this soon but is just a temporary migration from gspeak
-public class DrawSundesmoRequest
+public class DrawEntityRequest
 {
     private readonly MainHub _hub;
     private readonly SundesmoManager _sundesmos;
@@ -24,7 +24,7 @@ public class DrawSundesmoRequest
 
     private SundesmoRequest _entry;
     private bool _hovered = false;
-    public DrawSundesmoRequest(string id, SundesmoRequest requestEntry, MainHub hub, 
+    public DrawEntityRequest(string id, SundesmoRequest requestEntry, MainHub hub, 
         RequestsManager manager, SundesmoManager sundesmos)
     {
         _id = id;

@@ -28,8 +28,8 @@ public class RequestsTab : DisposableMediatorSubscriberBase
 
     private bool _hoveringIncoming = false;
     private bool _hoveringOutgoing = false;
-    private ImmutableList<DrawSundesmoRequest> _incoming;
-    private ImmutableList<DrawSundesmoRequest> _outgoing;
+    private ImmutableList<DrawEntityRequest> _incoming;
+    private ImmutableList<DrawEntityRequest> _outgoing;
 
     public RequestsTab(ILogger<RequestsTab> logger, SundouleiaMediator mediator,
         MainHub hub, GroupsConfig config, SundesmoManager sundesmos, RequestsManager requests) 
@@ -120,7 +120,7 @@ public class RequestsTab : DisposableMediatorSubscriberBase
 
     private void RecreateRequests()
     {
-        _incoming = _requests.Incoming.Select(r => new DrawSundesmoRequest(INCOMING_ID + r.User.UID + r.Target.UID, r, _hub, _requests, _sundesmos)).ToImmutableList();
-        _outgoing = _requests.Outgoing.Select(r => new DrawSundesmoRequest(OUTGOING_ID + r.User.UID + r.Target.UID, r, _hub, _requests, _sundesmos)).ToImmutableList();
+        _incoming = _requests.Incoming.Select(r => new DrawEntityRequest(INCOMING_ID + r.User.UID + r.Target.UID, r, _hub, _requests, _sundesmos)).ToImmutableList();
+        _outgoing = _requests.Outgoing.Select(r => new DrawEntityRequest(OUTGOING_ID + r.User.UID + r.Target.UID, r, _hub, _requests, _sundesmos)).ToImmutableList();
     }
 }

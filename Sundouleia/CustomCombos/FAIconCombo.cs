@@ -1,3 +1,4 @@
+using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using OtterGui.Text;
@@ -19,11 +20,17 @@ public sealed class FAIconCombo : CkFilterComboGalleryCache<FAI>
     protected override string ToString(FAI icon)
         => Enum.GetName(icon)?.ToLowerInvariant() ?? "unknown";
 
+    protected override bool DrawSelectable(int globalIdx, bool selected)
+    {
+        var icon = Items[globalIdx];
+        return CkGui.IconButton(icon, disabled: selected, inPopup: true);
+    }
+
     /// <summary> Simple draw invoke. </summary>
-    public bool Draw(string label, string preview, int iconsPerRow, CFlags flags = CFlags.None)
+    public bool Draw(string label, FAI preview, float comboWidth, int iconsPerRow, CFlags flags = CFlags.None)
     {
         ItemsPerRow = iconsPerRow;
-        return Draw(label, preview, iconsPerRow, flags);
+        return base.Draw($"##{label}", preview.ToIconString(), comboWidth, flags);
     }
 
     public bool DrawPopup(string label, int iconsPerRow, Vector2 drawPos, uint? searchBg = null)

@@ -210,6 +210,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<TransientCacheConfig>()
         .AddSingleton<ConfigFileProvider>()
         // Config Managers / Savers
+        .AddSingleton<GroupsManager>()
         .AddSingleton<AccountManager>()
         .AddSingleton<ServerConfigManager>()
         .AddSingleton<HybridSaveService>();

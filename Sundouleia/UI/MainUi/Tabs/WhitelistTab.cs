@@ -68,6 +68,7 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     /// </summary>
     public List<IDrawFolder> GetDrawFolders()
     {
+        Logger.LogDebug("Generating draw folders for whitelist tab with filter: " + _filter);
         List<IDrawFolder> drawFolders = [];
         // the list of all direct pairs.
         var allPairs = _sundesmos.DirectPairs;
@@ -110,19 +111,19 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         {
             var allVisiblePairs = ImmutablePairList(allPairs.Where(u => u.IsRendered && u.IsOnline));
             var filteredVisiblePairs = BasicSortedList(filteredPairs.Where(u => u.IsRendered && u.IsOnline));
-            drawFolders.Add(_factory.CreateDrawTagFolder(Constants.CustomVisibleTag, filteredVisiblePairs, allVisiblePairs));
+            drawFolders.Add(_factory.CreateDefaultFolder(Constants.CustomVisibleTag, filteredVisiblePairs, allVisiblePairs));
         }
 
         var allOnlinePairs = ImmutablePairList(allPairs.Where(FilterOnlineOrPausedSelf));
         var onlineFilteredPairs = BasicSortedList(filteredPairs.Where(u => u.IsOnline && FilterPairedOrPausedSelf(u)));
-        drawFolders.Add(_factory.CreateDrawTagFolder(_config.Current.ShowOfflineUsersSeparately ? Constants.CustomOnlineTag : Constants.CustomAllTag, onlineFilteredPairs, allOnlinePairs));
+        drawFolders.Add(_factory.CreateDefaultFolder(_config.Current.ShowOfflineUsersSeparately ? Constants.CustomOnlineTag : Constants.CustomAllTag, onlineFilteredPairs, allOnlinePairs));
 
         // if we want to show offline users separately,
         if (_config.Current.ShowOfflineUsersSeparately)
         {
             var allOfflinePairs = ImmutablePairList(allPairs.Where(FilterOfflineUsers));
             var filteredOfflinePairs = BasicSortedList(filteredPairs.Where(FilterOfflineUsers));
-            drawFolders.Add(_factory.CreateDrawTagFolder(Constants.CustomOfflineTag, filteredOfflinePairs, allOfflinePairs));
+            drawFolders.Add(_factory.CreateDefaultFolder(Constants.CustomOfflineTag, filteredOfflinePairs, allOfflinePairs));
         }
 
         return drawFolders;

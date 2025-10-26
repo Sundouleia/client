@@ -140,7 +140,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Notify other services.
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] rendered!", LoggerType.PairHandler);
         Mediator.Publish(new SundesmoPlayerRendered(this));
-        Mediator.Publish(new RefreshWhitelistMessage());
+        // Mediator.Publish(new RefreshWhitelistMessage());
         ReInitializeInternal().ConfigureAwait(false);
     }
 

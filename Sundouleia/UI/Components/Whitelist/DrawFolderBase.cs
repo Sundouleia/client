@@ -6,68 +6,56 @@ using Dalamud.Bindings.ImGui;
 using System.Collections.Immutable;
 using CkCommons.Raii;
 using Sundouleia.PlayerClient;
+using TerraFX.Interop.Windows;
+using CkCommons;
+using OtterGui.Text;
 
 namespace Sundouleia.Gui.Components;
 
-/// <summary> The base for the draw folder, a dropdown section in the list of paired users </summary>
+/// <summary>
+///     Base logic for drawn folders. Most if not all abstract draw logic is removed in order
+///     to improve draw time performance, as calls invoked for draws that are abstract rack up
+///     draw time quickly, especially when combined with interfaces. (learned this from CkRichText)
+/// </summary>
 public abstract class DrawFolderBase : IDrawFolder
 {
-    public IImmutableList<DrawUserPair> DrawPairs { get; init; }
-    protected readonly string _id;
-    protected readonly IImmutableList<Sundesmo> _allPairs;
-    protected readonly GroupsConfig _config;
+    protected readonly MainConfig _config;
+    protected readonly GroupsManager _manager;
 
-    private bool _wasHovered = false;
-    public int OnlinePairs => DrawPairs.Count(u => u.Pair.IsOnline);
-    public int TotalPairs => _allPairs.Count;
-    protected DrawFolderBase(string id, IImmutableList<DrawUserPair> drawPairs,
-        IImmutableList<Sundesmo> allPairs, GroupsConfig config)
+    protected bool _hovered;
+
+    // Required Stylization for all folders.
+    protected uint _colorBG = uint.MinValue;
+    protected uint _colorBorder = uint.MaxValue;
+
+    protected FAI _icon = FAI.Folder;
+    protected uint _iconColor = uint.MaxValue;
+
+    protected readonly string _label;
+    protected uint _labelColor = uint.MaxValue;
+
+    // Tracks all Sundesmos involved with this folder.
+    protected readonly IImmutableList<Sundesmo> _allSundesmos;
+
+    protected DrawFolderBase(string label, IImmutableList<DrawEntitySundesmo> drawEntities, 
+        IImmutableList<Sundesmo> allSundesmos, MainConfig config, GroupsManager manager)
     {
-        _id = id;
-        DrawPairs = drawPairs;
-        _allPairs = allPairs;
+        _label = label;
+        DrawEntities = drawEntities;
+        _allSundesmos = allSundesmos;
         _config = config;
+        _manager = manager;
     }
 
-    protected abstract bool RenderIfEmpty { get; }
+    // Interface satisfaction.
+    public int Total => _allSundesmos.Count;
+    public int Online => _allSundesmos.Count(s => s.IsOnline);
+    public IImmutableList<DrawEntitySundesmo> DrawEntities { get; init; }
 
-    public void Draw()
-    {
-        if (!RenderIfEmpty && !DrawPairs.Any())
-            return;
+    /// <summary>
+    ///     If this folder should be displayed when nobody in it is online.
+    /// </summary>
+    protected virtual bool RenderIfEmpty => true;
 
-        var expanded = _config.IsDefaultExpanded(_id);
-        using var id = ImRaii.PushId("folder_" + _id);
-        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
-        using (CkRaii.Child("folder__" + _id, size, _wasHovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0, 0f))
-        {
-            CkGui.FramedIconText(expanded ? FAI.CaretDown : FAI.CaretRight);
-
-            ImGui.SameLine();
-            var leftSideEnd = DrawIcon();
-
-            ImGui.SameLine();
-            var rightSideStart = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth() - ImGui.GetStyle().ItemSpacing.X;
-
-            // draw name
-            ImGui.SameLine(leftSideEnd);
-            DrawName(rightSideStart - leftSideEnd);
-        }
-        _wasHovered = ImGui.IsItemHovered();
-        if (ImGui.IsItemClicked())
-            _config.ToggleDefaultFolder(_id);
-
-        ImGui.Separator();
-        if (!expanded)
-            return;
-        // if opened draw content
-        using var indent = ImRaii.PushIndent(CkGui.IconSize(FAI.EllipsisV).X + ImGui.GetStyle().ItemSpacing.X, false);
-        foreach (var item in DrawPairs)
-            item.DrawPairedClient();
-        ImGui.Separator();
-    }
-
-    protected abstract float DrawIcon();
-
-    protected abstract void DrawName(float width);
+    public abstract void Draw();
 }
