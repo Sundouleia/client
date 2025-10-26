@@ -433,7 +433,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.PreferNicknamesOverNames = nickOverName;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshWhitelistMessage());
+            Mediator.Publish(new RefreshFoldersMessage());
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.PreferNicknamesTT);
 
@@ -441,7 +441,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.ShowVisibleUsersSeparately = sepVisibleUsers;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshWhitelistMessage());
+            Mediator.Publish(new RefreshFoldersMessage());
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.ShowVisibleSeparateTT);
 
@@ -449,7 +449,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.ShowOfflineUsersSeparately = sepOfflineUsers;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshWhitelistMessage());
+            Mediator.Publish(new RefreshFoldersMessage());
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.ShowOfflineSeparateTT);
 
@@ -464,7 +464,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.FocusTargetOverTarget = useFocusTarget;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshWhitelistMessage());
+            Mediator.Publish(new RefreshFoldersMessage());
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.FocusTargetTT);
     }

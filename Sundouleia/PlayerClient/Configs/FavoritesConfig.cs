@@ -22,7 +22,7 @@ public class FavoritesConfig : IHybridSavable
         Load();
     }
 
-    public readonly HashSet<string>  SundesmoUids = [];
+    public readonly HashSet<string>  SundesmoUids = new(StringComparer.Ordinal);
 
     public void Load()
     {

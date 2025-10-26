@@ -138,7 +138,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         _gameObject = null;
         // Refresh the list to reflect visible state.
         Logger.LogDebug($"Marking {Sundesmo.GetNickAliasOrUid()}'s {ObjectType} as unrendered @ [{address:X}]", LoggerType.PairHandler);
-        Mediator.Publish(new RefreshWhitelistMessage());
     }
 
     private async Task WaitUntilValidDrawObject(CancellationToken timeoutToken = default)

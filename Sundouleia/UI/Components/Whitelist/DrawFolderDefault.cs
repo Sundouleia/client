@@ -63,8 +63,8 @@ public class DrawFolderDefault : DrawFolderBase
 
     private string GetBracketText() => _label switch
     {
-        Constants.CustomAllTag => $"[{Online}]",
-        Constants.CustomVisibleTag => $"[{Online}]",
+        Constants.CustomAllTag => $"[{Total}]",
+        Constants.CustomVisibleTag => $"[{Rendered}]",
         Constants.CustomOnlineTag => $"[{Online}]",
         Constants.CustomOfflineTag => $"[{Total}]",
         _ => _label,
@@ -72,9 +72,9 @@ public class DrawFolderDefault : DrawFolderBase
 
     private string GetBracketTooltip() => _label switch
     {
-        Constants.CustomAllTag => $"{Online} online\n{Total} total",
-        Constants.CustomVisibleTag => $"{Online} online\n{Total} total",
-        Constants.CustomOnlineTag => $"{Online} online\n{Total} total",
+        Constants.CustomAllTag => $"{Total} total",
+        Constants.CustomVisibleTag => $"{Online} visible",
+        Constants.CustomOnlineTag => $"{Online} online",
         Constants.CustomOfflineTag => $"{Total} offline",
         _ => string.Empty,
     };
@@ -91,7 +91,6 @@ public class DrawFolderDefault : DrawFolderBase
         // pre-determine the size of the folder.
         var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
         var bgCol = _hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : _colorBG;
-        var rightWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconButtonSize(FAI.Filter).X + ImUtf8.ItemInnerSpacing.X * 2;
 
         // Draw framed child via CkRaii with background based on hover state 
         using (var _ = CkRaii.FramedChildPaddedW($"sundouleia_folder__{_label}", folderWidth, ImUtf8.FrameHeight, bgCol, _colorBorder, 5f, 1f))

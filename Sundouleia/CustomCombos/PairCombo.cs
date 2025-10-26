@@ -30,7 +30,7 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
         _favorites = favorites;
         SearchByParts = true;
 
-        Mediator.Subscribe<RefreshWhitelistMessage>(this, _ => _needsRefresh = true);
+        Mediator.Subscribe<RefreshFoldersMessage>(this, _ => _needsRefresh = true);
     }
 
     public SundouleiaMediator Mediator { get; }

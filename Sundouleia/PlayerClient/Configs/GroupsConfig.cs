@@ -3,12 +3,27 @@ using Sundouleia.Services.Configs;
 
 namespace Sundouleia.PlayerClient;
 
+// Can rearrange the order these are listed in the folder to adjust sort priority.
+public enum FolderSortFilter
+{
+    Rendered,       // Rendered sundesmos first.
+    Online,         // Online sundesmos first.
+    Alphabetical,   // Default behavior.
+    Temporary,      // Temporary sundesmos first.
+    // DateAdded,      // When the pair was established.
+    Favorite,      // Favorite sundesmos first.
+}
+
 public class GroupsStorage
 {
     public HashSet<string> OpenedDefaultFolders { get; set; } = new(StringComparer.Ordinal);
+    public HashSet<string> VisibleGroupFolders { get; set; } = new(StringComparer.Ordinal);
     public HashSet<string> OpenedGroupFolders { get; set; } = new(StringComparer.Ordinal);
     // could maybe revise this by comparing as a HashSet with a comparer override that goes by label.
     public List<SundesmoGroup> Groups { get; set; } = new();
+
+    // Cached sort order filters.
+    public List<FolderSortPreset> SortPresets { get; set; } = new();
 }
 
 public class SundesmoGroup
@@ -20,8 +35,11 @@ public class SundesmoGroup
     public uint LabelColor { get; set; } = 0xFFFFFFFF;
     public uint DescriptionColor { get; set; } = 0xFFFFFFFF;
     public bool ShowOffline { get; set; } = true;
+    public List<FolderSortFilter> SortOrder { get; set; } = new(); // Empty == Alphabetical
     public HashSet<string> LinkedUids { get; set; } = new();
 }
+
+public record FolderSortPreset(string Name, List<FolderSortFilter> SortFilters);
 
 public class GroupsConfig : IHybridSavable
 {

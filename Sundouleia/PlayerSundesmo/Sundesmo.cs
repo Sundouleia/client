@@ -9,6 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using OtterGui;
 using Sundouleia.Pairs.Factories;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
@@ -26,6 +27,8 @@ public class Sundesmo : IComparable<Sundesmo>
 {
     private readonly ILogger<Sundesmo> _logger;
     private readonly SundouleiaMediator _mediator;
+    private readonly MainConfig _config;
+    private readonly FavoritesConfig _favorites;
     private readonly ServerConfigManager _nickConfig;
     private readonly SundesmoHandlerFactory _factory;
     private readonly CharaObjectWatcher _watcher;
@@ -42,10 +45,13 @@ public class Sundesmo : IComparable<Sundesmo>
     private PlayerOwnedHandler _companion;
 
     public Sundesmo(UserPair userPairInfo, ILogger<Sundesmo> logger, SundouleiaMediator mediator,
-        SundesmoHandlerFactory factory, ServerConfigManager nicks, CharaObjectWatcher watcher)
+        MainConfig config, FavoritesConfig favorites, ServerConfigManager nicks,
+        SundesmoHandlerFactory factory, CharaObjectWatcher watcher)
     {
         _logger = logger;
         _mediator = mediator;
+        _config = config;
+        _favorites = favorites;
         _nickConfig = nicks;
         _watcher = watcher;
 
@@ -68,8 +74,9 @@ public class Sundesmo : IComparable<Sundesmo>
 
     // Internal Helpers
     public bool IsTemporary => UserPair.IsTemp;
-    public bool IsOnline => _onlineUser != null;
     public bool IsRendered => _player.IsRendered;
+    public bool IsOnline => _onlineUser != null;
+    public bool IsFavorite => _favorites.SundesmoUids.Contains(UserData.UID);
     public bool IsPaused => OwnPerms.PauseVisuals;
     public string Ident => _onlineUser?.Ident ?? string.Empty;
     public string PlayerName => _player.NameString;
@@ -106,6 +113,10 @@ public class Sundesmo : IComparable<Sundesmo>
         }]);
     }
 
+    public string? AlphabeticalSortKey()
+        => (IsRendered && !string.IsNullOrEmpty(PlayerName)
+            ? (_config.Current.PreferNicknamesOverNames ? GetNickAliasOrUid() : PlayerName)
+            : GetNickAliasOrUid());
     public string? GetNickname() => _nickConfig.GetNicknameForUid(UserData.UID);
     public string GetNickAliasOrUid() => GetNickname() ?? UserData.AliasOrUID;
 

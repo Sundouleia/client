@@ -1,14 +1,6 @@
-using CkCommons.Gui;
-using Dalamud.Interface.Utility.Raii;
 using Sundouleia.Pairs;
-using Sundouleia.Services.Configs;
-using Dalamud.Bindings.ImGui;
-using System.Collections.Immutable;
-using CkCommons.Raii;
 using Sundouleia.PlayerClient;
-using TerraFX.Interop.Windows;
-using CkCommons;
-using OtterGui.Text;
+using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.Components;
 
@@ -50,6 +42,7 @@ public abstract class DrawFolderBase : IDrawFolder
     // Interface satisfaction.
     public int Total => _allSundesmos.Count;
     public int Online => _allSundesmos.Count(s => s.IsOnline);
+    public int Rendered => _allSundesmos.Count(s => s.IsRendered);
     public IImmutableList<DrawEntitySundesmo> DrawEntities { get; init; }
 
     /// <summary>

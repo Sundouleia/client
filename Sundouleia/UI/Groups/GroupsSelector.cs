@@ -35,7 +35,7 @@ public class GroupsSelector : DisposableMediatorSubscriberBase
         _sundesmos = sundesmos;
 
         // Should become refresh groups or something i dont know.
-        Mediator.Subscribe<RefreshWhitelistMessage>(this, _ => UpdatePairList());
+        Mediator.Subscribe<RefreshFoldersMessage>(this, _ => UpdatePairList());
     }
 
     private ImmutableList<Sundesmo>  _immutablePairs = ImmutableList<Sundesmo>.Empty;

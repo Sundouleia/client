@@ -117,13 +117,10 @@ public abstract class CkFilterComboGallery<T>
 
             // Updates the filter to have the correct _available indexes.
             UpdateFilter();
-
             var innerWidth = GetInnerWidth();
-
             // Draws the filter and updates the scroll to the selected items.
             DrawFilter(currentSelected, innerWidth, customSearchBg);
             // grab the filter height for reference incase the list uses custom height.
-
             var resHeight = ItemSize.Y * 12;
             // If any items are selected, they are stored in `NewSelection`.
             // `NewSelection` is cleared at the end of the parent DrawFunction.

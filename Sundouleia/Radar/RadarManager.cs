@@ -35,7 +35,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         _sundesmos = sundesmos;
         _watcher = watcher;
 
-        Mediator.Subscribe<RefreshWhitelistMessage>(this, _ => RecreateLists());
+        Mediator.Subscribe<RefreshFoldersMessage>(this, _ => { if (_.Whitelist) RecreateLists(); });
     }
 
     public IReadOnlyCollection<RadarUser> AllUsers => _users;

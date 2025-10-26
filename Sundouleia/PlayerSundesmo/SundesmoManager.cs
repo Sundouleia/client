@@ -268,7 +268,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     private void RecreateLazy()
     {
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
-        Mediator.Publish(new RefreshWhitelistMessage());
+        Mediator.Publish(new RefreshFoldersMessage(true, true, false));
+
     }
 
     #region Manager Helpers

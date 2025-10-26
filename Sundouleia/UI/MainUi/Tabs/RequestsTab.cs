@@ -42,7 +42,7 @@ public class RequestsTab : DisposableMediatorSubscriberBase
 
         RecreateRequests();
 
-        Mediator.Subscribe<RefreshRequestsMessage>(this, _ => RecreateRequests());
+        Mediator.Subscribe<RefreshFoldersMessage>(this, _ => { if (_.Requests) RecreateRequests(); });
     }
 
     public void DrawRequestsSection()

@@ -223,6 +223,7 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Components
         .AddScoped<ProfileHelper>()
+        .AddScoped<FolderHandler>()
         .AddScoped<UiFileCacheShared>()
 
         // Scoped Factories

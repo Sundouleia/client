@@ -51,6 +51,7 @@ public class ConfigStorage
     public int TransferBarWidth { get; set; } = 250;
 
     // Preferences - Pairs
+    public bool FavoritesFirst { get; set; } = true;
     public bool PreferNicknamesOverNames { get; set; } = false;
     public bool ShowVisibleUsersSeparately { get; set; } = true;
     public bool ShowOfflineUsersSeparately { get; set; } = true;

@@ -32,7 +32,7 @@ public sealed class RequestsManager
         _incomingRequests = allRequests.Where(r => r.Target.UID == MainHub.UID).ToList();
         _outgoingRequests = allRequests.Where(r => r.User.UID == MainHub.UID).ToList();
         _logger.LogDebug($"Loaded {_incomingRequests.Count} incoming and {_outgoingRequests.Count} outgoing requests", LoggerType.PairManagement);
-        _mediator.Publish(new RefreshRequestsMessage());
+        _mediator.Publish(new RefreshFoldersMessage(false, false, true));
     }
 
     public void AddRequest(SundesmoRequest request)
@@ -47,7 +47,7 @@ public sealed class RequestsManager
             _outgoingRequests.Add(request);
             _logger.LogDebug($"Added outgoing request", LoggerType.PairManagement);
         }
-        _mediator.Publish(new RefreshRequestsMessage());
+        _mediator.Publish(new RefreshFoldersMessage(false, false, true));
     }
 
     public void RemoveRequest(SundesmoRequest request)
@@ -62,6 +62,6 @@ public sealed class RequestsManager
             _outgoingRequests.Remove(request);
             _logger.LogDebug($"Removed outgoing request", LoggerType.PairManagement);
         }
-        _mediator.Publish(new RefreshRequestsMessage());
+        _mediator.Publish(new RefreshFoldersMessage(false, false, true));
     }
 }

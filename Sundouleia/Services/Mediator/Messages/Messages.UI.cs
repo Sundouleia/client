@@ -20,8 +20,7 @@ public enum ToggleType
 /// </summary>
 public record TogglePermissionWindow(Sundesmo Sundesmo) : MessageBase;
 
-public record RefreshWhitelistMessage : MessageBase;
-public record RefreshRequestsMessage : MessageBase;
+public record RefreshFoldersMessage(bool Whitelist = true, bool Groups = true, bool Requests = true) : MessageBase;
 
 /// <summary> Basic UI Toggle </summary>
 public record UiToggleMessage(Type UiType, ToggleType ToggleType = ToggleType.Toggle) : MessageBase;

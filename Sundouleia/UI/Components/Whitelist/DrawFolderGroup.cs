@@ -1,4 +1,3 @@
-using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
@@ -8,10 +7,7 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using System.Collections.Immutable;
-using TerraFX.Interop.Windows;
-using static FFXIVClientStructs.FFXIV.Client.UI.Misc.GroupPoseModule;
 
 namespace Sundouleia.Gui.Components;
 
@@ -31,8 +27,7 @@ public class DrawFolderGroup : DrawFolderBase
         _icon = group.Icon;
         _iconColor = group.IconColor;
         _colorBG = uint.MinValue;
-        _colorBorder = uint.MaxValue;
-
+        _colorBorder = ImGui.GetColorU32(ImGuiCol.TextDisabled);
         _showOffline = group.ShowOffline;
     }
 
@@ -51,7 +46,7 @@ public class DrawFolderGroup : DrawFolderBase
         var rightWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconButtonSize(FAI.Filter).X + ImUtf8.ItemInnerSpacing.X * 2;
 
         // Draw framed child via CkRaii with background based on hover state 
-        using (var _ = CkRaii.FramedChildPaddedW($"sundouleia_folder_group__{_label}", folderWidth, ImUtf8.FrameHeight, bgCol, _colorBorder, 5f, 2f))
+        using (var _ = CkRaii.FramedChildPaddedW($"sundouleia_folder_group__{_label}", folderWidth, ImUtf8.FrameHeight, bgCol, _colorBorder, 5f, 1f))
         {
             using (ImRaii.Group())
             {

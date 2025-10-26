@@ -66,6 +66,9 @@ public class GroupsManager
         _config.Save();
     }
 
+    public IEnumerable<string> ActiveGroups()
+        => Config.Groups.Where(g => g.LinkedUids.Count > 0).Select(g => g.Label);
+
     public void ToggleState(SundesmoGroup group)
     {
         if (!Config.OpenedGroupFolders.Remove(group.Label))

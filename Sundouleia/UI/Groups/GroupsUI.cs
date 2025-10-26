@@ -1,26 +1,18 @@
 using CkCommons;
-using CkCommons.FileSystem;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
-using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui;
-using OtterGui.Tasks;
 using OtterGui.Text;
-using OtterGui.Widgets;
 using Sundouleia.CustomCombos;
-using Sundouleia.Interop;
-using Sundouleia.ModFiles;
+using Sundouleia.Gui.Handlers;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
-using System.Xml.Linq;
-using static FFXIVClientStructs.FFXIV.Client.UI.Misc.GroupPoseModule;
 
 namespace Sundouleia.Gui;
 
@@ -28,17 +20,19 @@ public class GroupsUI : WindowMediatorSubscriberBase
 {
     private readonly GroupsSelector _selector;
     private readonly GroupsManager _manager;
+    private readonly FolderHandler _drawFolders;
     private readonly TutorialService _guides;
 
     private FAIconCombo _iconGalleryCombo;
 
     private SundesmoGroup? _editingGroup = null;
     public GroupsUI(ILogger<GroupsUI> logger, SundouleiaMediator mediator, GroupsSelector selector,
-        GroupsManager manager, TutorialService guides) 
+        GroupsManager manager, FolderHandler handler, TutorialService guides) 
         : base(logger, mediator, "Group Manager###Sundouleia_GroupUI")
     {
         _selector = selector;
         _manager = manager;
+        _drawFolders = handler;
         _guides = guides;
 
         _iconGalleryCombo = new FAIconCombo(logger);
@@ -73,31 +67,8 @@ public class GroupsUI : WindowMediatorSubscriberBase
         ImGui.Separator();
         CkGui.FontText("Existing Groups", UiFontService.UidFont);
 
-        foreach (var group in _manager.Config.Groups)
-            DrawGroupFolderPreview(group, _manager.IsOpen(group));
-    }
-
-    private void DrawGroupFolderPreview(SundesmoGroup folder, bool opened)
-    {
-        using var id = ImRaii.PushId($"CkFileSystem-Folder-{folder.Label}");
-        var clicked = false;
-        // must be a valid drag drop source, so use invisible button.
-        clicked = ImGui.InvisibleButton("##GroupFolderButton", new Vector2(ImGui.GetContentRegionAvail().X, ImGui.GetFrameHeightWithSpacing()));
-        var min = ImGui.GetItemRectMin();
-        var max = ImGui.GetItemRectMax();
-        var bgCol = ImGui.IsItemHovered() ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : CkGui.Color(new Vector4(0.3f, 0.3f, 0.3f, 0.3f));
-        ImGui.GetWindowDrawList().AddRectFilled(min, max, bgCol, 5);
-        ImGui.GetWindowDrawList().AddRect(min - ImGuiHelpers.ScaledVector2(ImGuiHelpers.GlobalScale * 2), max + ImGuiHelpers.ScaledVector2(ImGuiHelpers.GlobalScale * 2), 0xFFFFFFFF, 5);
-
-        // Then the actual items.
-        ImGui.SetCursorScreenPos(min with { X = min.X + ImGuiHelpers.GlobalScale * 2 });
-        CkGui.FramedIconText(opened ? FontAwesomeIcon.CaretDown : FontAwesomeIcon.CaretRight);
-        CkGui.FrameSeparatorV();
-        CkGui.FramedIconText(folder.Icon, folder.IconColor);
-        CkGui.ColorTextFrameAlignedInline(folder.Label, folder.LabelColor);
-
-        if (clicked)
-            _manager.ToggleState(folder);
+        foreach (var group in _drawFolders.GroupFolders)
+            group.Draw();
     }
 
     private void DrawGroupEditor()

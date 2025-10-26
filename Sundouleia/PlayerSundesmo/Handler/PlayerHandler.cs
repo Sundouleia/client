@@ -120,7 +120,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) is already rendered, reapplying alterations.", LoggerType.PairHandler);
             Mediator.Publish(new SundesmoPlayerRendered(this));
-            Mediator.Publish(new RefreshWhitelistMessage());
+            Mediator.Publish(new RefreshFoldersMessage(true, true, false));
             await ReInitializeInternal().ConfigureAwait(false);
         }
         else if (_watcher.TryGetExisting(this, out IntPtr playerAddr))
@@ -140,7 +140,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Notify other services.
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] rendered!", LoggerType.PairHandler);
         Mediator.Publish(new SundesmoPlayerRendered(this));
-        // Mediator.Publish(new RefreshWhitelistMessage());
         ReInitializeInternal().ConfigureAwait(false);
     }
 
@@ -174,7 +173,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Sundesmo.TriggerTimeoutTask();
         // Refresh the list to reflect visible state.
         Logger.LogDebug($"Marking {Sundesmo.GetNickAliasOrUid()} as unrendered @ [{address:X}]", LoggerType.PairHandler);
-        Mediator.Publish(new RefreshWhitelistMessage());
+        Mediator.Publish(new RefreshFoldersMessage(true, true, false));
     }
 
     // Faze out as we move to watcher.
