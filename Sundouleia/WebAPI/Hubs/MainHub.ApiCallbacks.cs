@@ -120,6 +120,16 @@ public partial class MainHub
     }
 
     /// <summary>
+    ///     Change a temporary sundesmo to a permanent one.
+    /// </summary>
+    public Task Callback_PersistPair(UserDto dto)
+    {
+        Logger.LogDebug($"Callback_UpdatePairToPermanent: {dto}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.UpdateToPermanent(dto));
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     ///     That there is a new pending request to add to the requests manager. <para />
     ///     Note that request sent by ourselves is not returned here, this callback
     ///     is only for requests sent by others. We can safely assume all requests 
@@ -373,6 +383,12 @@ public partial class MainHub
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_RemovePair), act);
+    }
+
+    public void OnPersistPair(Action<UserDto> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_PersistPair), act);
     }
 
     public void OnAddRequest(Action<SundesmoRequest> act)

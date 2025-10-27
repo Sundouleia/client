@@ -91,6 +91,12 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRemovePair), dto).ConfigureAwait(false);
     }
 
+    public async Task<HubResponse> UserPersistPair(UserDto dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPersistPair), dto).ConfigureAwait(false);
+    }
+
     public async Task<HubResponse> UserBlock(UserDto dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;

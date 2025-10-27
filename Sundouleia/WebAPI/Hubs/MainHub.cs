@@ -171,6 +171,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
 
         OnAddPair(dto => _ = Callback_AddPair(dto));
         OnRemovePair(dto => _ = Callback_RemovePair(dto));
+        OnPersistPair(dto => _ = Callback_PersistPair(dto)); 
         OnAddRequest(dto => _ = Callback_AddRequest(dto));
         OnRemoveRequest(dto => _ = Callback_RemoveRequest(dto));
 

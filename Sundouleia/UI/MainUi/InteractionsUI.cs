@@ -131,11 +131,24 @@ public class InteractionsUI : WindowMediatorSubscriberBase
 
     private void DrawPairOptions(float width)
     {
-        using (ImRaii.Disabled(!_sundesmo!.IsTemporary))
-            if (CkGui.IconTextButton(FAI.Link, "Convert To Non-Temporary", width, true, !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
-                _logger.LogInformation("This would convert the temporary pair to a non-temporary pair.");
-        CkGui.AttachToolTip($"Makes a temporary pair non-temporary." +
-            $"--SEP--Can only be done by the temporary pair request accepter.");
+        if (_sundesmo!.IsTemporary)
+        {
+            var blockButton = _sundesmo.UserPair.TempAccepterUID != MainHub.UID;
+            if (CkGui.IconTextButton(FAI.Link, "Convert To Non-Temporary", width, true, blockButton || !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
+                UiService.SetUITask(async () =>
+                {
+                    var res = await _hub.UserPersistPair(new(_sundesmo.UserData));
+                    if (res.ErrorCode is not SundouleiaApiEc.Success)
+                        _logger.LogWarning($"Failed to convert temporary pair for {_sundesmo.GetNickAliasOrUid()}. Reason: {res.ErrorCode}");
+                    else
+                    {
+                        _logger.LogInformation($"Successfully converted temporary pair for {_sundesmo.GetNickAliasOrUid()}.");
+                        _sundesmo.MarkAsPermanent();
+                    }
+                });
+            CkGui.AttachToolTip($"Makes a temporary pair non-temporary." +
+                $"--SEP--Can only be done by the temporary pair request accepter.");
+        }
 
         if (CkGui.IconTextButton(FAI.Trash, $"Remove {_dispName} from your Pairs", width, true, !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
             UiService.SetUITask(async () => await _hub.UserRemovePair(new(_sundesmo.UserData)));
@@ -168,9 +181,7 @@ public class InteractionsUI : WindowMediatorSubscriberBase
             UiService.SetUITask(async () =>
             {
                 if (await ChangeOwnUnique(permName, !current).ConfigureAwait(false))
-                {
-                    _logger.LogInformation($"Successfully changed own permission {permName} to {!current} for {_sundesmo.GetNickAliasOrUid()}.");
-                }
+                    _logger.LogInformation($"Successfully changed own permission {permName} to {!current} for {sundesmo.GetNickAliasOrUid()}.");
             });
         }
 

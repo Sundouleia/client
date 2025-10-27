@@ -66,14 +66,14 @@ public class Sundesmo : IComparable<Sundesmo>
     public bool IsReloading { get; private set; } = false;
 
     // Associated ServerData.
-    public UserPair UserPair { get; init; }
+    public UserPair UserPair { get; private set; }
     public UserData UserData => UserPair.User;
     public PairPerms OwnPerms => UserPair.OwnPerms;
     public GlobalPerms PairGlobals => UserPair.Globals;
     public PairPerms PairPerms => UserPair.Perms;
 
     // Internal Helpers
-    public bool IsTemporary => UserPair.IsTemp;
+    public bool IsTemporary => UserPair.IsTemporary;
     public bool IsRendered => _player.IsRendered;
     public bool IsOnline => _onlineUser != null;
     public bool IsFavorite => _favorites.SundesmoUids.Contains(UserData.UID);
@@ -220,6 +220,18 @@ public class Sundesmo : IComparable<Sundesmo>
         _onlineUser = null;
         TriggerTimeoutTask();
         _mediator.Publish(new SundesmoOffline(this));
+    }
+
+    public void MarkAsPermanent()
+    {
+        if (!UserPair.IsTemporary)
+        {
+            _logger.LogWarning($"Attempted to update a temporary sundesmo [{PlayerName}] ({GetNickAliasOrUid()}) to permanent, but they are already permanent.", LoggerType.PairManagement);
+            return;
+        }
+        // Update the status to non-temporary.
+        UserPair = UserPair with { TempAccepterUID = string.Empty };
+        _logger.LogInformation($"Sundesmo [{PlayerName}] ({GetNickAliasOrUid()}) has been updated to permanent.", LoggerType.PairManagement);
     }
 
     /// <summary>
