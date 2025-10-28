@@ -1,5 +1,4 @@
 using Sundouleia.Gui.Components;
-using Sundouleia.Pairs;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 

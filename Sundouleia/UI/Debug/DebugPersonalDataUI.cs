@@ -1,19 +1,15 @@
 using CkCommons;
 using CkCommons.Gui;
-using CkCommons.Textures;
 using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Common.Lua;
 using OtterGui;
-using OtterGui.Extensions;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
-using SundouleiaAPI.Data.Permissions;
 using System.Collections.Immutable;
 
 namespace Sundouleia.Gui;

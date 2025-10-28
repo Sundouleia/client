@@ -5,7 +5,6 @@ using Sundouleia.Gui;
 using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using System.Reflection;
 

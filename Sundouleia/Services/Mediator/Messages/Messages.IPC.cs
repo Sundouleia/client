@@ -1,5 +1,3 @@
-using Sundouleia.Pairs;
-
 namespace Sundouleia.Services.Mediator;
 
 // Useful for IPC-Updates, but may also become irrelevant once we get proper watchers / services / listeners hooked up for changes.

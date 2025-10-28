@@ -10,7 +10,6 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
-using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
 
 namespace Sundouleia.Gui.Profiles;

@@ -4,7 +4,6 @@ using Dalamud.Interface.ImGuiNotification;
 using Glamourer.Api.Enums;
 using Glamourer.Api.Helpers;
 using Glamourer.Api.IpcSubscribers;
-using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Interop;

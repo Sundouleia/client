@@ -6,20 +6,13 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
-using Microsoft.IdentityModel.Tokens;
 using OtterGui;
 using Penumbra.Api.IpcSubscribers;
 using Sundouleia.Interop;
-using Sundouleia.Localization;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using SundouleiaAPI.Data;
-using TerraFX.Interop.Windows;
-using static FFXIVClientStructs.FFXIV.Component.GUI.AtkTimer.Delegates;
-using static Lumina.Data.Files.ScdFile;
 
 namespace Sundouleia.ModFiles;
 

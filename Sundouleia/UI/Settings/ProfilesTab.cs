@@ -1,7 +1,6 @@
 using CkCommons;
 using CkCommons.Classes;
 using CkCommons.Gui;
-using CkCommons.Helpers;
 using CkCommons.Raii;
 using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
@@ -10,17 +9,10 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui;
 using OtterGui.Text;
-using OtterGui.Text.EndObjects;
-using Sundouleia.Localization;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
-using System.Drawing;
-using System.Threading;
-using TerraFX.Interop.Windows;
-using static FFXIVClientStructs.FFXIV.Client.UI.Misc.GroupPoseModule;
 
 namespace Sundouleia.Gui;
 

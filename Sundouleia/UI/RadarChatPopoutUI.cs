@@ -7,7 +7,6 @@ using OtterGui.Text;
 using Sundouleia.Radar.Chat;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 

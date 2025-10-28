@@ -1,5 +1,4 @@
 using CkCommons;
-using CkCommons.Raii;
 using Dalamud.Hooking;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
@@ -7,9 +6,7 @@ using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
-using SundouleiaAPI.Network;
 using System.Diagnostics.CodeAnalysis;
-using static Lumina.Data.Parsing.Layer.LayerCommon;
 
 namespace Sundouleia.Watchers;
 

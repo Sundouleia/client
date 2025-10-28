@@ -1,15 +1,6 @@
 using CkCommons;
-using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
-using FFXIVClientStructs.FFXIV.Client.Game;
-using FFXIVClientStructs.FFXIV.Client.Game.Control;
-using FFXIVClientStructs.FFXIV.Client.Game.Event;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using FFXIVClientStructs.FFXIV.Client.UI;
-using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Microsoft.Extensions.Hosting;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Services;

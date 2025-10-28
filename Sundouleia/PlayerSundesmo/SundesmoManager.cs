@@ -13,7 +13,6 @@ using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
 using SundouleiaAPI.Util;
 using System.Diagnostics.CodeAnalysis;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Pairs;
 

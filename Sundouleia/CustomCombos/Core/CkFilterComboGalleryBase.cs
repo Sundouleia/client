@@ -2,11 +2,9 @@ using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
 using OtterGui.Classes;
 using OtterGui.Raii;
 using OtterGui.Text;
-using OtterGui.Text.EndObjects;
 
 // Credit to OtterGui for the original implementation.
 namespace Sundouleia.CustomCombos;

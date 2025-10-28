@@ -5,7 +5,6 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
-using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
 

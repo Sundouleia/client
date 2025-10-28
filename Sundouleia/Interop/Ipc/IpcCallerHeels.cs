@@ -1,5 +1,4 @@
 using Dalamud.Plugin.Ipc;
-using Sundouleia.Pairs;
 
 namespace Sundouleia.Interop;
 

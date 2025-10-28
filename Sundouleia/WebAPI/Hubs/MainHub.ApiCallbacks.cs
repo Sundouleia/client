@@ -3,7 +3,6 @@ using Dalamud.Interface.ImGuiNotification;
 using Microsoft.AspNetCore.SignalR.Client;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Utils;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.WebAPI;

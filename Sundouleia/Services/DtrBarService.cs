@@ -1,6 +1,5 @@
 using CkCommons;
 using Dalamud.Game.Gui.Dtr;
-using Dalamud.Plugin.Services;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;

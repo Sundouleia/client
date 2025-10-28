@@ -13,8 +13,6 @@ using Sundouleia.Utils;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
-using System.Xml.Linq;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Pairs;
 

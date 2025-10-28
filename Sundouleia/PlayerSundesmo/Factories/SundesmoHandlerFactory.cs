@@ -1,7 +1,5 @@
-using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
-using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;

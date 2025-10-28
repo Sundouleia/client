@@ -1,6 +1,5 @@
 using Dalamud.Interface.ImGuiNotification;
 using Sundouleia.Services.Events;
-using SundouleiaAPI.Network;
 
 namespace Sundouleia.Services.Mediator;
 

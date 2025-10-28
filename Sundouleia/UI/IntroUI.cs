@@ -6,7 +6,6 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using OtterGui.Custom;
 using OtterGui.Text;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;

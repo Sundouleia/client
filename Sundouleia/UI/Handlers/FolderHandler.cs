@@ -3,7 +3,6 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 
 namespace Sundouleia.Gui.Handlers;
 

@@ -1,4 +1,3 @@
-using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -10,7 +9,6 @@ using Sundouleia.Radar.Chat;
 using Sundouleia.Services;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.WebAPI;
-using System.Linq.Expressions;
 
 namespace Sundouleia.Gui.MainWindow;
 

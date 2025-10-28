@@ -1,8 +1,6 @@
 using CkCommons.Gui;
-using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using OtterGui.Text;
-using System.Drawing;
 
 namespace Sundouleia.CustomCombos;
 

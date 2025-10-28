@@ -1,6 +1,5 @@
 using CkCommons;
 using Dalamud.Interface.ImGuiNotification;
-using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;

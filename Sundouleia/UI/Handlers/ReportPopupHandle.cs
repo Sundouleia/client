@@ -5,7 +5,6 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using OtterGui;
 using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
@@ -13,7 +12,6 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
-using static FFXIVClientStructs.FFXIV.Client.UI.Misc.GroupPoseModule;
 
 namespace Sundouleia.Gui.Components;
 

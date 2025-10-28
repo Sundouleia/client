@@ -1,7 +1,5 @@
 using Dalamud.Plugin.Ipc;
-using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Interop;
 

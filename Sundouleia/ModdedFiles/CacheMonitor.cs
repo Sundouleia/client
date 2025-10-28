@@ -1,12 +1,9 @@
 ﻿using CkCommons;
-using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles.Cache;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModFiles;
 

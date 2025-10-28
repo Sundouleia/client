@@ -10,7 +10,6 @@ global using System.Text;
 global using System.Numerics;
 global using SundouleiaAPI.Enums;
 global using SundouleiaAPI;
-global using ITFlags = Dalamud.Bindings.ImGui.ImGuiInputTextFlags;
 global using CFlags = Dalamud.Bindings.ImGui.ImGuiComboFlags;
 global using WFlags = Dalamud.Bindings.ImGui.ImGuiWindowFlags;
 global using FAI = Dalamud.Interface.FontAwesomeIcon;
