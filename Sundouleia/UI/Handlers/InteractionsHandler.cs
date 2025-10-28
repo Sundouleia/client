@@ -72,10 +72,6 @@ public class InteractionsHandler : DisposableMediatorSubscriberBase
         var id = ImGui.GetID(PopupLabel);
         if (!popup)
             return;
-
-        Logger.LogInformation($"Drawing interactions popup {PopupLabel} for {_sundesmo.GetNickAliasOrUid()}.");
-
-
         // Otherwise draw out the contents and stuff.
         DrawContentsInternal();
     }
