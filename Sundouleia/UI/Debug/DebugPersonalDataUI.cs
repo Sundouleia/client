@@ -28,7 +28,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
         _config = config;
         _pairs = pairs;
         // Ensure the list updates properly.
-        Mediator.Subscribe<RefreshFoldersMessage>(this, _ => { if (_.Whitelist) UpdateList(); });
+        Mediator.Subscribe<RefreshFolders>(this, _ => { if (_.Whitelist) UpdateList(); });
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
     }
 

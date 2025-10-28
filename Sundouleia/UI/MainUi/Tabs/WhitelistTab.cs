@@ -1,4 +1,3 @@
-using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Gui.Utility;
 using CkCommons.Raii;
@@ -7,13 +6,10 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
-using Sundouleia.Gui.Components;
 using Sundouleia.Gui.Handlers;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
-using System.Collections.Immutable;
-using static FFXIVClientStructs.FFXIV.Component.Completion.CompletionModule.Delegates;
 
 namespace Sundouleia.Gui.MainWindow;
 

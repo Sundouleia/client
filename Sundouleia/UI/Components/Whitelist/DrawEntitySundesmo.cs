@@ -1,22 +1,22 @@
 using CkCommons.Gui;
+using CkCommons.Raii;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using OtterGui.Text;
 using Sundouleia.Gui.Handlers;
+using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
-using Sundouleia.WebAPI;
-using Dalamud.Bindings.ImGui;
-using OtterGui.Text;
-using CkCommons.Raii;
-using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Gui.Components;
 public class DrawEntitySundesmo
 {
     private readonly SundouleiaMediator _mediator;
-    private readonly MainHub _hub;
     private readonly FavoritesConfig _favorites;
+    private readonly InteractionsHandler _interactions;
     private readonly IdDisplayHandler _nameHandler;
 
     /// <summary>
@@ -26,13 +26,13 @@ public class DrawEntitySundesmo
     private bool _hovered = false;
     private Sundesmo _sundesmo;
     public DrawEntitySundesmo(string id, Sundesmo sundesmo, SundouleiaMediator mediator, 
-        MainHub hub, FavoritesConfig favorites, IdDisplayHandler nameDisp)
+        FavoritesConfig favorites, InteractionsHandler interactions, IdDisplayHandler nameDisp)
     {
         _id = id;
         _sundesmo = sundesmo;
         _mediator = mediator;
-        _hub = hub;
         _favorites = favorites;
+        _interactions = interactions;
         _nameHandler = nameDisp;
     }
 
@@ -53,7 +53,7 @@ public class DrawEntitySundesmo
             var posX = ImGui.GetCursorPosX();
             var rightSide = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth() - CkGui.IconButtonSize(FAI.EllipsisV).X;
             rightSide = DrawRightSide();
-            selected = DrawName(posX, rightSide);            
+            selected = DrawName(posX, rightSide);
         }
         _hovered = ImGui.IsItemHovered();
         // if they were a supporter, go back to the start and draw the image.
@@ -115,12 +115,14 @@ public class DrawEntitySundesmo
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         if (CkGui.IconButton(FAI.ChevronRight, inPopup: true))
-            _mediator.Publish(new TogglePermissionWindow(_sundesmo));
+            _interactions.OpenSundesmoInteractions(_sundesmo);
 
         currentRightSide -= interactionsSize.X;
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         SundouleiaEx.DrawFavoriteStar(_favorites, _sundesmo.UserData.UID, true);
+
+        _interactions.DrawIfOpen(_sundesmo);
 
         return currentRightSide;
     }

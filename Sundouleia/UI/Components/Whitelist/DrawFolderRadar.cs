@@ -9,77 +9,67 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.Components;
 
 /// <summary>
-///     The Draw Folders used by Sundouleia by default. (Visible, Online, Offline)
+///     Attempting to test a new iteration of draw folders with a LazyGeneration for recalculation on radar users.
 /// </summary>
-public class DrawFolderDefault : DrawFolderBase
+public class DrawFolderRadar : IRadarFolder
 {
-    public DrawFolderDefault(string label, IImmutableList<DrawEntitySundesmo> drawEntities,
-        IImmutableList<Sundesmo> allSundesmos, MainConfig config, GroupsManager manager)
-        : base(label, drawEntities, allSundesmos, config, manager)
+    protected readonly MainConfig _config;
+    protected readonly GroupsManager _manager;
+
+    protected bool _hovered;
+
+    // Required Stylization for all folders.
+    protected uint _colorBG = uint.MinValue;
+    protected uint _colorBorder = uint.MaxValue;
+
+    protected FAI _icon = FAI.Folder;
+    protected uint _iconColor = uint.MaxValue;
+
+    protected readonly string _label;
+    protected uint _labelColor = uint.MaxValue;
+
+    // Tracks all Sundesmos involved with this folder.
+    private readonly List<RadarUser> _allUsers;
+    private readonly Func<List<RadarUser>, IImmutableList<DrawEntityRadarUser>> _lazyGen;
+
+    public DrawFolderRadar(string label,
+        List<RadarUser> allUsers, // Could add a second generator for this to make it truly dynamic but eh.
+        Func<List<RadarUser>, IImmutableList<DrawEntityRadarUser>> lazyGen,
+        MainConfig config,
+        GroupsManager manager)
     {
+        _label = label;
+        _allUsers = allUsers;
+        _lazyGen = lazyGen;
+        _config = config;
+        _manager = manager;
+
+        DrawEntities = _lazyGen(_allUsers);
+
         // Globals.
+        _icon = label == Constants.FolderTagRadarPaired ? FAI.Link : FAI.SatelliteDish;
+        _iconColor = uint.MaxValue;
         _labelColor = uint.MaxValue;
         _colorBG = uint.MinValue;
         _colorBorder = ImGui.GetColorU32(ImGuiCol.TextDisabled);
-        // Label specific.
-        switch (label)
-        {
-            case Constants.FolderTagAll:
-                _icon = FAI.Globe;
-                _iconColor = uint.MaxValue;
-                break;
-            case Constants.FolderTagVisible:
-                _icon = FAI.Eye;
-                _iconColor = CkColor.TriStateCheck.Uint();
-                break;
-            case Constants.FolderTagOnline:
-                _icon = FAI.Link;
-                _iconColor = CkColor.TriStateCheck.Uint();
-                break;
-            case Constants.FolderTagOffline:
-                _icon = FAI.Link;
-                _iconColor = CkColor.TriStateCross.Uint();
-                break;
-            default:
-                _icon = FAI.Folder;
-                _iconColor = uint.MaxValue;
-                break;
-        }
     }
 
-    protected override bool RenderIfEmpty => _label switch
-    {
-        Constants.FolderTagAll => true, 
-        Constants.FolderTagVisible => false,
-        Constants.FolderTagOnline => false,
-        Constants.FolderTagOffline => false,
-        _ => false,
-    };
+    // Interface satisfaction.
+    public int Total => _allUsers.Count;
+    public int Rendered => _allUsers.Count(s => s.IsValid);
+    public int Lurkers => _allUsers.Count(s => !s.IsValid);
+    private bool RenderIfEmpty => _label == Constants.FolderTagRadarUnpaired;
+    public IImmutableList<DrawEntityRadarUser> DrawEntities { get; private set; }
 
-    private string GetBracketText() => _label switch
-    {
-        Constants.FolderTagAll => $"[{Total}]",
-        Constants.FolderTagVisible => $"[{Rendered}]",
-        Constants.FolderTagOnline => $"[{Online}]",
-        Constants.FolderTagOffline => $"[{Total}]",
-        _ => _label,
-    };
+    public void RefreshEntityOrder() => DrawEntities = _lazyGen(_allUsers);
 
-    private string GetBracketTooltip() => _label switch
-    {
-        Constants.FolderTagAll => $"{Total} total",
-        Constants.FolderTagVisible => $"{Online} visible",
-        Constants.FolderTagOnline => $"{Online} online",
-        Constants.FolderTagOffline => $"{Total} offline",
-        _ => string.Empty,
-    };
-
-    public override void Draw()
+    public void Draw()
     {
         // If we have opted to not render the folder if empty, and we have nothing to draw, return.
         if (!RenderIfEmpty && !DrawEntities.Any())
@@ -102,21 +92,17 @@ public class DrawFolderDefault : DrawFolderBase
             CkGui.IconText(_icon, _iconColor);
 
             CkGui.ColorTextFrameAlignedInline(GetLabelName(), _labelColor);
-
-            CkGui.ColorTextFrameAlignedInline(GetBracketText(), ImGuiColors.DalamudGrey2);
-            CkGui.AttachToolTip(GetBracketTooltip());
+            CkGui.ColorTextFrameAlignedInline($"[{Total}]", ImGuiColors.DalamudGrey2);
+            CkGui.AttachToolTip($"{Total} total. --COL--({Lurkers} lurkers)--COL--", ImGuiColors.DalamudGrey2);
         }
         var folderMin = ImGui.GetItemRectMin();
         var folderMax = ImGui.GetItemRectMax();
 
         _hovered = ImGui.IsItemHovered();
 
-        if (ImGui.IsItemClicked())
-            _manager.ToggleState(_label);
+        if (ImGui.IsItemClicked()) _manager.ToggleState(_label);
 
-
-        if (!_manager.IsOpen(_label))
-            return;
+        if (!_manager.IsOpen(_label)) return;
 
         var wdl = ImGui.GetWindowDrawList();
         wdl.ChannelsSplit(2);
@@ -138,10 +124,8 @@ public class DrawFolderDefault : DrawFolderBase
     private string GetLabelName()
         => _label switch
         {
-            Constants.FolderTagAll => "All Sundesmos",
-            Constants.FolderTagVisible => "Visible",
-            Constants.FolderTagOnline => "Online",
-            Constants.FolderTagOffline => "Offline",
+            Constants.FolderTagRadarUnpaired => "Unpaired",
+            Constants.FolderTagRadarPaired => "Paired",
             _ => _label,
         };
 }

@@ -15,12 +15,9 @@ public enum ToggleType
     Hide
 }
 
-/// <summary>
-///     Toggle open / close / between sundesmos?
-/// </summary>
-public record TogglePermissionWindow(Sundesmo Sundesmo) : MessageBase;
+public record RefreshFolders(bool Whitelist = true, bool Groups = true, bool Requests = true) : MessageBase;
 
-public record RefreshFoldersMessage(bool Whitelist = true, bool Groups = true, bool Requests = true) : MessageBase;
+public record RefreshRadarEntities(bool OnlyReorder) : MessageBase;
 
 /// <summary> Basic UI Toggle </summary>
 public record UiToggleMessage(Type UiType, ToggleType ToggleType = ToggleType.Toggle) : MessageBase;
@@ -45,6 +42,9 @@ public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : Message
 
 /// <summary> When a standalone profile UI is created. </summary>
 public record ProfileOpenMessage(UserData UserData) : MessageBase;
+
+/// <summary> When a standalone profile UI is created. </summary>
+public record OpenSundesmoInteractions(UserData UserData) : MessageBase;
 
 /// <summary> When the whitelist has a User hovered long enough and displays a profile, this is fired. </summary>
 public record OpenProfilePopout(UserData UserData) : MessageBase;

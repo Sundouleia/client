@@ -20,25 +20,25 @@ public unsafe class RadarUser
         _player = address != IntPtr.Zero ? (Character*)address : null;
     }
 
-    public string AnonymousName => _user.AnonName;
     public string UID => _user.UID;
+    public string AnonymousName => _user.AnonName;
+    public string PlayerName => IsValid ? _player->NameString : string.Empty; // Maybe remove.
     public string HashedIdent { get; private set; } = string.Empty;
 
     public bool IsValid => _player is not null;
-    public string PlayerName => IsValid ? _player->NameString : string.Empty; // Maybe remove.
-   
+    public bool CanSendRequest => !string.IsNullOrEmpty(HashedIdent);
+
     // All of the below only works if valid.
-    internal Character PlayerState { get { unsafe { return *_player; } } } // Maybe remove.
     public unsafe IntPtr Address => (nint)_player;
     public unsafe ushort ObjIndex => _player->ObjectIndex;
     public unsafe ulong EntityId => _player->EntityId;
-    public unsafe ulong PlayerObjectId => _player->GetGameObjectId().ObjectId;
+    public unsafe ulong PlayerObjectId => _player->GetGameObjectId().Id;
 
     /// <summary>
     ///     Update the hashedId for this radar user. It will 
     ///     determine resulting visibility status.
     /// </summary>
-    public void UpdateState(OnlineUser newState)
+    public void UpdateOnlineUser(OnlineUser newState)
     {
         HashedIdent = newState.Ident;
         // If the hashedIdent is string.Empty, clear the player pointer.
@@ -49,7 +49,7 @@ public unsafe class RadarUser
     /// <summary>
     ///     The User is now visible, bind the address to their visible character.
     /// </summary>
-    public void BindToAddress(IntPtr address)
+    public void UpdateVisibility(IntPtr address)
     {
         if (address == IntPtr.Zero)
             return;

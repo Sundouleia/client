@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
@@ -60,10 +61,10 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         _sundesmos = sundesmos;
 
         // Subscribe to the things.
-        Mediator.Subscribe<ClosedMessage>(this, (msg) => HubInstanceOnClosed(msg.Exception));
-        Mediator.Subscribe<ReconnectedMessage>(this, (msg) => _ = HubInstanceOnReconnected());
-        Mediator.Subscribe<ReconnectingMessage>(this, (msg) => HubInstanceOnReconnecting(msg.Exception));
-
+        Mediator.Subscribe<ClosedMessage>(this, _ => HubInstanceOnClosed(_.Exception));
+        Mediator.Subscribe<ReconnectedMessage>(this, async _ => await HubInstanceOnReconnected().ConfigureAwait(false));
+        Mediator.Subscribe<ReconnectingMessage>(this, _ => HubInstanceOnReconnecting(_.Exception));
+        Mediator.Subscribe<SendTempRequestMessage>(this, _ => OnSendTempRequest(_.TargetUser));
         Svc.ClientState.Login += OnLogin;
         Svc.ClientState.Logout += (_, _) => OnLogout();
 
@@ -138,7 +139,20 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         return;
     }
 
+    private async void OnSendTempRequest(UserData user)
+    {
+        var msg = $"Temporary Request from {OwnUserData.AnonName}";
+        var ret = await UserSendRequest(new(new(user.UID), true, msg)).ConfigureAwait(false);
+        if (ret.ErrorCode is SundouleiaApiEc.Success && ret.Value is { } request)
+        {
+            Logger.LogInformation($"Temporary request sent to {user.AnonName}.", LoggerType.RadarData);
+            // Add to our requests, updating the requests manager.
+            _requests.AddRequest(request);
+            return;
+        }
 
+        Logger.LogWarning($"Failed to send temporary pair request to {user.AnonName} [{ret.ErrorCode}]", LoggerType.RadarData);
+    }
     private async void OnLogin()
     {
         Logger.LogInformation("Starting connection on login after fully loaded...");

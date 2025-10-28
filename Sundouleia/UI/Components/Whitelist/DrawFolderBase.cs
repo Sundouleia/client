@@ -9,7 +9,7 @@ namespace Sundouleia.Gui.Components;
 ///     to improve draw time performance, as calls invoked for draws that are abstract rack up
 ///     draw time quickly, especially when combined with interfaces. (learned this from CkRichText)
 /// </summary>
-public abstract class DrawFolderBase : IDrawFolder
+public abstract class DrawFolderBase : ISundesmoFolder
 {
     protected readonly MainConfig _config;
     protected readonly GroupsManager _manager;
@@ -41,8 +41,8 @@ public abstract class DrawFolderBase : IDrawFolder
 
     // Interface satisfaction.
     public int Total => _allSundesmos.Count;
-    public int Online => _allSundesmos.Count(s => s.IsOnline);
     public int Rendered => _allSundesmos.Count(s => s.IsRendered);
+    public int Online => _allSundesmos.Count(s => s.IsOnline);
     public IImmutableList<DrawEntitySundesmo> DrawEntities { get; init; }
 
     /// <summary>

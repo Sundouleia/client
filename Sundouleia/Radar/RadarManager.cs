@@ -1,15 +1,15 @@
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
-using Lumina.Models.Models;
-using NAudio.Dmo;
-using SixLabors.ImageSharp.ColorSpaces;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
+using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Network;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.Radar;
 
@@ -23,9 +23,9 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     private readonly SundesmoManager _sundesmos;
     private readonly CharaObjectWatcher _watcher;
 
-    private HashSet<RadarUser> _users = new();
-    private List<RadarUser> _rendered = new();
-    private List<RadarUser> _renderedUnpaired = new();
+    // Keep keyed UserData private, preventing unwanted access.
+    private ConcurrentDictionary<UserData, RadarUser> _allRadarUsers = new(UserDataComparer.Instance);
+    private Lazy<List<RadarUser>> _usersInternal;
 
     public RadarManager(ILogger<RadarManager> logger, SundouleiaMediator mediator,
         MainConfig config, SundesmoManager sundesmos, CharaObjectWatcher watcher)
@@ -35,77 +35,114 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         _sundesmos = sundesmos;
         _watcher = watcher;
 
-        Mediator.Subscribe<RefreshFoldersMessage>(this, _ => { if (_.Whitelist) RecreateLists(); });
+        RecreateLazy();
+
+        Mediator.Subscribe<RadarAddOrUpdateUser>(this, _ => AddOrUpdateUser(_.UpdatedUser, IntPtr.Zero));
+        Mediator.Subscribe<RadarRemoveUser>(this, _ => RemoveUser(_.User));
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearUsers());
+        Svc.ContextMenu.OnMenuOpened += OnRadarContextMenu;
     }
 
-    public IReadOnlyCollection<RadarUser> AllUsers => _users;
-    public IReadOnlyCollection<RadarUser> RenderedUsers => _rendered;
-    public IReadOnlyCollection<RadarUser> RenderedUnpairedUsers => _renderedUnpaired;
+    // Expose the RadarUser, keeping the UserData private.
+    public List<RadarUser> RadarUsers => _usersInternal.Value;
 
-    public bool HasUser(OnlineUser user)
-        => _users.Any(u => u.UID == user.User.UID);
-    public bool IsUserValid(UserData user)
-        => _users.FirstOrDefault(u => u.UID == user.UID) is { } match && match.IsValid;
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Svc.ContextMenu.OnMenuOpened -= OnRadarContextMenu;
+    }
+
+    private void OnRadarContextMenu(IMenuOpenedArgs args)
+    {
+        if (args.MenuType is ContextMenuType.Inventory) return;
+        if (!_config.Current.ShowContextMenus) return;
+        if (args.Target is not MenuTargetDefault target || target.TargetObjectId == 0) return;
+
+        // Locate the user to display it in.
+        Logger.LogTrace("Context menu opened, checking for radar user.", LoggerType.RadarManagement);
+        foreach (var (userData, radarUser) in _allRadarUsers)
+        {
+            // If they are already a pair, skip.
+            if (_sundesmos.ContainsSundesmo(radarUser.UID)) continue;
+            // If they are not valid / rendered, skip.
+            if (!radarUser.IsValid) continue;
+            // If they do not match the targetObjectId, skip.
+            if (target.TargetObjectId != radarUser.PlayerObjectId) continue;
+            
+            // Otherwise, we found a match, so log it.
+            Logger.LogDebug($"Context menu target matched radar user {radarUser.AnonymousName}.", LoggerType.RadarManagement);
+            args.AddMenuItem(new MenuItem()
+            {
+                Name = new SeStringBuilder().AddText("Send Temporary Request").Build(),
+                PrefixChar = 'S',
+                PrefixColor = 708,
+                OnClicked = _ => Mediator.Publish(new SendTempRequestMessage(userData)),
+            });
+        }
+    }
+
+    public bool ContainsUser(UserData user)
+        => _allRadarUsers.ContainsKey(user);
+    public bool IsUserRendered(UserData user)
+        => _allRadarUsers.TryGetValue(user, out var match) && match.IsValid;
+
+    public bool TryGetUser(UserData user, [NotNullWhen(true)] out RadarUser? radarUser)
+        => _allRadarUsers.TryGetValue(user, out radarUser);
 
     // Add a user, regardless of visibility.
-    public void AddRadarUser(OnlineUser user, IntPtr address)
+    public void AddOrUpdateUser(OnlineUser user, IntPtr address)
     {
+        if (user.User.UID == MainHub.UID)
+            return; // Ignore Self.
+
         Logger.LogDebug($"Adding radar user {user.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
-        _users.Add(new(user, address));
-        // recreate the rendered list.
-        RecreateLists();
+        if (_allRadarUsers.TryGetValue(user.User, out var existing))
+        {
+            Logger.LogDebug($"Updating radar user {user.User.AnonName}.", LoggerType.RadarManagement);
+            existing.UpdateOnlineUser(user);
+        }
+        else
+        {
+            Logger.LogDebug($"Creating new radar user {user.User.AnonName}.", LoggerType.RadarManagement);
+            // Attempt to fetch their visibility if the address was zero in the call.
+            if (address == IntPtr.Zero && !string.IsNullOrEmpty(user.Ident))
+                _watcher.TryGetExisting(user.Ident, out address);
+            // Not create the user.
+            _allRadarUsers.TryAdd(user.User, new RadarUser(user, address));
+        }
+        // Could have removed hashedIdent from the User, so we should remove them from the list.
+        RecreateLazy();
+    }
+
+    public void UpdateVisibility(UserData user, IntPtr address)
+    {
+        if (!_allRadarUsers.TryGetValue(user, out var existing))
+            return;
+        // Update visibility.
+        Logger.LogDebug($"(Radar) {existing.AnonymousName} is now {(address != IntPtr.Zero ? "rendered" : "unrendered")}.", LoggerType.RadarManagement);
+        existing.UpdateVisibility(address);
+        RecreateLazy(true);
     }
 
     // Remove a user, regardless of visibility.
-    public void RemoveRadarUser(UserData user)
+    public void RemoveUser(UserData user)
     {
         Logger.LogDebug($"(Radar) A user was removed.", LoggerType.RadarManagement);
-        _users.RemoveWhere(u => u.UID == user.UID);
-        // recreate the rendered list.
-        RecreateLists();
-    }
-
-    public void UpdateVisibility(UserData existing, IntPtr address)
-    {
-        if (_users.FirstOrDefault(u => u.UID == existing.UID) is not { } user)
-            return;
-        // Update visibility.
-        Logger.LogDebug($"(Radar) {user.AnonymousName} is now {(address != IntPtr.Zero ? "rendered" : "unrendered")}.", LoggerType.RadarManagement);
-        user.BindToAddress(address);
-        // recreate the rendered list.
-        RecreateLists();
-    }
-
-    public void UpdateUserState(OnlineUser newState)
-    {
-        // Firstly determine if the user even exists. If they dont, return.
-        if (_users.FirstOrDefault(u => u.UID == newState.User.UID) is not { } match)
-            return;        
-        // Update their state.
-        match.UpdateState(newState);
-        
-        // If their new hashedIdent changed, check for visibility.
-        if (!string.IsNullOrEmpty(match.HashedIdent) && !match.IsValid)
-            // Try and bind them to an address.
-            if (_watcher.TryGetExisting(match.HashedIdent, out IntPtr foundAddress))
-                match.BindToAddress(foundAddress);
-
-        // recreate the rendered list.
-        RecreateLists();
+        _allRadarUsers.TryRemove(user, out _);
+        RecreateLazy();
     }
 
     public void ClearUsers()
     {
         Logger.LogDebug("Clearing all valid radar users.", LoggerType.RadarManagement);
-        _users.Clear();
-        // recreate the rendered list.
-        RecreateLists();
+        // Nothing to dispose of (yet), so just clear.
+        _allRadarUsers.Clear();
+        RecreateLazy();
     }
 
-    // maybe change overtime to regenerate with updated status on pair state?
-    private void RecreateLists()
+    private void RecreateLazy(bool reorderOnly = false)
     {
-        _rendered = _users.Where(u => u.IsValid).ToList();
-        _renderedUnpaired = _rendered.Where(u => !_sundesmos.ContainsSundesmo(u.UID)).ToList();
+        _usersInternal = new Lazy<List<RadarUser>>(() => _allRadarUsers.Values.ToList());
+        Mediator.Publish(new RefreshRadarEntities(reorderOnly));
     }
 }

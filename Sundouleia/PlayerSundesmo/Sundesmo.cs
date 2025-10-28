@@ -8,6 +8,9 @@ using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using OtterGui;
+using OtterGui.Text.Widget.Editors;
+using Sundouleia.Gui.Components;
+using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
@@ -109,7 +112,7 @@ public class Sundesmo : IComparable<Sundesmo>
             Name = new SeStringBuilder().AddText("Open Permissions").Build(),
             PrefixChar = 'S',
             PrefixColor = 708,
-            OnClicked = (a) => { _mediator.Publish(new TogglePermissionWindow(this)); },
+            OnClicked = (a) => _mediator.Publish(new OpenSundesmoInteractions(UserData)),
         }]);
     }
 

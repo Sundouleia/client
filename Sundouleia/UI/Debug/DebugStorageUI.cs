@@ -29,13 +29,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        if (ImGui.CollapsingHeader("Radar Storages"))
-        {
-            // All Users.
-            DrawRadarUsers("All Users", _radar.AllUsers);
-            // Rendered Users.
-            DrawRadarUsers("Rendered Users", _radar.RenderedUsers);
-        }
+        DrawRadarUsers("All Users", _radar.RadarUsers);
     }
 
     private void DrawIconBoolColumn(bool value)

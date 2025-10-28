@@ -20,10 +20,9 @@ public class FolderHandler : DisposableMediatorSubscriberBase
     private readonly RequestsManager _requests;
 
     // Private collections.
-    private List<IDrawFolder> _defaultFolders;
-    private DrawFolderDefault _allFolder;
-    private List<IDrawFolder> _groupFolders;
-    private List<IDrawFolder> _requestFolders;
+    private List<ISundesmoFolder> _defaultFolders;
+    private List<ISundesmoFolder> _groupFolders;
+    private List<DrawFolderBase> _requestFolders;
 
     // For now just onw filter. Maybe make modular later.
     private string _filter = string.Empty;
@@ -42,7 +41,7 @@ public class FolderHandler : DisposableMediatorSubscriberBase
         UpdateDefaultFolders();
         UpdateGroupFolders();
 
-        Mediator.Subscribe<RefreshFoldersMessage>(this, _ =>
+        Mediator.Subscribe<RefreshFolders>(this, _ =>
         {
             if (_.Whitelist)
                 UpdateDefaultFolders();
@@ -62,7 +61,7 @@ public class FolderHandler : DisposableMediatorSubscriberBase
             if (_filter != value)
             {
                 _filter = value;
-                Mediator.Publish(new RefreshFoldersMessage(true, true, false));
+                Mediator.Publish(new RefreshFolders(true, true, false));
             }
         }
     }
@@ -75,20 +74,20 @@ public class FolderHandler : DisposableMediatorSubscriberBase
             if (_requestFilter != value)
             {
                 _requestFilter = value;
-                Mediator.Publish(new RefreshFoldersMessage(false, false, true));
+                Mediator.Publish(new RefreshFolders(false, false, true));
             }
         }
     }
 
-    public IReadOnlyList<IDrawFolder> DefaultFolders => _defaultFolders;
-    public IReadOnlyList<IDrawFolder> GroupFolders => _groupFolders;
-    public IReadOnlyList<IDrawFolder> RequestFolders => _requestFolders;
+    public IReadOnlyList<ISundesmoFolder> DefaultFolders => _defaultFolders;
+    public IReadOnlyList<ISundesmoFolder> GroupFolders => _groupFolders;
+    public IReadOnlyList<DrawFolderBase> RequestFolders => _requestFolders;
 
 
     private void UpdateDefaultFolders()
     {
         Logger.LogDebug($"Getting default folders with filter {{{_filter}}}");
-        List<IDrawFolder> drawFolders = [];
+        List<ISundesmoFolder> drawFolders = [];
         var allSundesmos = _sundesmos.DirectPairs;
         // Limit the list by the filter.
         var filteredPairs = allSundesmos.Where(p => CheckFilter(p, _filter));
@@ -97,24 +96,24 @@ public class FolderHandler : DisposableMediatorSubscriberBase
         {
             var allRendered = allSundesmos.Where(u => u.IsRendered && u.IsOnline).ToImmutableList();
             var renderedFiltered = BasicSortedList(filteredPairs.Where(u => u.IsRendered && u.IsOnline));
-            drawFolders.Add(_factory.CreateDefaultFolder(Constants.CustomVisibleTag, renderedFiltered, allRendered));
+            drawFolders.Add(_factory.CreateDefaultFolder(Constants.FolderTagVisible, renderedFiltered, allRendered));
         }
 
         if (_config.Current.ShowOfflineUsersSeparately)
         {
             var allOnline = allSundesmos.Where(s => s.IsOnline).ToImmutableList();
             var onlineFiltered = BasicSortedList(filteredPairs.Where(u => u.IsOnline));
-            drawFolders.Add(_factory.CreateDefaultFolder(Constants.CustomOnlineTag, onlineFiltered, allOnline));
+            drawFolders.Add(_factory.CreateDefaultFolder(Constants.FolderTagOnline, onlineFiltered, allOnline));
 
             var allOffline = allSundesmos.Where(FilterOfflineUsers).ToImmutableList();
             var filteredOffline = BasicSortedList(filteredPairs.Where(FilterOfflineUsers));
-            drawFolders.Add(_factory.CreateDefaultFolder(Constants.CustomOfflineTag, filteredOffline, allOffline));
+            drawFolders.Add(_factory.CreateDefaultFolder(Constants.FolderTagOffline, filteredOffline, allOffline));
         }
         else
         {
             // Make the All tag.
             var allFiltered = BasicSortedList(filteredPairs);
-            drawFolders.Add(_factory.CreateDefaultFolder(Constants.CustomAllTag, allFiltered, allSundesmos.ToImmutableList()));
+            drawFolders.Add(_factory.CreateDefaultFolder(Constants.FolderTagAll, allFiltered, allSundesmos.ToImmutableList()));
         }
         
         // Update.
@@ -125,7 +124,7 @@ public class FolderHandler : DisposableMediatorSubscriberBase
     {
         Logger.LogDebug($"Getting group folders with filter {{{_filter}}}");
         var configGroups = _groups.Config.Groups;
-        var groupFolders = new List<IDrawFolder>();
+        var groupFolders = new List<ISundesmoFolder>();
         var allSundesmos = _sundesmos.DirectPairs;
 
         foreach (var group in configGroups)
@@ -148,7 +147,7 @@ public class FolderHandler : DisposableMediatorSubscriberBase
         // Make the All tag.
         var filteredAll = allSundesmos.Where(u => CheckFilter(u, _filter));
         var filteredAllSorted = BasicSortedList(filteredAll);
-        groupFolders.Add(_factory.CreateDefaultFolder(Constants.CustomAllTag, filteredAllSorted, allSundesmos.ToImmutableList()));
+        groupFolders.Add(_factory.CreateDefaultFolder(Constants.FolderTagAll, filteredAllSorted, allSundesmos.ToImmutableList()));
 
         // Update. 
         _groupFolders = groupFolders;
@@ -170,7 +169,7 @@ public class FolderHandler : DisposableMediatorSubscriberBase
         Logger.LogDebug($"Getting request folders with filter {{{_requestFilter}}}");
         var incoming = _requests.Incoming;
         var pending = _requests.Outgoing;
-        var requestFolders = new List<IDrawFolder>(); // Make Request folder later.
+        var requestFolders = new List<DrawFolderBase>(); // Make Request folder later.
         // Generate the folders and stuff i guess, idk.
     }
 

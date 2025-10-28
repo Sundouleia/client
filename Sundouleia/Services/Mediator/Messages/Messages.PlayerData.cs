@@ -1,5 +1,6 @@
 using Sundouleia.Pairs;
 using Sundouleia.WebAPI.Files.Models;
+using SundouleiaAPI.Data;
 
 namespace Sundouleia.Services.Mediator;
 
@@ -10,6 +11,7 @@ public record SundesmoPlayerRendered(PlayerHandler Handler) : SameThreadMessage;
 public record SundesmoEnteredLimbo(Sundesmo Sundesmo) : MessageBase; // Alteration Timeout Begin.
 public record SundesmoLeftLimbo(Sundesmo Sundesmo) : MessageBase; // Alteration Timeout End.
 public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // when desiring to target a sundesmo.
+public record SendTempRequestMessage(UserData TargetUser) : MessageBase; // for examine-based sends. Not sends handled via UI.
 public record DownloadLimitChangedMessage : SameThreadMessage;
 public record FilesUploading(PlayerHandler Player) : MessageBase;
 public record FilesUploaded(PlayerHandler Player) : MessageBase;

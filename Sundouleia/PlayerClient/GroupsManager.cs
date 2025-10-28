@@ -15,7 +15,7 @@ namespace Sundouleia.PlayerClient;
 /// </summary>
 public class GroupsManager
 {
-    public static readonly IEnumerable<string> DefaultLabels = [Constants.CustomAllTag, Constants.CustomVisibleTag, Constants.CustomOnlineTag, Constants.CustomOfflineTag];
+    public static readonly IEnumerable<string> DefaultLabels = [Constants.FolderTagAll, Constants.FolderTagVisible, Constants.FolderTagOnline, Constants.FolderTagOffline];
 
     private readonly ILogger<GroupsManager> _logger;
     private readonly SundouleiaMediator _mediator;
@@ -50,7 +50,6 @@ public class GroupsManager
 
     public void ToggleState(string label)
     {
-        _logger.LogWarning($"Toggling state for folder {{{label}}}.");
         // Handle default folders.
         if (DefaultLabels.Contains(label))
         {

@@ -23,7 +23,7 @@ namespace Sundouleia.Pairs;
 /// </summary>
 public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 {
-    // concurrent dictionary of all paired paired to the client.
+    // concurrent dictionary of all paired paired to the client. 
     private readonly ConcurrentDictionary<UserData, Sundesmo> _allSundesmos;
     private readonly MainConfig _config;
     private readonly ServerConfigManager _serverConfigs;
@@ -283,7 +283,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     private void RecreateLazy()
     {
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
-        Mediator.Publish(new RefreshFoldersMessage(true, true, false));
+        Mediator.Publish(new RefreshFolders(true, true, false));
 
     }
 

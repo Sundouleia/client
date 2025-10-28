@@ -101,7 +101,6 @@ public class RadarChatTab
         CkGui.CenterText("You can verify via Sundouleia's Discord Bot.");
         CkGui.CenterText("Verification is easy & doesn't interact with lodestone");
         CkGui.CenterText("or any other SE properties.");
-        CkGui.FontTextCentered("Now In View-Only Mode", UiFontService.UidFont);
     }
 }
 
