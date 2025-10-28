@@ -471,10 +471,24 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
             Logger.LogDebug($"Missing files downloaded, applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
         }
+        catch (ObjectDisposedException)
+        {
+            // If this token was disposed the pair is disposing, so just return an empty dictionary.
+            Logger.LogWarning($"Downloader interrupted during disposal for {NameString}({Sundesmo.GetNickAliasOrUid()}), returning empty application.", LoggerType.PairMods);
+            return new Dictionary<string, string>();
+        }
         catch (TaskCanceledException)
         {
             // Grab final partial progress. This could happen during unloading, so catch ObjectDisposedException as well.
-            missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _runtimeCTS.Token);
+            try
+            {
+                missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _runtimeCTS.Token);
+            }
+            catch (ObjectDisposedException)
+            {
+                Logger.LogWarning($"Downloader interrupted during disposal for {NameString}({Sundesmo.GetNickAliasOrUid()}), returning empty application.", LoggerType.PairMods);
+                return new Dictionary<string, string>();
+            }
         }
 
         // Return the modded dictionary to apply.
