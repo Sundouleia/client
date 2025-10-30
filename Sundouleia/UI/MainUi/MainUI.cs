@@ -89,7 +89,6 @@ public class MainUI : WindowMediatorSubscriberBase
 
     public static Vector2 LastPos { get; private set; } = Vector2.Zero;
     public static Vector2 LastSize { get; private set; } = Vector2.Zero;
-    public static bool StaticIsFocused { get; private set; } = false;
 
     // for tutorial, and for profile popouts.
     private Vector2 WindowPos => ImGui.GetWindowPos();
@@ -114,10 +113,14 @@ public class MainUI : WindowMediatorSubscriberBase
         }
     }
 
+    public override void OnClose()
+    {
+        base.OnClose();
+        Mediator.Publish(new CloseInteractionUi());
+    }
+
     protected override void DrawInternal()
     {
-        StaticIsFocused = IsFocused;
-
         // get the width of the window content region we set earlier
         var winContentWidth = CkGui.GetWindowContentRegionWidth();
 

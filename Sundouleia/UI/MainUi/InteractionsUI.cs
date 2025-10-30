@@ -24,6 +24,7 @@ public class InteractionsUI : WindowMediatorSubscriberBase
     private readonly MainMenuTabs _mainUiTabs;
     private readonly MainHub _hub;
     private readonly SundesmoManager _sundesmos;
+
     public InteractionsUI(ILogger<InteractionsUI> logger, SundouleiaMediator mediator,
         MainMenuTabs tabs, MainHub hub, SundesmoManager sundesmos)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
@@ -44,6 +45,23 @@ public class InteractionsUI : WindowMediatorSubscriberBase
             IsOpen = false;
         });
 
+        Mediator.Subscribe<CloseInteractionUi>(this, _ =>
+        {
+            _logger.LogInformation("Closing InteractionsUI via CloseInteractionUi Message.");
+            _sundesmo = null;
+            IsOpen = false;
+        });
+
+        Mediator.Subscribe<MainWindowTabChangeMessage>(this, _ =>
+        {
+            if (_.NewTab is not MainMenuTabs.SelectedTab.Whitelist && IsOpen)
+            {
+                _logger.LogTrace("Closing InteractionsUI via MainWindowTabChangeMessage.");
+                _sundesmo = null;
+                IsOpen = false;
+            }
+        });
+
         Mediator.Subscribe<ToggleSundesmoInteractionUI>(this, _ =>
         {
             if (_sundesmos.GetUserOrDefault(_.Sundesmo.UserData) is not { } match)
@@ -61,6 +79,7 @@ public class InteractionsUI : WindowMediatorSubscriberBase
             // Do open logic if we should open
             if (shouldOpen)
             {
+                _logger.LogTrace("Showing InteractionsUI via ToggleSundesmoInteractionUI Message.");
                 // Ensure MainUI is open
                 Mediator.Publish(new UiToggleMessage(typeof(MainUI), ToggleType.Show));
                 // Set the tab selection
@@ -80,7 +99,6 @@ public class InteractionsUI : WindowMediatorSubscriberBase
     private Sundesmo? _sundesmo = null;
     private string _dispName = string.Empty;
     private float _windowWidth = 0f;
-
     protected override void PreDrawInternal()
     {
         // Magic that makes the sticky pair window move with the main UI.
@@ -101,44 +119,8 @@ public class InteractionsUI : WindowMediatorSubscriberBase
     protected override void PostDrawInternal()
     { }
 
-    private bool _pendingClose = false;
     protected override void DrawInternal()
     {
-        // If the window is not focused and the user clicks anywhere: close.
-        //if (!ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-        //{
-        //    _sundesmo = null;
-        //    IsOpen = false;
-        //    return;
-        //}
-
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-        {
-            bool hovered = ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows);
-
-            if (!hovered)
-            {
-                // Clicked outside, IsAnyItemActive allows for MainUI dragging but instant closes on other actions.
-                if (_pendingClose || ImGui.IsAnyItemActive())
-                {
-                    // Second outside click -> close
-                    _sundesmo = null;
-                    IsOpen = false;
-                    _pendingClose = false;
-                    return;
-                }
-
-                // First outside click -> arm closing
-                _pendingClose = true;
-            }
-            else
-            {
-                // Clicked inside -> cancel pending close
-                _pendingClose = false;
-            }
-        }
-
-
         // Shouldnt even be drawing at all if the sundesmo is null.
         if (_sundesmo is not { } s)
             return;
@@ -342,11 +324,5 @@ public class InteractionsUI : WindowMediatorSubscriberBase
         }
 
         return true;
-    }
-
-    public override void OnClose()
-    {
-        _pendingClose = false;
-        base.OnClose();
     }
 }

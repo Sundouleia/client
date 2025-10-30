@@ -43,6 +43,8 @@ public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : Message
 /// <summary> When a standalone profile UI is created. </summary>
 public record ProfileOpenMessage(UserData UserData) : MessageBase;
 
+public record CloseInteractionUi : MessageBase;
+
 /// <summary> When a standalone profile UI is created. </summary>
 public record ToggleSundesmoInteractionUI(Sundesmo Sundesmo, ToggleType NewState) : MessageBase;
 
