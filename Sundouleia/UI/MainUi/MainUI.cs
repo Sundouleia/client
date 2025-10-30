@@ -2,6 +2,7 @@ using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs;
 using OtterGui.Text;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
@@ -29,7 +30,6 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly MainMenuTabs _tabMenu;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
-    private readonly InteractionsHandler _interactions;
     private readonly TutorialService _guides;
     private readonly HomepageTab _homepage;
     private readonly WhitelistTab _whitelist;
@@ -45,8 +45,7 @@ public class MainUI : WindowMediatorSubscriberBase
 
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
         ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
-        SundesmoManager sundesmos, InteractionsHandler interactions, TutorialService guides, 
-        HomepageTab home, WhitelistTab whitelist, 
+        SundesmoManager sundesmos, TutorialService guides, HomepageTab home, WhitelistTab whitelist, 
         RequestsTab requestsTab, RadarTab radar, RadarChatTab chat, AccountTab account) 
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
@@ -56,7 +55,6 @@ public class MainUI : WindowMediatorSubscriberBase
         _tabMenu = tabMenu;
         _requests = requests;
         _sundesmos = sundesmos;
-        _interactions = interactions;
         _guides = guides;
 
         _homepage = home;
@@ -87,21 +85,11 @@ public class MainUI : WindowMediatorSubscriberBase
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<OpenSundesmoInteractions>(this, _ =>
-        {
-            if (_sundesmos.GetUserOrDefault(_.UserData) is not { } match)
-                return;
-            // Force UI open.
-            IsOpen = true;
-            // Force switch to the whitelist tab.
-            _tabMenu.TabSelection = MainMenuTabs.SelectedTab.Whitelist;
-            // Force open interactions for this sundesmos.
-            _interactions.OpenSundesmoInteractions(match);
-        });
     }
 
     public static Vector2 LastPos { get; private set; } = Vector2.Zero;
     public static Vector2 LastSize { get; private set; } = Vector2.Zero;
+    public static bool StaticIsFocused { get; private set; } = false;
 
     // for tutorial, and for profile popouts.
     private Vector2 WindowPos => ImGui.GetWindowPos();
@@ -128,6 +116,8 @@ public class MainUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
+        StaticIsFocused = IsFocused;
+
         // get the width of the window content region we set earlier
         var winContentWidth = CkGui.GetWindowContentRegionWidth();
 

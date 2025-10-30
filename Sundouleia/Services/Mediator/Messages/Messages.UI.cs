@@ -44,7 +44,7 @@ public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : Message
 public record ProfileOpenMessage(UserData UserData) : MessageBase;
 
 /// <summary> When a standalone profile UI is created. </summary>
-public record OpenSundesmoInteractions(UserData UserData) : MessageBase;
+public record ToggleSundesmoInteractionUI(Sundesmo Sundesmo, ToggleType NewState) : MessageBase;
 
 /// <summary> When the whitelist has a User hovered long enough and displays a profile, this is fired. </summary>
 public record OpenProfilePopout(UserData UserData) : MessageBase;

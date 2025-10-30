@@ -75,6 +75,8 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         });
     }
 
+    public static bool IsMainUiOpen => _createdWindows.OfType<MainUI>().FirstOrDefault() is { } mainUi && mainUi.IsOpen;
+
     /// <summary>
     ///     Offloads a UI task to the thread pool to not halt ImGui. 
     ///     When the task is finished DisableUI will be set to false.

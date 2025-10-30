@@ -27,7 +27,6 @@ public class DrawEntitySundesmo : ISundesmoEntity
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
     private readonly FavoritesConfig _favorites;
-    private readonly InteractionsHandler _interactions;
     private readonly IdDisplayHandler _nameHandler;
 
     private bool       _hovered = false;
@@ -39,7 +38,7 @@ public class DrawEntitySundesmo : ISundesmoEntity
     private Sundesmo   _sundesmo;
 
     public DrawEntitySundesmo(DrawFolder parent, Sundesmo sundesmo, SundouleiaMediator mediator,
-        MainConfig config, FavoritesConfig favorites, InteractionsHandler interactions, IdDisplayHandler nameDisp)
+        MainConfig config, FavoritesConfig favorites, IdDisplayHandler nameDisp)
     {
         Identifier = GetType() + parent.Label + sundesmo.UserData.UID;
         _parentFolder = parent;
@@ -48,7 +47,6 @@ public class DrawEntitySundesmo : ISundesmoEntity
         _mediator = mediator;
         _config = config;
         _favorites = favorites;
-        _interactions = interactions;
         _nameHandler = nameDisp;
     }
 
@@ -208,7 +206,7 @@ public class DrawEntitySundesmo : ISundesmoEntity
         {
             ImGui.AlignTextToFramePadding();
             if (CkGui.IconButton(FAI.ChevronRight, inPopup: true))
-                _interactions.OpenSundesmoInteractions(_sundesmo);
+                _mediator.Publish(new ToggleSundesmoInteractionUI(_sundesmo, ToggleType.Toggle));
 
             currentRightSide -= interactionsSize.X;
             ImGui.SameLine(currentRightSide);
@@ -216,8 +214,6 @@ public class DrawEntitySundesmo : ISundesmoEntity
 
         ImGui.AlignTextToFramePadding();
         SundouleiaEx.DrawFavoriteStar(_favorites, _sundesmo.UserData.UID, true);
-
-        _interactions.DrawIfOpen(_sundesmo);
 
         return currentRightSide;
     }

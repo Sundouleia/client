@@ -18,7 +18,6 @@ public class DrawEntityFactory
     private readonly MainConfig _config;
     private readonly FavoritesConfig _favorites;
     private readonly SharedFolderMemory _folderMemory;
-    private readonly InteractionsHandler _interactions;
     private readonly IdDisplayHandler _nameDisplay;
     private readonly GroupsManager _groupManager;
     private readonly SundesmoManager _sundesmos;
@@ -30,7 +29,6 @@ public class DrawEntityFactory
         MainConfig config, 
         FavoritesConfig favorites, 
         SharedFolderMemory memory,
-        InteractionsHandler interactions, 
         IdDisplayHandler nameDisplay,
         GroupsManager groups,
         SundesmoManager sundesmos,
@@ -42,7 +40,6 @@ public class DrawEntityFactory
         _config = config;
         _favorites = favorites;
         _folderMemory = memory;
-        _interactions = interactions;
         _nameDisplay = nameDisplay;
         _groupManager = groups;
         _sundesmos = sundesmos;
@@ -58,7 +55,7 @@ public class DrawEntityFactory
             _config, _folderMemory, this, _groupManager, _sundesmos);
 
     public DrawEntitySundesmo CreateDrawEntity(DrawFolder parent, Sundesmo sundesmo)
-        => new DrawEntitySundesmo(parent, sundesmo, _mediator, _config, _favorites, _interactions, _nameDisplay);
+        => new DrawEntitySundesmo(parent, sundesmo, _mediator, _config, _favorites, _nameDisplay);
 
 
     // In Rework.

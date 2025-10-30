@@ -109,7 +109,7 @@ public class Sundesmo : IComparable<Sundesmo>
             Name = new SeStringBuilder().AddText("Open Permissions").Build(),
             PrefixChar = 'S',
             PrefixColor = 708,
-            OnClicked = (a) => _mediator.Publish(new OpenSundesmoInteractions(UserData)),
+            OnClicked = (a) => _mediator.Publish(new ToggleSundesmoInteractionUI(this, ToggleType.Show)),
         }]);
     }
 

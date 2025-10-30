@@ -5,8 +5,10 @@ using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using Microsoft.VisualBasic;
 using OtterGui;
 using OtterGui.Text;
+using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -17,67 +19,130 @@ using SundouleiaAPI.Util;
 using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.MainWindow;
-public class InteractionsHandler : DisposableMediatorSubscriberBase
+public class InteractionsUI : WindowMediatorSubscriberBase
 {
+    private readonly MainMenuTabs _mainUiTabs;
     private readonly MainHub _hub;
-    public InteractionsHandler(ILogger<InteractionsHandler> logger, SundouleiaMediator mediator, MainHub hub)
-        : base(logger, mediator)
+    private readonly SundesmoManager _sundesmos;
+    public InteractionsUI(ILogger<InteractionsUI> logger, SundouleiaMediator mediator,
+        MainMenuTabs tabs, MainHub hub, SundesmoManager sundesmos)
+        : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
+        _mainUiTabs = tabs;
         _hub = hub;
+        _sundesmos = sundesmos;
+
+        Flags = WFlags.NoCollapse | WFlags.NoTitleBar | WFlags.NoResize | WFlags.NoScrollbar;
+        IsOpen = false;
 
         Mediator.Subscribe<DisconnectedMessage>(this, (msg) =>
         {
-            if (ImGui.IsPopupOpen(PopupLabel))
-                ImGui.CloseCurrentPopup();
+            // Set the sundesmo to null, clearing draw functionality.
+            // Do not restore this between loads, as the window is not that critical to keep alive (yet)
+            _sundesmo = null;
+            // Force close the UI.
+            IsOpen = false;
+        });
+
+        Mediator.Subscribe<ToggleSundesmoInteractionUI>(this, _ =>
+        {
+            if (_sundesmos.GetUserOrDefault(_.Sundesmo.UserData) is not { } match)
+                return;
+            // Get if this is different.
+            var isDiffSundesmo = _sundesmo is null || _sundesmo.UserData.UID != match.UserData.UID;
+
+            // Update if different.
+            if (isDiffSundesmo)
+                _sundesmo = match;
+
+            // If we satisfy any condition to open the UI, we need to make sure all prerequisites are met.
+            var shouldOpen = (_.NewState is ToggleType.Show) || (_.NewState is ToggleType.Toggle && !IsOpen) || isDiffSundesmo;
+
+            // Do open logic if we should open
+            if (shouldOpen)
+            {
+                // Ensure MainUI is open
+                Mediator.Publish(new UiToggleMessage(typeof(MainUI), ToggleType.Show));
+                // Set the tab selection
+                if (_mainUiTabs.TabSelection != MainMenuTabs.SelectedTab.Whitelist)
+                    _mainUiTabs.TabSelection = MainMenuTabs.SelectedTab.Whitelist;
+                // Open the window.
+                IsOpen = true;
+            }
+            else if (_.NewState is ToggleType.Toggle)
+                IsOpen = !IsOpen;
+            else
+                IsOpen = false;
         });
     }
 
-    private Sundesmo? _sundesmo;
-    private string _dispName => _sundesmo?.GetNickAliasOrUid() ?? "Anon. User";
+    // The current user. Will not draw the window if null.
+    private Sundesmo? _sundesmo = null;
+    private string _dispName = string.Empty;
+    private float _windowWidth = 0f;
 
-    public string PopupLabel { get; private set; } = string.Empty;
-
-    // Dynamically adjustable window based on interactable.
-    private float _windowWidth => (ImGui.CalcTextSize($"Preventing animations from {_dispName}zz").X + ImGui.GetFrameHeightWithSpacing()).AddWinPadX();
-
-    // Assign and define the popup window for the sundesmo interactions.
-    public void OpenSundesmoInteractions(Sundesmo sundesmo)
+    protected override void PreDrawInternal()
     {
-        Logger.LogInformation($"Attempting to open interactions for {sundesmo.GetNickAliasOrUid()}.");
-        // close any others if they are open.
-        if (ImGui.IsPopupOpen(PopupLabel))
-            ImGui.CloseCurrentPopup();
-
-        // Set the new values.
-        PopupLabel = $"interactions_{sundesmo.UserData.UID}";
-        _sundesmo = sundesmo;
-
-        Logger.LogInformation($"Opened interactions for {sundesmo.GetNickAliasOrUid()} with popup label {PopupLabel}.");
-        // Open the new popup.
-        ImGui.OpenPopup(PopupLabel);
-    }
-
-    public void DrawIfOpen(Sundesmo s)
-    {
-        // If the sundesmo's do not match, fail.
-        if (_sundesmo is null || s.UserData.UID != _sundesmo.UserData.UID)
-            return;
-
-        var position = MainUI.LastPos + new Vector2(MainUI.LastSize.X, ImGui.GetFrameHeightWithSpacing());
-        var size = new Vector2(_windowWidth, MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2);
-        var flags = WFlags.NoMove | WFlags.NoResize | WFlags.NoCollapse | WFlags.NoScrollbar;
+        // Magic that makes the sticky pair window move with the main UI.
+        var position = MainUI.LastPos;
+        position.X += MainUI.LastSize.X;
+        position.Y += ImGui.GetFrameHeightWithSpacing();
         ImGui.SetNextWindowPos(position);
-        ImGui.SetNextWindowSize(size);
-        using var popup = ImRaii.Popup(PopupLabel, flags);
-        var id = ImGui.GetID(PopupLabel);
-        if (!popup)
-            return;
-        // Otherwise draw out the contents and stuff.
-        DrawContentsInternal();
+
+        Flags |= WFlags.NoMove;
+
+        // Define the drawn parameters used so they are only calculated once per draw frame.
+        _dispName = _sundesmo?.GetNickAliasOrUid() ?? "Anon. User";
+        _windowWidth = (ImGui.CalcTextSize($"Preventing animations from {_dispName}").X + ImGui.GetFrameHeightWithSpacing()).AddWinPadX();
+        // Set the size.
+        ImGui.SetNextWindowSize(new Vector2(_windowWidth, MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2));
     }
 
-    private void DrawContentsInternal()
+    protected override void PostDrawInternal()
+    { }
+
+    private bool _pendingClose = false;
+    protected override void DrawInternal()
     {
+        // If the window is not focused and the user clicks anywhere: close.
+        //if (!ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+        //{
+        //    _sundesmo = null;
+        //    IsOpen = false;
+        //    return;
+        //}
+
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+        {
+            bool hovered = ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows);
+
+            if (!hovered)
+            {
+                // Clicked outside, IsAnyItemActive allows for MainUI dragging but instant closes on other actions.
+                if (_pendingClose || ImGui.IsAnyItemActive())
+                {
+                    // Second outside click -> close
+                    _sundesmo = null;
+                    IsOpen = false;
+                    _pendingClose = false;
+                    return;
+                }
+
+                // First outside click -> arm closing
+                _pendingClose = true;
+            }
+            else
+            {
+                // Clicked inside -> cancel pending close
+                _pendingClose = false;
+            }
+        }
+
+
+        // Shouldnt even be drawing at all if the sundesmo is null.
+        if (_sundesmo is not { } s)
+            return;
+
         using var _ = CkRaii.Child("InteractionsUI", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
         DrawHeader();
@@ -86,9 +151,9 @@ public class InteractionsHandler : DisposableMediatorSubscriberBase
         ImGui.Separator();
 
         ImGui.Text("Permissions");
-        DrawDistinctPermRow(_sundesmo!, _dispName, width, nameof(PairPerms.AllowAnimations), _sundesmo!.OwnPerms.AllowAnimations);
-        DrawDistinctPermRow(_sundesmo, _dispName, width, nameof(PairPerms.AllowSounds), _sundesmo.OwnPerms.AllowSounds);
-        DrawDistinctPermRow(_sundesmo, _dispName, width, nameof(PairPerms.AllowVfx), _sundesmo.OwnPerms.AllowVfx);
+        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowAnimations), s.OwnPerms.AllowAnimations);
+        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowSounds), s.OwnPerms.AllowSounds);
+        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowVfx), s.OwnPerms.AllowVfx);
 
         ImGui.Separator();
 
@@ -115,7 +180,7 @@ public class InteractionsHandler : DisposableMediatorSubscriberBase
         CkGui.IconText(FAI.PersonBurst, vfx ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
         CkGui.AttachToolTip($"{_dispName} {(vfx ? "can see your modded VFX." : "disabled your modded VFX.")}");
 
-        ImGui.Separator();    
+        ImGui.Separator(); 
     }
 
     private void DrawCommon(float width)
@@ -146,10 +211,10 @@ public class InteractionsHandler : DisposableMediatorSubscriberBase
                 {
                     var res = await _hub.UserPersistPair(new(_sundesmo.UserData));
                     if (res.ErrorCode is not SundouleiaApiEc.Success)
-                        Logger.LogWarning($"Failed to convert temporary pair for {_sundesmo.GetNickAliasOrUid()}. Reason: {res.ErrorCode}");
+                        _logger.LogWarning($"Failed to convert temporary pair for {_sundesmo.GetNickAliasOrUid()}. Reason: {res.ErrorCode}");
                     else
                     {
-                        Logger.LogInformation($"Successfully converted temporary pair for {_sundesmo.GetNickAliasOrUid()}.");
+                        _logger.LogInformation($"Successfully converted temporary pair for {_sundesmo.GetNickAliasOrUid()}.");
                         _sundesmo.MarkAsPermanent();
                     }
                 });
@@ -166,10 +231,10 @@ public class InteractionsHandler : DisposableMediatorSubscriberBase
             {
                 var res = await _hub.UserRemovePair(new(_sundesmo.UserData));
                 if (res.ErrorCode is not SundouleiaApiEc.Success)
-                    Logger.LogWarning($"Failed to remove pair {_sundesmo.GetNickAliasOrUid()}. Reason: {res.ErrorCode}");
+                    _logger.LogWarning($"Failed to remove pair {_sundesmo.GetNickAliasOrUid()}. Reason: {res.ErrorCode}");
                 else
                 {
-                    Logger.LogInformation($"Successfully removed pair {_sundesmo.GetNickAliasOrUid()}.");
+                    _logger.LogInformation($"Successfully removed pair {_sundesmo.GetNickAliasOrUid()}.");
                     ImGui.CloseCurrentPopup();
                 }
             });
@@ -193,7 +258,7 @@ public class InteractionsHandler : DisposableMediatorSubscriberBase
             UiService.SetUITask(async () =>
             {
                 if (await ChangeOwnUnique(permName, !current).ConfigureAwait(false))
-                    Logger.LogInformation($"Successfully changed own permission {permName} to {!current} for {sundesmo.GetNickAliasOrUid()}.");
+                    _logger.LogInformation($"Successfully changed own permission {permName} to {!current} for {sundesmo.GetNickAliasOrUid()}.");
             });
         }
 
@@ -277,5 +342,11 @@ public class InteractionsHandler : DisposableMediatorSubscriberBase
         }
 
         return true;
+    }
+
+    public override void OnClose()
+    {
+        _pendingClose = false;
+        base.OnClose();
     }
 }

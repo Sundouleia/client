@@ -722,11 +722,12 @@ public class IntroUi : WindowMediatorSubscriberBase
 
                 // if we are still in the try statement by this point we have successfully retrieved our new account details.
                 // This means that we can not create the new authentication and validate our account as created.
-
+                _logger.LogInformation("Fetched Account Details, proceeding to create Primary Account authentication.");
                 // However, if an auth already exists for the current content ID, and we are trying to create a new primary account, this should not be possible, so early throw.
                 if (_serverConfigs.CharaHasValidLoginAuth())
                     throw new InvalidOperationException("Auth already exists, cannot create new Primary auth if one already exists!");
 
+                _logger.LogInformation("No existing authentication found, proceeding to create new Primary Account authentication.");
                 // set the key to that newly added authentication
                 var addedIdx = _serverConfigs.AddProfileToAccount(new()
                 {
@@ -737,22 +738,31 @@ public class IntroUi : WindowMediatorSubscriberBase
                     HadValidConnection = true,
                 });
                 // create the new secret key object to store.
+                _logger.LogInformation("Setting Profile for Login Auth.");
                 _serverConfigs.SetProfileForLoginAuth(PlayerData.ContentId, addedIdx);
+                _logger.LogInformation("Profile for Login Auth set successfully.");
                 _config.Save();
                 // Log the details.
                 _logger.LogInformation("UID: " + accountDetails.Item1);
                 _logger.LogInformation("Secret Key: " + accountDetails.Item2);
                 _logger.LogInformation("Fetched Account Details Successfully and finished creating Primary Account.");
-
-                // Attempt an initialization connection test.
-                await TryConnectForInitialization();
             }
-            catch (Bagagwa)
+            catch (Bagagwa ex)
             {
-                // Log the error
-                _logger.LogError("Failed to fetch account details and create the primary authentication. Performing early return.");
+                _logger.LogError($"Failed to fetch account details for current character: {ex}");
                 _config.Current.ButtonUsed = false;
                 _config.Save();
+                return;
+            }
+
+            // Next, attempt an initialization connection test.
+            try
+            {
+                await TryConnectForInitialization();
+            }
+            catch (Bagagwa ex)
+            {
+                _logger.LogError($"Failed to fetch account details and create the primary authentication. Performing early return: {ex}");
             }
         });
     }

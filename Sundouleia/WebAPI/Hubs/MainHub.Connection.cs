@@ -162,41 +162,49 @@ public partial class MainHub
     /// </remarks>
     public async Task Disconnect(ServerState disconnectionReason, DisconnectIntent intent)
     {
-        // if we are unloading the plugin, or performing a hard reset / disconnect, we want to make sure
-        // that we both notify our online pairs we are unloading.
-        if (IsConnected && ((int)intent > 1))
+        try
         {
-            // Notify all online sundesmos that we are unloading upon our disconnect.
-            Logger.LogInformation("Disconnecting due to a hard-reconnect or plugin unload. Notifying online Sundesmos!");
-            await UserNotifyIsUnloading();
-            // Now we can actually disconnect with this taken care of.
+            // if we are unloading the plugin, or performing a hard reset / disconnect, we want to make sure
+            // that we both notify our online pairs we are unloading.
+            if (IsConnected && ((int)intent > 1))
+            {
+                // Notify all online sundesmos that we are unloading upon our disconnect.
+                Logger.LogInformation("Disconnecting due to a hard-reconnect or plugin unload. Notifying online Sundesmos!");
+                await UserNotifyIsUnloading();
+                // Now we can actually disconnect with this taken care of.
+            }
+
+            // Set new state to Disconnecting.
+            ServerStatus = ServerState.Disconnecting;
+            Logger.LogInformation("Disposing of SundouleiaHub-Main's Hub Instance");
+
+            // Obliterate the SundouleiaHub-Main into the ground, erase it out of existence .
+            await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
+
+            // If our hub was already initialized by the time we call this, reset all values monitoring it.
+            // After this connection revision this should technically ALWAYS be true, so if it isnt log it as an error.
+            if (_hubConnection is not null)
+            {
+                Logger.LogInformation("Instance disposed of in '_hubFactory', but still exists in MainHub.cs, " +
+                    $"clearing all other variables for [{MAIN_SERVER_NAME}]");
+                // Clear the Health check so we stop pinging the server, set Initialized to false, publish a disconnect.
+                _apiHooksInitialized = false;
+                _hubHealthCTS?.Cancel();
+                Mediator.Publish(new DisconnectedMessage(intent));
+                // set the ConnectionResponse and hub to null.
+                Logger.LogInformation("Clearing ConnectionResponse and HubConnection instances for SundouleiaHub-Main");
+                _hubConnection = null;
+                ConnectionResponse = null;
+            }
+
+            // Update our server state to the necessary reason
+            Logger.LogInformation("SundouleiaHub-Main disconnected due to: [" + disconnectionReason + "]");
+            ServerStatus = disconnectionReason;
         }
-
-        // Set new state to Disconnecting.
-        ServerStatus = ServerState.Disconnecting;
-        Logger.LogInformation("Disposing of SundouleiaHub-Main's Hub Instance", LoggerType.ApiCore);
-
-        // Obliterate the SundouleiaHub-Main into the ground, erase it out of existence .
-        await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
-
-        // If our hub was already initialized by the time we call this, reset all values monitoring it.
-        // After this connection revision this should technically ALWAYS be true, so if it isnt log it as an error.
-        if (_hubConnection is not null)
+        catch (Bagagwa ex)
         {
-            Logger.LogInformation("Instance disposed of in '_hubFactory', but still exists in MainHub.cs, " +
-                $"clearing all other variables for [{MAIN_SERVER_NAME}]", LoggerType.ApiCore);
-            // Clear the Health check so we stop pinging the server, set Initialized to false, publish a disconnect.
-            _apiHooksInitialized = false;
-            _hubHealthCTS?.Cancel();
-            Mediator.Publish(new DisconnectedMessage(intent));
-            // set the ConnectionResponse and hub to null.
-            _hubConnection = null;
-            ConnectionResponse = null;
+            Logger.LogError("Error during disconnection from SundouleiaHub-Main: " + ex);
         }
-
-        // Update our server state to the necessary reason
-        Logger.LogInformation("SundouleiaHub-Main disconnected due to: [" + disconnectionReason + "]", LoggerType.ApiCore);
-        ServerStatus = disconnectionReason;
     }
 
     /// <summary>
@@ -264,14 +272,15 @@ public partial class MainHub
         }
         catch (Bagagwa ex)
         {
-            Logger.LogError($"Error fetching new account details: {ex.StackTrace}", LoggerType.ApiCore);
+            Logger.LogError($"Error fetching new account details: {ex.StackTrace}");
             throw;
         }
         finally
         {
-            Logger.LogInformation("Disposing of SundouleiaHub-Main after obtaining account details.", LoggerType.ApiCore);
+            Logger.LogInformation("Disposing of SundouleiaHub-Main after obtaining account details.");
             if (_hubConnection is not null && _hubConnection.State is HubConnectionState.Connected)
                 await Disconnect(ServerState.Disconnected, DisconnectIntent.Normal).ConfigureAwait(false);
+            Logger.LogInformation("Disposed of SundouleiaHub-Main after obtaining account details.");
         }
     }
 
