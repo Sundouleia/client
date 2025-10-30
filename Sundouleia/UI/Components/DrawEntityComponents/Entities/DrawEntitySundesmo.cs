@@ -11,7 +11,6 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
-using System.Reflection.Metadata.Ecma335;
 
 namespace Sundouleia.Gui.Components;
 public class DrawEntitySundesmo : ISundesmoEntity
@@ -21,9 +20,9 @@ public class DrawEntitySundesmo : ISundesmoEntity
         "--NL----COL--[CTRL + L-CLICK]--COL-- Single-Select this item for multi-select Drag-Drop" +
         "--NL----COL--[SHIFT + L-CLICK]--COL-- Select/Deselect all users between current and last selection";
     private static readonly string NormalTooltip =
-        "--COL--[L-CLICK]--COL-- Swap between PlayerName/Nickname/Alias & UID." +
-        "--NL----COL--[R-CLICK]--COL-- Enter/Exit Nickname Editor" +
-        "--NL----COL--[M-CLICK]--COL-- Open standalone profile";
+        "--COL--[L-CLICK]--COL-- Swap Between Name/Nick/Alias & UID." +
+        "--NL----COL--[M-CLICK]--COL-- Open Profile" +
+        "--NL----COL--[R-CLICK]--COL-- Edit Nickname";
 
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
@@ -66,7 +65,7 @@ public class DrawEntitySundesmo : ISundesmoEntity
         var clicked = false;
         var cursorPos = ImGui.GetCursorPos();
         var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
-        var hovered = _hovered || selected;
+        var hovered = !_nameHandler.IsEditing(Identifier) && (_hovered || selected);
         var bgCol = hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
 
         using (var _ = CkRaii.Child(Identifier, childSize, bgCol, 5f))
@@ -118,7 +117,6 @@ public class DrawEntitySundesmo : ISundesmoEntity
         // Handle the case of editing state.
         if (_nameHandler.IsEditing(Identifier))
         {
-            ImGui.SameLine(area.X);
             _nameHandler.DrawEditor(Identifier, _sundesmo, area.X);
             return false;
         }
@@ -135,8 +133,7 @@ public class DrawEntitySundesmo : ISundesmoEntity
 
         // Return to the position and draw out the contents.
         ImGui.SameLine(pos.X);
-        var useMono = DisplayName == _sundesmo.UserData.UID;
-        using (ImRaii.PushFont(UiBuilder.MonoFont, useMono))
+        using (ImRaii.PushFont(UiBuilder.MonoFont, _showingUID))
             CkGui.TextFrameAligned(_showingUID ? UID : DisplayName);
         CkGui.AttachToolTip(_parentFolder.Options.DragDropItems ? DragDropTooltip : NormalTooltip, ImGuiColors.DalamudOrange);
         

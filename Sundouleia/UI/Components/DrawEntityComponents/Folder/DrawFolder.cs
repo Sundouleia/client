@@ -174,6 +174,11 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
         // Give the folder a id for the contents.
         using var id = ImRaii.PushId($"sundouleia_folder_{Label}");
         using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One);
+
+        // Style intended only for DragDrop selections.
+        if (Options.IsDropTarget || Options.DragDropItems)
+            style.Push(ImGuiStyleVar.ItemSpacing, new Vector2(ImUtf8.ItemSpacing.X, 2f * ImGuiHelpers.GlobalScale));
+
         // pre-determine the size of the folder.
         var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
         var bgCol = _hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : ColorBG;
@@ -230,7 +235,7 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
         wdl.ChannelsSetCurrent(1); // Foreground.
 
         using var indent = ImRaii.PushIndent(ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X + ImGuiHelpers.GlobalScale, false);
-        ImGuiClip.ClippedDraw(DrawEntities, DrawEntity, ImUtf8.FrameHeightSpacing);
+         ImGuiClip.ClippedDraw(DrawEntities, DrawEntity, ImUtf8.FrameHeightSpacing);
 
         wdl.ChannelsSetCurrent(0); // Background.
         var gradientTL = new Vector2(folderMin.X, folderMax.Y);
@@ -328,6 +333,10 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
             // Ensure correct selection order (top to bottom / bottom to top)
             (i1, i2) = i1 <= i2 ? (i1, i2) : (i2, i1);
             // Determine intent: are we selecting or deselecting?
+
+            // NOTE:
+            // This can produce behavior where it depends on what is shift selected, and not anchored.
+            // It's nothing to worry about, other than personal preference. if more prefer the other way around, just flip this from item to _lastAnchor.
             bool selecting = !_selectedItems.Contains(item);
             // Bulk select/deselect.
             for (int i = i1; i <= i2; i++)
