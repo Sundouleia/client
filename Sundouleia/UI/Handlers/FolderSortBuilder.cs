@@ -2,40 +2,38 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Gui.Handlers;
-
-public record SortInstruction(FolderSortFilter Filter, bool Ascending = false);
 public sealed class FolderSortBuilder
 {
     private readonly IEnumerable<Sundesmo> _source;
-    private readonly List<SortInstruction> _instructions = new();
+    private readonly List<FolderSortFilter> _instructions = new();
 
     public FolderSortBuilder(IEnumerable<Sundesmo> source)
     {
         _source = source;
     }
 
-    public FolderSortBuilder Add(FolderSortFilter filter, bool ascending = false)
+    public FolderSortBuilder Add(FolderSortFilter filter)
     {
-        _instructions.Add(new SortInstruction(filter, ascending));
+        _instructions.Add(filter);
         return this;
     }
 
     public List<Sundesmo> Build()
     {
         if (_instructions.Count == 0)
-            _instructions.Add(new SortInstruction(FolderSortFilter.Alphabetical));
+            _instructions.Add(FolderSortFilter.Alphabetical);
 
         IOrderedEnumerable<Sundesmo>? ordered = null;
 
-        foreach (var (filter, ascending) in _instructions)
+        foreach (var filter in _instructions)
         {
             var keySelector = GetKeySelector(filter);
             if (ordered == null)
-                ordered = ascending
+                ordered = filter is FolderSortFilter.Alphabetical
                     ? _source.OrderBy(keySelector)
                     : _source.OrderByDescending(keySelector);
             else
-                ordered = ascending
+                ordered = filter is FolderSortFilter.Alphabetical
                     ? ordered.ThenBy(keySelector)
                     : ordered.ThenByDescending(keySelector);
         }

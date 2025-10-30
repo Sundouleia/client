@@ -98,9 +98,11 @@ public class DrawFolderRadar : IRadarFolder
 
         _hovered = ImGui.IsItemHovered();
 
-        if (ImGui.IsItemClicked()) _manager.ToggleState(_label);
+        if (ImGui.IsItemClicked())
+            _manager.ToggleState(_label);
 
-        if (!_manager.IsOpen(_label)) return;
+        if (!_manager.IsOpen(_label))
+            return;
 
         var wdl = ImGui.GetWindowDrawList();
         wdl.ChannelsSplit(2);

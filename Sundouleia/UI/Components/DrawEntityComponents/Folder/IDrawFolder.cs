@@ -1,4 +1,5 @@
 
+using Sundouleia.Pairs;
 using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.Components;
@@ -9,6 +10,16 @@ namespace Sundouleia.Gui.Components;
 /// </summary>
 public interface ISundesmoFolder
 {
+    /// <summary>
+    ///     Required to share memory between sundesmo folders.
+    /// </summary>
+    SharedFolderMemory SharedMemory { get; }
+
+    /// <summary>
+    ///     The Identifier label of this folder.
+    /// </summary>
+    string Label { get; }
+
     /// <summary>
     ///     The total sundesmos within this folder.
     /// </summary>
@@ -25,12 +36,35 @@ public interface ISundesmoFolder
     int Online { get; }
 
     /// <summary>
-    ///     The sundesmo entries to draw when the folder is opened.
+    ///     The Entities to display.
     /// </summary>
-    IImmutableList<DrawEntitySundesmo> DrawEntities { get; }
+    ImmutableList<DrawEntitySundesmo> DrawEntities { get; }
 
-    void Draw();
+    /// <summary>
+    ///     Primary Draw Function.
+    /// </summary>
+    void DrawContents();
+
+    /// <summary>
+    ///     Regenerate the 'DrawEntities' based on the provided filter."
+    /// </summary>
+    void RegenerateItems(string filter);
+
+    /// <summary>
+    ///     Update the filtered items based on the new provided filter.
+    /// </summary>
+    void UpdateItemsForFilter(string filter);
+
 }
+
+public interface ISundesmoEntity
+{
+    // Unique DrawTag
+    string Identifier { get; }
+
+    Sundesmo Sundesmo { get; }
+}
+
 
 /// <summary>
 ///     The contract requirement for any radar related draw folder.

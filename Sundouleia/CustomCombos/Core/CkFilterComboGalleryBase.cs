@@ -11,7 +11,7 @@ namespace Sundouleia.CustomCombos;
 
 public abstract class CkFilterComboGallery<T>
 {
-    private const CFlags heightMask = CFlags.HeightSmall | CFlags.HeightRegular | CFlags.HeightLarge | CFlags.HeightLargest;
+    protected const CFlags HEIGHT_MASK = CFlags.HeightSmall | CFlags.HeightRegular | CFlags.HeightLarge | CFlags.HeightLargest;
 
     private readonly HashSet<uint> _popupState = [];
 
@@ -135,10 +135,10 @@ public abstract class CkFilterComboGallery<T>
 
 
     /// <summary> Called by the filter combo base Draw() call. Handles updates and changed items. </summary>
-    private void DrawCombo(string label, string preview, float comboWidth, int curSelected, CFlags flags, uint? customSearchBg = null)
+    protected virtual void DrawCombo(string label, string preview, float comboWidth, int curSelected, CFlags flags, uint? customSearchBg = null)
     {
         // Ensure a height flag is set.
-        if ((flags & heightMask) == 0)
+        if ((flags & HEIGHT_MASK) == 0)
             flags |= CFlags.HeightLarge;
 
         // Give this an id and begin the combo.

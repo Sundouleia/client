@@ -6,85 +6,91 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
+using OtterGui.Widgets;
+using Sundouleia.Gui.Components;
 using Sundouleia.Gui.Handlers;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using System.Linq;
 
 namespace Sundouleia.Gui.MainWindow;
 
 public class WhitelistTab : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
+    private readonly DrawEntityFactory _factory;
     private readonly GroupsManager _groups;
     private readonly SundesmoManager _sundesmos;
     private readonly FolderHandler _drawFolders;
 
-    public enum ViewMode
-    {
-        Basic,
-        Groups,
-    }
-
-    private ViewMode _viewMode = ViewMode.Basic;
-
+    private List<ISundesmoFolder> _mainFolders;
+    private List<ISundesmoFolder> _groupFolders;
+    private bool _viewingGroups = false;
+    private string _filter = string.Empty;
     public WhitelistTab(ILogger<WhitelistTab> logger, SundouleiaMediator mediator,
-        MainConfig config, GroupsManager groups, SundesmoManager sundesmos, 
-        FolderHandler drawFolders)
+        MainConfig config, DrawEntityFactory factory, GroupsManager groups, 
+        SundesmoManager sundesmos, FolderHandler drawFolders)
         : base(logger, mediator)
     {
         _config = config;
+        _factory = factory;
         _groups = groups;
         _sundesmos = sundesmos;
         _drawFolders = drawFolders;
+        UpdateFolders();
+
+        Mediator.Subscribe<RefreshFolders>(this, _ => UpdateFolders());
     }
 
     public void DrawWhitelistSection()
     {
-        DrawSearchFilter();
+        var folders = _viewingGroups ? _groupFolders : _mainFolders;
+        DrawSearchFilter(folders);
         ImGui.Separator();
 
         using var _ = CkRaii.Child("content", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-
-        var toDraw = _viewMode is ViewMode.Groups ? _drawFolders.GroupFolders : _drawFolders.DefaultFolders;
-
         // Draw Folders out.
-        foreach (var folder in toDraw)
-            folder.Draw();
+        foreach (var folder in folders)
+            folder.DrawContents();
     }
 
     // Find a way to improve this soon, right now it is a little messy.
-    private void DrawSearchFilter()
+    private void DrawSearchFilter(IEnumerable<ISundesmoFolder> toDraw)
     {
-        var enumWidth = ImGui.CalcTextSize("Groups").X + ImUtf8.FramePadding.X * 2 + ImUtf8.ItemInnerSpacing.X;
+        // Pre-Determine the right width.
+        var icon = _viewingGroups ? FAI.PeopleGroup : FAI.Globe;
+        var text = _viewingGroups ? "Groups" : "Basic";
+        var rightWidth = CkGui.IconTextButtonSize(icon, text);
+        if (_viewingGroups) rightWidth += CkGui.IconButtonSize(FAI.Filter).X + ImUtf8.ItemInnerSpacing.X;
         
-        var filter = _drawFolders.Filter;
-        if (_viewMode is ViewMode.Groups)
+        // Draw the search bar.
+        if (FancySearchBar.Draw("SundesmoSearch", ImGui.GetContentRegionAvail().X, "filter..", ref _filter, 128, rightWidth, RightContent))
         {
-            var buttonWidth = _viewMode is ViewMode.Groups ? CkGui.IconButtonSize(FAI.Filter).X : 0f;
-            if (FancySearchBar.Draw("SundesmoSearch", ImGui.GetContentRegionAvail().X - enumWidth, "filter..", ref filter, 128, buttonWidth, DrawFilterButton))
-                _drawFolders.Filter = filter;
-        }
-        else
-        {
-            if (FancySearchBar.Draw("SundesmoSearch", ImGui.GetContentRegionAvail().X - enumWidth, "filter..", ref filter, 128))
-                _drawFolders.Filter = filter;
+            foreach (var folder in toDraw)
+                folder.UpdateItemsForFilter(_filter);
         }
 
-        ImUtf8.SameLineInner();
-        if (CkGuiUtils.EnumCombo("##pair_view_type", ImGui.GetContentRegionAvail().X, _viewMode, out var newMode, Enum.GetValues<ViewMode>(), flags: CFlags.NoArrowButton))
-            _viewMode = newMode;
-
-        void DrawFilterButton()
+        void RightContent()
         {
-            var pressed = CkGui.IconButton(FAI.Filter, inPopup: true);
-            var popupDrawPos = ImGui.GetItemRectMin() + new Vector2(ImGui.GetItemRectSize().X, 0);
-            CkGui.AttachToolTip("Arrange Group display order and visibility.");
+            if (_viewingGroups)
+            {
+                var pressed = CkGui.IconButton(FAI.Filter, inPopup: true);
+                var popupDrawPos = ImGui.GetItemRectMin() + new Vector2(ImGui.GetItemRectSize().X, 0);
+                CkGui.AttachToolTip("Arrange Group display order and visibility.");
 
-            if (pressed)
-                ImGui.OpenPopup("##GroupConfiguration");
+                if (pressed)
+                    ImGui.OpenPopup("##GroupConfiguration");
 
-            DrawGroupListPopup(popupDrawPos);
+                DrawGroupListPopup(popupDrawPos);
+
+                ImUtf8.SameLineInner();
+            }
+
+            if (CkGui.IconTextButton(icon, text, isInPopup: true))
+                _viewingGroups = !_viewingGroups;
+            CkGui.AttachToolTip(_viewingGroups ? "Switch to Basic View" : "Switch to Groups View");
         }
     }
 
@@ -151,5 +157,56 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
             ImUtf8.SameLineInner();
             ImUtf8.TextFrameAligned(label);
         }
+    }
+
+    public void UpdateFolders()
+    {
+        if (_mainFolders is null)
+            RecreateDefaultFolders();
+        else
+        {
+            // Regenerate the items otherwise.
+            foreach (var folder in _mainFolders)
+                folder.RegenerateItems(string.Empty);
+        }
+
+        if (_groupFolders is null)
+            RecreateGroupFolders();
+        else
+        {
+            // Regenerate the items otherwise.
+            foreach (var folder in _groupFolders)
+                folder.RegenerateItems(string.Empty);
+        }
+    }
+
+    private void RecreateDefaultFolders()
+    {
+        // Create the folders based on the current config options.
+        var folders = new List<ISundesmoFolder>();
+
+        if (_config.Current.ShowVisibleUsersSeparately)
+            folders.Add(_factory.CreateDefaultFolder(Constants.FolderTagVisible, FolderOptions.Default));
+
+        if (_config.Current.ShowOfflineUsersSeparately)
+        {
+            folders.Add(_factory.CreateDefaultFolder(Constants.FolderTagOnline, FolderOptions.Default));
+            folders.Add(_factory.CreateDefaultFolder(Constants.FolderTagOffline, FolderOptions.Default));
+        }
+        else
+            folders.Add(_factory.CreateDefaultFolder(Constants.FolderTagAll, FolderOptions.DefaultShowEmpty));
+
+        _mainFolders = folders;
+    }
+
+    private void RecreateGroupFolders()
+    {
+        // Create the folders based on the current config options.
+        var groupFolders = new List<ISundesmoFolder>();
+        foreach (var group in _groups.Config.Groups)
+            groupFolders.Add(_factory.CreateGroupFolder(group, FolderOptions.DefaultShowEmpty));
+        _groupFolders = groupFolders;
+        // Ensure All folder exists.
+        _groupFolders.Add(_factory.CreateDefaultFolder(Constants.FolderTagAll, FolderOptions.Default));
     }
 }

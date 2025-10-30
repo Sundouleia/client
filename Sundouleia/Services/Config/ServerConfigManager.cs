@@ -192,6 +192,9 @@ public class ServerConfigManager
         _accountConfig.Save();
     }
 
+    internal bool TryGetNickname(string uid, [NotNullWhen(true)] out string? nickname)
+        => NicknameStorage.Nicknames.TryGetValue(uid, out nickname);
+
     /// <summary>Retrieves the nickname associated with a given UID (User Identifier).</summary>
     /// <returns>Returns the nickname as a string if found; otherwise, returns null.</returns>
     internal string? GetNicknameForUid(string uid)
@@ -210,7 +213,7 @@ public class ServerConfigManager
     /// <summary> Set a nickname for a user identifier. </summary>
     /// <param name="uid">the user identifier</param>
     /// <param name="nickname">the nickname to add</param>
-    internal void SetNicknameForUid(string uid, string nickname)
+    internal void SetNickname(string uid, string nickname)
     {
         if (string.IsNullOrEmpty(uid))
             return;

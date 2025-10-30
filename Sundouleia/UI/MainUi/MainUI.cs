@@ -388,10 +388,4 @@ public class MainUI : WindowMediatorSubscriberBase
             _ => string.Empty
         };
     }
-
-    public override void OnClose()
-    {
-        Mediator.Publish(new ClosedMainUiMessage());
-        base.OnClose();
-    }
 }

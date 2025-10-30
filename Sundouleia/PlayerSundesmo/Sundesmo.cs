@@ -117,8 +117,14 @@ public class Sundesmo : IComparable<Sundesmo>
         => (IsRendered && !string.IsNullOrEmpty(PlayerName)
             ? (_config.Current.PreferNicknamesOverNames ? GetNickAliasOrUid() : PlayerName)
             : GetNickAliasOrUid());
+    public string GetDrawEntityName()
+    {
+        var condition = IsRendered && !_config.Current.PreferNicknamesOverNames && !string.IsNullOrEmpty(PlayerName);
+        return condition ? PlayerName : GetNickAliasOrUid();
+    }
+
     public string? GetNickname() => _nickConfig.GetNicknameForUid(UserData.UID);
-    public string GetNickAliasOrUid() => GetNickname() ?? UserData.AliasOrUID;
+    public string GetNickAliasOrUid() => _nickConfig.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
 
     // Reapply all existing data to all rendered objects.
     public void ReapplyAlterations()

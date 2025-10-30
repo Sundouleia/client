@@ -1,4 +1,5 @@
 using Sundouleia.Gui.Components;
+using Sundouleia.Pairs;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 
@@ -34,7 +35,7 @@ public record OpenReportUIMessage(UserData UserToReport, ReportKind Kind) : Mess
 public record MainWindowTabChangeMessage(MainMenuTabs.SelectedTab NewTab) : MessageBase;
 
 /// <summary> Should fire whenever the Main UI closes. Useful for the interactions popout. </summary>
-public record ClosedMainUiMessage : MessageBase;
+public record FolderDragDropComplete(DrawFolder Source, DrawFolder Dest, List<Sundesmo> Payload) : MessageBase;
 
 /// <summary> When we want a specific window removed. Most beneficial for profiles. </summary>
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;

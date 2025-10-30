@@ -206,8 +206,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             return;
         }
 
-        // Init the proper first-time online message.
-        if (notify && _config.Current.OnlineNotifications)
+        // Init the proper first-time online message. (also prevent reload spamming logs)
+        if (notify && _config.Current.OnlineNotifications && !sundesmo.IsReloading)
         {
             var nick = sundesmo.GetNickname();
             // Do not show if we limit it to nicked pairs and there is no nickname.

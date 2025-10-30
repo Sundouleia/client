@@ -2,11 +2,10 @@ using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using OtterGui;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
+using Sundouleia.Gui.Components;
 using Sundouleia.Gui.Handlers;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
@@ -18,24 +17,29 @@ namespace Sundouleia.Gui;
 
 public class GroupsUI : WindowMediatorSubscriberBase
 {
-    private readonly GroupsSelector _selector;
     private readonly GroupsManager _manager;
+    private readonly DrawEntityFactory _factory;
     private readonly FolderHandler _drawFolders;
     private readonly TutorialService _guides;
 
     private FAIconCombo _iconGalleryCombo;
+    private List<DrawFolderGroup> _groups;
+    private DrawFolderDefault _allSundesmos;
 
-    private SundesmoGroup? _editingGroup = null;
-    public GroupsUI(ILogger<GroupsUI> logger, SundouleiaMediator mediator, GroupsSelector selector,
-        GroupsManager manager, FolderHandler handler, TutorialService guides) 
+    private SundesmoGroup _creator = new SundesmoGroup();
+    public GroupsUI(ILogger<GroupsUI> logger, SundouleiaMediator mediator, GroupsManager manager,
+        DrawEntityFactory factory, FolderHandler handler, TutorialService guides) 
         : base(logger, mediator, "Group Manager###Sundouleia_GroupUI")
     {
-        _selector = selector;
         _manager = manager;
+        _factory = factory;
         _drawFolders = handler;
         _guides = guides;
 
         _iconGalleryCombo = new FAIconCombo(logger);
+        UpdateFolders();
+
+        Mediator.Subscribe<RefreshFolders>(this, _ => UpdateFolders());
 
         this.PinningClickthroughFalse();
         this.SetBoundaries(new(550, 470), ImGui.GetIO().DisplaySize);        
@@ -52,112 +56,116 @@ public class GroupsUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        CkGui.FontText("Group Manager", UiFontService.UidFont);
-        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-
-        if (CkGui.IconTextButton(FAI.Plus, "Create New Group", disabled: _editingGroup is not null))
-        {
-            _editingGroup = new SundesmoGroup();
-        }
-
-        if (_editingGroup is not null)
-            DrawGroupEditor();
+        DrawGroupEditor();
 
         // Display active groups.
-        ImGui.Separator();
-        CkGui.FontText("Existing Groups", UiFontService.UidFont);
+        ImGui.Spacing();
+        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
 
-        foreach (var group in _drawFolders.GroupFolders)
-            group.Draw();
+        // calculate the width of the display area.
+        var region = ImGui.GetContentRegionAvail();
+        var childSize = new Vector2((region.X - ImUtf8.ItemSpacing.X) / 2, region.Y);
+
+        using (CkRaii.Child("GroupManagerEditor_Groups", childSize))
+        {
+            foreach (var group in _groups)
+                group.DrawContents();
+        }
+
+        ImUtf8.SameLineInner();
+
+        using (CkRaii.Child("GroupManagerEditor_AllSundesmos", childSize))
+        {
+            _allSundesmos.DrawContents();
+        }
     }
 
+    #region Creator
     private void DrawGroupEditor()
     {
-        CkGui.FontText("Group Editor.", UiFontService.Default150Percent);
-        using var _ = CkRaii.FramedChildPaddedW($"##GroupEditorFrame", ImGui.GetContentRegionAvail().X, CkStyle.GetFrameRowsHeight(6), 0, CkColor.LushPinkLine.Uint());
+        // Icon & Name Line. (with create button)
+        var createButtonWidth = CkGui.IconTextButtonSize(FAI.Plus, "Create Group");
+        var rightArea = createButtonWidth + ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X * 2;
+        var label = _creator.Label;
+        var desc = _creator.Description;
+        var iconCol = ImGui.ColorConvertU32ToFloat4(_creator.IconColor);
+        var labelCol = ImGui.ColorConvertU32ToFloat4(_creator.LabelColor);
+        var seeOffline = _creator.ShowOffline;
 
-        if (_editingGroup is not { } group)
-            return;
+        // Draw out the gallery combo for the icon.
+        _iconGalleryCombo.Draw("IconSelector", _creator.Icon, 10, ImGuiComboFlags.NoArrowButton);
+        CkGui.AttachToolTip("Select an icon for the group.");
+        // Then the icon color editor.
+        ImUtf8.SameLineInner();
+        if (ImGui.ColorEdit4("##IconColor", ref iconCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+            _creator.IconColor = ImGui.ColorConvertFloat4ToU32(iconCol);
+        CkGui.AttachToolTip("The color of the icon.");
 
-        using (var t = ImRaii.Table("GroupEditorTable", 2, ImGuiTableFlags.SizingFixedFit))
-        {
-            if (!t)
-                return;
-
-            ImGui.TableSetupColumn("Attribute");
-            ImGui.TableSetupColumn("Value");
-            ImGui.TableNextRow();
-
-            // Icon Line.
-            var iconCol = ImGui.ColorConvertU32ToFloat4(group.IconColor);
-            ImGuiUtil.DrawFrameColumn("Icon");
-
-            ImGui.TableNextColumn();
-            _iconGalleryCombo.Draw("IconSelector", group.Icon, 50f, 10, ImGuiComboFlags.NoArrowButton);
-            ImUtf8.SameLineInner();
-            if (ImGui.ColorEdit4("##IconColor", ref iconCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
-                group.IconColor = ImGui.ColorConvertFloat4ToU32(iconCol);
-            ImGui.TableNextRow();
-
-            // Label Line.
-            var label = group.Label;
-            var labelCol = ImGui.ColorConvertU32ToFloat4(group.LabelColor);
-            ImGuiUtil.DrawFrameColumn("Name");
-
-            ImGui.TableNextColumn();
-            ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
-            if (ImGui.InputText("##GroupLabelInput", ref label, 64))
-                group.Label = label;
-            ImUtf8.SameLineInner();
-            if (ImGui.ColorEdit4("##LabelColor", ref labelCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
-                group.LabelColor = ImGui.ColorConvertFloat4ToU32(labelCol);
-            ImGui.TableNextRow();
-
-            // Description Line.
-            var desc = group.Description;
-            var descCol = ImGui.ColorConvertU32ToFloat4(group.DescriptionColor);
-            ImGuiUtil.DrawFrameColumn("Description");
-
-            ImGui.TableNextColumn();
-            ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
-            if (ImGui.InputText("##GroupDescInput", ref desc, 128))
-                group.Description = desc;
-            ImUtf8.SameLineInner();
-            if (ImGui.ColorEdit4("##DescColor", ref descCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
-                group.DescriptionColor = ImGui.ColorConvertFloat4ToU32(descCol);
-            ImGui.TableNextRow();
-
-            // Preferences.
-            var seeOffline = group.ShowOffline;
-            ImGuiUtil.DrawFrameColumn("Show Offline");
-            ImGui.TableNextColumn();
-            if (ImGui.Checkbox("##Show Offline", ref seeOffline))
-                group.ShowOffline = seeOffline;
-        }
-
+        // Then the Label.
+        ImUtf8.SameLineInner();
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X -  rightArea);
+        if (ImGui.InputTextWithHint("##GroupLabelInput", "Define Group Name..", ref label, 64))
+            _creator.Label = label;
+        CkGui.AttachToolTip("The name of this group.");
+        ImUtf8.SameLineInner();
+        if (ImGui.ColorEdit4("##LabelColor", ref labelCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+            _creator.LabelColor = ImGui.ColorConvertFloat4ToU32(labelCol);
+        // Then the create button.
+        ImUtf8.SameLineInner();
         if (ImGui.Button("Create Group", new Vector2(ImGui.GetContentRegionAvail().X, ImUtf8.FrameHeight)))
         {
-            if (_manager.TryAddNewGroup(group))
-            {
-                _logger.LogInformation($"Created new group {{{group.Label}}}");
-                _editingGroup = null;
-            }
+            if (_manager.TryAddNewGroup(_creator))
+                _logger.LogInformation($"Created new group {{{_creator.Label}}}");
+            else
+                _logger.LogWarning($"Failed to create new group {{{_creator.Label}}}");
+        }
+        CkGui.AttachToolTip("Create the group with these current settings.");
+
+        // Next Line, the Description.
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - rightArea);
+        if (ImGui.InputTextWithHint("##GroupDescInput", "Short Description of Group..", ref desc, 150))
+            _creator.Description = desc;
+        CkGui.AttachToolTip("The description of this group.");
+        
+        // Then the offline checkbox.
+        ImUtf8.SameLineInner();
+        if (ImGui.Checkbox("Show Offline", ref seeOffline))
+            _creator.ShowOffline = seeOffline;
+    }
+    #endregion Creator
+
+    private void UpdateFolders()
+    {
+        // Ensure folders exist.
+        if (_groups is null)
+            RecreateGroupFolders();
+        else
+        {
+            // Regenerate items for each folder.
+            foreach (var folder in _groups)
+                folder.RegenerateItems(string.Empty);
         }
 
-        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-        CkGui.FontText("Linked Users", UiFontService.Default150Percent);
-
-        // List of users for drag drop multi-selection.
+        // Ensure All folder exists.
+        if (_allSundesmos is null)
+            RecreateAllFolder();
+        else
+            _allSundesmos.RegenerateItems(string.Empty);
     }
 
-    private void DrawCreatorEditor()
+    private void RecreateGroupFolders()
     {
-        // Framed child.
-        var height = CkStyle.TwoRowHeight() + CkGui.GetSeparatorHeight() + CkGui.CalcFontTextSize("A", UiFontService.UidFont).Y;
-        using var _ = CkRaii.FramedChildPaddedW("Storage", ImGui.GetContentRegionAvail().X, height, 0, CkColor.VibrantPink.Uint(), CkStyle.ChildRoundingLarge());
-        var topLeftPos = ImGui.GetCursorScreenPos();
+        // Create the folders based on the current config options.
+        var groupFolders = new List<DrawFolderGroup>();
+        foreach (var group in _manager.Config.Groups)
+            groupFolders.Add(_factory.CreateGroupFolder(group, FolderOptions.FolderEditor));
 
-        CkGui.FontTextCentered("FileCache Storage", UiFontService.UidFont);
-        CkGui.Separator(CkColor.VibrantPink.Uint());
+        _groups = groupFolders;
     }
+
+    private void RecreateAllFolder()
+    {
+        _allSundesmos = _factory.CreateDefaultFolder(Constants.FolderTagAllDragDrop, FolderOptions.FolderEditor);
+    }
+
 }

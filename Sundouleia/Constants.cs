@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Windows.Forms;
 
 namespace Sundouleia;
 
@@ -7,14 +8,15 @@ public static class Constants
     public const int Blake3HashLength = 64;
     public const int SundesmoTimeoutSeconds = 7;
     // Default, Unchangeable Tags used for base Sundesmo grouping.
-    public const string FolderTagAll            = "Sundouleia_All";
-    public const string FolderTagVisible        = "Sundouleia_Visible";
-    public const string FolderTagOnline         = "Sundouleia_Online";
-    public const string FolderTagOffline        = "Sundouleia_Offline";
-    public const string FolderTagRadarPaired    = "Sundouleia_Radar_Paired";
-    public const string FolderTagRadarUnpaired  = "Sundouleia_Radar_Unpaired";
-    public const string FolderTagRequestIncoming= "Sundouleia_Request_Incoming";
-    public const string FolderTagRequestPending = "Sundouleia_Request_Pending";
+    public const string FolderTagAllDragDrop    = "All Sundesmos (For Drag-Drop)";
+    public const string FolderTagAll            = "All Sundesmos";
+    public const string FolderTagVisible        = "Visible";
+    public const string FolderTagOnline         = "Online";
+    public const string FolderTagOffline        = "Offline";
+    public const string FolderTagRadarPaired    = "Paired";
+    public const string FolderTagRadarUnpaired  = "Unpaired";
+    public const string FolderTagRequestIncoming= "Incoming Requests";
+    public const string FolderTagRequestPending = "Pending Requests";
     // CachePrefixes
     public const string PrefixCache = "{cache}";
     public const string PrefixPenumbra = "{penumbra}";

@@ -117,10 +117,9 @@ public class GroupsManager
         return true;
     }
 
-    public void UpdateDescription(SundesmoGroup group, string newDesc, uint newColor)
+    public void UpdateDescription(SundesmoGroup group, string newDesc)
     {
         group.Description = newDesc;
-        group.DescriptionColor = newColor;
         _config.Save();
     }
 
@@ -142,7 +141,6 @@ public class GroupsManager
         match.Label = updated.Label;
         match.LabelColor = updated.LabelColor;
         match.Description = updated.Description;
-        match.DescriptionColor = updated.DescriptionColor;
         match.ShowOffline = updated.ShowOffline;
         _config.Save();
         return true;
@@ -161,7 +159,6 @@ public class GroupsManager
         group.Label = updated.Label;
         group.LabelColor = updated.LabelColor;
         group.Description = updated.Description;
-        group.DescriptionColor = updated.DescriptionColor;
         group.ShowOffline = updated.ShowOffline;
         _config.Save();
         return true;
@@ -262,5 +259,43 @@ public class GroupsManager
         Config.Groups.Remove(group);
         _config.Save();
         return true;
+    }
+
+    public bool RenderIfEmpty(string label)
+    {
+        // Check defaults first.
+        if (DefaultLabels.Contains(label))
+            return label switch
+            {
+                Constants.FolderTagAll => true,
+                Constants.FolderTagVisible => false,
+                Constants.FolderTagOnline => false,
+                Constants.FolderTagOffline => false,
+                _ => false,
+            };
+        // Fallback to groups.
+        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(label, StringComparison.Ordinal)) is { } match)
+            return true;
+        // Default false.
+        return false;
+    }
+
+    public FAI IconForGroup(string label)
+    {
+        // Check defaults first.
+        if (DefaultLabels.Contains(label))
+            return label switch
+            {
+                Constants.FolderTagAll => FAI.Globe,
+                Constants.FolderTagVisible => FAI.Eye,
+                Constants.FolderTagOnline => FAI.Link,
+                Constants.FolderTagOffline => FAI.Link,
+                _ => FAI.Folder,
+            };
+        // Fallback to groups.
+        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(label, StringComparison.Ordinal)) is { } match)
+            return match.Icon;
+        // Default folder icon.
+        return FAI.Folder;
     }
 }

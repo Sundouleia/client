@@ -324,6 +324,9 @@ namespace Sundouleia.Localization
         public readonly string TransferBarWidthTT = Loc.Localize("Preferences_TransferBarWidthTT", "Sets the width of the download progress bars.");
 
         // Pairs Section
+        public readonly string FavoritesFirstLabel = Loc.Localize("Preferences_FavoritesFirstLabel", "Show Favorites First");
+        public readonly string FavoritesFirstTT = Loc.Localize("Preferences_FavoritesFirstTT", "Render all favorites first for all main folders.");
+
         public readonly string PreferNicknamesLabel = Loc.Localize("Preferences_PreferNicknamesLabel", "Prefer nicknames for visible pairs");
         public readonly string PreferNicknamesTT = Loc.Localize("Preferences_PreferNicknamesTT", "Displays nicknames instead of character names for paired players within render range.");
 

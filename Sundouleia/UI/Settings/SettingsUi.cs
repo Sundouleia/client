@@ -423,11 +423,19 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawPrefsSundesmos()
     {
         CkGui.FontText(CkLoc.Settings.Preferences.HeaderPairs, UiFontService.UidFont);
+        var favoritesFirst = _mainConfig.Current.FavoritesFirst;
         var nickOverName = _mainConfig.Current.PreferNicknamesOverNames;
         var sepVisibleUsers = _mainConfig.Current.ShowVisibleUsersSeparately;
         var sepOfflineUsers = _mainConfig.Current.ShowOfflineUsersSeparately;
         var contextMenus = _mainConfig.Current.ShowContextMenus;
         var useFocusTarget = _mainConfig.Current.FocusTargetOverTarget;
+
+        if (ImGui.Checkbox(CkLoc.Settings.Preferences.FavoritesFirstLabel, ref favoritesFirst))
+        {
+            _mainConfig.Current.FavoritesFirst = favoritesFirst;
+            _mainConfig.Save();
+            Mediator.Publish(new RefreshFolders());
+        }
 
         if (ImGui.Checkbox(CkLoc.Settings.Preferences.PreferNicknamesLabel, ref nickOverName))
         {

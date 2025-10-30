@@ -1,4 +1,5 @@
 using CkCommons.HybridSaver;
+using Dalamud.Bindings.ImGui;
 using Sundouleia.Services.Configs;
 
 namespace Sundouleia.PlayerClient;
@@ -33,7 +34,8 @@ public class SundesmoGroup
     public string Description { get; set; } = string.Empty;
     public uint IconColor { get; set; } = 0xFFFFFFFF;
     public uint LabelColor { get; set; } = 0xFFFFFFFF;
-    public uint DescriptionColor { get; set; } = 0xFFFFFFFF;
+    public uint BorderColor { get; set; } = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+    public bool ShowIfEmpty { get; set; } = true;
     public bool ShowOffline { get; set; } = true;
     public List<FolderSortFilter> SortOrder { get; set; } = new(); // Empty == Alphabetical
     public HashSet<string> LinkedUids { get; set; } = new();
