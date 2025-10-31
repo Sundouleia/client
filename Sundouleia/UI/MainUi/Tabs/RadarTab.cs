@@ -36,6 +36,9 @@ public class RadarTab : DisposableMediatorSubscriberBase
         _unpairedFolder = _factory.CreateRadarFolder(Constants.FolderTagRadarUnpaired, FolderOptions.Default);
     }
 
+    public DynamicRadarFolder Paired => _pairedFolder;
+    public DynamicRadarFolder Unpaired => _unpairedFolder;
+
     public void DrawSection()
     {
         var unverified = !MainHub.Reputation.IsVerified;

@@ -64,7 +64,7 @@ public class DrawFolderDefault : DynamicPairFolder
         });
     }
 
-    protected override void DrawFolderInternal()
+    protected override void DrawFolderInternal(bool toggles)
     {
         // pre-determine the size of the folder.
         var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
@@ -74,7 +74,7 @@ public class DrawFolderDefault : DynamicPairFolder
         {
             var pos = ImGui.GetCursorPos();
             ImGui.InvisibleButton($"folder_click_area_{Label}", new Vector2(folderWidth, _.InnerRegion.Y));
-            if (ImGui.IsItemClicked())
+            if (ImGui.IsItemClicked() && toggles)
                 _groups.ToggleState(Label);
 
             // Back to start and then draw.

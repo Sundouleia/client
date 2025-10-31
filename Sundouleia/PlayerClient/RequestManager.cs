@@ -44,6 +44,8 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
         });
     }
 
+    public int TotalRequests => _allRequests.Count;
+
     // Expose the Request Entries.
     public List<RequestEntry> Incoming => _incomingInternal.Value;
     public List<RequestEntry> Outgoing => _outgoingInternal.Value;

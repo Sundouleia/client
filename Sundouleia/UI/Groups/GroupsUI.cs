@@ -19,7 +19,6 @@ public class GroupsUI : WindowMediatorSubscriberBase
 {
     private readonly GroupsManager _manager;
     private readonly DrawEntityFactory _factory;
-    private readonly FolderHandler _drawFolders;
     private readonly TutorialService _guides;
 
     private FAIconCombo _iconGalleryCombo;
@@ -27,13 +26,12 @@ public class GroupsUI : WindowMediatorSubscriberBase
     private DrawFolderDefault _allSundesmos;
 
     private SundesmoGroup _creator = new SundesmoGroup();
-    public GroupsUI(ILogger<GroupsUI> logger, SundouleiaMediator mediator, GroupsManager manager,
-        DrawEntityFactory factory, FolderHandler handler, TutorialService guides) 
+    public GroupsUI(ILogger<GroupsUI> logger, SundouleiaMediator mediator,
+        GroupsManager manager, DrawEntityFactory factory, TutorialService guides) 
         : base(logger, mediator, "Group Manager###Sundouleia_GroupUI")
     {
         _manager = manager;
         _factory = factory;
-        _drawFolders = handler;
         _guides = guides;
 
         _iconGalleryCombo = new FAIconCombo(logger);
@@ -51,6 +49,8 @@ public class GroupsUI : WindowMediatorSubscriberBase
             .AddTutorial(guides, TutorialType.Groups)
             .Build();
     }
+
+    public List<DrawFolderGroup> Groups => _groups;
 
     protected override void PreDrawInternal()
     { }

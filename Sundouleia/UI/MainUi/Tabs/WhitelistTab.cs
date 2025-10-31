@@ -23,7 +23,6 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     private readonly DrawEntityFactory _factory;
     private readonly GroupsManager _groups;
     private readonly SundesmoManager _sundesmos;
-    private readonly FolderHandler _drawFolders;
 
     private List<IDynamicFolder> _mainFolders;
     private List<IDynamicFolder> _groupFolders;
@@ -31,14 +30,13 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     private string _filter = string.Empty;
     public WhitelistTab(ILogger<WhitelistTab> logger, SundouleiaMediator mediator,
         MainConfig config, DrawEntityFactory factory, GroupsManager groups, 
-        SundesmoManager sundesmos, FolderHandler drawFolders)
+        SundesmoManager sundesmos)
         : base(logger, mediator)
     {
         _config = config;
         _factory = factory;
         _groups = groups;
         _sundesmos = sundesmos;
-        _drawFolders = drawFolders;
 
         // Need to regen main folders on config setting changes.
         RegenerateDefaultFolders();
@@ -47,6 +45,9 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         Mediator.Subscribe<GroupAdded>(this, _ => RegenerateGroupFolders());
         Mediator.Subscribe<GroupRemoved>(this, _ => RegenerateGroupFolders());
     }
+
+    public List<IDynamicFolder> MainFolders => _mainFolders;
+    public List<IDynamicFolder> GroupFolders => _groupFolders;
 
     public void DrawWhitelistSection()
     {

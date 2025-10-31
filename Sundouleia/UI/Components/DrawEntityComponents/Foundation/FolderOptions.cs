@@ -7,5 +7,6 @@ public readonly record struct FolderOptions(bool ShowIfEmpty, bool IsDropTarget,
 {
     public static FolderOptions Default => new(false, false, false, false);
     public static FolderOptions DefaultShowEmpty => new(true, false, false, false);
+    public static FolderOptions Requests => new(true, false, false, true);
     public static FolderOptions FolderEditor => new(true, true, true, true);
 }

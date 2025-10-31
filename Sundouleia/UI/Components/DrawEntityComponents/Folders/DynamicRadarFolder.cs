@@ -51,7 +51,7 @@ public class DynamicRadarFolder : DynamicFolder<RadarUser, DrawEntityRadarUser>
     public int Rendered => _allItems.Count(s => s.IsValid);
     public int Lurkers => _allItems.Count(s => !s.IsValid);
 
-    protected override void DrawFolderInternal()
+    protected override void DrawFolderInternal(bool toggles)
     {
         // pre-determine the size of the folder.
         var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
@@ -61,7 +61,7 @@ public class DynamicRadarFolder : DynamicFolder<RadarUser, DrawEntityRadarUser>
         {
             var pos = ImGui.GetCursorPos();
             ImGui.InvisibleButton($"folder_click_area_{Label}", new Vector2(folderWidth, _.InnerRegion.Y));
-            if (ImGui.IsItemClicked())
+            if (ImGui.IsItemClicked() && toggles)
                 _groups.ToggleState(Label);
 
             // Back to start and then draw.
@@ -86,7 +86,7 @@ public class DynamicRadarFolder : DynamicFolder<RadarUser, DrawEntityRadarUser>
     protected override bool CheckFilter(RadarUser u, string filter)
     {
         if (filter.IsNullOrEmpty()) return true;
-        return u.UID.Contains(filter, StringComparison.OrdinalIgnoreCase);
+        return ToRadarName(u).Contains(filter, StringComparison.OrdinalIgnoreCase);
     }
 
     private string ToRadarName(RadarUser user)

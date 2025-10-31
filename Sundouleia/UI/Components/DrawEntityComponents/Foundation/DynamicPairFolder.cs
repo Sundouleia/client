@@ -1,18 +1,7 @@
-using CkCommons.Gui;
-using CkCommons.Raii;
-using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
-using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
-using Lumina.Excel.Sheets;
-using OtterGui.Text;
-using OtterGui.Text.EndObjects;
 using Sundouleia.Gui.Handlers;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
-using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.Components;
 

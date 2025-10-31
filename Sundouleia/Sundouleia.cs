@@ -223,7 +223,6 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Components
         .AddScoped<ProfileHelper>()
-        .AddScoped<FolderHandler>()
         .AddScoped<SharedFolderMemory>()
         .AddScoped<UiFileCacheShared>()
 
@@ -248,6 +247,7 @@ public static class SundouleiaServiceExtensions
         .AddScoped<AccountTab>()
 
         // Scoped Modules
+        .AddScoped<GroupsUI>()
         .AddScoped<WindowMediatorSubscriberBase, GroupsUI>()
         .AddScoped<WindowMediatorSubscriberBase, TransferBarUI>()
         .AddScoped<WindowMediatorSubscriberBase, RadarChatPopoutUI>()

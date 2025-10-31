@@ -18,9 +18,9 @@ namespace Sundouleia.Gui.Components;
 ///     Comes includes with <see cref="FolderOptions"/>, drag-drop support, and multi-selection support. <para />
 ///     Generated Dynamically as needed by updates, for DrawTime performance.
 /// </summary>
-public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSubscriberBase, IDynamicFolder
+public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSubscriberBase, IDynamicFolder<TDrawEntity>
     where TModel : class 
-    where TDrawEntity : class, IDrawEntity<TModel>
+    where TDrawEntity : class, IDrawEntity
 {
     protected readonly MainConfig _config;
     protected readonly DrawEntityFactory _factory;
@@ -74,7 +74,7 @@ public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSub
     public int Total => _allItems.Count;
 
     // For public read use only, modification made in _drawEntities.
-    public IReadOnlyList<IDrawEntity> DrawEntities { get; private set; } = [];
+    public IReadOnlyList<TDrawEntity> DrawEntities { get; private set; } = [];
 
     protected bool ShouldShowFolder() => DrawEntities.Count > 0 || (ShowIfEmpty || Options.ShowIfEmpty);
 
@@ -154,7 +154,7 @@ public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSub
         if (Options.IsDropTarget || Options.DragDropItems)
             style.Push(ImGuiStyleVar.ItemSpacing, new Vector2(ImUtf8.ItemSpacing.X, 2f * ImGuiHelpers.GlobalScale));
 
-        DrawFolderInternal();
+        DrawFolderInternal(true);
         AsDragDropTarget();
 
         if (!_groups.IsOpen(Label))
@@ -170,7 +170,7 @@ public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSub
         if (Options.IsDropTarget || Options.DragDropItems)
             style.Push(ImGuiStyleVar.ItemSpacing, new Vector2(ImUtf8.ItemSpacing.X, 2f * ImGuiHelpers.GlobalScale));
 
-        DrawFolderInternal();
+        DrawFolderInternal(false);
         AsDragDropTarget();
     }
 
@@ -192,7 +192,7 @@ public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSub
         wdl.ChannelsMerge();
     }
 
-    protected virtual void DrawFolderInternal()
+    protected virtual void DrawFolderInternal(bool toggles)
     {
         // pre-determine the size of the folder.
         var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
@@ -202,7 +202,7 @@ public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSub
         {
             var pos = ImGui.GetCursorPos();
             ImGui.InvisibleButton($"folder_click_area_{Label}", new Vector2(folderWidth, _.InnerRegion.Y));
-            if (ImGui.IsItemClicked())
+            if (ImGui.IsItemClicked() && toggles)
                 _groups.ToggleState(Label);
 
             // Back to start and then draw.

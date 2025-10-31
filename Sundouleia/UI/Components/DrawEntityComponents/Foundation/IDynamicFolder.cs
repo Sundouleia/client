@@ -1,5 +1,13 @@
 namespace Sundouleia.Gui.Components;
 
+public interface IDynamicFolder<TDrawEntity> : IDynamicFolder where TDrawEntity : IDrawEntity
+{
+    /// <summary>
+    ///     The DrawEntities contained within this folder.
+    /// </summary>
+    IReadOnlyList<TDrawEntity> DrawEntities { get; }
+}
+
 public interface IDynamicFolder
 {
     /// <summary>
@@ -16,11 +24,6 @@ public interface IDynamicFolder
     ///     Display Label for the folder (can change).
     /// </summary>
     string Label { get; }
-
-    /// <summary>
-    ///     The DrawEntities contained within this folder.
-    /// </summary>
-    IReadOnlyList<IDrawEntity> DrawEntities { get; }
 
     /// <summary>
     ///     The total sundesmos within this folder.

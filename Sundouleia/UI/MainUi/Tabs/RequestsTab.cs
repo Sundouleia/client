@@ -15,9 +15,12 @@ public class RequestsTab
     {
 
         // Create the folders.
-        _incomingFolder = factory.CreateRequestFolder(Constants.FolderTagRequestIncoming, new FolderOptions(true, false, false, true));
-        _pendingFolder = factory.CreateRequestFolder(Constants.FolderTagRequestPending, new FolderOptions(true, false, false, true));
+        _incomingFolder = factory.CreateIncomingRequestsFolder();
+        _pendingFolder = factory.CreateOutgoingRequestsFolder();
     }
+
+    public DynamicRequestFolder Incoming => _incomingFolder;
+    public DynamicRequestFolder Pending => _pendingFolder;
 
     public void DrawRequestsSection()
     {

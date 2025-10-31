@@ -62,10 +62,11 @@ public class DrawEntityFactory
         => new DynamicRadarFolder(label, options, _logFactory.CreateLogger<DynamicRadarFolder>(), _mediator,
             _config, this, _groupManager, _folderMemory, _radarManager, _sundesmos);
 
-    public DynamicRequestFolder CreateRequestFolder(string label, FolderOptions options)
-        => new DynamicRequestFolder(label, options, _logFactory.CreateLogger<DynamicRequestFolder>(), _mediator,
-            _config, this, _groupManager, _folderMemory, _requests);
+    public DrawFolderRequestsIn CreateIncomingRequestsFolder()
+        => new DrawFolderRequestsIn(_logFactory.CreateLogger<DrawFolderRequestsIn>(), _mediator, _config, this, _groupManager, _folderMemory, _requests);
 
+    public DrawFolderRequestsOut CreateOutgoingRequestsFolder()
+        => new DrawFolderRequestsOut(_logFactory.CreateLogger<DrawFolderRequestsOut>(), _mediator, _config, this, _groupManager, _folderMemory, _requests);
 
     // For DynamicPairFolder 
     public DrawEntitySundesmo CreateDrawEntity(DynamicPairFolder parent, Sundesmo sundesmo)

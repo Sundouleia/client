@@ -14,14 +14,14 @@ namespace Sundouleia.Gui.Components;
 ///     Might want to make a separate one for incoming and outgoing as they are fairly different.
 ///     But they do use the same draw method so idk.
 /// </summary>
-public class DynamicRequestFolder : DynamicFolder<RequestEntry, DrawEntityRequest>
+public abstract class DynamicRequestFolder : DynamicFolder<RequestEntry, DrawEntityRequest>
 {
     protected readonly RequestsManager _requests;
 
-    public DynamicRequestFolder(string label, FolderOptions options, ILogger log, 
-        SundouleiaMediator mediator, MainConfig config, DrawEntityFactory factory, 
-        GroupsManager groups, SharedFolderMemory memory, RequestsManager requests)
-        : base(label, options, log, mediator, config, factory, groups, memory)
+    protected DynamicRequestFolder(string label, ILogger log, SundouleiaMediator mediator,
+        MainConfig config, DrawEntityFactory factory, GroupsManager groups, 
+        SharedFolderMemory memory, RequestsManager requests)
+        : base(label, FolderOptions.Requests, log, mediator, config, factory, groups, memory)
     {
         _requests = requests;
 
@@ -40,14 +40,9 @@ public class DynamicRequestFolder : DynamicFolder<RequestEntry, DrawEntityReques
             if (_.TargetFolders is RefreshTarget.Requests)
                 RegenerateItems(string.Empty);
         });
-
-        // Subscribe to pair-related changes here via the mediator calls.
     }
 
-    public int Incoming => _allItems.Count(s => !s.FromClient);
-    public int Outgoing => _allItems.Count(s => s.FromClient);
-
-    protected override void DrawFolderInternal()
+    protected override void DrawFolderInternal(bool toggles)
     {
         // pre-determine the size of the folder.
         var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
@@ -57,7 +52,7 @@ public class DynamicRequestFolder : DynamicFolder<RequestEntry, DrawEntityReques
         {
             var pos = ImGui.GetCursorPos();
             ImGui.InvisibleButton($"folder_click_area_{Label}", new Vector2(folderWidth, _.InnerRegion.Y));
-            if (ImGui.IsItemClicked())
+            if (ImGui.IsItemClicked() && toggles)
                 _groups.ToggleState(Label);
 
             // Back to start and then draw.

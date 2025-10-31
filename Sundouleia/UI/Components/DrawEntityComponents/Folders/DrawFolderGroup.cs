@@ -57,7 +57,7 @@ public class DrawFolderGroup : DynamicPairFolder
     protected override IEnumerable<FolderSortFilter> GetSortOrder()
         => _group.SortOrder;
 
-    protected override void DrawFolderInternal()
+    protected override void DrawFolderInternal(bool toggles)
     {
         // pre-determine the size of the folder.
         var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
