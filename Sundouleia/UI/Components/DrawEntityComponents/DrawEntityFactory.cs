@@ -20,6 +20,7 @@ public class DrawEntityFactory
     private readonly SharedFolderMemory _folderMemory;
     private readonly IdDisplayHandler _nameDisplay;
     private readonly GroupsManager _groupManager;
+    private readonly RadarManager _radarManager;
     private readonly SundesmoManager _sundesmos;
     private readonly RequestsManager _requests;
 
@@ -31,6 +32,7 @@ public class DrawEntityFactory
         SharedFolderMemory memory,
         IdDisplayHandler nameDisplay,
         GroupsManager groups,
+        RadarManager radar,
         SundesmoManager sundesmos,
         RequestsManager requests)
     {
@@ -41,6 +43,8 @@ public class DrawEntityFactory
         _favorites = favorites;
         _folderMemory = memory;
         _nameDisplay = nameDisplay;
+        _requests = requests;
+        _radarManager = radar;
         _groupManager = groups;
         _sundesmos = sundesmos;
     }
@@ -54,14 +58,22 @@ public class DrawEntityFactory
         => new DrawFolderGroup(group, options, _logFactory.CreateLogger<DrawFolderGroup>(), _mediator, 
             _config, _folderMemory, this, _groupManager, _sundesmos);
 
-    public DrawEntitySundesmo CreateDrawEntity(DrawFolder parent, Sundesmo sundesmo)
+    public DynamicRadarFolder CreateRadarFolder(string label, FolderOptions options)
+        => new DynamicRadarFolder(label, options, _logFactory.CreateLogger<DynamicRadarFolder>(), _mediator,
+            _config, this, _groupManager, _folderMemory, _radarManager, _sundesmos);
+
+    public DynamicRequestFolder CreateRequestFolder(string label, FolderOptions options)
+        => new DynamicRequestFolder(label, options, _logFactory.CreateLogger<DynamicRequestFolder>(), _mediator,
+            _config, this, _groupManager, _folderMemory, _requests);
+
+
+    // For DynamicPairFolder 
+    public DrawEntitySundesmo CreateDrawEntity(DynamicPairFolder parent, Sundesmo sundesmo)
         => new DrawEntitySundesmo(parent, sundesmo, _mediator, _config, _favorites, _nameDisplay);
 
-
-    // In Rework.
-    public DrawFolderRadar CreateRadarFolder(string label, List<RadarUser> all, Func<List<RadarUser>, IImmutableList<DrawEntityRadarUser>> lazyGen)
-        => new DrawFolderRadar(label, all, lazyGen, _config, _groupManager);
-
     public DrawEntityRadarUser CreateRadarEntity(RadarUser user)
-        => new DrawEntityRadarUser(user, _mediator, _hub, _sundesmos, _requests);
+        => new DrawEntityRadarUser(user, _hub, _sundesmos, _requests);
+
+    public DrawEntityRequest CreateRequestEntity(DynamicRequestFolder parent, RequestEntry entry)
+        => new DrawEntityRequest(parent, entry, _hub, _sundesmos, _requests);
 }

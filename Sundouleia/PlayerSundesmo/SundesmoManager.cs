@@ -108,6 +108,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             }
         }
         RecreateLazy();
+
+        // Experimental.
         if (created.Count > 0) Logger.LogDebug($"Created: {string.Join(", ", created)}", LoggerType.PairManagement);
         if (refreshed.Count > 0) Logger.LogDebug($"Refreshed: {string.Join(", ", refreshed)}", LoggerType.PairManagement);
     }
@@ -271,19 +273,10 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
                 TargetSystem.Instance()->SetHardTarget((GameObject*)s.PlayerAddress);
         }
     }
-
-    // While this is nice to have, I often wonder what value or purpose it serves.
-    // Ideally, it would be nicer if the folders containing any immutable lists
-    // these are in simply updated on certain triggers, and had their sorting algorithms
-    // embedded inside of them that could trigger upon a necessary refresh.
-    //
-    // But this will do for now.. Until we need to change things (which may be soon)
-    // because creating a mass list for all our pairs in multiple locations is a lot of allocation.
     private void RecreateLazy()
     {
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
-        Mediator.Publish(new RefreshFolders(true, true, false));
-
+        Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
     }
 
     #region Manager Helpers

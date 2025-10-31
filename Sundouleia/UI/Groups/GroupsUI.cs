@@ -39,7 +39,11 @@ public class GroupsUI : WindowMediatorSubscriberBase
         _iconGalleryCombo = new FAIconCombo(logger);
         UpdateFolders();
 
-        Mediator.Subscribe<RefreshFolders>(this, _ => UpdateFolders());
+        Mediator.Subscribe<RegenerateEntries>(this, _ =>
+        {
+            if (_.TargetFolders is RefreshTarget.Groups || _.TargetFolders is RefreshTarget.Sundesmos)
+                UpdateFolders();
+        });
 
         this.PinningClickthroughFalse();
         this.SetBoundaries(new(550, 470), ImGui.GetIO().DisplaySize);        

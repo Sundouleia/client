@@ -20,8 +20,8 @@ public class RadarTab : DisposableMediatorSubscriberBase
     private readonly RadarManager _manager;
     private readonly TutorialService _guides;
 
-    private DrawFolderRadar _pairedFolder;
-    private DrawFolderRadar _unpairedFolder;
+    private DynamicRadarFolder _pairedFolder;
+    private DynamicRadarFolder _unpairedFolder;
 
     public RadarTab(ILogger<RadarTab> logger, SundouleiaMediator mediator, DrawEntityFactory factory,
         SundesmoManager sundesmos, RadarManager manager, TutorialService guides)
@@ -32,16 +32,9 @@ public class RadarTab : DisposableMediatorSubscriberBase
         _manager = manager;
         _guides = guides;
 
-        // we might also want to subscribe to the whitelist refresh message too if we wanted to recalculate the draws 
-        Mediator.Subscribe<RefreshRadarEntities>(this, _ => UpdateEntityLists(_.OnlyReorder));
+        _pairedFolder = _factory.CreateRadarFolder(Constants.FolderTagRadarPaired, FolderOptions.Default);
+        _unpairedFolder = _factory.CreateRadarFolder(Constants.FolderTagRadarUnpaired, FolderOptions.Default);
     }
-
-    public int Total => PairedCount + UnpairedCount;
-    public int PairedCount => _pairedFolder.Total;
-    public int UnpairedCount => _unpairedFolder.Total;
-    public int RenderedCount => _pairedFolder.Rendered + _unpairedFolder.Rendered;
-    public int LurkerCount => _pairedFolder.Lurkers + _unpairedFolder.Lurkers;
-
 
     public void DrawSection()
     {
@@ -80,9 +73,8 @@ public class RadarTab : DisposableMediatorSubscriberBase
         // Draw paired first, then unpaired, (yes, this is done intentionally to help with things not being 'too automated')
         ImGui.Spacing();
 
-        // Could add a search filter here, if we feel the need for one i guess.
-        _pairedFolder.Draw();
-        _unpairedFolder.Draw();
+        _pairedFolder.DrawContents();
+        _unpairedFolder.DrawContents();
     }
 
     private void DrawUnverifiedOverlay()
@@ -110,33 +102,5 @@ public class RadarTab : DisposableMediatorSubscriberBase
         CkGui.FontTextCentered("Cannot Use This Anymore", UiFontService.UidFont, ImGuiColors.DalamudRed);
         CkGui.FontTextCentered($"You have [{MainHub.Reputation.ChatStrikes}] radar chat strikes.", UiFontService.Default150Percent, ImGuiColors.DalamudRed);
     }
-
-    private void UpdateEntityLists(bool reorderOnly)
-    {
-        if (reorderOnly)
-        {
-            _pairedFolder.RefreshEntityOrder();
-            _unpairedFolder.RefreshEntityOrder();
-            Logger.LogDebug("Refreshed entity orders only.", LoggerType.UIManagement);
-            return;
-        }
-
-        var allUsers = _manager.RadarUsers;
-        var pairedUsers = allUsers.Where(r => _sundesmos.ContainsSundesmo(r.UID)).ToList();
-        var unpairedUsers = allUsers.Except(pairedUsers).ToList();
-        // Generate the folders.
-        _pairedFolder = _factory.CreateRadarFolder(Constants.FolderTagRadarPaired, pairedUsers, DrawEntityGenerator);
-        _unpairedFolder = _factory.CreateRadarFolder(Constants.FolderTagRadarUnpaired, unpairedUsers, DrawEntityGenerator);
-        Logger.LogDebug("Recreated entity lists.", LoggerType.UIManagement);
-    }
-
-    private string ToRadarName(RadarUser user)
-        => _sundesmos.TryGetNickAliasOrUid(user.UID, out var dispName) ? dispName : user.AnonymousName;
-
-    private IImmutableList<DrawEntityRadarUser> DrawEntityGenerator(IReadOnlyList<RadarUser> allUsers)
-        => allUsers
-        .OrderBy(ToRadarName, StringComparer.OrdinalIgnoreCase)
-        .Select(_factory.CreateRadarEntity)
-        .ToImmutableList();
 }
 

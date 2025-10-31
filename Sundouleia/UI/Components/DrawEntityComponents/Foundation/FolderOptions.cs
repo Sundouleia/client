@@ -1,7 +1,7 @@
 namespace Sundouleia.Gui.Components;
 
 /// <summary>
-///     Generic options given to a <see cref="DrawFolder"/> to control its behavior."/>
+///     Generic options given to a <see cref="DynamicFolder"/> to control its behavior."/>
 /// </summary>
 public readonly record struct FolderOptions(bool ShowIfEmpty, bool IsDropTarget, bool DragDropItems, bool MultiSelect)
 {

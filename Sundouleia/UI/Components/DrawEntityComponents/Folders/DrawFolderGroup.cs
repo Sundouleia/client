@@ -1,4 +1,5 @@
 using CkCommons.Gui;
+using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using OtterGui.Text;
@@ -14,27 +15,23 @@ namespace Sundouleia.Gui.Components;
 ///     Comes includes with <see cref="FolderOptions"/>, drag-drop support, and multi-selection support. <para />
 ///     Generated Dynamically as needed by updates, for DrawTime performance.
 /// </summary>
-public class DrawFolderGroup : DrawFolder
+public class DrawFolderGroup : DynamicPairFolder
 {
     private SundesmoGroup _group;
-    public DrawFolderGroup(SundesmoGroup group, FolderOptions options, ILogger<DrawFolderGroup> log, 
+    public DrawFolderGroup(SundesmoGroup group, FolderOptions options, ILogger<DrawFolderGroup> log,
         SundouleiaMediator mediator, MainConfig config, SharedFolderMemory memory,
-        DrawEntityFactory factory, GroupsManager manager, SundesmoManager sundesmos)
-        : base(group, options, log, mediator, config, memory, factory, manager, sundesmos)
+        DrawEntityFactory factory, GroupsManager groups, SundesmoManager sundesmos)
+        : base(group.Label, options, log, mediator, config, factory, groups, memory, sundesmos)
     {
         _group = group;
+
+        // Can regenerate the items here.
         RegenerateItems(string.Empty);
+        // Set stylizations here.
         SetStylizations(group);
+
+        // Can subscribe to any group-related changes here via mediator calls.
     }
-
-
-    protected override IImmutableList<Sundesmo> GetAllItems()
-        => _sundesmos.DirectPairs
-            .Where(u => _group.LinkedUids.Contains(u.UserData.AliasOrUID))
-            .ToImmutableList();
-
-    protected override IEnumerable<FolderSortFilter> GetSortOrder()
-        => _group.SortOrder;
 
     private void SetStylizations(SundesmoGroup group)
     {
@@ -53,20 +50,45 @@ public class DrawFolderGroup : DrawFolder
             RegenerateItems(string.Empty);
     }
 
-    protected override void CleanupEntities(IEnumerable<Sundesmo> removedItems)
+    // Inheritance Satisfiers.
+    protected override List<Sundesmo> GetAllItems()
+        => _sundesmos.DirectPairs.Where(u => _group.LinkedUids.Contains(u.UserData.UID)).ToList();
+
+    protected override IEnumerable<FolderSortFilter> GetSortOrder()
+        => _group.SortOrder;
+
+    protected override void DrawFolderInternal()
     {
-        // Unsure what to do here yet but can find out.
+        // pre-determine the size of the folder.
+        var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
+        var bgCol = _hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : ColorBG;
+        var rightWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconButtonSize(FAI.Filter).X + ImUtf8.ItemInnerSpacing.X * 2f;
+        // Draw framed child via CkRaii with background based on hover state 
+        using (var _ = CkRaii.FramedChildPaddedW($"sundouleia_folder_ {Label}", folderWidth, ImUtf8.FrameHeight, bgCol, ColorBorder, 5f, 1f))
+        {
+            var pos = ImGui.GetCursorPos();
+            ImGui.InvisibleButton($"folder_click_area_{Label}", new Vector2(folderWidth - rightWidth, _.InnerRegion.Y));
+            if (ImGui.IsItemClicked())
+                _groups.ToggleState(Label);
+
+            // Back to start and then draw.
+            ImGui.SameLine(pos.X);
+            CkGui.FramedIconText(_groups.IsOpen(Label) ? FAI.CaretDown : FAI.CaretRight);
+            ImGui.SameLine();
+            ImGui.AlignTextToFramePadding();
+            CkGui.IconText(Icon, IconColor);
+            CkGui.ColorTextFrameAlignedInline(Label, LabelColor);
+            CkGui.ColorTextFrameAlignedInline($"[{Online}]", ImGuiColors.DalamudGrey2);
+            CkGui.AttachToolTip($"{Online} online\n{Total} total");
+
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth() - rightWidth);
+            DrawRightOptions();
+        }
+        _hovered = ImGui.IsItemHovered();
     }
 
-    // Can customize later.
-    protected override void DrawOtherInfo()
-    {
-        CkGui.ColorTextFrameAlignedInline($"[{Online}]", ImGuiColors.DalamudGrey2);
-        CkGui.AttachToolTip($"{Online} online\n{Total} total");
-    }
-
-    // Can polish later.
-    protected override void DrawRightOptions()
+    // Steer away from popups, instead do expandable slide down view.
+    private void DrawRightOptions()
     {
         var config = CkGui.IconButtonSize(FAI.Cog);
         var filter = CkGui.IconButtonSize(FAI.Filter);
@@ -111,23 +133,23 @@ public class DrawFolderGroup : DrawFolder
 
     // Should probably publish this to a mediator so it can be called across folders
     // but then we would need disposable classes and it would make a mess. See about this more later.
-    protected override void OnDragDropFinish(DrawFolder Source, DrawFolder Finish, List<Sundesmo> items)
+    protected override void OnDragDropFinish(IDynamicFolder Source, IDynamicFolder Finish, List<IDrawEntity> transferred)
     {
-        Logger.LogDebug($"Drag-Drop finished from folder {Source.Label} to folder {Finish.Label} with {items.Count} items.");
+        Logger.LogDebug($"Drag-Drop finished from folder {Source.Label} to folder {Finish.Label} with {transferred.Count} items.");
         // If we are the source, we want to remove all items in the transfer from our group, and regenerate the list.
         if (Source.Label == Label)
         {
-            Logger.LogDebug($"Removing {items.Count} items from group folder {_group.Label}.");
+            Logger.LogDebug($"Removing {transferred.Count} items from group folder {_group.Label}.");
             // Remove all of the UID's from the groups linked UID's.
-            if (_manager.UnlinkFromGroup(items.Select(u => u.UserData.UID), _group.Label))
-                RegenerateItems(string.Empty);
+            if (_groups.UnlinkFromGroup(transferred.Select(u => u.UID), _group.Label))
+                RegenerateItems(string.Empty); // still figuring this one out.
         }
         // If we are the finish, we want to add all items in the transfer to our group, and regenerate the list.
         else if (Finish.Label == Label)
         {
-            Logger.LogDebug($"Adding {items.Count} items to group folder {_group.Label}.");
+            Logger.LogDebug($"Adding {transferred.Count} items to group folder {_group.Label}.");
             // Add all of the UID's into the groups linked UID's.
-            if (_manager.LinkToGroup(items.Select(u => u.UserData.UID), _group.Label))
+            if (_groups.LinkToGroup(transferred.Select(u => u.UID), _group.Label))
                 RegenerateItems(string.Empty);
         }
     }

@@ -142,6 +142,6 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     private void RecreateLazy(bool reorderOnly = false)
     {
         _usersInternal = new Lazy<List<RadarUser>>(() => _allRadarUsers.Values.ToList());
-        Mediator.Publish(new RefreshRadarEntities(reorderOnly));
+        Mediator.Publish(new RegenerateEntries(RefreshTarget.Radar));
     }
 }

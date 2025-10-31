@@ -7,136 +7,156 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services;
+using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
+using static System.ComponentModel.Design.ObjectSelectorEditor;
 
 namespace Sundouleia.Gui.Components;
 
 // Will likely remove this soon but is just a temporary migration from gspeak
-public class DrawEntityRequest
+public class DrawEntityRequest : IDrawEntity<RequestEntry>
 {
     private readonly MainHub _hub;
     private readonly SundesmoManager _sundesmos;
     private readonly RequestsManager _manager;
-    private readonly string _id;
 
-    private SundesmoRequest _entry;
+    // Multi-Select support.
+    private DynamicRequestFolder _parentFolder;
+    public RequestEntry Item { get; init; }
+
     private bool _hovered = false;
-    public DrawEntityRequest(string id, SundesmoRequest requestEntry, MainHub hub, 
-        RequestsManager manager, SundesmoManager sundesmos)
+    private bool _selectingGroups = false;
+
+    public DrawEntityRequest(DynamicRequestFolder parent, RequestEntry user, MainHub hub, SundesmoManager sundesmos, RequestsManager requests)
     {
-        _id = id;
-        _entry = requestEntry;
+        DistinctId = $"requestItem_{user.SenderUID}_{user.RecipientUID}";
+        Item = user;
         _hub = hub;
-        _manager = manager;
         _sundesmos = sundesmos;
+        _manager = requests;
     }
 
-    public void DrawRequestEntry(bool isOutgoing)
+    public string DistinctId { get; init; }
+    // a bit botched at the moment.
+    public string DisplayName => _sundesmos.TryGetNickAliasOrUid(new(Item.SenderUID), out var res) ? res : Item.SenderAnonName;
+    public string UID => Item.SenderUID + '_' + Item.RecipientUID;
+
+    public bool Draw(bool isSelected)
     {
-        using var id = ImRaii.PushId(GetType() + _id);
-        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
-        using (CkRaii.Child(GetType() + _id, size, _hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0))
-        {
-            // draw here the left side icon and the name that follows it.
-            ImUtf8.SameLineInner();
-            DrawLeftSide();
+        var clicked = false;
 
-            using (ImRaii.PushFont(UiBuilder.MonoFont))
-                CkGui.TextFrameAlignedInline("User-" + (isOutgoing
-                ? _entry.Target.UID.Substring(_entry.Target.UID.Length - 4)
-                : _entry.User.UID.Substring(_entry.User.UID.Length - 4)));
-
-            // draw the right side based on the entry type.
-            if (isOutgoing)
-                DrawPendingCancel();
-            else
-                DrawAcceptReject();
-        }
+        // The button we draw for the drag-drop / multi-select support depends on what we draw.
+        if (Item.FromClient)
+            clicked = DrawOutgoingRequest(isSelected);
+        else
+            clicked = DrawIncomingRequest(isSelected);
+        // can modify hover inside these, dont need to do it outside.
         _hovered = ImGui.IsItemHovered();
+
+        // If they are a supporter, we can draw their icon.
+        // TODO ?
+
+        return clicked;
     }
 
-    private void DrawLeftSide()
+    private bool DrawOutgoingRequest(bool isSelected)
     {
-        CkGui.FramedIconText(FAI.QuestionCircle, ImGuiColors.DalamudYellow);
-        var timeLeft = _entry.TimeLeft();
-        var displayText = $"Expires in {timeLeft.Days}d {timeLeft.Hours}h {timeLeft.Minutes}m.";
-        if (_entry.Details.Message.Length > 0) displayText += $" --SEP----COL--Message: --COL--{_entry.Details.Message}";
-        CkGui.AttachToolTip(displayText, color: ImGuiColors.TankBlue);
-        ImGui.SameLine();
+        var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
+        var bgCol = (_hovered || isSelected) ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
+        using (var _ = CkRaii.Child(DistinctId, childSize, bgCol, 5f))
+        {
+            CkGui.CenterText("Bagagwa");
+        }
+
+        return false;
     }
 
-    private void DrawAcceptReject()
+    // These windows can be expanded to select things like groups and what not upon acceptance.
+    private bool DrawIncomingRequest(bool isSelected)
     {
-        var acceptButtonSize = CkGui.IconTextButtonSize(FAI.PersonCircleCheck, "Accept");
-        var rejectButtonSize = CkGui.IconTextButtonSize(FAI.PersonCircleXmark, "Reject");
-        var spacingX = ImGui.GetStyle().ItemInnerSpacing.X;
-        var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
-        var currentRightSide = windowEndX - acceptButtonSize;
-
-        ImGui.SameLine(currentRightSide);
-        ImGui.AlignTextToFramePadding();
-        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
+        var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
+        var bgCol = (_hovered || isSelected) ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
+        using (var _ = CkRaii.Child(DistinctId, childSize, bgCol, 5f))
         {
-            if (CkGui.IconTextButton(FAI.PersonCircleXmark, "Reject", null, true, UiService.DisableUI))
-            {
-                UiService.SetUITask(async () =>
-                {
-                    if (await _hub.UserRejectRequest(new(_entry.User)) is { } res && res.ErrorCode is SundouleiaApiEc.Success)
-                        _manager.RemoveRequest(_entry);
-                });
-            }
+            CkGui.CenterText("Bagagwa");
         }
-        CkGui.AttachToolTip("Reject the Request");
 
-        currentRightSide -= acceptButtonSize + spacingX;
-        ImGui.SameLine(currentRightSide);
-        ImGui.AlignTextToFramePadding();
-        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen))
-        {
-            if (CkGui.IconTextButton(FAI.PersonCircleCheck, "Accept", null, true, UiService.DisableUI))
-            {
-                UiService.SetUITask(async () =>
-                {
-                    var res = await _hub.UserAcceptRequest(new(_entry.User)).ConfigureAwait(false);
-                    if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
-                        _manager.RemoveRequest(_entry);
-                    else if (res.ErrorCode is SundouleiaApiEc.Success)
-                    {
-                        _manager.RemoveRequest(_entry);
-                        _sundesmos.AddSundesmo(res.Value!.Pair);
-                        if (res.Value!.OnlineInfo is { } onlineSundesmo)
-                            _sundesmos.MarkSundesmoOnline(onlineSundesmo);
-                    }
-                });
-            }
-        }
-        CkGui.AttachToolTip("Accept the Request");
+        return false;
     }
 
-    private void DrawPendingCancel()
-    {
-        var cancelButtonSize = CkGui.IconTextButtonSize(FAI.PersonCircleXmark, "Cancel Request");
-        var spacingX = ImGui.GetStyle().ItemSpacing.X;
-        var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
-        var currentRightSide = windowEndX - cancelButtonSize;
+    //private void DrawAcceptReject()
+    //{
+    //    var acceptButtonSize = CkGui.IconTextButtonSize(FAI.PersonCircleCheck, "Accept");
+    //    var rejectButtonSize = CkGui.IconTextButtonSize(FAI.PersonCircleXmark, "Reject");
+    //    var spacingX = ImGui.GetStyle().ItemInnerSpacing.X;
+    //    var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
+    //    var currentRightSide = windowEndX - acceptButtonSize;
 
-        ImGui.SameLine(currentRightSide);
-        ImGui.AlignTextToFramePadding();
-        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
-        {
-            if (CkGui.IconTextButton(FAI.PersonCircleXmark, "Cancel Request", null, true, UiService.DisableUI))
-            {
-                UiService.SetUITask(async () =>
-                {
-                    var res = await _hub.UserCancelRequest(new(_entry.Target));
-                    if (res.ErrorCode is SundouleiaApiEc.Success)
-                        _manager.RemoveRequest(_entry);
-                });
-            }
-        }
-        CkGui.AttachToolTip("Remove the pending request from both yourself and the pending Users list.");
-    }
+    //    ImGui.SameLine(currentRightSide);
+    //    ImGui.AlignTextToFramePadding();
+    //    using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
+    //    {
+    //        if (CkGui.IconTextButton(FAI.PersonCircleXmark, "Reject", null, true, UiService.DisableUI))
+    //        {
+    //            UiService.SetUITask(async () =>
+    //            {
+    //                if (await _hub.UserRejectRequest(new(Item..User)) is { } res && res.ErrorCode is SundouleiaApiEc.Success)
+    //                    _manager.RemoveRequest(_entry);
+    //            });
+    //        }
+    //    }
+    //    CkGui.AttachToolTip("Reject the Request");
+
+    //    currentRightSide -= acceptButtonSize + spacingX;
+    //    ImGui.SameLine(currentRightSide);
+    //    ImGui.AlignTextToFramePadding();
+    //    using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen))
+    //    {
+    //        if (CkGui.IconTextButton(FAI.PersonCircleCheck, "Accept", null, true, UiService.DisableUI))
+    //        {
+    //            UiService.SetUITask(async () =>
+    //            {
+    //                var res = await _hub.UserAcceptRequest(new(_entry.User)).ConfigureAwait(false);
+    //                if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
+    //                    _manager.RemoveRequest(_entry);
+    //                else if (res.ErrorCode is SundouleiaApiEc.Success)
+    //                {
+    //                    _manager.RemoveRequest(_entry);
+    //                    _sundesmos.AddSundesmo(res.Value!.Pair);
+    //                    if (res.Value!.OnlineInfo is { } onlineSundesmo)
+    //                        _sundesmos.MarkSundesmoOnline(onlineSundesmo);
+    //                }
+    //            });
+    //        }
+    //    }
+    //    CkGui.AttachToolTip("Accept the Request");
+    //}
+
+    //private void DrawPendingCancel()
+    //{
+    //    var cancelButtonSize = CkGui.IconTextButtonSize(FAI.PersonCircleXmark, "Cancel Request");
+    //    var spacingX = ImGui.GetStyle().ItemSpacing.X;
+    //    var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
+    //    var currentRightSide = windowEndX - cancelButtonSize;
+
+    //    ImGui.SameLine(currentRightSide);
+    //    ImGui.AlignTextToFramePadding();
+    //    using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
+    //    {
+    //        if (CkGui.IconTextButton(FAI.PersonCircleXmark, "Cancel Request", null, true, UiService.DisableUI))
+    //        {
+    //            UiService.SetUITask(async () =>
+    //            {
+    //                var res = await _hub.UserCancelRequest(new(_entry.Target));
+    //                if (res.ErrorCode is SundouleiaApiEc.Success)
+    //                    _manager.RemoveRequest(_entry);
+    //            });
+    //        }
+    //    }
+    //    CkGui.AttachToolTip("Remove the pending request from both yourself and the pending Users list.");
+    //}
 }

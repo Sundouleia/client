@@ -146,7 +146,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         {
             Logger.LogInformation($"Temporary request sent to {user.AnonName}.", LoggerType.RadarData);
             // Add to our requests, updating the requests manager.
-            _requests.AddRequest(request);
+            _requests.AddNewRequest(request);
             return;
         }
 
@@ -264,7 +264,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private async Task LoadRequests()
     {
         var requests = await UserGetSundesmoRequests().ConfigureAwait(false);
-        _requests.LoadInitial(requests);
+        _requests.AddNewRequest(requests);
     }
 
     /// <summary>

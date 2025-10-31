@@ -24,7 +24,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
         _config = config;
         _pairs = pairs;
         // Ensure the list updates properly.
-        Mediator.Subscribe<RefreshFolders>(this, _ => { if (_.Whitelist) UpdateList(); });
+        Mediator.Subscribe<RegenerateEntries>(this, _ => { if (_.TargetFolders is RefreshTarget.Sundesmos) UpdateList(); });
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
     }
 

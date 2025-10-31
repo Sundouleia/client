@@ -15,10 +15,6 @@ public enum ToggleType
     Hide
 }
 
-public record RefreshFolders(bool Whitelist = true, bool Groups = true, bool Requests = true) : MessageBase;
-
-public record RefreshRadarEntities(bool OnlyReorder) : MessageBase;
-
 /// <summary> Basic UI Toggle </summary>
 public record UiToggleMessage(Type UiType, ToggleType ToggleType = ToggleType.Toggle) : MessageBase;
 
@@ -35,7 +31,7 @@ public record OpenReportUIMessage(UserData UserToReport, ReportKind Kind) : Mess
 public record MainWindowTabChangeMessage(MainMenuTabs.SelectedTab NewTab) : MessageBase;
 
 /// <summary> Should fire whenever the Main UI closes. Useful for the interactions popout. </summary>
-public record FolderDragDropComplete(DrawFolder Source, DrawFolder Dest, List<Sundesmo> Payload) : MessageBase;
+public record FolderDragDropComplete(IDynamicFolder Source, IDynamicFolder Dest, List<IDrawEntity> Transferred) : MessageBase;
 
 /// <summary> When we want a specific window removed. Most beneficial for profiles. </summary>
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;

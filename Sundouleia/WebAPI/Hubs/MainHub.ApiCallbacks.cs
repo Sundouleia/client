@@ -137,7 +137,7 @@ public partial class MainHub
     public Task Callback_AddRequest(SundesmoRequest dto)
     {
         Logger.LogDebug($"Callback_AddPairRequest: {dto}", LoggerType.Callbacks);
-        _requests.AddRequest(dto);
+        _requests.AddNewRequest(dto);
         return Task.CompletedTask;
     }
 

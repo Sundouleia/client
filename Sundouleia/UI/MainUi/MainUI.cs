@@ -219,7 +219,7 @@ public class MainUI : WindowMediatorSubscriberBase
                 _creatingRequest = false;
                 // Add the request if it was successful!
                 if (res.ErrorCode is SundouleiaApiEc.Success)
-                    _requests.AddRequest(res.Value!);
+                    _requests.AddNewRequest(res.Value!);
             });
         }
         if (!string.IsNullOrEmpty(_uidToSentTo))

@@ -434,14 +434,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.FavoritesFirst = favoritesFirst;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshFolders());
+            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
         }
 
         if (ImGui.Checkbox(CkLoc.Settings.Preferences.PreferNicknamesLabel, ref nickOverName))
         {
             _mainConfig.Current.PreferNicknamesOverNames = nickOverName;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshFolders());
+            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.PreferNicknamesTT);
 
@@ -449,7 +449,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.ShowVisibleUsersSeparately = sepVisibleUsers;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshFolders());
+            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.ShowVisibleSeparateTT);
 
@@ -457,7 +457,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.ShowOfflineUsersSeparately = sepOfflineUsers;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshFolders());
+            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.ShowOfflineSeparateTT);
 
@@ -472,7 +472,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _mainConfig.Current.FocusTargetOverTarget = useFocusTarget;
             _mainConfig.Save();
-            Mediator.Publish(new RefreshFolders());
+            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.FocusTargetTT);
     }

@@ -2,13 +2,11 @@ using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using OtterGui.Extensions;
 using OtterGui.Text;
 using OtterGui.Text.EndObjects;
-using Sundouleia.Gui.Handlers;
-using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using System.Collections.Immutable;
@@ -20,13 +18,15 @@ namespace Sundouleia.Gui.Components;
 ///     Comes includes with <see cref="FolderOptions"/>, drag-drop support, and multi-selection support. <para />
 ///     Generated Dynamically as needed by updates, for DrawTime performance.
 /// </summary>
-public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFolder
+public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSubscriberBase, IDynamicFolder
+    where TModel : class 
+    where TDrawEntity : class, IDrawEntity<TModel>
 {
     protected readonly MainConfig _config;
-    protected readonly GroupsManager _manager;
-    protected readonly SundesmoManager _sundesmos;
     protected readonly DrawEntityFactory _factory;
+    protected readonly GroupsManager _groups;
 
+    public string DistinctId => Label;
     public SharedFolderMemory SharedMemory { get; init; }
 
     protected bool _hovered;
@@ -41,19 +41,23 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
     protected bool ShowIfEmpty = true;
     protected bool ShowOffline = true;
 
-    // A lazily evaluated list of all sundesmos 
-    protected IImmutableList<Sundesmo> _allItems { get; private set; } = ImmutableList<Sundesmo>.Empty;
+    // All items known for this folder.
+    protected List<TModel> _allItems { get; private set; } = new();
+    // Map to properly allocate entities to models.
+    // Preferably make List if possible for improvements, but leave as functional for now.
+    protected Dictionary<TModel, TDrawEntity> _drawEntityMap { get; private set; } = new();
     
     // Internal Evaluation of selected items.
-    protected HashSet<DrawEntitySundesmo> _selectedItems = [];
-    protected DrawEntitySundesmo? _selected;
-    protected DrawEntitySundesmo? _lastAnchor;
+    protected HashSet<IDrawEntity> _selectedItems = [];
+    protected IDrawEntity? _selected;
+    protected IDrawEntity? _lastAnchor;
 
-    internal readonly Queue<Action> DragDropActions = new();
-
-    protected DrawFolder(string label, FolderOptions options, ILogger log, SundouleiaMediator mediator,
-        MainConfig config, SharedFolderMemory memory, DrawEntityFactory factory, GroupsManager manager, 
-        SundesmoManager sundesmos)
+    /// <summary>
+    ///     You are expected to call RegenerateItems in any derived constructor to populate the folder contents.
+    /// </summary>
+    protected DynamicFolder(string label, FolderOptions options, ILogger log, 
+        SundouleiaMediator mediator, MainConfig config, DrawEntityFactory factory,
+        GroupsManager groups, SharedFolderMemory memory)
         : base(log, mediator)
     {
         Label = label;
@@ -61,110 +65,81 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
 
         _config = config;
         _factory = factory;
-        _manager = manager;
-        _sundesmos = sundesmos;
-        SharedMemory = memory;
-        RegenerateItems(string.Empty);
-
-        Mediator.Subscribe<FolderDragDropComplete>(this, _ => OnDragDropFinish(_.Source, _.Dest, _.Payload));
-    }
-
-    protected DrawFolder(SundesmoGroup group, FolderOptions options, ILogger<DrawFolder> log, 
-        SundouleiaMediator mediator, MainConfig config, SharedFolderMemory memory, 
-        DrawEntityFactory factory, GroupsManager manager, SundesmoManager sundesmos)
-        : base(log, mediator)
-    {
-        Label = group.Label;
-        Options = options;
-
-        _config = config;
-        _factory = factory;
-        _manager = manager;
-        _sundesmos = sundesmos;
+        _groups = groups;
         SharedMemory = memory;
 
-        Mediator.Subscribe<FolderDragDropComplete>(this, _ => OnDragDropFinish(_.Source, _.Dest, _.Payload));
+        Mediator.Subscribe<FolderDragDropComplete>(this, _ => OnDragDropFinish(_.Source, _.Dest, _.Transferred));
     }
 
     public int Total => _allItems.Count;
-    public int Rendered => _allItems.Count(s => s.IsRendered);
-    public int Online => _allItems.Count(s => s.IsOnline);
-    public ImmutableList<DrawEntitySundesmo> DrawEntities { get; private set; }
 
-    protected bool ShouldShowFolder()
-        => (DrawEntities.Count > 0) || (ShowIfEmpty || Options.ShowIfEmpty);
+    // For public read use only, modification made in _drawEntities.
+    public IReadOnlyList<IDrawEntity> DrawEntities { get; private set; } = [];
 
-    protected virtual IImmutableList<Sundesmo> GetAllItems()
-        => _sundesmos.DirectPairs.ToImmutableList();
+    protected bool ShouldShowFolder() => DrawEntities.Count > 0 || (ShowIfEmpty || Options.ShowIfEmpty);
 
     /// <summary>
-    ///     Convert the sorted sundesmo collection into draw-entities. 
-    ///     Concrete subclasses must implement.
+    ///     Obtain all current items for this folder.
     /// </summary>
-    protected virtual ImmutableList<DrawEntitySundesmo> CreateDrawEntities(IEnumerable<Sundesmo> sorted)
-        => sorted.Select(u => _factory.CreateDrawEntity(this, u)).ToImmutableList();
+    /// <returns></returns>
+    protected abstract List<TModel> GetAllItems();
+
+    /// <summary>
+    ///     Make a DrawEntity from the given item.
+    /// </summary>
+    protected abstract TDrawEntity ToDrawEntity(TModel item);
+
+    protected virtual void OnDragDropFinish(IDynamicFolder Source, IDynamicFolder Finish, List<IDrawEntity> items)
+    { /* do nothing by default */ }
+
+    protected abstract bool CheckFilter(TModel u, string filter);
 
     /// <summary>
     ///     Default sort order for folders. Override in subclasses to provide folder-specific defaults.
     /// </summary>
     protected virtual IEnumerable<FolderSortFilter> GetSortOrder()
         => _config.Current.FavoritesFirst
-        ? [FolderSortFilter.Rendered, FolderSortFilter.Online, FolderSortFilter.Favorite, FolderSortFilter.Alphabetical]
-        : [FolderSortFilter.Rendered, FolderSortFilter.Online, FolderSortFilter.Alphabetical];
+            ? [ FolderSortFilter.Rendered, FolderSortFilter.Online, FolderSortFilter.Favorite, FolderSortFilter.Alphabetical ]
+            : [ FolderSortFilter.Rendered, FolderSortFilter.Online, FolderSortFilter.Alphabetical ];
 
-    // Regenerate the list of contents. (usually on sundesmo add / removal)
+    // We dont technically need to regenerate all drawn items,
+    // but rather draw what does exist, and create what doesn't.
     public virtual void RegenerateItems(string filter)
     {
-        // Regenerate the items.
-        var newItems = GetAllItems();
-        // Update _allItems.
-        _allItems = newItems;
-
-        // Cleanup empty selections here if any exist.
-        CleanupEntities(newItems.Except(_allItems));
-
-        // Update the filtered list.
+        _allItems = GetAllItems();
+        // Could add a cleanup filter here if desired.
         UpdateItemsForFilter(filter);
-
-        // 
     }
 
-    protected virtual void CleanupEntities(IEnumerable<Sundesmo> removedItems) { }
-
-    // Update the filtered display from the current items.
     public void UpdateItemsForFilter(string filter)
     {
-        // Filter the new items by the search filter.
-        var filteredItems = _allItems.Where(i => CheckFilter(i, filter));
-        // Perform the desired filter sort order to this new result.
-        var finalSorted = ApplySortOrder(filteredItems);
-        // build it.
-        DrawEntities = CreateDrawEntities(finalSorted);
+        // To hash for quick lookup.
+        var filteredItems = _allItems.Where(i => CheckFilter(i, filter)).ToHashSet();
+
+        // Remove items no longer in filtered.
+        foreach (var item in _drawEntityMap.Keys.ToList())
+            if (!filteredItems.Contains(item))
+                _drawEntityMap.Remove(item);
+
+        // Add new draw-entities for filtered items not already present.
+        foreach (var item in filteredItems)
+            if (!_drawEntityMap.ContainsKey(item))
+                _drawEntityMap[item] = ToDrawEntity(item);
+
+        // Sort the new filtered items.
+        var sortedFilteredItems = ApplySortOrder(filteredItems.Select(i => _drawEntityMap[i]));
+        DrawEntities = sortedFilteredItems;
     }
 
     /// <summary>
     ///     Functionalized sort application.
     ///     Accepts the source set and an optional explicit sort-order sequence.
-    ///     Returns a concrete, ordered List&lt;Sundesmo&gt;.
+    ///     Returns a concrete, ordered List&lt;TModel&gt;.
     /// </summary>
-    protected List<Sundesmo> ApplySortOrder(IEnumerable<Sundesmo> source)
-    {
-        var builder = new FolderSortBuilder(source);
-        foreach (var f in GetSortOrder())
-            builder.Add(f);
+    protected virtual List<TDrawEntity> ApplySortOrder(IEnumerable<TDrawEntity> source)
+        => source.OrderBy(u => u.DisplayName).ToList();
 
-        return builder.Build();
-    }
-
-    private bool CheckFilter(Sundesmo u, string filter)
-    {
-        if (filter.IsNullOrEmpty()) return true;
-        // return a user if the filter matches their alias or ID, playerChara name, or the nickname we set.
-        return u.UserData.AliasOrUID.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-            (u.GetNickname()?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (u.PlayerName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
-    }
-
+    // Could maybe make folders expand here or something, idk.
     public void DrawContents()
     {
         // If we have opted to not render the folder if empty, and we have nothing to draw, return.
@@ -179,54 +154,27 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
         if (Options.IsDropTarget || Options.DragDropItems)
             style.Push(ImGuiStyleVar.ItemSpacing, new Vector2(ImUtf8.ItemSpacing.X, 2f * ImGuiHelpers.GlobalScale));
 
-        // pre-determine the size of the folder.
-        var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
-        var bgCol = _hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : ColorBG;
-        var rightWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconButtonSize(FAI.Filter).X + ImUtf8.ItemInnerSpacing.X * 2;
-
-        // Draw framed child via CkRaii with background based on hover state 
-        using (var _ = CkRaii.FramedChildPaddedW($"sundouleia_folder_ {Label}", folderWidth, ImUtf8.FrameHeight, bgCol, ColorBorder, 5f, 1f))
-        {
-            var pos = ImGui.GetCursorPos();
-            ImGui.InvisibleButton($"folder_click_area_{Label}", new Vector2(folderWidth - rightWidth, _.InnerRegion.Y));
-            if (ImGui.IsItemClicked())
-                _manager.ToggleState(Label);
-
-            // Back to start and then draw.
-            ImGui.SameLine(pos.X);
-            CkGui.FramedIconText(_manager.IsOpen(Label) ? FAI.CaretDown : FAI.CaretRight);
-            ImGui.SameLine();
-            ImGui.AlignTextToFramePadding();
-            CkGui.IconText(Icon, IconColor);
-            CkGui.ColorTextFrameAlignedInline(Label, LabelColor);
-            DrawOtherInfo();
-            if (rightWidth > 0)
-            {
-                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth() - rightWidth);
-                DrawRightOptions();
-            }
-        }
-        _hovered = ImGui.IsItemHovered();
-
-        // Handle as a drag-drop target.
+        DrawFolderInternal();
         AsDragDropTarget();
 
-        if (!_manager.IsOpen(Label))
+        if (!_groups.IsOpen(Label))
             return;
 
         DrawItems();
     }
 
-    protected virtual void DrawOtherInfo()
+    public void DrawFolder()
     {
-        CkGui.ColorTextFrameAlignedInline($"[{Online}]", ImGuiColors.DalamudGrey2);
-        CkGui.AttachToolTip($"{Online} online\n{Total} total");
+        using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One);
+        // Style intended only for DragDrop selections.
+        if (Options.IsDropTarget || Options.DragDropItems)
+            style.Push(ImGuiStyleVar.ItemSpacing, new Vector2(ImUtf8.ItemSpacing.X, 2f * ImGuiHelpers.GlobalScale));
+
+        DrawFolderInternal();
+        AsDragDropTarget();
     }
 
-    protected virtual void DrawRightOptions()
-    { }
-
-    private void DrawItems()
+    public void DrawItems()
     {
         var folderMin = ImGui.GetItemRectMin();
         var folderMax = ImGui.GetItemRectMax();
@@ -235,7 +183,7 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
         wdl.ChannelsSetCurrent(1); // Foreground.
 
         using var indent = ImRaii.PushIndent(ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X + ImGuiHelpers.GlobalScale, false);
-         ImGuiClip.ClippedDraw(DrawEntities, DrawEntity, ImUtf8.FrameHeightSpacing);
+        ImGuiClip.ClippedDraw(DrawEntities, DrawEntity, ImUtf8.FrameHeightSpacing);
 
         wdl.ChannelsSetCurrent(0); // Background.
         var gradientTL = new Vector2(folderMin.X, folderMax.Y);
@@ -244,9 +192,33 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
         wdl.ChannelsMerge();
     }
 
-    protected void DrawEntity(DrawEntitySundesmo item)
+    protected virtual void DrawFolderInternal()
     {
-        var clicked = item.DrawItem(_selected == item || _selectedItems.Contains(item));
+        // pre-determine the size of the folder.
+        var folderWidth = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
+        var bgCol = _hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : ColorBG;
+        // Draw framed child via CkRaii with background based on hover state 
+        using (var _ = CkRaii.FramedChildPaddedW($"sundouleia_folder_ {Label}", folderWidth, ImUtf8.FrameHeight, bgCol, ColorBorder, 5f, 1f))
+        {
+            var pos = ImGui.GetCursorPos();
+            ImGui.InvisibleButton($"folder_click_area_{Label}", new Vector2(folderWidth, _.InnerRegion.Y));
+            if (ImGui.IsItemClicked())
+                _groups.ToggleState(Label);
+
+            // Back to start and then draw.
+            ImGui.SameLine(pos.X);
+            CkGui.FramedIconText(_groups.IsOpen(Label) ? FAI.CaretDown : FAI.CaretRight);
+            ImGui.SameLine();
+            ImGui.AlignTextToFramePadding();
+            CkGui.IconText(Icon, IconColor);
+            CkGui.ColorTextFrameAlignedInline(Label, LabelColor);
+        }
+        _hovered = ImGui.IsItemHovered();
+    }
+
+    protected void DrawEntity(IDrawEntity item)
+    {
+        var clicked = item.Draw(item.Equals(_selected) || _selectedItems.Contains(item));
 
         // Do not process click detection if we are not doing selections.
         if (!Options.MultiSelect)
@@ -256,7 +228,7 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
             SelectItem(item);
     }
 
-    public void AsDragDropSource(DrawEntitySundesmo item)
+    public void AsDragDropSource(TDrawEntity item)
     {
         if (!Options.DragDropItems)
             return;
@@ -268,7 +240,7 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
         if (!DragDropSource.SetPayload(SharedFolderMemory.MoveLabel))
         {
             UpdateSelectedCache(item);
-            SharedMemory.UpdateSourceCache(this, _selectedItems.Select(s => s.Sundesmo).ToList());
+            SharedMemory.UpdateSourceCache(this, _selectedItems.Cast<IDrawEntity>().ToList());
         }
 
         // Display tooltip text.
@@ -298,9 +270,7 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
         _selectedItems.Clear();
     }
 
-    protected abstract void OnDragDropFinish(DrawFolder Source, DrawFolder Finish, List<Sundesmo> items);
-
-    protected void UpdateSelectedCache(DrawEntitySundesmo item)
+    protected void UpdateSelectedCache(TDrawEntity item)
     {
         if (_selectedItems.Contains(item))
             return;
@@ -318,7 +288,7 @@ public abstract class DrawFolder : DisposableMediatorSubscriberBase, ISundesmoFo
         }
     }
 
-    protected void SelectItem(DrawEntitySundesmo item)
+    protected void SelectItem(IDrawEntity item)
     {
         bool ctrl = ImGui.GetIO().KeyCtrl;
         bool shift = ImGui.GetIO().KeyShift;

@@ -6,14 +6,13 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Gui.Handlers;
-using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 
 namespace Sundouleia.Gui.Components;
-public class DrawEntitySundesmo : ISundesmoEntity
+public class DrawEntitySundesmo : IDrawEntity<Sundesmo>
 {
     private static readonly string DragDropTooltip =
         "--COL--[L-CLICK & DRAG]--COL-- Drag-Drop this User to another Folder." +
@@ -34,13 +33,13 @@ public class DrawEntitySundesmo : ISundesmoEntity
     private DateTime?  _lastHoverTime;
     private bool       _popupProfileShown = false;
 
-    private DrawFolder _parentFolder;
+    private DynamicPairFolder _parentFolder;
     private Sundesmo   _sundesmo;
 
-    public DrawEntitySundesmo(DrawFolder parent, Sundesmo sundesmo, SundouleiaMediator mediator,
+    public DrawEntitySundesmo(DynamicPairFolder parent, Sundesmo sundesmo, SundouleiaMediator mediator,
         MainConfig config, FavoritesConfig favorites, IdDisplayHandler nameDisp)
     {
-        Identifier = GetType() + parent.Label + sundesmo.UserData.UID;
+        DistinctId = GetType() + parent.Label + sundesmo.UserData.UID;
         _parentFolder = parent;
         _sundesmo = sundesmo;
 
@@ -50,23 +49,23 @@ public class DrawEntitySundesmo : ISundesmoEntity
         _nameHandler = nameDisp;
     }
 
-    public string Identifier { get; init; }
+    public string DistinctId { get; init; }
     public string DisplayName => _sundesmo.GetDrawEntityName();
     public string UID => _sundesmo.UserData.UID;
-    public Sundesmo Sundesmo => _sundesmo;
+    public Sundesmo Item => _sundesmo;
 
     /// <summary>
     ///     Returns if the name region was clicked.
     /// </summary>
-    public bool DrawItem(bool selected)
+    public bool Draw(bool selected)
     {
         var clicked = false;
         var cursorPos = ImGui.GetCursorPos();
         var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
-        var hovered = !_nameHandler.IsEditing(Identifier) && (_hovered || selected);
+        var hovered = !_nameHandler.IsEditing(DistinctId) && (_hovered || selected);
         var bgCol = hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
 
-        using (var _ = CkRaii.Child(Identifier, childSize, bgCol, 5f))
+        using (var _ = CkRaii.Child(DistinctId, childSize, bgCol, 5f))
         {
             ImUtf8.SameLineInner();
             DrawLeftSide();
@@ -113,16 +112,16 @@ public class DrawEntitySundesmo : ISundesmoEntity
     private bool DrawNameArea(Vector2 area)
     {
         // Handle the case of editing state.
-        if (_nameHandler.IsEditing(Identifier))
+        if (_nameHandler.IsEditing(DistinctId))
         {
-            _nameHandler.DrawEditor(Identifier, _sundesmo, area.X);
+            _nameHandler.DrawEditor(DistinctId, _sundesmo, area.X);
             return false;
         }
 
         // Otherwise draw out the name handle.
         var pos = ImGui.GetCursorPos();
         // Draw an invisible button covering the available area for interaction.
-        var pressed = ImGui.InvisibleButton($"{Identifier}-name-area", area);
+        var pressed = ImGui.InvisibleButton($"{DistinctId}-name-area", area);
         // Handle logic according to state.
         if (_parentFolder.Options.DragDropItems)
             AsDragDropSource();
@@ -157,7 +156,7 @@ public class DrawEntitySundesmo : ISundesmoEntity
         if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
             _mediator.Publish(new ProfileOpenMessage(_sundesmo.UserData));
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            _nameHandler.ToggleEditModeForID(Identifier, _sundesmo);
+            _nameHandler.ToggleEditModeForID(DistinctId, _sundesmo);
     }
 
     private void HandleTextHoverLogic(bool isHovered)

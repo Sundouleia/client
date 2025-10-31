@@ -21,46 +21,49 @@ namespace Sundouleia.Gui.Components;
 
 // Drawn Radar User Entity. Managed via DrawEntityFactory in Radar Tab.
 // Handles the display of a drawn radar user.
-public class DrawEntityRadarUser
+public class DrawEntityRadarUser : IDrawEntity<RadarUser>
 {
     private readonly MainHub _hub;
     private readonly SundesmoManager _sundesmos; // Know if they are a pair or not.
     private readonly RequestsManager _requests; // Know if they are pending request or not.
 
-    private readonly string _id;
     private bool _hovered = false;
     private bool _draftingRequest = false;
     private string _requestDesc = string.Empty;
-    private RadarUser _user;
-    public DrawEntityRadarUser(RadarUser user, SundouleiaMediator mediator, 
-        MainHub hub, SundesmoManager sundesmos, RequestsManager requests)
+
+    // parent folder could go here if we ever wanted to support drag drop stuff.
+    public RadarUser Item { get; init; }
+
+    public DrawEntityRadarUser(RadarUser user, MainHub hub, SundesmoManager sundesmos, RequestsManager requests)
     {
-        _id = $"radar_user_{user.UID}";
-        _user = user;
+        DistinctId = $"radarItem_{user.UID}";
+        Item = user;
 
         _hub = hub;
         _sundesmos = sundesmos;
         _requests = requests;
     }
 
-    public RadarUser User => _user;
-    public bool IsLinked => _sundesmos.ContainsSundesmo(_user.UID);
-    public string QuickDispName => _sundesmos.TryGetNickAliasOrUid(new(_user.UID), out var res) ? res : _user.AnonymousName;
-    public void DrawListItem()
+    public string DistinctId { get; init; }
+    public string DisplayName => _sundesmos.TryGetNickAliasOrUid(new(Item.UID), out var res) ? res : Item.AnonymousName;
+    public string UID => Item.UID;
+    public bool IsLinked => _sundesmos.ContainsSundesmo(Item.UID);
+    public bool Draw(bool _)
     {
         // get the current cursor pos
-        var cursorPos = ImGui.GetCursorPosX();
-        using var id = ImRaii.PushId(GetType() + _id);
+        using var id = ImRaii.PushId(DistinctId);
         var childSize = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight());
         if (_draftingRequest)
             DrawOpenRequestEntry(childSize);
         else
             DrawNormalEntry(childSize);
+        // we dont care about selections for radar users.
+        return false;
     }
 
     private void DrawNormalEntry(Vector2 childSize)
     {
-        using (CkRaii.Child(GetType() + _id, childSize, _hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0, 5f))
+        using (CkRaii.Child(DistinctId, childSize, _hovered ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0, 5f))
         {
             ImUtf8.SameLineInner();
             DrawLeftSide();
@@ -102,18 +105,18 @@ public class DrawEntityRadarUser
     private unsafe void DrawLeftSide()
     {
         ImGui.AlignTextToFramePadding();
-        if (_user.IsValid)
+        if (Item.IsValid)
         {
             CkGui.IconText(FAI.Eye, ImGuiColors.ParsedGreen);
             CkGui.AttachToolTip($"Nearby and Rendered / Visible!");
 #if DEBUG
             if (ImGui.IsItemHovered())
             {
-                TargetSystem.Instance()->FocusTarget = (GameObject*)_user.Address;
+                TargetSystem.Instance()->FocusTarget = (GameObject*)Item.Address;
             }
             else
             {
-                if (TargetSystem.Instance()->FocusTarget == (GameObject*)_user.Address)
+                if (TargetSystem.Instance()->FocusTarget == (GameObject*)Item.Address)
                     TargetSystem.Instance()->FocusTarget = null;
             }
 #endif
@@ -127,7 +130,7 @@ public class DrawEntityRadarUser
 
     private void DrawNameText()
     {
-        if (_sundesmos.GetUserOrDefault(new(_user.UID)) is { } match)
+        if (_sundesmos.GetUserOrDefault(new(Item.UID)) is { } match)
         {
             if (match.GetNickname() is { } nick)
                 CkGui.TextFrameAligned(nick);
@@ -137,7 +140,7 @@ public class DrawEntityRadarUser
         }
         else
         {
-            ImGui.Text(User.AnonymousName);
+            ImGui.Text(Item.AnonymousName);
         }
     }
 
@@ -147,7 +150,7 @@ public class DrawEntityRadarUser
         var sendRequestSize = CkGui.IconTextButtonSize(FAI.CloudUploadAlt, "Send Request");
         var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
         // If we are already paired, no interactions. (Add condition here for if we have a request pending already.)
-        if (!_user.CanSendRequest || _sundesmos.ContainsSundesmo(_user.UID))
+        if (!Item.CanSendRequest || _requests.Outgoing.Any(r => r.RecipientUID == UID) || _sundesmos.ContainsSundesmo(Item.UID))
             return false;
 
         // Otherwise, draw out the send request button.
@@ -175,11 +178,11 @@ public class DrawEntityRadarUser
             .Push(ImGuiStyleVar.PopupBorderSize, 2f);
         using var color = ImRaii.PushColor(ImGuiCol.Border, CkColor.VibrantPink.Uint());
         using var popup = ImRaii.Popup("Send Request Popup", WFlags.AlwaysAutoResize | WFlags.NoMove);
-        using var id = ImRaii.PushId($"popup_send_request_{_user.UID}");
+        using var id = ImRaii.PushId($"popup_send_request_{Item.UID}");
         if (!popup) return;
 
         // NOTE: we could potentially add something like "groups to filter to on accept" but we can do this later.
-        CkGui.ColorTextCentered($"Send Request to {User.AnonymousName}", ImGuiColors.ParsedGold);
+        CkGui.ColorTextCentered($"Send Request to {Item.AnonymousName}", ImGuiColors.ParsedGold);
         ImGui.SameLine(CkGui.IconTextButtonSize(FAI.CloudUploadAlt, "Send"));
         if (CkGui.IconTextButton(FAI.CloudUploadAlt, "Send"))
         {
@@ -196,16 +199,16 @@ public class DrawEntityRadarUser
     {
         UiService.SetUITask(async () =>
         {
-            var res = await _hub.UserSendRequest(new(new(_user.UID), true, _requestDesc));
+            var res = await _hub.UserSendRequest(new(new(Item.UID), true, _requestDesc));
             if (res.ErrorCode is SundouleiaApiEc.Success && res.Value is { } sentRequest)
             {
-                Svc.Logger.Information($"Successfully sent sundesmo request to {User.AnonymousName}");
-                _requests.AddRequest(sentRequest);
+                Svc.Logger.Information($"Successfully sent sundesmo request to {Item.AnonymousName}");
+                _requests.AddNewRequest(sentRequest);
                 _requestDesc = string.Empty;
                 return;
             }
             // Notify failure.
-            Svc.Logger.Warning($"Request to {User.AnonymousName} failed with error code {res.ErrorCode}");
+            Svc.Logger.Warning($"Request to {Item.AnonymousName} failed with error code {res.ErrorCode}");
         });
     }
 }

@@ -25,8 +25,8 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     private readonly SundesmoManager _sundesmos;
     private readonly FolderHandler _drawFolders;
 
-    private List<ISundesmoFolder> _mainFolders;
-    private List<ISundesmoFolder> _groupFolders;
+    private List<IDynamicFolder> _mainFolders;
+    private List<IDynamicFolder> _groupFolders;
     private bool _viewingGroups = false;
     private string _filter = string.Empty;
     public WhitelistTab(ILogger<WhitelistTab> logger, SundouleiaMediator mediator,
@@ -39,9 +39,13 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         _groups = groups;
         _sundesmos = sundesmos;
         _drawFolders = drawFolders;
-        UpdateFolders();
 
-        Mediator.Subscribe<RefreshFolders>(this, _ => UpdateFolders());
+        // Need to regen main folders on config setting changes.
+        RegenerateDefaultFolders();
+        RegenerateGroupFolders();
+
+        Mediator.Subscribe<GroupAdded>(this, _ => RegenerateGroupFolders());
+        Mediator.Subscribe<GroupRemoved>(this, _ => RegenerateGroupFolders());
     }
 
     public void DrawWhitelistSection()
@@ -57,7 +61,7 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     }
 
     // Find a way to improve this soon, right now it is a little messy.
-    private void DrawSearchFilter(IEnumerable<ISundesmoFolder> toDraw)
+    private void DrawSearchFilter(IEnumerable<IDynamicFolder> toDraw)
     {
         // Pre-Determine the right width.
         var icon = _viewingGroups ? FAI.PeopleGroup : FAI.Globe;
@@ -159,31 +163,10 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         }
     }
 
-    public void UpdateFolders()
-    {
-        if (_mainFolders is null)
-            RecreateDefaultFolders();
-        else
-        {
-            // Regenerate the items otherwise.
-            foreach (var folder in _mainFolders)
-                folder.RegenerateItems(string.Empty);
-        }
-
-        if (_groupFolders is null)
-            RecreateGroupFolders();
-        else
-        {
-            // Regenerate the items otherwise.
-            foreach (var folder in _groupFolders)
-                folder.RegenerateItems(string.Empty);
-        }
-    }
-
-    private void RecreateDefaultFolders()
+    private void RegenerateDefaultFolders()
     {
         // Create the folders based on the current config options.
-        var folders = new List<ISundesmoFolder>();
+        var folders = new List<IDynamicFolder>();
 
         if (_config.Current.ShowVisibleUsersSeparately)
             folders.Add(_factory.CreateDefaultFolder(Constants.FolderTagVisible, FolderOptions.Default));
@@ -199,14 +182,14 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
         _mainFolders = folders;
     }
 
-    private void RecreateGroupFolders()
+    private void RegenerateGroupFolders()
     {
-        // Create the folders based on the current config options.
-        var groupFolders = new List<ISundesmoFolder>();
+        // Create the group folders.
+        var groupFolders = new List<IDynamicFolder>();
         foreach (var group in _groups.Config.Groups)
             groupFolders.Add(_factory.CreateGroupFolder(group, FolderOptions.DefaultShowEmpty));
-        _groupFolders = groupFolders;
         // Ensure All folder exists.
-        _groupFolders.Add(_factory.CreateDefaultFolder(Constants.FolderTagAll, FolderOptions.Default));
+        groupFolders.Add(_factory.CreateDefaultFolder(Constants.FolderTagAll, FolderOptions.Default));
+        _groupFolders = groupFolders;
     }
 }
