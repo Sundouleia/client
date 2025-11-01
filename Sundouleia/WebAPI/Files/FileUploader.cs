@@ -3,6 +3,7 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI.Files.Models;
 using SundouleiaAPI.Data;
+using ZstdSharp;
 
 namespace Sundouleia.WebAPI.Files;
 
@@ -11,6 +12,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     private readonly MainConfig _config;
     private readonly FileCacheManager _fileDbManager;
     private readonly FileTransferService _transferService;
+    private readonly Compressor  _compressor = new();
 
     public FileUploader(ILogger<FileUploader> logger, SundouleiaMediator mediator,
         MainConfig config, FileCacheManager fileDbManager, FileTransferService transferService)
@@ -19,6 +21,12 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
         _config = config;
         _fileDbManager = fileDbManager;
         _transferService = transferService;
+    }
+    
+    protected override void Dispose(bool disposing)
+    {
+        _compressor.Dispose();
+        base.Dispose(disposing);
     }
 
     public FileTransferProgress CurrentUploads { get; } = new(); // update as time does on.
@@ -87,10 +95,36 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
             }
         });
 
-        using var fileStream = File.OpenRead(fileInfo.ResolvedFilepath);
-        using var content = new ProgressableStreamContent(fileStream, progressTracker);
+        HttpResponseMessage response;
+        if (fileInfo.Size > 300_000)
+        {
+            var fileBytes = await File.ReadAllBytesAsync(fileInfo.ResolvedFilepath, cancelToken);
+            Span<byte> compressedBytes = _compressor.Wrap(fileBytes);
+            using var compressedStream = new MemoryStream(compressedBytes.ToArray());
+            compressedStream.Position = 0;
+            using var content = new ProgressableStreamContent(compressedStream, progressTracker);
+            
+            Logger.LogDebug($"Compressed uploaded file {fileInfo.Hash} from {fileBytes.Length / 1024} KB to {compressedBytes.Length / 1024} KB.", LoggerType.FileUploads);
 
-        var response = await _transferService.SendRequestStreamAsync(HttpMethod.Put, new(modFile.Link), content, cancelToken).ConfigureAwait(false);
+            response = await _transferService
+                .SendRequestCompressedStreamAsync(HttpMethod.Put, new Uri(modFile.Link), content, fileBytes.LongLength,
+                    cancelToken);
+        }
+        else
+        {
+            Logger.LogDebug($"File {modFile.Hash} is too small to be compressed.",  LoggerType.FileUploads);
+            await using var fileStream = File.OpenRead(fileInfo.ResolvedFilepath);
+            using var content = new ProgressableStreamContent(fileStream, progressTracker);
+
+            response =
+                await _transferService.SendRequestStreamAsync(HttpMethod.Put, new Uri(modFile.Link), content,
+                    cancelToken);
+        }
+        
+        var responseText = await response.Content.ReadAsStringAsync(cancelToken);
+        Logger.LogDebug($"{fileInfo.Hash}: {responseText}", LoggerType.FileUploads);
         response.EnsureSuccessStatusCode();
+
+        CurrentUploads.MarkFileCompleted(modFile.Hash);
     }
 }

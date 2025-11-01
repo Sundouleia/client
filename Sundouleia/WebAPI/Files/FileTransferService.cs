@@ -74,6 +74,19 @@ public class FileTransferService : DisposableMediatorSubscriberBase
     }
 
     /// <summary>
+    ///     process a request stream using progressable stream content.
+    /// </summary>
+    public async Task<HttpResponseMessage> SendRequestCompressedStreamAsync(HttpMethod method, Uri uri, ProgressableStreamContent content, long? uncompressedSize, CancellationToken ct)
+    {
+        using var requestMessage = new HttpRequestMessage(method, uri);
+        requestMessage.Headers.Add("X-File-Compression", "zstd");
+        if (uncompressedSize != null)
+            requestMessage.Headers.Add("X-File-Size", uncompressedSize.ToString());
+        requestMessage.Content = content;
+        return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     ///     awaits for a download slot to become available for us to start processing the download task.
     /// </summary>
     public async Task WaitForDownloadSlotAsync(CancellationToken ct)
@@ -157,6 +170,10 @@ public class FileTransferService : DisposableMediatorSubscriberBase
         {
             Logger.LogWarning($"Error during SendRequestInternal for {reqMsg.RequestUri}: {ex}");
             throw;
+        }
+        finally
+        {
+            Logger.LogDebug($"Request end for {reqMsg.Method} to {reqMsg.RequestUri}", LoggerType.FileService);
         }
     }
 }
