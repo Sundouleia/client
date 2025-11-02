@@ -22,7 +22,7 @@ public class DynamicRadarFolder : DynamicFolder<RadarUser, DrawEntityRadarUser>
     ///     You are expected to call RegenerateItems in any derived constructor to populate the folder contents.
     /// </summary>
     public DynamicRadarFolder(string label, FolderOptions options, ILogger<DynamicRadarFolder> log, 
-        SundouleiaMediator mediator, MainConfig config, DrawEntityFactory factory, 
+        SundouleiaMediator mediator, FolderConfig config, DrawEntityFactory factory, 
         GroupsManager groups, SharedFolderMemory memory, RadarManager radar, SundesmoManager sundesmos)
         : base(label, options, log, mediator, config, factory, groups, memory)
     {
@@ -39,13 +39,7 @@ public class DynamicRadarFolder : DynamicFolder<RadarUser, DrawEntityRadarUser>
         RegenerateItems(string.Empty);
 
         // We should subscribe to radar-user-related changes here via the mediator calls.
-        Mediator.Subscribe<RegenerateEntries>(this, _ =>
-        {
-            if (_.TargetFolders is RefreshTarget.Radar)
-                RegenerateItems(string.Empty);
-        });
-
-        // Subscribe to pair-related changes here via the mediator calls.
+        Mediator.Subscribe<FolderUpdateRadar>(this, _ => RegenerateItems(string.Empty));
     }
 
     public int Rendered => _allItems.Count(s => s.IsValid);

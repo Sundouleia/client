@@ -19,7 +19,7 @@ public class DrawFolderGroup : DynamicPairFolder
 {
     private SundesmoGroup _group;
     public DrawFolderGroup(SundesmoGroup group, FolderOptions options, ILogger<DrawFolderGroup> log,
-        SundouleiaMediator mediator, MainConfig config, SharedFolderMemory memory,
+        SundouleiaMediator mediator, FolderConfig config, SharedFolderMemory memory,
         DrawEntityFactory factory, GroupsManager groups, SundesmoManager sundesmos)
         : base(group.Label, options, log, mediator, config, factory, groups, memory, sundesmos)
     {
@@ -29,8 +29,6 @@ public class DrawFolderGroup : DynamicPairFolder
         RegenerateItems(string.Empty);
         // Set stylizations here.
         SetStylizations(group);
-
-        // Can subscribe to any group-related changes here via mediator calls.
     }
 
     private void SetStylizations(SundesmoGroup group)
@@ -141,7 +139,7 @@ public class DrawFolderGroup : DynamicPairFolder
         {
             Logger.LogDebug($"Removing {transferred.Count} items from group folder {_group.Label}.");
             // Remove all of the UID's from the groups linked UID's.
-            if (_groups.UnlinkFromGroup(transferred.Select(u => u.UID), _group.Label))
+            if (_groups.UnlinkFromGroup(transferred.Select(u => u.EntityId), _group.Label))
                 RegenerateItems(string.Empty); // still figuring this one out.
         }
         // If we are the finish, we want to add all items in the transfer to our group, and regenerate the list.
@@ -149,7 +147,7 @@ public class DrawFolderGroup : DynamicPairFolder
         {
             Logger.LogDebug($"Adding {transferred.Count} items to group folder {_group.Label}.");
             // Add all of the UID's into the groups linked UID's.
-            if (_groups.LinkToGroup(transferred.Select(u => u.UID), _group.Label))
+            if (_groups.LinkToGroup(transferred.Select(u => u.EntityId), _group.Label))
                 RegenerateItems(string.Empty);
         }
     }

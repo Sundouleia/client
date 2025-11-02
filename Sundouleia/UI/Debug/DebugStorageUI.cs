@@ -175,7 +175,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
             foreach (var item in folder.DrawEntities)
             {
                 ImGui.TableNextColumn();
-                ImGui.Text(item.UID);
+                ImGui.Text(item.EntityId);
                 ImGui.TableNextColumn();
                 ImGui.Text(item.DisplayName);
                 ImGui.TableNextColumn();
@@ -232,7 +232,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
                 ImGui.TableNextColumn();
                 ImGui.Text(item.DistinctId);
                 ImGui.TableNextColumn();
-                ImGui.Text(item.UID);
+                ImGui.Text(item.EntityId);
                 ImGui.TableNextColumn();
                 ImGui.Text(item.DisplayName);
                 ImGui.TableNextRow();
@@ -279,7 +279,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
                 ImGui.TableNextColumn();
                 ImGui.Text(item.DistinctId);
                 ImGui.TableNextColumn();
-                ImGui.Text(item.UID);
+                ImGui.Text(item.EntityId);
                 ImGui.TableNextColumn();
                 ImGui.Text(item.DisplayName);
                 ImGui.TableNextRow();

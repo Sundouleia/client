@@ -9,6 +9,7 @@ using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Network;
 using System.Diagnostics.CodeAnalysis;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Radar;
 
@@ -34,12 +35,25 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         _sundesmos = sundesmos;
         _watcher = watcher;
 
-        RecreateLazy();
+        _usersInternal = new Lazy<List<RadarUser>>(() => _allRadarUsers.Values.ToList());
 
         Mediator.Subscribe<RadarAddOrUpdateUser>(this, _ => AddOrUpdateUser(_.UpdatedUser, IntPtr.Zero));
         Mediator.Subscribe<RadarRemoveUser>(this, _ => RemoveUser(_.User));
         Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearUsers());
         Svc.ContextMenu.OnMenuOpened += OnRadarContextMenu;
+
+#if DEBUG
+        // Generate some dummy entries.
+        Mediator.Subscribe<ConnectedMessage>(this, _ =>
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                var toAdd = new RadarUser(new(new($"Dummy Sender {i}"), $"RandomIdent{i}"), IntPtr.Zero);
+                _allRadarUsers.TryAdd(new($"Dummy Sender {i}"), toAdd);
+            }
+            RecreateLazy();
+        });
+#endif
     }
 
     // Expose the RadarUser, keeping the UserData private.
@@ -142,6 +156,6 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     private void RecreateLazy(bool reorderOnly = false)
     {
         _usersInternal = new Lazy<List<RadarUser>>(() => _allRadarUsers.Values.ToList());
-        Mediator.Publish(new RegenerateEntries(RefreshTarget.Radar));
+        Mediator.Publish(new FolderUpdateRadar());
     }
 }

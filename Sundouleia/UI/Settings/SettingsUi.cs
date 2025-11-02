@@ -121,15 +121,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     DrawMainGlobals();
                     ImGui.Separator();
                     DrawMainRadar();
-                    ImGui.Separator();
-                    DrawMainExports();
                     ImGui.EndTabItem();
                 }
                 if (ImGui.BeginTabItem(CkLoc.Settings.TabPreferences))
                 {
                     DrawPrefsDownloads();
-                    ImGui.Separator();
-                    DrawPrefsSundesmos();
                     ImGui.Separator();
                     DrawPrefsNotify();
                     ImGui.EndTabItem();
@@ -168,6 +164,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     {
         CkGui.FontText(CkLoc.Settings.MainOptions.HeaderGeneric, UiFontService.UidFont);
         var autoOpen = _mainConfig.Current.OpenUiOnStartup;
+        var contextMenus = _mainConfig.Current.ShowContextMenus;
         var showProfiles = _mainConfig.Current.ShowProfiles;
         var profileDelay = _mainConfig.Current.ProfileDelay;
         var allowNsfw = _mainConfig.Current.AllowNSFW;
@@ -178,6 +175,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _mainConfig.Save();
         }
         CkGui.HelpText(CkLoc.Settings.MainOptions.ShowMainUiOnStartTT);
+
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.ContextMenusLabel, ref contextMenus))
+        {
+            _mainConfig.Current.ShowContextMenus = contextMenus;
+            _mainConfig.Save();
+        }
+        CkGui.HelpText(CkLoc.Settings.MainOptions.ContextMenusTT);
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.ShowProfilesLabel, ref showProfiles))
         {
@@ -301,13 +305,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
         CkGui.HelpText(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleTT, true);
     }
 
-    private void DrawMainExports()
-    {
-        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderExports, UiFontService.UidFont);
-
-        CkGui.ColorTextCentered("TBD - Future Export Options", ImGuiColors.ParsedGold);
-    }
-
     private void DrawPrefsDownloads()
     {
         CkGui.FontText(CkLoc.Settings.Preferences.HeaderDownloads, UiFontService.UidFont);
@@ -418,63 +415,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
             }
             CkGui.HelpText(CkLoc.Settings.Preferences.TransferBarTextTT);
         }
-    }
-
-    private void DrawPrefsSundesmos()
-    {
-        CkGui.FontText(CkLoc.Settings.Preferences.HeaderPairs, UiFontService.UidFont);
-        var favoritesFirst = _mainConfig.Current.FavoritesFirst;
-        var nickOverName = _mainConfig.Current.PreferNicknamesOverNames;
-        var sepVisibleUsers = _mainConfig.Current.ShowVisibleUsersSeparately;
-        var sepOfflineUsers = _mainConfig.Current.ShowOfflineUsersSeparately;
-        var contextMenus = _mainConfig.Current.ShowContextMenus;
-        var useFocusTarget = _mainConfig.Current.FocusTargetOverTarget;
-
-        if (ImGui.Checkbox(CkLoc.Settings.Preferences.FavoritesFirstLabel, ref favoritesFirst))
-        {
-            _mainConfig.Current.FavoritesFirst = favoritesFirst;
-            _mainConfig.Save();
-            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
-        }
-
-        if (ImGui.Checkbox(CkLoc.Settings.Preferences.PreferNicknamesLabel, ref nickOverName))
-        {
-            _mainConfig.Current.PreferNicknamesOverNames = nickOverName;
-            _mainConfig.Save();
-            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
-        }
-        CkGui.HelpText(CkLoc.Settings.Preferences.PreferNicknamesTT);
-
-        if (ImGui.Checkbox(CkLoc.Settings.Preferences.ShowVisibleSeparateLabel, ref sepVisibleUsers))
-        {
-            _mainConfig.Current.ShowVisibleUsersSeparately = sepVisibleUsers;
-            _mainConfig.Save();
-            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
-        }
-        CkGui.HelpText(CkLoc.Settings.Preferences.ShowVisibleSeparateTT);
-
-        if (ImGui.Checkbox(CkLoc.Settings.Preferences.ShowOfflineSeparateLabel, ref sepOfflineUsers))
-        {
-            _mainConfig.Current.ShowOfflineUsersSeparately = sepOfflineUsers;
-            _mainConfig.Save();
-            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
-        }
-        CkGui.HelpText(CkLoc.Settings.Preferences.ShowOfflineSeparateTT);
-
-        if (ImGui.Checkbox(CkLoc.Settings.Preferences.ContextMenusLabel, ref contextMenus))
-        {
-            _mainConfig.Current.ShowContextMenus = contextMenus;
-            _mainConfig.Save();
-        }
-        CkGui.HelpText(CkLoc.Settings.Preferences.ContextMenusTT);
-
-        if (ImGui.Checkbox(CkLoc.Settings.Preferences.FocusTargetLabel, ref useFocusTarget))
-        {
-            _mainConfig.Current.FocusTargetOverTarget = useFocusTarget;
-            _mainConfig.Save();
-            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
-        }
-        CkGui.HelpText(CkLoc.Settings.Preferences.FocusTargetTT);
     }
 
     private void DrawPrefsNotify()

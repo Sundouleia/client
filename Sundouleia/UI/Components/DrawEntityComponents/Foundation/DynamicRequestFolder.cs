@@ -19,7 +19,7 @@ public abstract class DynamicRequestFolder : DynamicFolder<RequestEntry, DrawEnt
     protected readonly RequestsManager _requests;
 
     protected DynamicRequestFolder(string label, ILogger log, SundouleiaMediator mediator,
-        MainConfig config, DrawEntityFactory factory, GroupsManager groups, 
+        FolderConfig config, DrawEntityFactory factory, GroupsManager groups, 
         SharedFolderMemory memory, RequestsManager requests)
         : base(label, FolderOptions.Requests, log, mediator, config, factory, groups, memory)
     {
@@ -31,14 +31,12 @@ public abstract class DynamicRequestFolder : DynamicFolder<RequestEntry, DrawEnt
         ColorBG = uint.MinValue;
         ColorBorder = ImGui.GetColorU32(ImGuiCol.TextDisabled);
         ShowIfEmpty = label == Constants.FolderTagRadarUnpaired;
-        // RegenerateItems here.
-        RegenerateItems(string.Empty);
 
         // We should subscribe to radar-user-related changes here via the mediator calls.
-        Mediator.Subscribe<RegenerateEntries>(this, _ =>
+        Mediator.Subscribe<FolderUpdateRequests>(this, _ =>
         {
-            if (_.TargetFolders is RefreshTarget.Requests)
-                RegenerateItems(string.Empty);
+            Logger.LogDebug($"DynamicRequestFolder [{Label}] received");
+            RegenerateItems(string.Empty);
         });
     }
 
@@ -67,9 +65,6 @@ public abstract class DynamicRequestFolder : DynamicFolder<RequestEntry, DrawEnt
         _hovered = ImGui.IsItemHovered();
     }
 
-
-    protected override List<RequestEntry> GetAllItems()
-        => Label == Constants.FolderTagRequestIncoming ? _requests.Incoming : _requests.Outgoing;
     protected override DrawEntityRequest ToDrawEntity(RequestEntry entry) => _factory.CreateRequestEntity(this, entry);
 
     protected override bool CheckFilter(RequestEntry u, string filter)

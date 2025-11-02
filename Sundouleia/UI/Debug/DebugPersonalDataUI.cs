@@ -16,15 +16,15 @@ namespace Sundouleia.Gui;
 
 public class DebugPersonalDataUI : WindowMediatorSubscriberBase
 {
-    private readonly MainConfig _config;
+    private readonly FolderConfig _config;
     private readonly SundesmoManager _pairs;
     public DebugPersonalDataUI(ILogger<DebugPersonalDataUI> logger, SundouleiaMediator mediator,
-        MainConfig config, SundesmoManager pairs) : base(logger, mediator, "Own Data Debug")
+        FolderConfig config, SundesmoManager pairs) : base(logger, mediator, "Own Data Debug")
     {
         _config = config;
         _pairs = pairs;
         // Ensure the list updates properly.
-        Mediator.Subscribe<RegenerateEntries>(this, _ => { if (_.TargetFolders is RefreshTarget.Sundesmos) UpdateList(); });
+        Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => UpdateList());
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
     }
 
@@ -57,7 +57,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
             .OrderByDescending(u => u.IsRendered)
             .ThenByDescending(u => u.IsOnline)
             .ThenBy(pair => !pair.PlayerName.IsNullOrEmpty()
-                ? (_config.Current.PreferNicknamesOverNames ? pair.GetNickAliasOrUid() : pair.PlayerName)
+                ? (_config.Current.NickOverPlayerName ? pair.GetNickAliasOrUid() : pair.PlayerName)
                 : pair.GetNickAliasOrUid(), StringComparer.OrdinalIgnoreCase)
             .ToImmutableList();
     }

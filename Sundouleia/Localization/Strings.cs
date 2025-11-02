@@ -233,9 +233,30 @@ namespace Sundouleia.Localization
         public readonly string TabStorage = Loc.Localize("Settings_TabsStorage", "Storage");
         public readonly string TabLogging = Loc.Localize("Settings_TabsLogging", "Logging"); // no sub-class needed.
 
+        public GroupPrefs GroupPrefs { get; set; } = new();
         public MainOptions MainOptions { get; set; } = new();
         public Preferences Preferences { get; set; } = new();
         public Accounts Accounts { get; set; } = new();
+    }
+
+    public class GroupPrefs
+    {
+        // Pairs Section
+        public readonly string FavoritesFirstLabel = Loc.Localize("Preferences_FavoritesFirstLabel", "By Favorites First");
+        public readonly string FavoritesFirstTT = Loc.Localize("Preferences_FavoritesFirstTT", "Sort Favorite-First Render for main folders.");
+
+        public readonly string ShowVisibleSeparateLabel = Loc.Localize("Preferences_ShowVisibleSeparateLabel", "Visible Folder");
+        public readonly string ShowVisibleSeparateTT = Loc.Localize("Preferences_ShowVisibleSeparateTT", "Lists rendered online pairs in a separate folder.");
+
+        public readonly string ShowOfflineSeparateLabel = Loc.Localize("Preferences_ShowOfflineSeparateLabel", "Offline Folder");
+        public readonly string ShowOfflineSeparateTT = Loc.Localize("Preferences_ShowOfflineSeparateTT", "Lists offline pairs in a separate group.");
+
+        public readonly string PreferNicknamesLabel = Loc.Localize("Preferences_PreferNicknamesLabel", "Prefer Nicknames");
+        public readonly string PreferNicknamesTT = Loc.Localize("Preferences_PreferNicknamesTT", "Still use a pairs nickname, even while visible.");
+
+        public readonly string FocusTargetLabel = Loc.Localize("Preferences_FocusTargetLabel", "Prefer FocusTarget");
+        public readonly string FocusTargetTT = Loc.Localize("Preferences_FocusTargetTT", "Uses the FocusTarget instead of the Target for identifying pairs." +
+            "--SEP--Used when clicking the eye icon in the whitelist.");
     }
 
     public class MainOptions
@@ -243,12 +264,15 @@ namespace Sundouleia.Localization
         public readonly string HeaderGeneric = Loc.Localize("MainOptions_HeaderGeneric", "Generic");
         public readonly string HeaderGlobalPerms = Loc.Localize("MainOptions_HeaderGlobalPerms", "Global Permissions");
         public readonly string HeaderRadar = Loc.Localize("MainOptions_HeaderRadar", "Radar");
-        public readonly string HeaderExports = Loc.Localize("MainOptions_HeaderExports", "Exports");
 
         // Player synchronization options here and stuff.
 
         public readonly string ShowMainUiOnStartLabel = Loc.Localize("Preferences_ShowMainUiOnStartLabel", "Open the Main Window UI upon plugin startup.");
         public readonly string ShowMainUiOnStartTT = Loc.Localize("Preferences_ShowMainUiOnStartTT", "Determines if the Main UI will open upon plugin startup or not.");
+
+        public readonly string ContextMenusLabel = Loc.Localize("Preferences_ShowContextMenusLabel", "Enable Context Menus");
+        public readonly string ContextMenusTT = Loc.Localize("Preferences_ShowContextMenusTT", "Right-Clicking your pairs will display additional options from Sundouleia." +
+            "--SEP--The context menu provides quick access to interactions or profile viewing.");
 
         public readonly string ShowProfilesLabel = Loc.Localize("Preferences_ShowProfilesLabel", "Show Sundouleia profiles on hover");
         public readonly string ShowProfilesTT = Loc.Localize("Preferences_ShowProfilesTT", "Displays the configured user profile after hovering over the player.");
@@ -287,17 +311,15 @@ namespace Sundouleia.Localization
 
         public readonly string RadarShowUnreadBubbleLabel = Loc.Localize("Preferences_RadarShowUnreadBubbleLabel", "Show Unread Chat Bubble");
         public readonly string RadarShowUnreadBubbleTT = Loc.Localize("Preferences_RadarShowUnreadBubbleTT", "Displays a small bubble on the MainUI Chat tab for unread messages.");
-
-        // Export Options
-        public readonly string ExportFolderCDFLabel = Loc.Localize("Preferences_ExportFolderCDFLabel", "Export Folder for CDF/Mods");
     }
 
     public class Preferences
     {
         // UI Preferences Section
         public readonly string HeaderDownloads = Loc.Localize("Preferences_HeaderDownloadPref", "Downloads");
-        public readonly string HeaderPairs = Loc.Localize("Preferences_HeaderPairPref", "Pairs");
         public readonly string HeaderNotifier = Loc.Localize("Preferences_HeaderNotifier", "Notifier");
+        public readonly string HeaderExports = Loc.Localize("MainOptions_HeaderExports", "Exports");
+
 
         // Download Section
         public readonly string MaxParallelDLsLabel = Loc.Localize("Preferences_MaxParallelDLsLabel", "Max Parallel Downloads");
@@ -323,29 +345,6 @@ namespace Sundouleia.Localization
         public readonly string TransferBarHeightTT = Loc.Localize("Preferences_TransferBarHeightTT", "Sets the height of the download progress bars.");
         public readonly string TransferBarWidthTT = Loc.Localize("Preferences_TransferBarWidthTT", "Sets the width of the download progress bars.");
 
-        // Pairs Section
-        public readonly string FavoritesFirstLabel = Loc.Localize("Preferences_FavoritesFirstLabel", "Show Favorites First");
-        public readonly string FavoritesFirstTT = Loc.Localize("Preferences_FavoritesFirstTT", "Render all favorites first for all main folders.");
-
-        public readonly string PreferNicknamesLabel = Loc.Localize("Preferences_PreferNicknamesLabel", "Prefer nicknames for visible pairs");
-        public readonly string PreferNicknamesTT = Loc.Localize("Preferences_PreferNicknamesTT", "Displays nicknames instead of character names for paired players within render range.");
-
-        // Might be phased out soon idk..
-        public readonly string ShowVisibleSeparateLabel = Loc.Localize("Preferences_ShowVisibleSeparateLabel", "Show separate Visible group");
-        public readonly string ShowVisibleSeparateTT = Loc.Localize("Preferences_ShowVisibleSeparateTT", "Lists paired players within render range in a separate group.");
-
-        // Might be phased out soon idk..
-        public readonly string ShowOfflineSeparateLabel = Loc.Localize("Preferences_ShowOfflineSeparateLabel", "Show separate Offline group");
-        public readonly string ShowOfflineSeparateTT = Loc.Localize("Preferences_ShowOfflineSeparateTT", "Lists offline paired players in a separate group.");
-
-        public readonly string ContextMenusLabel = Loc.Localize("Preferences_ShowContextMenusLabel", "Enable Context Menus");
-        public readonly string ContextMenusTT = Loc.Localize("Preferences_ShowContextMenusTT", "Right-Clicking your pairs will display additional options from Sundouleia." +
-            "--SEP--The context menu provides quick access to interactions or profile viewing.");
-
-        public readonly string FocusTargetLabel = Loc.Localize("Preferences_FocusTargetLabel", "Use FocusTarget over Target");
-        public readonly string FocusTargetTT = Loc.Localize("Preferences_FocusTargetTT", "Uses the FocusTarget instead of the Target for identifying pairs." +
-            "--SEP--Used when clicking the eye icon in the whitelist.");
-
         // Notifications Section
         public readonly string HeaderNotifications = Loc.Localize("Preferences_HeaderNotifications", "Notifications");
 
@@ -358,6 +357,8 @@ namespace Sundouleia.Localization
 
         public readonly string LimitForNicksLabel = Loc.Localize("Preferences_LimitForNicksLabel", "Limit Online Pair Notifications to Nicknamed Pairs");
         public readonly string LimitForNicksTT = Loc.Localize("Preferences_LimitForNicksTT", "Limits notifications to pairs with an assigned nickname.");
+
+        public readonly string ExportFolderCDFLabel = Loc.Localize("Preferences_ExportFolderCDFLabel", "Export Folder for CDF/Mods");
     }
 
     public class Accounts

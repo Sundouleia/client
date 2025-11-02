@@ -46,7 +46,7 @@ public class DrawEntityRadarUser : IDrawEntity<RadarUser>
 
     public string DistinctId { get; init; }
     public string DisplayName => _sundesmos.TryGetNickAliasOrUid(new(Item.UID), out var res) ? res : Item.AnonymousName;
-    public string UID => Item.UID;
+    public string EntityId => Item.UID;
     public bool IsLinked => _sundesmos.ContainsSundesmo(Item.UID);
     public bool Draw(bool _)
     {
@@ -150,7 +150,7 @@ public class DrawEntityRadarUser : IDrawEntity<RadarUser>
         var sendRequestSize = CkGui.IconTextButtonSize(FAI.CloudUploadAlt, "Send Request");
         var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
         // If we are already paired, no interactions. (Add condition here for if we have a request pending already.)
-        if (!Item.CanSendRequest || _requests.Outgoing.Any(r => r.RecipientUID == UID) || _sundesmos.ContainsSundesmo(Item.UID))
+        if (!Item.CanSendRequest || _requests.Outgoing.Any(r => r.RecipientUID == EntityId) || _sundesmos.ContainsSundesmo(Item.UID))
             return false;
 
         // Otherwise, draw out the send request button.

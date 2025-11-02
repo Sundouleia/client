@@ -1,19 +1,9 @@
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
-using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility.Raii;
-using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using Sundouleia.Radar;
-using Sundouleia.Services;
-using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
-using SundouleiaAPI.Hub;
-using SundouleiaAPI.Network;
-using static System.ComponentModel.Design.ObjectSelectorEditor;
 
 namespace Sundouleia.Gui.Components;
 
@@ -43,7 +33,7 @@ public class DrawEntityRequest : IDrawEntity<RequestEntry>
     public string DistinctId { get; init; }
     // a bit botched at the moment.
     public string DisplayName => _sundesmos.TryGetNickAliasOrUid(new(Item.SenderUID), out var res) ? res : Item.SenderAnonName;
-    public string UID => Item.SenderUID + '_' + Item.RecipientUID;
+    public string EntityId => Item.SenderUID + '_' + Item.RecipientUID;
 
     public bool Draw(bool isSelected)
     {

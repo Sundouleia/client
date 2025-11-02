@@ -22,7 +22,7 @@ public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSub
     where TModel : class 
     where TDrawEntity : class, IDrawEntity
 {
-    protected readonly MainConfig _config;
+    protected readonly FolderConfig _config;
     protected readonly DrawEntityFactory _factory;
     protected readonly GroupsManager _groups;
 
@@ -56,7 +56,7 @@ public abstract class DynamicFolder<TModel, TDrawEntity> : DisposableMediatorSub
     ///     You are expected to call RegenerateItems in any derived constructor to populate the folder contents.
     /// </summary>
     protected DynamicFolder(string label, FolderOptions options, ILogger log, 
-        SundouleiaMediator mediator, MainConfig config, DrawEntityFactory factory,
+        SundouleiaMediator mediator, FolderConfig config, DrawEntityFactory factory,
         GroupsManager groups, SharedFolderMemory memory)
         : base(log, mediator)
     {

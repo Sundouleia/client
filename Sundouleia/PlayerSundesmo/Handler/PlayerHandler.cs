@@ -118,7 +118,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) is already rendered, reapplying alterations.", LoggerType.PairHandler);
             Mediator.Publish(new SundesmoPlayerRendered(this));
-            Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
+            Mediator.Publish(new FolderUpdateSundesmos());
             await ReInitializeInternal().ConfigureAwait(false);
         }
         else if (_watcher.TryGetExisting(this, out IntPtr playerAddr))
@@ -171,7 +171,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Sundesmo.TriggerTimeoutTask();
         // Refresh the list to reflect visible state.
         Logger.LogDebug($"Marking {Sundesmo.GetNickAliasOrUid()} as unrendered @ [{address:X}]", LoggerType.PairHandler);
-        Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos)); // Should maybe remove? Idk. Could be excessive if we just need to update the state.
+        Mediator.Publish(new FolderUpdateSundesmos());
     }
 
     // Faze out as we move to watcher.

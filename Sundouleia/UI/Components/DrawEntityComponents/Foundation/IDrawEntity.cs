@@ -11,15 +11,15 @@ public interface IDrawEntity<TModel> : IDrawEntity
 public interface IDrawEntity
 {
     /// <summary>
-    ///     Unique Identification, assigned on initialization, usually folder + UID
+    ///     Unique Identification, assigned on initialization, usually folder + EntityId
     /// </summary>
     string DistinctId { get; }
 
     /// <summary>
     ///     Every entry should have a UID in some manner 
-    ///     (request target UID, radar UID, sundesmo UID)
+    ///     (request sender+target UID, radar UID, sundesmo UID)
     /// </summary>
-    string UID { get; }
+    string EntityId { get; }
 
     /// <summary>
     ///     Name shown on UI Displays, can become anonymous if needed.

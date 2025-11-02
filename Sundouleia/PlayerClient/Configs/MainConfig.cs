@@ -24,6 +24,7 @@ public class ConfigStorage
     // General
     public MainMenuTabs.SelectedTab MainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
     public bool OpenUiOnStartup { get; set; } = true;
+    public bool ShowContextMenus { get; set; } = true;
     public bool ShowProfiles { get; set; } = true;
     public float ProfileDelay { get; set; } = 1.5f;
     public bool AllowNSFW { get; set; } = false;
@@ -49,14 +50,6 @@ public class ConfigStorage
     public bool TransferBarText { get; set; } = true;
     public int TransferBarHeight { get; set; } = 30;
     public int TransferBarWidth { get; set; } = 250;
-
-    // Preferences - Pairs
-    public bool FavoritesFirst { get; set; } = true;
-    public bool PreferNicknamesOverNames { get; set; } = false;
-    public bool ShowVisibleUsersSeparately { get; set; } = true;
-    public bool ShowOfflineUsersSeparately { get; set; } = true;
-    public bool ShowContextMenus { get; set; } = true;
-    public bool FocusTargetOverTarget { get; set; } = false;
 
     // Preferences - Notifier
     public bool OnlineNotifications { get; set; } = true;

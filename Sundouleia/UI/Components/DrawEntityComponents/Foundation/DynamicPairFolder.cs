@@ -16,13 +16,14 @@ public abstract class DynamicPairFolder : DynamicFolder<Sundesmo, DrawEntitySund
     ///     You are expected to call RegenerateItems in any derived constructor to populate the folder contents.
     /// </summary>
     protected DynamicPairFolder(string label, FolderOptions options, ILogger log, 
-        SundouleiaMediator mediator, MainConfig config, DrawEntityFactory factory, 
+        SundouleiaMediator mediator, FolderConfig config, DrawEntityFactory factory, 
         GroupsManager groups, SharedFolderMemory memory, SundesmoManager sundesmos)
         : base(label, options, log, mediator, config, factory, groups, memory)
     {
         _sundesmos = sundesmos;
 
         // Subscribe to pair-related changes here via the mediator calls.
+        Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => RegenerateItems(string.Empty));
     }
 
     public int Rendered => _allItems.Count(s => s.IsRendered);

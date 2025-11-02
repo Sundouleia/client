@@ -55,7 +55,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         Mediator.Subscribe<FilesUploaded>(this, (msg) => _uploads.TryRemove(msg.Player, out _));
         Mediator.Subscribe<SundesmoOffline>(this, (msg) => 
         {
-            _logger.LogWarning($"Ending all transfer tracking for offline {msg.Sundesmo.PlayerName}");
+            _logger.LogTrace($"Ending all transfer tracking for offline {msg.Sundesmo.PlayerName}", LoggerType.PairDataTransfer);
             _uploads.TryRemove(msg.Sundesmo.PlayerHandler, out _);
             _downloads.TryRemove(msg.Sundesmo.PlayerHandler, out _);
         });

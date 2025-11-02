@@ -25,6 +25,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     // concurrent dictionary of all paired paired to the client. 
     private readonly ConcurrentDictionary<UserData, Sundesmo> _allSundesmos;
     private readonly MainConfig _config;
+    private readonly FolderConfig _folderConfig;
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoFactory _pairFactory;
 
@@ -32,11 +33,14 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public List<Sundesmo> DirectPairs => _directPairsInternal.Value; // the direct pairs the client has with other users.
 
     public SundesmoManager(ILogger<SundesmoManager> logger, SundouleiaMediator mediator,
-        SundesmoFactory factory, MainConfig config, ServerConfigManager serverConfigs) : base(logger, mediator)
+        SundesmoFactory factory, MainConfig config, FolderConfig folderConfig,
+        ServerConfigManager serverConfigs)
+        : base(logger, mediator)
     {
         _allSundesmos = new(UserDataComparer.Instance);
         _pairFactory = factory;
         _config = config;
+        _folderConfig = folderConfig;
         _serverConfigs = serverConfigs;
 
         Mediator.Subscribe<ConnectedMessage>(this, _ => OnClientConnected());
@@ -267,7 +271,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (PlayerData.IsInPvP || !s.IsRendered) return;
         unsafe
         {
-            if (_config.Current.FocusTargetOverTarget)
+            if (_folderConfig.Current.TargetWithFocus)
                 TargetSystem.Instance()->FocusTarget = (GameObject*)s.PlayerAddress;
             else
                 TargetSystem.Instance()->SetHardTarget((GameObject*)s.PlayerAddress);
@@ -276,7 +280,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     private void RecreateLazy()
     {
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
-        Mediator.Publish(new RegenerateEntries(RefreshTarget.Sundesmos));
+        Mediator.Publish(new FolderUpdateSundesmos());
     }
 
     #region Manager Helpers

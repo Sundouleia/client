@@ -51,7 +51,7 @@ public class DrawEntitySundesmo : IDrawEntity<Sundesmo>
 
     public string DistinctId { get; init; }
     public string DisplayName => _sundesmo.GetDrawEntityName();
-    public string UID => _sundesmo.UserData.UID;
+    public string EntityId => _sundesmo.UserData.UID;
     public Sundesmo Item => _sundesmo;
 
     /// <summary>
@@ -131,7 +131,7 @@ public class DrawEntitySundesmo : IDrawEntity<Sundesmo>
         // Return to the position and draw out the contents.
         ImGui.SameLine(pos.X);
         using (ImRaii.PushFont(UiBuilder.MonoFont, _showingUID))
-            CkGui.TextFrameAligned(_showingUID ? UID : DisplayName);
+            CkGui.TextFrameAligned(_showingUID ? EntityId : DisplayName);
         CkGui.AttachToolTip(_parentFolder.Options.DragDropItems ? DragDropTooltip : NormalTooltip, ImGuiColors.DalamudOrange);
         
         // handle hover logic if not a drag-drop item.

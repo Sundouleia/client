@@ -202,7 +202,7 @@ public static class SundouleiaServiceExtensions
     public static IServiceCollection AddSundouleiaConfigs(this IServiceCollection services)
     => services
         .AddSingleton<MainConfig>()
-        .AddSingleton<GroupsConfig>()
+        .AddSingleton<FolderConfig>()
         .AddSingleton<NickConfig>()
         .AddSingleton<FavoritesConfig>()
         .AddSingleton<AccountConfig>()

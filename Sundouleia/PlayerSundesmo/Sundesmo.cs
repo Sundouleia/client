@@ -28,6 +28,7 @@ public class Sundesmo : IComparable<Sundesmo>
     private readonly ILogger<Sundesmo> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
+    private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favorites;
     private readonly ServerConfigManager _nickConfig;
     private readonly SundesmoHandlerFactory _factory;
@@ -45,12 +46,13 @@ public class Sundesmo : IComparable<Sundesmo>
     private PlayerOwnedHandler _companion;
 
     public Sundesmo(UserPair userPairInfo, ILogger<Sundesmo> logger, SundouleiaMediator mediator,
-        MainConfig config, FavoritesConfig favorites, ServerConfigManager nicks,
+        MainConfig config, FolderConfig folderConfig, FavoritesConfig favorites, ServerConfigManager nicks,
         SundesmoHandlerFactory factory, CharaObjectWatcher watcher)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
+        _folderConfig = folderConfig;
         _favorites = favorites;
         _nickConfig = nicks;
         _watcher = watcher;
@@ -115,11 +117,11 @@ public class Sundesmo : IComparable<Sundesmo>
 
     public string? AlphabeticalSortKey()
         => (IsRendered && !string.IsNullOrEmpty(PlayerName)
-            ? (_config.Current.PreferNicknamesOverNames ? GetNickAliasOrUid() : PlayerName)
+            ? (_folderConfig.Current.NickOverPlayerName ? GetNickAliasOrUid() : PlayerName)
             : GetNickAliasOrUid());
     public string GetDrawEntityName()
     {
-        var condition = IsRendered && !_config.Current.PreferNicknamesOverNames && !string.IsNullOrEmpty(PlayerName);
+        var condition = IsRendered && !_folderConfig.Current.NickOverPlayerName && !string.IsNullOrEmpty(PlayerName);
         return condition ? PlayerName : GetNickAliasOrUid();
     }
 

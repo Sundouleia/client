@@ -35,13 +35,11 @@ public class GroupsUI : WindowMediatorSubscriberBase
         _guides = guides;
 
         _iconGalleryCombo = new FAIconCombo(logger);
-        UpdateFolders();
 
-        Mediator.Subscribe<RegenerateEntries>(this, _ =>
-        {
-            if (_.TargetFolders is RefreshTarget.Groups || _.TargetFolders is RefreshTarget.Sundesmos)
-                UpdateFolders();
-        });
+        CreateGroupFolders();
+        _allSundesmos = _factory.CreateDefaultFolder(Constants.FolderTagAllDragDrop, FolderOptions.FolderEditor);
+
+        Mediator.Subscribe<FolderUpdateGroups>(this, _ => CreateGroupFolders());
 
         this.PinningClickthroughFalse();
         this.SetBoundaries(new(550, 470), ImGui.GetIO().DisplaySize);        
@@ -137,39 +135,12 @@ public class GroupsUI : WindowMediatorSubscriberBase
             _creator.ShowOffline = seeOffline;
     }
     #endregion Creator
-
-    private void UpdateFolders()
-    {
-        // Ensure folders exist.
-        if (_groups is null)
-            RecreateGroupFolders();
-        else
-        {
-            // Regenerate items for each folder.
-            foreach (var folder in _groups)
-                folder.RegenerateItems(string.Empty);
-        }
-
-        // Ensure All folder exists.
-        if (_allSundesmos is null)
-            RecreateAllFolder();
-        else
-            _allSundesmos.RegenerateItems(string.Empty);
-    }
-
-    private void RecreateGroupFolders()
+    private void CreateGroupFolders()
     {
         // Create the folders based on the current config options.
         var groupFolders = new List<DrawFolderGroup>();
         foreach (var group in _manager.Config.Groups)
             groupFolders.Add(_factory.CreateGroupFolder(group, FolderOptions.FolderEditor));
-
         _groups = groupFolders;
     }
-
-    private void RecreateAllFolder()
-    {
-        _allSundesmos = _factory.CreateDefaultFolder(Constants.FolderTagAllDragDrop, FolderOptions.FolderEditor);
-    }
-
 }

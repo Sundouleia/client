@@ -9,18 +9,25 @@ public enum FolderSortFilter
 {
     Rendered,       // Rendered sundesmos first.
     Online,         // Online sundesmos first.
+    Favorite,       // Favorite sundesmos first.
     Alphabetical,   // Default behavior.
     Temporary,      // Temporary sundesmos first.
-    // DateAdded,      // When the pair was established.
-    Favorite,      // Favorite sundesmos first.
+    DateAdded,      // When the pair was established.
 }
 
 public class GroupsStorage
 {
-    public HashSet<string> OpenedDefaultFolders { get; set; } = new(StringComparer.Ordinal);
-    public HashSet<string> VisibleGroupFolders { get; set; } = new(StringComparer.Ordinal);
-    public HashSet<string> OpenedGroupFolders { get; set; } = new(StringComparer.Ordinal);
-    // could maybe revise this by comparing as a HashSet with a comparer override that goes by label.
+    // Basic config options for all folders.
+    public bool FavoritesFirst { get; set; } = true;
+    public bool NickOverPlayerName { get; set; } = false;
+    public bool VisibleFolder { get; set; } = true;
+    public bool OfflineFolder { get; set; } = true;
+    public bool TargetWithFocus { get; set; } = false;
+
+    // Tracks opened folders from any type.
+    public HashSet<string> OpenedFolders { get; set; } = new(StringComparer.Ordinal);
+
+    // All Created groups. Not tracked as a dictionary with label keys to allow renaming while keeping references.
     public List<SundesmoGroup> Groups { get; set; } = new();
 
     // Cached sort order filters.
@@ -29,6 +36,7 @@ public class GroupsStorage
 
 public class SundesmoGroup
 {
+    public bool Visible { get; set; } = true;
     public FAI Icon { get; set; } = FAI.User;
     public string Label { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -43,9 +51,10 @@ public class SundesmoGroup
 
 public record FolderSortPreset(string Name, List<FolderSortFilter> SortFilters);
 
-public class GroupsConfig : IHybridSavable
+// Configuration for everything relating to dynamic folder and draw entity displays.
+public class FolderConfig : IHybridSavable
 {
-    private readonly ILogger<GroupsConfig> _logger;
+    private readonly ILogger<FolderConfig> _logger;
     private readonly HybridSaveService _saver;
     public DateTime LastWriteTimeUTC { get; private set; } = DateTime.MinValue;
     public int ConfigVersion => 0;
@@ -60,7 +69,7 @@ public class GroupsConfig : IHybridSavable
             ["Config"] = JObject.FromObject(Current),
         }.ToString(Formatting.Indented);
     }
-    public GroupsConfig(ILogger<GroupsConfig> logger, HybridSaveService saver)
+    public FolderConfig(ILogger<FolderConfig> logger, HybridSaveService saver)
     {
         _logger = logger;
         _saver = saver;
@@ -107,19 +116,21 @@ public class GroupsConfig : IHybridSavable
 
     public GroupsStorage Current { get; set; } = new GroupsStorage();
 
-    // Helpers.
-    public bool IsDefaultExpanded(string id) => Current.OpenedDefaultFolders.Contains(id);
-    public void ToggleDefaultFolder(string id)
+    public IEnumerable<string> GroupFolderLabels => Current.Groups.Select(g => g.Label);
+    public bool LabelExists(string l) => Constants.OwnedFolders.Contains (l) || Current.Groups.Any(g => g.Label == l);
+    public bool IsFolderOpen(string id) => Current.OpenedFolders.Contains(id);
+    
+    public void ToggleFolder(string id)
     {
-        Current.OpenedDefaultFolders.SymmetricExceptWith([ id ]);
+        Current.OpenedFolders.SymmetricExceptWith([ id ]);
         Save();
     }
-    public void SetDefaultFolder(string id, bool open)
+
+    public void SetFolder(string id, bool open)
     {
-        if (open)
-            Current.OpenedDefaultFolders.Add(id);
-        else
-            Current.OpenedDefaultFolders.Remove(id);
-        Save();
+        if (open && Current.OpenedFolders.Add(id))
+            Save();
+        else if (!open && Current.OpenedFolders.Remove(id))
+            Save();
     }
 }

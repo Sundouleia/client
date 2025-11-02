@@ -16,7 +16,7 @@ namespace Sundouleia.Gui.Components;
 public class DrawFolderDefault : DynamicPairFolder
 {
     public DrawFolderDefault(string label, FolderOptions options, ILogger<DrawFolderDefault> log, 
-        SundouleiaMediator mediator, MainConfig config, SharedFolderMemory memory, 
+        SundouleiaMediator mediator, FolderConfig config, SharedFolderMemory memory, 
         DrawEntityFactory factory, GroupsManager groups, SundesmoManager sundesmos)
         : base(label, options, log, mediator, config, factory, groups, memory, sundesmos)
     {
@@ -56,12 +56,6 @@ public class DrawFolderDefault : DynamicPairFolder
 
         // Can regenerate the items here.
         RegenerateItems(string.Empty);
-
-        Mediator.Subscribe<RegenerateEntries>(this, _ =>
-        {
-            if (_.TargetFolders is RefreshTarget.Sundesmos)
-                RegenerateItems(string.Empty);
-        });
     }
 
     protected override void DrawFolderInternal(bool toggles)

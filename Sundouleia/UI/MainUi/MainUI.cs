@@ -89,6 +89,7 @@ public class MainUI : WindowMediatorSubscriberBase
 
     public static Vector2 LastPos { get; private set; } = Vector2.Zero;
     public static Vector2 LastSize { get; private set; } = Vector2.Zero;
+    public static Vector2 LastBottomTabMenuPos { get; private set; } = Vector2.Zero;
 
     // for tutorial, and for profile popouts.
     private Vector2 WindowPos => ImGui.GetWindowPos();
@@ -172,6 +173,9 @@ public class MainUI : WindowMediatorSubscriberBase
         
         // draw the bottom tab bar
         _tabMenu.Draw(winContentWidth);
+
+        // store the bottom of the tab menu for tutorial purposes.
+        LastBottomTabMenuPos = ImGui.GetCursorScreenPos();
 
         // Show content based on the selected tab.
         // (Note: This used to have Using ImRaii.PushId here but never really saw a reason to need it,

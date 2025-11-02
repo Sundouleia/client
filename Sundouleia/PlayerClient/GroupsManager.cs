@@ -8,84 +8,44 @@ namespace Sundouleia.PlayerClient;
 /// </summary>
 public class GroupsManager
 {
-    public static readonly IEnumerable<string> DefaultLabels = [Constants.FolderTagAll, Constants.FolderTagVisible, Constants.FolderTagOnline, Constants.FolderTagOffline];
+    public static readonly IEnumerable<string> BasicLabels = [Constants.FolderTagAll, Constants.FolderTagVisible, Constants.FolderTagOnline, Constants.FolderTagOffline];
+    public static readonly IEnumerable<string> RadarLabels = [Constants.FolderTagRadarPaired, Constants.FolderTagRadarUnpaired];
 
     private readonly ILogger<GroupsManager> _logger;
     private readonly SundouleiaMediator _mediator;
-    private readonly GroupsConfig _config;
+    private readonly FolderConfig _config;
 
-    public GroupsManager(ILogger<GroupsManager> logger, SundouleiaMediator mediator, GroupsConfig config)
+    public GroupsManager(ILogger<GroupsManager> logger, SundouleiaMediator mediator, FolderConfig config)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
     }
 
-    public GroupsStorage Config
-        => _config.Current;
+    public IEnumerable<string> GroupLabels => _config.GroupFolderLabels;
+    public GroupsStorage Config => _config.Current;
+    public void SaveConfig() => _config.Save(); // Prefer to faze this out.
 
-    public void SaveConfig()
-        => _config.Save();
 
-    // Could do generic fallback here for groups
-    // and defaults if we restrict groups from having names assigned to defaults.
-    public bool IsOpen(string label)
-    {
-        // Check defaults first.
-        if (DefaultLabels.Contains(label))
-            return Config.OpenedDefaultFolders.Contains(label);
-        // Fallback to groups.
-        return Config.OpenedGroupFolders.Contains(label);
-    }
+    public bool IsOpen(string label) => _config.IsFolderOpen(label);
+    public bool IsOpen(SundesmoGroup group) => _config.IsFolderOpen(group.Label);
 
-    public bool IsOpen(SundesmoGroup group)
-        => Config.OpenedGroupFolders.Contains(group.Label);
+    public void ToggleState(SundesmoGroup group) => _config.ToggleFolder(group.Label);
+    public void ToggleState(string label) => _config.ToggleFolder(label);
 
-    public void ToggleState(string label)
-    {
-        // Handle default folders.
-        if (DefaultLabels.Contains(label))
-        {
-            if (!Config.OpenedDefaultFolders.Remove(label))
-                Config.OpenedDefaultFolders.Add(label);
-            _config.Save();
-            return;
-        }
-
-        // Handle Group Folders.
-        if (!Config.OpenedGroupFolders.Remove(label))
-            Config.OpenedGroupFolders.Add(label);
-        _config.Save();
-    }
-
-    public IEnumerable<string> ActiveGroups()
-        => Config.Groups.Where(g => g.LinkedUids.Count > 0).Select(g => g.Label);
-
-    public void ToggleState(SundesmoGroup group)
-    {
-        if (!Config.OpenedGroupFolders.Remove(group.Label))
-            Config.OpenedGroupFolders.Add(group.Label);
-        _config.Save();
-    }
+    public IEnumerable<string> ActiveGroups() => Config.Groups.Where(g => g.LinkedUids.Count > 0).Select(g => g.Label);
 
     // Attempts to add a new sundesmoGroup to the config.
     // Fails if the name already exists. 
     public bool TryAddNewGroup(SundesmoGroup group)
     {
-        if (Config.Groups.Any(g => g.Label.Equals(group.Label, StringComparison.Ordinal)))
+        if (_config.LabelExists(group.Label))
         {
             _logger.LogWarning($"A group with the name {{{group.Label}}} already exists!");
             return false;
         }
-        else if (DefaultLabels.Contains(group.Label))
-        {
-            _logger.LogWarning($"A group cannot be created with the reserved name {{{group.Label}}}!");
-            return false;
-        }
-        
         // Default the linked UID's.
         group.LinkedUids = new();
-
         Config.Groups.Add(group);
         _config.Save();
         return true;
@@ -100,14 +60,9 @@ public class GroupsManager
 
     public bool UpdateLabel(SundesmoGroup group, string newLabel, uint newColor)
     {
-        if (Config.Groups.Any(g => g.Label.Equals(newLabel, StringComparison.Ordinal)))
+        if (_config.LabelExists(group.Label))
         {
-            _logger.LogWarning($"A group with the name {{{newLabel}}} already exists!");
-            return false;
-        }
-        else if (DefaultLabels.Contains(newLabel))
-        {
-            _logger.LogWarning($"A group cannot be renamed to the reserved name {{{newLabel}}}!");
+            _logger.LogWarning($"A group with the name {{{group.Label}}} already exists!");
             return false;
         }
 
@@ -130,12 +85,7 @@ public class GroupsManager
             _logger.LogWarning($"No group found with the name {{{existing}}} to update.");
             return false;
         }
-        else if (DefaultLabels.Contains(updated.Label))
-        {
-            _logger.LogWarning($"A group cannot be renamed to the reserved name {{{updated.Label}}}!");
-            return false;
-        }
-        
+
         match.Icon = updated.Icon;
         match.IconColor = updated.IconColor;
         match.Label = updated.Label;
@@ -148,9 +98,9 @@ public class GroupsManager
 
     public bool UpdateDetails(SundesmoGroup group, SundesmoGroup updated)
     {
-        if (DefaultLabels.Contains(updated.Label))
+        if (_config.LabelExists(updated.Label))
         {
-            _logger.LogWarning($"A group cannot be renamed to the reserved name {{{updated.Label}}}!");
+            _logger.LogWarning($"A group with the name {{{updated.Label}}} already exists!");
             return false;
         }
 
@@ -259,43 +209,5 @@ public class GroupsManager
         Config.Groups.Remove(group);
         _config.Save();
         return true;
-    }
-
-    public bool RenderIfEmpty(string label)
-    {
-        // Check defaults first.
-        if (DefaultLabels.Contains(label))
-            return label switch
-            {
-                Constants.FolderTagAll => true,
-                Constants.FolderTagVisible => false,
-                Constants.FolderTagOnline => false,
-                Constants.FolderTagOffline => false,
-                _ => false,
-            };
-        // Fallback to groups.
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(label, StringComparison.Ordinal)) is { } match)
-            return true;
-        // Default false.
-        return false;
-    }
-
-    public FAI IconForGroup(string label)
-    {
-        // Check defaults first.
-        if (DefaultLabels.Contains(label))
-            return label switch
-            {
-                Constants.FolderTagAll => FAI.Globe,
-                Constants.FolderTagVisible => FAI.Eye,
-                Constants.FolderTagOnline => FAI.Link,
-                Constants.FolderTagOffline => FAI.Link,
-                _ => FAI.Folder,
-            };
-        // Fallback to groups.
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(label, StringComparison.Ordinal)) is { } match)
-            return match.Icon;
-        // Default folder icon.
-        return FAI.Folder;
     }
 }

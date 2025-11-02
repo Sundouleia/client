@@ -1,3 +1,4 @@
+using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Network;
@@ -19,21 +20,8 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
     public RequestsManager(ILogger<RequestsManager> logger, SundouleiaMediator mediator)
         : base(logger, mediator)
     {
-#if DEBUG
-        // Generate some dummy entries.
-        Mediator.Subscribe<ConnectedMessage>(this, _ =>
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                var incomingRequest = new SundesmoRequest(new($"Dummy Sender {i}"), MainHub.OwnUserData, new(false, "Blah Blah", (ushort)i, (ushort)(i * 10)), DateTime.Now);
-                var outgoingRequest = new SundesmoRequest(MainHub.OwnUserData, new($"Dummy Recipient {i}"), new(false, "Blah Blah", (ushort)(i * 5), (ushort)(i * 15)), DateTime.Now);
-                _allRequests.Add(new RequestEntry(incomingRequest));
-                _allRequests.Add(new RequestEntry(outgoingRequest));
-            }
-            RecreateLazy();
-        });
-#endif
-        RecreateLazy();
+        _incomingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => !r.FromClient).OrderByDescending(r => r.TimeToRespond).ToList());
+        _outgoingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => r.FromClient).OrderByDescending(r => r.TimeToRespond).ToList());
 
         Mediator.Subscribe<DisconnectedMessage>(this, _ =>
         {
@@ -98,9 +86,10 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
 
     private void RecreateLazy()
     {
-        // Update internals.
-        _incomingInternal = new(() => _allRequests.Where(r => !r.FromClient).OrderByDescending(r => r.TimeToRespond).ToList());
-        _outgoingInternal = new(() => _allRequests.Where(r => !r.FromClient).OrderByDescending(r => r.TimeToRespond).ToList());
-        Mediator.Publish(new RegenerateEntries(RefreshTarget.Requests));
+        // Update internals
+        _incomingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => !r.FromClient).OrderByDescending(r => r.TimeToRespond).ToList());
+        _outgoingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => r.FromClient).OrderByDescending(r => r.TimeToRespond).ToList());
+        Logger.LogInformation($"Recreated lazy Request lists with {_allRequests.Count} total requests. ({Incoming.Count} in, {Outgoing.Count} out)", LoggerType.PairManagement);
+        Mediator.Publish(new FolderUpdateRequests());
     }
 }

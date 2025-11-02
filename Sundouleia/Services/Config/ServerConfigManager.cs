@@ -14,22 +14,22 @@ public class ServerConfigManager
 {
     private readonly ILogger<ServerConfigManager> _logger;
     private readonly SundouleiaMediator _mediator;
-    private readonly GroupsConfig _groupConfig;
+    private readonly FolderConfig _folderConfig;
     private readonly NickConfig _nickConfig;
     private readonly AccountConfig _accountConfig;
 
     // Migrate group config later.
     public ServerConfigManager(ILogger<ServerConfigManager> logger, SundouleiaMediator mediator,
-        GroupsConfig groupConfig, AccountConfig accountConfig, NickConfig nicksConfig)
+        FolderConfig folderConfig, AccountConfig accountConfig, NickConfig nicksConfig)
     {
         _logger = logger;
         _mediator = mediator;
-        _groupConfig = groupConfig;
+        _folderConfig = folderConfig;
         _accountConfig = accountConfig;
         _nickConfig = nicksConfig;
     }
 
-    public GroupsStorage Groups => _groupConfig.Current;
+    public GroupsStorage Groups => _folderConfig.Current; // try and faze out?
     public NickStorage NicknameStorage => _nickConfig.Current;
     public AccountStorage AccountStorage => _accountConfig.Current;
 
@@ -220,12 +220,5 @@ public class ServerConfigManager
 
         NicknameStorage.Nicknames[uid] = nickname;
         _nickConfig.Save();
-    }
-
-    // Updates the opened default public folders in the groups config.
-    public void ToggleWhitelistFolderState(string folder)
-    {
-        _groupConfig.Current.OpenedDefaultFolders.SymmetricExceptWith(new[] { folder });
-        _groupConfig.Save();
     }
 }

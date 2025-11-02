@@ -16,6 +16,7 @@ public class DrawEntityFactory
     private readonly SundouleiaMediator _mediator;
     private readonly MainHub _hub;
     private readonly MainConfig _config;
+    private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favorites;
     private readonly SharedFolderMemory _folderMemory;
     private readonly IdDisplayHandler _nameDisplay;
@@ -26,8 +27,9 @@ public class DrawEntityFactory
 
     public DrawEntityFactory(ILoggerFactory logFactory,
         SundouleiaMediator mediator, 
-        MainHub hub, 
-        MainConfig config, 
+        MainHub hub,
+        MainConfig config,
+        FolderConfig folderConfig, 
         FavoritesConfig favorites, 
         SharedFolderMemory memory,
         IdDisplayHandler nameDisplay,
@@ -40,6 +42,7 @@ public class DrawEntityFactory
         _mediator = mediator;
         _hub = hub;
         _config = config;
+        _folderConfig = folderConfig;
         _favorites = favorites;
         _folderMemory = memory;
         _nameDisplay = nameDisplay;
@@ -52,21 +55,21 @@ public class DrawEntityFactory
     // Advance this for groups later.
     public DrawFolderDefault CreateDefaultFolder(string tag, FolderOptions options)
         => new DrawFolderDefault(tag, options, _logFactory.CreateLogger<DrawFolderDefault>(), _mediator,
-            _config, _folderMemory, this, _groupManager, _sundesmos);
+            _folderConfig, _folderMemory, this, _groupManager, _sundesmos);
 
     public DrawFolderGroup CreateGroupFolder(SundesmoGroup group, FolderOptions options)
         => new DrawFolderGroup(group, options, _logFactory.CreateLogger<DrawFolderGroup>(), _mediator, 
-            _config, _folderMemory, this, _groupManager, _sundesmos);
+            _folderConfig, _folderMemory, this, _groupManager, _sundesmos);
 
     public DynamicRadarFolder CreateRadarFolder(string label, FolderOptions options)
         => new DynamicRadarFolder(label, options, _logFactory.CreateLogger<DynamicRadarFolder>(), _mediator,
-            _config, this, _groupManager, _folderMemory, _radarManager, _sundesmos);
+            _folderConfig, this, _groupManager, _folderMemory, _radarManager, _sundesmos);
 
     public DrawFolderRequestsIn CreateIncomingRequestsFolder()
-        => new DrawFolderRequestsIn(_logFactory.CreateLogger<DrawFolderRequestsIn>(), _mediator, _config, this, _groupManager, _folderMemory, _requests);
+        => new DrawFolderRequestsIn(_logFactory.CreateLogger<DrawFolderRequestsIn>(), _mediator, _folderConfig, this, _groupManager, _folderMemory, _requests);
 
     public DrawFolderRequestsOut CreateOutgoingRequestsFolder()
-        => new DrawFolderRequestsOut(_logFactory.CreateLogger<DrawFolderRequestsOut>(), _mediator, _config, this, _groupManager, _folderMemory, _requests);
+        => new DrawFolderRequestsOut(_logFactory.CreateLogger<DrawFolderRequestsOut>(), _mediator, _folderConfig, this, _groupManager, _folderMemory, _requests);
 
     // For DynamicPairFolder 
     public DrawEntitySundesmo CreateDrawEntity(DynamicPairFolder parent, Sundesmo sundesmo)

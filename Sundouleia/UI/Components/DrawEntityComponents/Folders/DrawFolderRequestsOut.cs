@@ -16,25 +16,12 @@ namespace Sundouleia.Gui.Components;
 /// </summary>
 public class DrawFolderRequestsOut : DynamicRequestFolder
 {
-    public DrawFolderRequestsOut(ILogger log, SundouleiaMediator mediator, MainConfig config,
+    public DrawFolderRequestsOut(ILogger log, SundouleiaMediator mediator, FolderConfig config,
         DrawEntityFactory factory, GroupsManager groups, SharedFolderMemory memory, RequestsManager requests)
         : base(Constants.FolderTagRequestPending, log, mediator, config, factory, groups, memory, requests)
     {
-        Icon = FAI.Inbox;
-        IconColor = uint.MaxValue;
-        LabelColor = uint.MaxValue;
-        ColorBG = uint.MinValue;
-        ColorBorder = ImGui.GetColorU32(ImGuiCol.TextDisabled);
-        ShowIfEmpty = true;
         // RegenerateItems here.
         RegenerateItems(string.Empty);
-
-        // We should subscribe to radar-user-related changes here via the mediator calls.
-        Mediator.Subscribe<RegenerateEntries>(this, _ =>
-        {
-            if (_.TargetFolders is RefreshTarget.Requests)
-                RegenerateItems(string.Empty);
-        });
     }
 
     protected override void DrawFolderInternal(bool toggles)

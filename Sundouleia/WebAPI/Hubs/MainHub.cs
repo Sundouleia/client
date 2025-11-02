@@ -264,7 +264,18 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private async Task LoadRequests()
     {
         var requests = await UserGetSundesmoRequests().ConfigureAwait(false);
-        _requests.AddNewRequest(requests);
+
+#if DEBUG
+        // Generate some dummy entries.
+        var dummyRequests = new List<SundesmoRequest>();
+        for (int i = 0; i < 5; i++)
+        {
+            dummyRequests.Add(new SundesmoRequest(new($"Dummy Sender {i}"), MainHub.OwnUserData, new(false, "Blah Blah", (ushort)i, (ushort)(i * 10)), DateTime.Now));
+            dummyRequests.Add(new SundesmoRequest(MainHub.OwnUserData, new($"Dummy Recipient {i}"), new(false, "Blah Blah", (ushort)(i * 5), (ushort)(i * 15)), DateTime.Now));
+        }
+#endif
+
+        _requests.AddNewRequest([ ..requests, .. dummyRequests]);
     }
 
     /// <summary>

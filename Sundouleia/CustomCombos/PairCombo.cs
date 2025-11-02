@@ -15,14 +15,14 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
 
     private Sundesmo? _currentUser;
     private bool _needsRefresh = false;
-    public PairCombo(ILogger log, SundouleiaMediator mediator, MainConfig config, SundesmoManager pairs, FavoritesConfig favorites)
+    public PairCombo(ILogger log, SundouleiaMediator mediator, FolderConfig config, SundesmoManager pairs, FavoritesConfig favorites)
         : base(() => [
             ..pairs.DirectPairs
                 .OrderByDescending(p => favorites.SundesmoUids.Contains(p.UserData.UID))
                 .ThenByDescending(u => u.IsRendered)
                 .ThenByDescending(u => u.IsOnline)
                 .ThenBy(pair => !pair.PlayerName.IsNullOrEmpty()
-                    ? (config.Current.PreferNicknamesOverNames ? pair.GetNickAliasOrUid() : pair.PlayerName)
+                    ? (config.Current.NickOverPlayerName ? pair.GetNickAliasOrUid() : pair.PlayerName)
                     : pair.GetNickAliasOrUid(), StringComparer.OrdinalIgnoreCase)
         ], log)
     {
@@ -30,7 +30,7 @@ public sealed class PairCombo : CkFilterComboCache<Sundesmo>, IMediatorSubscribe
         _favorites = favorites;
         SearchByParts = true;
 
-        Mediator.Subscribe<RegenerateEntries>(this, _ => { if (_.TargetFolders is RefreshTarget.Sundesmos) _needsRefresh = true; });
+        Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => _needsRefresh = true);
     }
 
     public SundouleiaMediator Mediator { get; }
