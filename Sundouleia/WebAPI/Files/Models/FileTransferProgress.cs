@@ -129,6 +129,17 @@ public class FileTransferProgress
 	}
 
 	/// <summary>
+	///    Checks if a file is being tracked by its hash.
+	/// </summary>
+	public bool IsFileTransferActive(string fileHash)
+	{
+		lock (_lock)
+		{
+			return _fileTransfers.ContainsKey(fileHash);
+		}
+	}
+
+	/// <summary>
 	///     Removes a file from tracking by its hash.
 	/// </summary>
 	public void RemoveFile(string fileHash)
