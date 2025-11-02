@@ -98,6 +98,12 @@
           "Microsoft.IdentityModel.Tokens": "7.5.2"
         }
       },
+      "ZstdSharp.Port": {
+        "type": "Direct",
+        "requested": "[0.8.6, )",
+        "resolved": "0.8.6",
+        "contentHash": "iP4jVLQoQmUjMU88g1WObiNr6YKZGvh4aOXn3yOJsHqZsflwRsxZPcIBvNXgjXO3vQKSLctXGLTpcBPLnWPS8A=="
+      },
       "JetBrains.Annotations": {
         "type": "Transitive",
         "resolved": "2024.3.0",
