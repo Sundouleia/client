@@ -79,7 +79,7 @@ public class ProfileUI : WindowMediatorSubscriberBase
         _drawHelper.RectMax = wdl.GetClipRectMax();
 
         // Draw the plate and store if we hovered the report button.
-        _drawHelper.DrawProfileLight(wdl, toDraw, dispName, User, ShowFullUID, ref HoveringReportButton);
+        _drawHelper.DrawProfile(wdl, toDraw, dispName, User, ShowFullUID, ref HoveringReportButton);
         // Close button.
         CloseButton(wdl);
         CkGui.AttachToolTipRect(_drawHelper.CloseButtonPos, _drawHelper.CloseButtonSize, $"Close {dispName}'s Profile");

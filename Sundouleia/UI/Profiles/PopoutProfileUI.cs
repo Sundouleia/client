@@ -73,6 +73,6 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
         var wdl = ImGui.GetWindowDrawList();
         _drawHelper.RectMin = wdl.GetClipRectMin();
         _drawHelper.RectMax = wdl.GetClipRectMax();
-        _drawHelper.DrawProfileLight(wdl, toDraw, dispName, User, true);
+        _drawHelper.DrawProfile(wdl, toDraw, dispName, User, true);
     }
 }

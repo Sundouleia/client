@@ -22,7 +22,6 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         Whitelist,
         Radar,
         RadarChat,
-        Account,
     }
 
     public override SelectedTab TabSelection
@@ -56,11 +55,8 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         AddDrawButton(FontAwesomeIcon.BroadcastTower, SelectedTab.Radar, "Connect easily with others!",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Radar, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.RadarChat));
 
-        AddDrawButton(FontAwesomeIcon.Comments, SelectedTab.RadarChat, "Chat with other sundouleia users nearby!",
+        AddDrawButton(FontAwesomeIcon.Comments, SelectedTab.RadarChat, "Chat with others in similar areas!",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarChat, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
-
-        AddDrawButton(FontAwesomeIcon.UserCircle, SelectedTab.Account, "Account Settings",
-            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.AccountPage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.Account));
 
         TabSelectionChanged += (oldTab, newTab) => _mediator.Publish(new MainWindowTabChangeMessage(newTab));
     }
@@ -116,6 +112,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
                     ImGui.GetColorU32(ImGuiCol.Separator), 2f);
             }
 
+            // Handle special cases for notification badges. (Occurs for Requests & RadarChat)
             if (tab.TargetTab is SelectedTab.RadarChat && _config.Current.RadarShowUnreadBubble)
             {
                 if (RadarChatLog.NewMsgCount > 0)

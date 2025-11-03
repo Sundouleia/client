@@ -239,12 +239,11 @@ public static class SundouleiaServiceExtensions
         .AddScoped<WindowMediatorSubscriberBase, IntroUi>()
         .AddScoped<WindowMediatorSubscriberBase, MainUI>()
         .AddScoped<WindowMediatorSubscriberBase, InteractionsUI>()
-        .AddScoped<HomepageTab>()
+        .AddScoped<HomeTab>()
+        .AddScoped<RequestsTab>()
         .AddScoped<WhitelistTab>()
         .AddScoped<RadarTab>()
-        .AddScoped<RequestsTab>()
         .AddScoped<RadarChatTab>()
-        .AddScoped<AccountTab>()
 
         // Scoped Modules
         .AddScoped<GroupsUI>()

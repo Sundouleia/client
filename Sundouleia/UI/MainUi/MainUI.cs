@@ -2,7 +2,6 @@ using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs;
 using OtterGui.Text;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
@@ -22,6 +21,9 @@ namespace Sundouleia.Gui.MainWindow;
 // Primary UI that hosts the bulk of Sundouleias Interface.
 public class MainUI : WindowMediatorSubscriberBase
 {
+    // Note that if you ever change this width you will need to also adjust the display width for the account page display.
+    public const float MAIN_UI_WIDTH = 380f;
+
     private bool THEME_PUSHED = false;
 
     private readonly MainConfig _config;
@@ -31,12 +33,11 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly TutorialService _guides;
-    private readonly HomepageTab _homepage;
+    private readonly HomeTab _homeTab;
     private readonly WhitelistTab _whitelist;
     private readonly RequestsTab _requestsTab;
     private readonly RadarTab _radar;
     private readonly RadarChatTab _radarChat;
-    private readonly AccountTab _account;
 
     // Some temp values used for sending requests.
     private bool  _creatingRequest  = false;
@@ -45,8 +46,8 @@ public class MainUI : WindowMediatorSubscriberBase
 
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
         ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
-        SundesmoManager sundesmos, TutorialService guides, HomepageTab home, WhitelistTab whitelist, 
-        RequestsTab requestsTab, RadarTab radar, RadarChatTab chat, AccountTab account) 
+        SundesmoManager sundesmos, TutorialService guides, HomeTab homeTab, WhitelistTab whitelist, 
+        RequestsTab requestsTab, RadarTab radar, RadarChatTab chat) 
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
@@ -57,12 +58,11 @@ public class MainUI : WindowMediatorSubscriberBase
         _sundesmos = sundesmos;
         _guides = guides;
 
-        _homepage = home;
+        _homeTab = homeTab;
         _requestsTab = requestsTab;
         _whitelist = whitelist;
         _radar = radar;
         _radarChat = chat;
-        _account = account;
 
         // display info about the folders
         var ver = Assembly.GetExecutingAssembly().GetName().Version!;
@@ -70,7 +70,7 @@ public class MainUI : WindowMediatorSubscriberBase
         Flags |= WFlags.NoDocking;
 
         this.PinningClickthroughFalse();
-        this.SetBoundaries(new Vector2(380, 500), new Vector2(380, 2000));
+        this.SetBoundaries(new(380, 500), new(380, 2000));
         TitleBarButtons = new TitleBarButtonBuilder()
             .Add(FAI.Book, "Changelog", () => Mediator.Publish(new UiToggleMessage(typeof(ChangelogUI))))
             .Add(FAI.Cog, "Settings", () => Mediator.Publish(new UiToggleMessage(typeof(SettingsUi))))
@@ -183,7 +183,7 @@ public class MainUI : WindowMediatorSubscriberBase
         switch (_tabMenu.TabSelection)
         {
             case MainMenuTabs.SelectedTab.Homepage:
-                _homepage.DrawHomepageSection();
+                _homeTab.DrawSection();
                 break;
             case MainMenuTabs.SelectedTab.Requests:
                 _requestsTab.DrawRequestsSection();
@@ -196,9 +196,6 @@ public class MainUI : WindowMediatorSubscriberBase
                 break;
             case MainMenuTabs.SelectedTab.RadarChat:
                 _radarChat.DrawSection();
-                break;
-            case MainMenuTabs.SelectedTab.Account:
-                _account.DrawAccountSection();
                 break;
         }
     }
@@ -232,11 +229,6 @@ public class MainUI : WindowMediatorSubscriberBase
         // draw a attached message field as well if they want.
         ImGui.SetNextItemWidth(availableXWidth);
         ImGui.InputTextWithHint("##pairAddOptionalMessage", "Attach Msg to Request (Optional)", ref _requestMessage, 100);
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.AttachingMessages, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () =>
-        {
-            _creatingRequest = !_creatingRequest;
-            _tabMenu.TabSelection = MainMenuTabs.SelectedTab.Account;
-        });
         ImGui.Separator();
     }
 

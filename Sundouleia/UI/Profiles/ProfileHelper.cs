@@ -50,7 +50,7 @@ public class ProfileHelper
     private Vector2 StatsPos => RectMin + ImGuiHelpers.ScaledVector2(0, 358f);
     private Vector2 StatIconSize => ImGuiHelpers.ScaledVector2(22.5f);
 
-    public void DrawProfileLight(ImDrawListPtr drawList, Profile profile, string displayName, UserData userData, bool isPair)
+    public void DrawProfile(ImDrawListPtr drawList, Profile profile, string displayName, UserData userData, bool isPair)
     {
         DrawPlate(drawList, profile.Info, displayName);
         DrawProfilePic(drawList, profile, displayName, userData, isPair);
@@ -73,7 +73,7 @@ public class ProfileHelper
         DrawStats(drawList, profile.Info, displayName, userData, false);
     }
 
-    public void DrawProfileLight(ImDrawListPtr drawList, Profile profile, string displayName, UserData userData, bool isPair, ref bool hoveringReport)
+    public void DrawProfile(ImDrawListPtr drawList, Profile profile, string displayName, UserData userData, bool isPair, ref bool hoveringReport)
     {
         DrawPlate(drawList, profile.Info, displayName);
         DrawProfilePic(drawList, profile, displayName, userData, isPair);

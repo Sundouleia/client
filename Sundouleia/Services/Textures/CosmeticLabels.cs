@@ -37,6 +37,7 @@ public static class CosmeticLabels
         { CoreTexture.Achievement, "RequiredImages\\achievement.png" },
         { CoreTexture.AchievementLineSplit, "RequiredImages\\achievementlinesplit.png" },
         { CoreTexture.Clock, "RequiredImages\\clock.png" },
+        { CoreTexture.Edit, "RequiredImages\\edit.png" },
         { CoreTexture.Icon256, "RequiredImages\\icon256.png" },
         { CoreTexture.Icon256Bg, "RequiredImages\\icon256bg.png" },
         { CoreTexture.Radar, "RequiredImages\\radar.png" },

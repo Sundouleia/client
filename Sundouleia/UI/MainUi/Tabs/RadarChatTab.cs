@@ -71,8 +71,6 @@ public class RadarChatTab
             CkGui.AttachToolTip("Cannot use chat, your account is not verified!");
         // Attach tutorials.
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarChat, ImGui.GetWindowPos(), ImGui.GetWindowSize());
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatUserExamine, ImGui.GetWindowPos(), ImGui.GetWindowSize(),
-            () => _tabMenu.TabSelection = MainMenuTabs.SelectedTab.Account);
     }
 
     private void DrawChatUseBlockedWarning()
