@@ -1,3 +1,4 @@
+using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -37,6 +38,7 @@ public class RadarChatTab
 
         // Add some CkRichText variant here later.
         CkGui.FontTextCentered(text, UiFontService.Default150Percent, col);
+        CkGui.ColorTextCentered(PlayerContent.TerritoryIntendedUse.ToString(), ImGuiColors.DalamudOrange);
         ImGui.Separator();
 
         // Restrict drawing the chat if their not verified or blocked from using it.

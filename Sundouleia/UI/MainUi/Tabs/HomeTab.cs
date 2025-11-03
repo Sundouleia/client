@@ -153,7 +153,7 @@ public class HomeTab
         // The threshold to draw 2 or 1 rows.
         var thresholdHeight = buttonHeight * 8 + ImUtf8.ItemSpacing.Y * 7;
         // if we draw compact (2 columns) or full (1 column)
-        var showCompact = region.Y < thresholdHeight.AddWinPadY();
+        var showCompact = region.Y < thresholdHeight;
         // Finalized Height of the child.
         var finalHeight = buttonHeight * (showCompact ? 4 : 8) + ImUtf8.ItemSpacing.Y * (showCompact ? 3 : 7);
 

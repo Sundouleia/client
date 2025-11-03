@@ -450,7 +450,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
             _logger.LogWarning(logMessage);
             AddMessage(new(new("System"), "System",
                 $"[color=grey2]Welcome to {RadarService.CurrZoneName}'s Radar Chat! Your Name displays as " +
-                $"[color=yellow]AnonUser-XXXX[/color] to others! Feel free to say hi![/color][line]"));
+                $"[color=yellow]{MainHub.OwnUserData.AnonName}[/color] to others! Feel free to say hi![/color][line]"));
         }
     }
 }
