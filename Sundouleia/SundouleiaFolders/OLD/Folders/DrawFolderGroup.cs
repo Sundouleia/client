@@ -6,7 +6,6 @@ using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
-using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.Components;
 

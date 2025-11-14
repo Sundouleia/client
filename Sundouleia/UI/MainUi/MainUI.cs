@@ -35,9 +35,9 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly TutorialService _guides;
     private readonly HomeTab _homeTab;
     private readonly WhitelistTab _whitelist;
-    private readonly RequestsTab _requestsTab;
     private readonly RadarTab _radar;
     private readonly RadarChatTab _radarChat;
+    private readonly RequestsTab _requestsTab;
 
     // Some temp values used for sending requests.
     private bool  _creatingRequest  = false;
@@ -47,7 +47,7 @@ public class MainUI : WindowMediatorSubscriberBase
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
         ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
         SundesmoManager sundesmos, TutorialService guides, HomeTab homeTab, WhitelistTab whitelist, 
-        RequestsTab requestsTab, RadarTab radar, RadarChatTab chat) 
+        RadarTab radar, RadarChatTab chat, RequestsTab requestsTab) 
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
@@ -59,10 +59,10 @@ public class MainUI : WindowMediatorSubscriberBase
         _guides = guides;
 
         _homeTab = homeTab;
-        _requestsTab = requestsTab;
         _whitelist = whitelist;
         _radar = radar;
         _radarChat = chat;
+        _requestsTab = requestsTab;
 
         // display info about the folders
         var ver = Assembly.GetExecutingAssembly().GetName().Version!;

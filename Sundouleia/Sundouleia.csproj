@@ -61,6 +61,9 @@
         <EmbeddedResource Include="Localization\jp.json" />
         <EmbeddedResource Include="Localization\fr.json" />
     </ItemGroup>
+    <ItemGroup>
+      <Folder Include="SundouleiaFolders\Foundation Prime\DrawSelector\" />
+    </ItemGroup>
 </Project>
 
 

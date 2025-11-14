@@ -1,4 +1,5 @@
 using CkCommons.Gui;
+using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
@@ -76,6 +77,7 @@ public class RadarTab : DisposableMediatorSubscriberBase
         // Draw paired first, then unpaired, (yes, this is done intentionally to help with things not being 'too automated')
         ImGui.Spacing();
 
+        using var _ = CkRaii.Child("radarTabPaired", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         _pairedFolder.DrawContents();
         _unpairedFolder.DrawContents();
     }
