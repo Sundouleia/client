@@ -4,6 +4,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Sundouleia.DrawSystem;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
 using Sundouleia.Gui.Handlers;
@@ -126,6 +127,13 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<EventAggregator>()
         .AddSingleton<SundouleiaLoc>()
 
+        // Draw Systems
+        .AddSingleton<GroupsDrawSystem>()
+        .AddSingleton<MCDFDrawSystem>()
+        .AddSingleton<RadarDrawSystem>()
+        .AddSingleton<RequestsDrawSystem>()
+        .AddSingleton<WhitelistDrawSystem>()
+
         // Mod Files (revise)
         .AddSingleton<PenumbraWatcher>()
         .AddSingleton<SundouleiaWatcher>()
@@ -229,6 +237,13 @@ public static class SundouleiaServiceExtensions
         // Scoped Factories
         .AddScoped<DrawEntityFactory>()
         .AddScoped<UiFactory>()
+
+        // Scoped Drawers
+        .AddScoped<GroupsDrawer>()
+        .AddScoped<MCDFDrawer>()
+        .AddScoped<RadarDrawer>()
+        .AddScoped<RequestsDrawer>()
+        .AddScoped<WhitelistDrawer>()
 
         // Scoped Handlers
         .AddScoped<WindowMediatorSubscriberBase, PopupHandler>()

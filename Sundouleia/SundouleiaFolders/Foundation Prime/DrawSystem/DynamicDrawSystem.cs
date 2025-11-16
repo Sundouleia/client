@@ -1,12 +1,10 @@
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using Sundouleia.DrawSystem.Selector;
-using Sundouleia.Services.Mediator;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace Sundouleia.DrawSystem;
 
-// Can add more or something i guess, not sure. see we we develop the selector more.
+// Maybe phase this out as things evolve, possibly make things abstract
+// and force implementation for actions as overrides.
 public enum DDSChangeType
 {
     ObjectRenamed,
@@ -36,16 +34,13 @@ public partial class DynamicDrawSystem<T> where T : class
 {
     // An internal change action event for a selector to link to without overloading
     // the mediator when multiple file systems are active.
-    public delegate void ChangeDelegate(DDSChangeType type, IDynamicNode obj, IDynamicFolder<T>? prevParent, IDynamicFolder<T>? newParent);
+    public delegate void ChangeDelegate(DDSChangeType type, IDynamicNode<T> obj, IDynamicCollection<T>? prevParent, IDynamicCollection<T>? newParent);
     public event ChangeDelegate? Changed;
 
-    private readonly Dictionary<T, HashSet<IDynamicLeaf<T>>> _leafMap = [];
+    private readonly Dictionary<T, HashSet<DynamicLeaf<T>>> _leafMap = [];
 
     /// <summary> For comparing Entities by name only. </summary>
     private readonly NameComparer _nameComparer;
-
-    /// <summary> The root folder collection of this dynamic folder system. </summary>
-    private DynamicFolderCollection<T> _root = DynamicFolderCollection<T>.CreateRoot();
 
     /// <summary> The private, incrementing ID counter for this dynamic folder system. </summary>
     private uint _idCounter = 1;
@@ -55,10 +50,10 @@ public partial class DynamicDrawSystem<T> where T : class
         _nameComparer = new NameComparer(comparer ?? new OrdinalSpanComparer());
     }
 
-    public IDynamicFolderCollection Root
-        => _root;
+    /// <summary> The root folder collection of this dynamic folder system. </summary>
+    public DynamicFolderGroup<T> Root = DynamicFolderGroup<T>.CreateRoot();
 
-    public bool TryGetValue(T key, [NotNullWhen(true)] out HashSet<IDynamicLeaf<T>>? values)
+    public bool TryGetValue(T key, [NotNullWhen(true)] out HashSet<DynamicLeaf<T>>? values)
         => _leafMap.TryGetValue(key, out values);
 
     /// <summary>
@@ -70,7 +65,7 @@ public partial class DynamicDrawSystem<T> where T : class
     /// <summary>
     ///     Find a leaf inside a folder using the given comparer.
     /// </summary>
-    private int Search(DynamicFolderCollection<T> parent, ReadOnlySpan<char> name)
+    private int Search(DynamicFolderGroup<T> parent, ReadOnlySpan<char> name)
         => CollectionsMarshal.AsSpan(parent.Children).BinarySearch(new SearchNode(_nameComparer, name));
 
     /// <summary>
@@ -80,20 +75,31 @@ public partial class DynamicDrawSystem<T> where T : class
         => _nameComparer.BaseComparer.Compare(lhs, rhs) is 0;
 
     // Sets the expanded state of a folder to a new value.
-    public bool SetFolderOpenState(IDynamicFolder<T> folder, bool isOpen)
+    public bool SetFolderOpenState(IDynamicCollection<T> folder, bool isOpen)
     {
         if (folder.IsOpen == isOpen)
             return false;
 
-        ((IDynamicWriteFolderNode<T>)folder).SetIsOpen(isOpen);
-        // TODO: Mediator Invoke here.
-        return true;
+        if (folder is DynamicFolderGroup<T> fc)
+        {
+            fc.SetIsOpen(isOpen);
+            // TODO : Mediator Invoke here.
+            return true;
+        }
+        else if (folder is DynamicFolder<T> f)
+        {
+            f.SetIsOpen(isOpen);
+            // TODO : Mediator Invoke here.
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
     ///     Attempt to locate a defined folder from its folder path.
     /// </summary>
-    public bool FindFolder(string fullFolderPath, out IDynamicFolderNode folder)
+    public bool FindFolder(string fullFolderPath, out IDynamicCollection<T> folder)
     {
         folder = Root;
         var segments = ParseSegments(fullFolderPath);
@@ -103,7 +109,7 @@ public partial class DynamicDrawSystem<T> where T : class
                 return false;
 
             // If the type is a folder, we found the end segment.
-            if (folder is not DynamicFolderCollection<T> fc)
+            if (folder is not DynamicFolderGroup<T> fc)
             {
                 // we found the end for folder condition.
                 return true;
@@ -133,7 +139,7 @@ public partial class DynamicDrawSystem<T> where T : class
     {
         if (!_leafMap.TryGetValue(data, out var leaves))
         {
-            leaves = new HashSet<IDynamicLeaf<T>>();
+            leaves = new HashSet<DynamicLeaf<T>>();
             _leafMap[data] = leaves;
         }
         leaves.Add(entity);
@@ -163,7 +169,7 @@ public partial class DynamicDrawSystem<T> where T : class
     /// <param name="data"> The data object associated with the node. </param>
     /// <returns> The newly created data node in <paramref name="parent"/>. </returns>
     /// <exception cref="Exception"> Throws if a leaf of the name already exists in parent. </exception>
-    public DynamicLeaf<T> CreateEntity(Folder parent, string name, T data)
+    public DynamicLeaf<T> CreateEntity(DynamicFolder<T> parent, string name, T data)
     {
         var entity = new DynamicLeaf<T>(parent, name, data, _idCounter + 1u);
         // Attempt to set the entity in the parent folder.
@@ -172,10 +178,7 @@ public partial class DynamicDrawSystem<T> where T : class
 
         // Successful, so increment the ID counter and add to the data-leaf map.
         ++_idCounter;
-
-        // Add the leaf to the data-leaf map.
         AddLeafToMap(data, entity);
-
         // TODO: Invoke mediator change here.
         return entity;
     }
@@ -187,11 +190,11 @@ public partial class DynamicDrawSystem<T> where T : class
     /// <param name="folderGroup"> The parent folder to create the data node in. </param>
     /// <param name="name"> The name to assign the data node. </param>
     /// <param name="icon"> The icon to assign to the folder. </param>
-    /// <returns> The newly created folder in <paramref name="parent"/>. </returns>
+    /// <returns> The newly created folder in <paramref name="folderGroup"/>. </returns>
     /// <exception cref="Exception"> Throws if a folder of the name already exists in parent. </exception>
-    public Folder CreateFolder(FolderCollection folderGroup, string name, FAI icon)
+    public DynamicFolder<T> CreateFolder(DynamicFolderGroup<T> folderGroup, string name, FAI icon)
     {
-        var folder = new Folder(folderGroup, icon, name, _idCounter + 1u);
+        var folder = new DynamicFolder<T>(folderGroup, icon, name, _idCounter + 1u);
         // Attempt to set the folder in the parent folder collection.
         if (AssignFolder(folderGroup, folder, out _) is Result.ItemExists)
             throw new Exception($"Could not add folder [{folder.Name}] to folder collection [{folderGroup.Name}]: Folder with the same name exists.");
@@ -210,9 +213,9 @@ public partial class DynamicDrawSystem<T> where T : class
     /// </summary>
     /// <returns> The topmost folder. </returns>
     /// <exception cref="Exception"> If a folder can't be found or created due to an existing non-folder child with the same name. </exception>
-    public IDynamicFolder<T> FindOrCreateAllFolders(string path)
+    public IDynamicCollection<T> FindOrCreateAllFolders(string path)
     {
-        var retCode = CreateAllFolders(path, out IDynamicFolder<T> topFolder);
+        var retCode = CreateAllFolders(path, out IDynamicCollection<T> topFolder);
         // Respond based on the resulting action.
         switch (retCode)
         {
@@ -249,21 +252,21 @@ public partial class DynamicDrawSystem<T> where T : class
         if (newPath == oldPath)
             return;
         // If any folders to the new path are missing, we should create them.
-        var retCode = CreateAllFoldersAndFile(newPath, out  IDynamicFolder folder, out string fileName);
+        var retCode = CreateAllFoldersAndFile(newPath, out IDynamicCollection<T> folder, out string fileName);
 
         // Handle case where entity is a leaf and output is [Folder]
-        if (entity is IDynamicLeaf && folder is Folder f)
+        if (entity is DynamicLeaf<T> l && folder is DynamicFolder<T> f)
         {
             switch (retCode)
             {
                 case Result.Success:
                     // Move the leaf.
-                    MoveLeaf((IDynamicWriteLeaf)entity, f, out _, fileName);
+                    MoveLeaf(l, f, out _, fileName);
                     // TODO: Invoke Mediator of change.
                     break;
                 case Result.SuccessNothingDone:
                     // Update the retCode to this move. If the item exists, throw an exception.
-                    retCode = MoveLeaf((IDynamicWriteLeaf)entity, f, out _, fileName);
+                    retCode = MoveLeaf(l, f, out _, fileName);
                     if (retCode is Result.ItemExists)
                         throw new Bagagwa($"Could not move {oldPath} to {newPath}: An object of name {fileName} already exists.");
                     // Otherwise it worked, so invoke change.
@@ -273,19 +276,19 @@ public partial class DynamicDrawSystem<T> where T : class
                     throw new Exception($"Could not create {newPath} for {oldPath}: A pre-existing folder contained an entity with the same name.");
             }
         }
-        else if (entity is IDynamicFolder && folder is FolderCollection fc)
+        else if (entity is IDynamicCollection<T> fn && folder is DynamicFolderGroup<T> fc)
         {
             // Handle case where entity is a folder and output is [FolderCollection]
             switch (retCode)
             {
                 case Result.Success:
                     // Move the folder.
-                    MoveFolder((IDynamicWriteFolder)entity, fc, out _, fileName);
+                    MoveFolder(fn, fc, out _, fileName);
                     // TODO: Invoke Mediator of change.
                     break;
                 case Result.SuccessNothingDone:
                     // Update the retCode to this move. If the item exists, throw an exception.
-                    retCode = MoveFolder((IDynamicWriteFolder)entity, fc, out _, fileName);
+                    retCode = MoveFolder(fn, fc, out _, fileName);
                     if (retCode is Result.ItemExists)
                         throw new Bagagwa($"Could not move {oldPath} to {newPath}: An object of name {fileName} already exists.");
                     // Otherwise it worked, so invoke change.
@@ -304,12 +307,12 @@ public partial class DynamicDrawSystem<T> where T : class
     ///     Throws if an item of the same name exists in the Children of <paramref name="entity"/>'s Parent folder.
     /// </summary>
     /// <exception cref="Exception"></exception>
-    public void Rename(IDynamicEntity entity, string newName)
+    public void Rename(IDynamicNode entity, string newName)
     {
         var retCode = entity switch
         {
-            IDynamicLeaf => RenameLeaf((IDynamicWriteLeaf)entity, newName),
-            IDynamicFolder => RenameFolder((IDynamicWriteFolder)entity, newName),
+            DynamicLeaf<T> l => RenameLeaf(l, newName),
+            IDynamicCollection<T> fn => RenameFolder(fn, newName),
             _ => throw new Exception($"Attempted to rename {entity.Name}, but it had an invalid type!")
         };
 
@@ -328,12 +331,12 @@ public partial class DynamicDrawSystem<T> where T : class
     /// </summary>
     /// <param name="entity"> The entity to delete </param>
     /// <exception cref="Exception"></exception>
-    public void Delete(IDynamicEntity entity)
+    public void Delete(IDynamicNode entity)
     {
         var retCode = entity switch
         {
-            IDynamicLeaf => RemoveLeaf((IDynamicWriteLeaf)entity),
-            IDynamicFolder => RemoveFolder((IDynamicWriteFolder)entity),
+            DynamicLeaf<T> l => RemoveLeaf(l),
+            IDynamicCollection<T> fn => RemoveFolder(fn),
             _ => throw new Exception($"Attempted to remove {entity.Name}, but it had an invalid type!")
         };
 
@@ -341,7 +344,7 @@ public partial class DynamicDrawSystem<T> where T : class
         {
             case Result.InvalidOperation: throw new Exception("Can't delete the root entity.");
             case Result.Success:
-                if (entity is Leaf l)
+                if (entity is DynamicLeaf<T> l)
                     RemoveLeafFromMap(l);
                 // TODO: Invoke Mediator Change.
                 return;
@@ -354,9 +357,9 @@ public partial class DynamicDrawSystem<T> where T : class
     /// <param name="leaf"> The leaf to move. </param>
     /// <param name="newParent"> the new parent the leaf will be under. </param>
     /// <exception cref="Exception"> Throws if the leaf name already exists in newParent. </exception>
-    public void Move(IDynamicLeaf leaf, Folder newParent)
+    public void Move(DynamicLeaf<T> leaf, DynamicFolder<T> newParent)
     {
-        switch(MoveLeaf((IDynamicWriteLeaf)leaf, newParent, out var oldParent))
+        switch(MoveLeaf(leaf, newParent, out var oldParent))
         {
             case Result.Success:
                 // TODO: Invoke Mediator change.
@@ -370,9 +373,9 @@ public partial class DynamicDrawSystem<T> where T : class
         }
     }
 
-    public void Move(IDynamicFolder folder, FolderCollection newParent)
+    public void Move(IDynamicCollection<T> folder, DynamicFolderGroup<T> newParent)
     {
-        switch (MoveFolder((IDynamicWriteFolder)folder, newParent, out var oldParent))
+        switch (MoveFolder(folder, newParent, out var oldParent))
         {
             case Result.Success:
                 // TODO: Invoke Mediator change.
@@ -387,7 +390,7 @@ public partial class DynamicDrawSystem<T> where T : class
                 // if and only if both folders are FolderCollections, should we allow a merge to occur.
                 var matchingIdx = Search(newParent, folder.Name);
                 // If we meet criteria to merge, do so.
-                if (folder is FolderCollection fc && newParent.Children[matchingIdx] is FolderCollection destFolder)
+                if (folder is DynamicFolderGroup<T> fc && newParent.Children[matchingIdx] is DynamicFolderGroup<T> destFolder)
                 {
                     Merge(fc, destFolder);
                     return;
@@ -397,7 +400,7 @@ public partial class DynamicDrawSystem<T> where T : class
         }
     }
 
-    public void Merge(Folder from, Folder to)
+    public void Merge(DynamicFolder<T> from, DynamicFolder<T> to)
     {
         switch (MergeFolders(from, to))
         {
@@ -420,7 +423,7 @@ public partial class DynamicDrawSystem<T> where T : class
         }
     }
 
-    public void Merge(FolderCollection from, FolderCollection to)
+    public void Merge(DynamicFolderGroup<T> from, DynamicFolderGroup<T> to)
     {
         switch(MergeFolders(from, to))
         {

@@ -20,10 +20,10 @@ public partial class DynamicDrawSystem<T> where T : class
     /// </summary>
     /// <param name="leaf"> The entity to rename. </param>
     /// <param name="newName"> The new name to assign to the leaf. </param>
-    private Result RenameLeaf(IDynamicWriteLeaf leaf, string newName)
+    private Result RenameLeaf(DynamicLeaf<T> leaf, string newName)
     {
         // Prevent allowing a Leaf to behave as Root.
-        if (leaf.Name.Length == 0 || leaf.Name == FolderCollection.RootLabel)
+        if (string.IsNullOrEmpty(leaf.Name) || string.IsNullOrEmpty(newName))
             return Result.InvalidOperation;
 
         // correct the newName to work with the dynamic file system.
@@ -39,14 +39,14 @@ public partial class DynamicDrawSystem<T> where T : class
 
         // Otherwise, rename the child and return success.
         leaf.SetName(newName, false);
-        // Some internal sort operation here.
+        leaf.Parent.SortChildren(_nameComparer);
         return Result.Success;
     }
 
-    private Result RenameFolder(IDynamicWriteFolder folder, string newName)
+    private Result RenameFolder(IDynamicCollection<T> folder, string newName)
     {
         // Prevent allowing a folder to behave as Root.
-        if (folder.Name.Length is 0 || folder.Name == FolderCollection.RootLabel)
+        if (string.IsNullOrEmpty(folder.Name) || string.IsNullOrEmpty(newName))
             return Result.InvalidOperation;
 
         // correct the newName to work with the DFS.
@@ -56,13 +56,26 @@ public partial class DynamicDrawSystem<T> where T : class
         if (newName == folder.Name)
             return Result.SuccessNothingDone;
 
-        // If we locate the new name in the parent folder's children, decline the operation.
-        if (Search(folder.Parent, newName) >= 0)
-            return Result.ItemExists;
-
-        // Otherwise, rename the folder and return success.
-        folder.SetName(newName, false);
-        return Result.Success;
+        if (folder is DynamicFolderGroup<T> fc)
+        {
+            if (Search(fc.Parent, newName) >= 0)
+                return Result.ItemExists;
+            fc.SetName(newName, false);
+            fc.Parent.SortChildren(_nameComparer);
+            return Result.Success;
+        }
+        else if (folder is DynamicFolder<T> f)
+        {
+            if (Search(f.Parent, newName) >= 0)
+                return Result.ItemExists;
+            f.SetName(newName, false);
+            f.Parent.SortChildren(_nameComparer);
+            return Result.Success;
+        }
+        else
+        {
+            return Result.InvalidOperation;
+        }
     }
 
     /// <summary>
@@ -100,7 +113,7 @@ public partial class DynamicDrawSystem<T> where T : class
     // Try to move a leaf to a new parent Folder, and renaming it if requested.
     // Concrete to folders because leaf entities can only exist under Folder entities.
     // Try to phase out the idx.
-    private Result MoveFolder(IDynamicFolderNode folder, DynamicFolderCollection<T> newParent, out DynamicFolderCollection<T> oldParent, string? newName = null)
+    private Result MoveFolder(IDynamicCollection<T> folder, DynamicFolderGroup<T> newParent, out DynamicFolderGroup<T> oldParent, string? newName = null)
     {
         // store the current old parent of the leaf.
         oldParent = folder.Parent;
@@ -115,10 +128,23 @@ public partial class DynamicDrawSystem<T> where T : class
             return Result.ItemExists;
 
         // Otherwise the move operation is valid, so remove the folder from the old FolderCollection, and assign it to the new one.
-        RemoveFolder(oldParent, folder);
-        folder.SetName(actualNewName, false);
-        AssignFolder(newParent, folder);
-        return Result.Success;
+        oldParent.Children.Remove(folder);
+        if (folder is DynamicFolderGroup<T> fc)
+        {
+            fc.SetName(actualNewName, false);
+            AssignFolder(newParent, fc);
+            return Result.Success;
+        }
+        else if (folder is DynamicFolder<T> f)
+        {
+            f.SetName(actualNewName, false);
+            AssignFolder(newParent, f);
+            return Result.Success;
+        }
+        else
+        {
+            return Result.InvalidOperation;
+        }
     }
 
 
@@ -128,10 +154,10 @@ public partial class DynamicDrawSystem<T> where T : class
     /// <param name="fullPath"> the entity's FullPath variable, excluding root. </param>
     /// <param name="topFolder"> the topmost available folder or folder collection in the path.</param>
     /// <returns> The result of this function. </returns>
-    private Result CreateAllFolders(string fullPath, out IDynamicFolder topFolder)
+    private Result CreateAllFolders(string fullPath, out IDynamicCollection<T> topFolder)
         => CreateAllFoldersInternal(ParseSegments(fullPath), out topFolder);
 
-    private Result CreateAllFoldersInternal(List<(string Name, SegmentType Type)> segments, out IDynamicFolder topFolder)
+    private Result CreateAllFoldersInternal(List<(string Name, SegmentType Type)> segments, out IDynamicCollection<T> topFolder)
     {
         topFolder = Root;
         Result res = Result.SuccessNothingDone;
@@ -139,12 +165,12 @@ public partial class DynamicDrawSystem<T> where T : class
         foreach (var segment in segments)
         {
             // If the segment type if leaf, or the last entry is [folder], we know we hit the end, so break.
-            if (segment.Type is SegmentType.Leaf || topFolder is not FolderCollection group)
+            if (segment.Type is SegmentType.Leaf || topFolder is not DynamicFolderGroup<T> group)
                 break;
 
-            IDynamicWriteFolder folder = segment.Type is SegmentType.FolderCollection
-                ? new FolderCollection(group, FAI.FolderTree, segment.Name, _idCounter + 1u)
-                : new Folder(group, FAI.Folder, segment.Name, _idCounter + 1u);
+            IDynamicCollection<T> folder = segment.Type is SegmentType.FolderCollection
+                ? new DynamicFolderGroup<T>(group, FAI.FolderTree, segment.Name, _idCounter + 1u)
+                : new DynamicFolder<T>(group, FAI.Folder, segment.Name, _idCounter + 1u);
 
             // Attempt to assign the folder.
             var assignRet = AssignFolder(group, folder, out int idx);
@@ -152,7 +178,7 @@ public partial class DynamicDrawSystem<T> where T : class
             if (assignRet is Result.ItemExists)
             {
                 // If there was a child with the same name, stop here.
-                if (group.Children[idx] is not IDynamicWriteFolder f)
+                if (group.Children[idx] is not IDynamicCollection<T> f)
                     return Result.ItemExists;
 
                 // Otherwise, update the top folder to this folder (which already existed, so dont inc ID)
@@ -171,7 +197,7 @@ public partial class DynamicDrawSystem<T> where T : class
         return res;
     }
 
-    private Result CreateAllFoldersAndFile(string path, out IDynamicFolderNode topFolder, out string fileName)
+    private Result CreateAllFoldersAndFile(string path, out IDynamicCollection<T> topFolder, out string fileName)
     {
         topFolder = Root;
         fileName = string.Empty;
@@ -194,15 +220,10 @@ public partial class DynamicDrawSystem<T> where T : class
         return CreateAllFoldersInternal(segments, out topFolder);
     }
 
-
-    private static void RemoveFolder(DynamicFolderCollection<T> parent, IDynamicFolderNode folder)
-        => parent.Children.Remove(folder); // used to do this by index, see if we can handle it by ref.
-
-
     /// <summary>
     ///     Adds a leaf to a parent folder.
     /// </summary>
-    private Result AssignLeaf( DynamicFolder<T> parent, DynamicLeaf<T> child)
+    private Result AssignLeaf(DynamicFolder<T> parent, DynamicLeaf<T> child)
     {
         // Ensure the item does not exist before calling the inner Method.
         if (Search(parent, child.Name) >= 0)
@@ -213,53 +234,71 @@ public partial class DynamicDrawSystem<T> where T : class
     }
 
     /// <summary>
-    ///     Add a leaf to its new parent folder directly without search checks.
+    ///     Add leaf and update that leaf's parent, then sort the parents children. <para />
+    ///     This is all done without search checks.
     /// </summary>
-    /// <remarks>
-    ///     You are expected when calling this to be certain a leaf of the same name 
-    ///     does not already exist in the parent folder.
-    /// </remarks>
-    internal void AssignLeafInternal(DynamicFolder<T> parent, IDynamicLeaf<T> entity)
+    internal void AssignLeafInternal(DynamicFolder<T> parent, DynamicLeaf<T> entity)
     {
-        // Add the child into the folder. (I pray casting works here)
-        parent.Children.Add((Leaf)entity);
-        // update the entity's parent.
-        entity.SetParent(parent);
-        // resort the folder's children to be sorted for binary search.
-        ((IDynamicWriteFolder)parent).SortChildren(_nameComparer);
+        parent.Children.Add(entity);
+        entity.Parent = parent;
+        entity.UpdateFullPath();
+        parent.SortChildren(_nameComparer);
         // Can re-add updating the parent's parent up to root here if needed.
     }
 
-
-    private void AssignFolder(FolderCollection parent, IDynamicWriteFolder folder)
+    internal void AssignFolder(DynamicFolderGroup<T> parent, IDynamicCollection<T> folder)
     {
-        // Add the child into the folder collection.
-        parent.Children.Add(folder);
-        // update the folder's parent.
-        folder.SetParent(parent);
-        // Update the path.
-        folder.UpdateFullPath();
-        // resort the folder collection's children to be sorted for binary search. (maybe change this down the line to be linked to sort order.
-        ((IDynamicWriteFolder)parent).SortChildren(_nameComparer);
+        if (folder is DynamicFolderGroup<T> fc)
+        {
+            parent.Children.Add(fc);
+            fc.Parent = parent;
+            fc.UpdateFullPath();
+            parent.SortChildren(_nameComparer);
+        }
+        else if (folder is DynamicFolder<T> f)
+        {
+            parent.Children.Add(f);
+            f.Parent = parent;
+            f.UpdateFullPath();
+            parent.SortChildren(_nameComparer);
+        }
     }
 
-    // Add a folder to its parent folder collection, and out the new idx.
+    // Add a folder to its parent FolderCollection, and out the new idx.
     // Aim to phase out IDX
-    private Result AssignFolder(FolderCollection parent, IDynamicWriteFolder folder, out int idx)
+    private Result AssignFolder(DynamicFolderGroup<T> parent, IDynamicCollection<T> folder, out int idx)
     {
+        if (folder is DynamicFolderGroup<T> fc)
+        {
+            idx = Search(parent, fc.Name);
+            if (idx >= 0)
+                return Result.ItemExists;
+            idx = ~idx;
+            AssignFolder(parent, fc);
+            return Result.Success;
+        }
+        else if (folder is DynamicFolder<T> f)
+        {
+            idx = Search(parent, f.Name);
+            if (idx >= 0)
+                return Result.ItemExists;
+            idx = ~idx;
+            AssignFolder(parent, f);
+            return Result.Success;
+        }
+
         idx = Search(parent, folder.Name);
         if (idx >= 0)
             return Result.ItemExists;
-
         idx = ~idx;
         AssignFolder(parent, folder);
         return Result.Success;
     }
 
     /// <summary>
-    ///     Removes a leaf from its parent folder. <see cref="Leaf.Parent"/> remains unchanged.
+    ///     Removes a leaf from its parent folder. <see cref="DynamicLeaf{T}.Parent"/> remains unchanged.
     /// </summary>
-    private Result RemoveLeaf(IDynamicWriteLeaf leaf)
+    private Result RemoveLeaf(DynamicLeaf<T> leaf)
     {
         // If the leaf doesn't exist in the folder, the operation was valid, but nothing happened.
         var idx = Search(leaf.Parent, leaf.Name);
@@ -271,16 +310,29 @@ public partial class DynamicDrawSystem<T> where T : class
         return Result.Success;
     }
 
-    private Result RemoveFolder(IDynamicWriteFolder folder)
+    private Result RemoveFolder(IDynamicCollection<T> folder)
     {
-        // if the folder does not exist in the parent FolderCollection, it was valid, but nothing occurred.
-        var idx = Search(folder.Parent, folder.Name);
-        if (idx < 0)
-            return Result.SuccessNothingDone;
-        // Otherwise remove it at the found index.
-        folder.Parent.Children.RemoveAt(idx);
-        // something about updating parent folder location should go here.
-        return Result.Success;
+        if (folder is DynamicFolderGroup<T> fc && !fc.IsRoot)
+        {
+            var idx = Search(fc.Parent, fc.Name);
+            if (idx < 0)
+                return Result.SuccessNothingDone;
+
+            fc.Parent.Children.RemoveAt(idx);
+            return Result.Success;
+        }
+        else if (folder is DynamicFolder<T> f)
+        {
+            var idx = Search(f.Parent, f.Name);
+            if (idx < 0)
+                return Result.SuccessNothingDone;
+            f.Parent.Children.RemoveAt(idx);
+            return Result.Success;
+        }
+        else
+        {
+            return Result.InvalidOperation;
+        }
     }
 
     /// <summary> 
@@ -289,7 +341,7 @@ public partial class DynamicDrawSystem<T> where T : class
     ///     Because mapped <typeparamref name="T"/> objects can associate with one or more leaves, leaves
     ///     containing data that <paramref name="to"/>'s leaves already map are ignored.
     /// </summary>
-    private Result MergeFolders(Folder from, Folder to)
+    private Result MergeFolders(DynamicFolder<T> from, DynamicFolder<T> to)
     {
         // if the collections are the same, fail.
         if (from == to)
@@ -336,7 +388,7 @@ public partial class DynamicDrawSystem<T> where T : class
     /// <summary> 
     ///     Try to merge all children <paramref name="from"/> into <paramref name="to"/>.
     /// </summary>
-    private Result MergeFolders(FolderCollection from, FolderCollection to)
+    private Result MergeFolders(DynamicFolderGroup<T> from, DynamicFolderGroup<T> to)
     {
         // if the collections are the same, fail.
         if (from == to)
@@ -384,10 +436,10 @@ public partial class DynamicDrawSystem<T> where T : class
 
     // Catch potential circular references in relationships.
     // Returns true if potentialParent is not anywhere up the tree from child, false otherwise.
-    private static bool HasValidHeritage(FolderCollection potentialParent, IDynamicFolder folder)
+    private static bool HasValidHeritage(DynamicFolderGroup<T> potentialParent, IDynamicCollection<T> folder)
     {
         var parent = potentialParent;
-        // Root is 
+        // Root is an empty string.
         while (parent.Name.Length > 0)
         {
             if (parent == folder)
@@ -397,5 +449,69 @@ public partial class DynamicDrawSystem<T> where T : class
         }
 
         return true;
+    }
+
+    public enum SegmentType
+    {
+        FolderCollection,
+        Folder,
+        Leaf
+    }
+
+    public static List<(string Name, SegmentType Type)> ParseSegments(string path)
+    {
+        var segments = new List<(string Name, SegmentType Type)>();
+        if (path.Length is 0)
+            return segments;
+
+        SegmentType lastType = SegmentType.FolderCollection; // Root is always FolderCollection
+
+        while (path.Length > 0)
+        {
+            int idxSingle = path.IndexOf('/');
+            bool isDouble = idxSingle >= 0 && idxSingle + 1 < path.Length && path[idxSingle + 1] == '/';
+            int sepIndex = idxSingle;
+
+            string segment;
+            if (sepIndex < 0)
+            {
+                segment = path;
+                path = string.Empty;
+            }
+            else
+            {
+                segment = path[..sepIndex];
+                path = path[(sepIndex + (isDouble ? 2 : 1))..].TrimStart();
+            }
+
+            segment = segment.Trim();
+            if (segment.Length is 0)
+                continue;
+
+            // Determine type based on previous segment
+            SegmentType type = lastType switch
+            {
+                SegmentType.FolderCollection => isDouble ? SegmentType.FolderCollection : SegmentType.Folder,
+                SegmentType.Folder => SegmentType.Folder,
+                _ => SegmentType.FolderCollection
+            };
+
+            segments.Add((segment, type));
+            lastType = type;
+
+            if (isDouble && segments.Count >= 1)
+                segments[^1] = (segments[^1].Name, SegmentType.FolderCollection);
+        }
+
+        // Mark last as Leaf if parent is Folder
+        if (segments.Count >= 2)
+        {
+            var parent = segments[^2];
+            var last = segments[^1];
+            if (parent.Type == SegmentType.Folder && last.Type != SegmentType.FolderCollection)
+                segments[^1] = (last.Name, SegmentType.Leaf);
+        }
+
+        return segments;
     }
 }

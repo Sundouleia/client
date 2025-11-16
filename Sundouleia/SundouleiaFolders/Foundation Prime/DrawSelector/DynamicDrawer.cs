@@ -10,16 +10,13 @@ namespace Sundouleia.DrawSystem.Selector;
 public partial class DynamicDrawer<T> : IDisposable where T : class
 {
     protected readonly ILogger Log;
-
-    // As we construct this further, pull more things into their own classes and add them here.
-
     protected readonly DynamicDrawSystem<T> DrawSystem;
-
-    private readonly string _label = string.Empty;
 
     // Queue of all actions to perform after completely drawing the list,
     // to avoid processing operations that would modify the filter mid-draw. (Can be reworked later if we need to)
     private readonly Queue<Action> _postDrawActions = new();
+
+    protected string Label = string.Empty;
 
     public DynamicDrawer(string label, ILogger log, DynamicDrawSystem<T> drawSystem)
     {
@@ -27,23 +24,14 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         Log        = log;
         Label      = label;
 
-        // Placeholder for state until it is moved to its own managed cache.
-        _cachedState = new List<EntityState>();
+        // Placeholder for state until it is moved to its own managed cache. (may or may not do)
+        _nodeCache = new CachedFolderGroup<T>(drawSystem.Root);
+        _nodeCacheFlat = [ .._nodeCache.GetChildren() ];
 
         // Previously, context was initialized here. We could maybe move that elsewhere later.
 
         // Listen to changes from the draw system.
         DrawSystem.Changed += OnDrawSystemChange;
-    }
-
-    public string Label
-    {
-        get => _label;
-        init
-        {
-            _label = value;
-            // Drag-Drop labels should be set here, for wherever is necessary.
-        }
     }
 
     public virtual void Dispose()
@@ -64,12 +52,12 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     {
         using ImRaii.IEndObject group = ImRaii.Group();
         float searchW = FilterButtonsWidth(width);
-        string tmp = FilterValue;
+        string tmp = Filter;
 
         if (FancySearchBar.Draw("Filter", width, ref tmp, string.Empty, 128, width - searchW, DrawCustomFilters))
         {
-            if (!string.Equals(tmp, FilterValue, StringComparison.Ordinal))
-                SetFilterDirty();
+            if (!string.Equals(tmp, Filter, StringComparison.Ordinal))
+                MarkCacheDirty();
         }
 
         // could maybe add inline button context here but not really that sure. Think about it later.
@@ -77,17 +65,13 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         // Draw popup context here for some filter button interactions, but can handle it otherwise later if needed.
     }
 
-    /// <summary> 
-    ///     Draw the main content region for the DynamicDrawer. 
-    /// </summary>
     public void DrawContents(float width)
     {
-        using var _ = ImRaii.PushColor(ImGuiCol.ButtonHovered, 0).Push(ImGuiCol.ButtonActive, 0);
-
         DrawContentsInternal(width);
         PostDraw();
     }
 
+    // Refactor later.
     private void DrawContentsInternal(float width)
     {
         using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.Zero);
@@ -102,7 +86,7 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         Draw();
     }
 
-    private void Draw()
+    private void Draw(DynamicFlags flags = DynamicFlags.BasicViewFolder)
     {
         ImGui.SetScrollX(0);
         using var style = ImRaii.PushStyle(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale)
@@ -111,12 +95,9 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
 
         // Apply the filter to generate the cache, if dirty.
         ApplyFilters();
-        // Jump to the filtered selection if requested.
-        JumpIfRequested();
-
         // We can update this as we develop further, fine tuning errors where we see them,
         // such as the above style interfering with drawn entities and such.
-        DrawEntities();
+        DrawAll(flags);
     }
 
     /// <summary>
@@ -142,26 +123,8 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     protected void AddPostDrawLogic(Action act)
         => _postDrawActions.Enqueue(act);
 
-    // Quick-Access a leaf by its T Value, expanding, selecting, and jumping to it.
-    public void SelectByValue(T data)
-    {
-        // Obtain the leaves associated with this data value.
-        if (!DrawSystem.TryGetValue(data, out var leaves))
-            return;
-
-        _postDrawActions.Enqueue(() =>
-        {
-            foreach (var leaf in leaves)
-            {
-                _filterDirty |= ExpandAncestors(leaf);
-                Select(leaf);
-                _jumpToSelection = leaf;
-            }
-        });
-    }
-
-    // We could maybe handle this with overloads somewhere but idk. For now this works.
-    private void OnDrawSystemChange(DDSChangeType type, DynamicDrawSystem<T>.IDynamicEntity obj, DynamicDrawSystem<T>.IDynamicFolder? prevParent, DynamicDrawSystem<T>.IDynamicFolder? newParent)
+    // Vastly change this overtime.
+    private void OnDrawSystemChange(DDSChangeType type, IDynamicNode<T> obj, IDynamicCollection<T>? prevParent, IDynamicCollection<T>? newParent)
     {
         switch (type)
         {
@@ -170,23 +133,17 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
                _postDrawActions.Enqueue(() =>
                {
                    ExpandAncestors(obj);
-                   SetFilterDirty();
+                   MarkCacheDirty();
                });
                 break;
             case DDSChangeType.ObjectRemoved:
             case DDSChangeType.Reload:
                 if (obj == SelectedLeaf)
                     ClearSelected();
-                else if (AllowMultiSelection)
-                {
-                    // Remove Selection, set dirty (not sure why we should do a full reload here but whatever)
-                    // Deselect(obj);
-                    SetFilterDirty();
-                }
-                SetFilterDirty();
+                MarkCacheDirty();
                 break;
             default:
-                SetFilterDirty();
+                MarkCacheDirty();
                 break;
         }
     }

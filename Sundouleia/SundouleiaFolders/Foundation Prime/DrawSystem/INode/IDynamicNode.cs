@@ -1,7 +1,8 @@
-
-using Dalamud.Interface;
-
 namespace Sundouleia.DrawSystem;
+
+// ================ NODE INTERFACES =================
+// - Public Interfaces that help structure the framework of DynamicDrawSystem nodes.
+// - Nodes themselves are public, but with internal setters to ensure integrity.
 
 /// <summary>
 ///     Flags that determine a folder's display behavior.
@@ -16,21 +17,21 @@ public enum FolderFlags : byte
 
 /// <summary>
 ///     Public accessor for a folder collection inside a DynamicDrawSystem. <para />
-///     Children can be either <see cref="IDynamicFolderCollection"/>s or <see cref="IDynamicFolder{T}"/>s.
+///     Children can be either <see cref="IDynamicFolderGroup{T}"/>s or <see cref="IDynamicFolder{T}"/>s.
 /// </summary>
 /// <remarks> A FolderCollection can be the Root folder if <see cref="IDynamicNode.Name"/> is string.Empty </remarks>
-public interface IDynamicFolderCollection : IDynamicFolderNode
+public interface IDynamicFolderGroup<T> : IDynamicCollection<T> where T : class
 {
     /// <summary>
     ///     The FolderCollections and Folders contained by this collection, exposed for read-only access.
     /// </summary>
-    public IReadOnlyList<IDynamicFolderNode> Children { get; }
+    public IReadOnlyList<IDynamicCollection<T>> Children { get; }
 
     /// <summary>
     ///     The instructions to be processed by any drawer wishing 
     ///     to display the folder in a sorted manner.
     /// </summary>
-    public IReadOnlyList<ISortMethod<IDynamicFolderNode>> Sorter { get; }
+    public IReadOnlyList<ISortMethod<IDynamicCollection<T>>> Sorter { get; }
 }
 
 /// <summary>
@@ -38,12 +39,12 @@ public interface IDynamicFolderCollection : IDynamicFolderNode
 ///     Children are always <see cref="IDynamicLeaf{T}"/>s.
 /// </summary>
 /// <typeparam name="T"> The data type contained within the leaves of this folder. </typeparam>
-public interface IDynamicFolder<T> : IDynamicFolderNode where T : class
+public interface IDynamicFolder<T> : IDynamicCollection<T> where T : class
 {
     /// <summary>
     ///     The Leaves contained by this folder, exposed for read-only access.
     /// </summary>
-    public IReadOnlyList<IDynamicLeaf<T>> Children { get; }
+    public IReadOnlyList<DynamicLeaf<T>> Children { get; }
 
     /// <summary>
     ///     The instructions to be processed by any drawer wishing 
@@ -55,15 +56,14 @@ public interface IDynamicFolder<T> : IDynamicFolderNode where T : class
 
 /// <summary>
 ///     Public accessor for a folder node inside a DynamicDrawSystem. <para />
-///     Can be either a <see cref="IDynamicFolderCollection"/> or a <see cref="IDynamicFolder{T}"/>. <para />
-///     The Parent of a folder node must be a <see cref="IDynamicFolderCollection"/>.
+///     The Parent of a folder node must be a <see cref="DynamicFolderGroup{T}"/>.
 /// </summary>
-public interface IDynamicFolderNode : IDynamicNode
+public interface IDynamicCollection<T> : IDynamicNode<T> where T : class
 {
     /// <summary>
     ///     The parent folder of this folder.
     /// </summary>
-    public IDynamicFolderCollection Parent { get; }
+    public DynamicFolderGroup<T> Parent { get; }
 
     /// <summary>
     ///     Associated Flags.
@@ -115,7 +115,7 @@ public interface IDynamicFolderNode : IDynamicNode
     /// </summary>
     public bool ShowIfEmpty { get; }
 
-    internal static bool Concat(IDynamicFolderNode path, StringBuilder sb, string separator)
+    internal static bool Concat(IDynamicCollection<T> path, StringBuilder sb, string separator)
     {
         if (path.IsRoot)
             return false;
@@ -125,4 +125,64 @@ public interface IDynamicFolderNode : IDynamicNode
         sb.Append(path.Name);
         return true;
     }
+}
+
+/// <summary>
+///     Public accessor for a leaf inside a DynamicDrawSystem. <para />
+///     A Leaf can only exist as a child of a <see cref="IDynamicFolder{T}"/>.
+/// </summary>
+/// <typeparam name="T"> The data contained within this leaf. </typeparam>
+public interface IDynamicLeaf<T> : IDynamicNode<T> where T : class
+{
+    /// <summary>
+    ///     The parent folder of this leaf.
+    /// </summary>
+    public DynamicFolder<T> Parent { get; }
+
+    /// <summary>
+    ///     The data associated with this leaf.
+    /// </summary>
+    public T Data { get; }
+}
+
+/// <summary>
+///     Dynamic Node but with a getter for ancestors. Helps keep search nodes free of generics.
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public interface IDynamicNode<T> : IDynamicNode where T : class
+{
+    /// <summary>
+    ///     Retrieve all ancestors of this node, excluding root.
+    /// </summary>
+    public IReadOnlyList<IDynamicCollection<T>> GetAncestors();
+}
+
+/// <summary>
+///     Public accessor for a node inside a DynamicDrawSystem.
+/// </summary>
+public interface IDynamicNode
+{
+    /// <summary>
+    ///     Unique ID for a node in the DynamicDrawSystem.
+    /// </summary>
+    public uint ID { get; }
+
+    /// <summary>
+    ///     The Label associated with this node.
+    /// </summary>
+    public string Name { get; }
+
+    /// <summary>
+    ///     Path used by the DynamicDrawSystem for lookup and creation. <para />
+    ///     Paths are generated by the hierarchy of node names. <para />
+    ///     <b>FolderCollections</b> split paths with '//', while <b>Folders</b> use '/'.
+    /// </summary>
+    public string FullPath { get; }
+
+    // Depth was here, we can insert it if necessary for line indentations.
+
+    /// <summary>
+    ///     If this folder is the root folder. (Root has ID 0)
+    /// </summary>
+    public bool IsRoot { get; }
 }

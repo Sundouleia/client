@@ -1,14 +1,5 @@
-using CkCommons;
-using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
-using Dalamud.Plugin.Services;
 using OtterGui.Extensions;
-using Sundouleia.Gui.Components;
-using TerraFX.Interop.Windows;
-using static FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentHousingPlant;
 
 namespace Sundouleia.DrawSystem.Selector;
 
@@ -22,33 +13,33 @@ public partial class DynamicDrawer<T> where T : class
     public event SelectionChangeDelegate SelectionChanged;
 
     // Quick-Lookup HashSet of all selected entities regardless of type.
-    protected readonly HashSet<DynamicDrawSystem<T>.IDynamicEntity> _selected = [];
+    protected readonly HashSet<IDynamicNode<T>> _selected = [];
     
     // Filtered Selection Caches (can remove later if not needed)
-    protected readonly List<DynamicDrawSystem<T>.FolderCollection> _selectedFolderGroups = [];
+    protected readonly List<DynamicFolderGroup<T>> _selectedFolderGroups = [];
     
-    protected readonly List<DynamicDrawSystem<T>.Folder> _selectedFolders = [];
+    protected readonly List<DynamicFolder<T>> _selectedFolders = [];
     
-    protected readonly List<DynamicDrawSystem<T>.IDynamicFolder> _selectedFoldersAll = [];
+    protected readonly List<IDynamicCollection<T>> _selectedFoldersAll = [];
     
-    protected readonly List<DynamicDrawSystem<T>.Leaf> _selectedLeaves = [];
+    protected readonly List<DynamicLeaf<T>> _selectedLeaves = [];
 
     // Track history of latest selection to know how to perform CTRL+SHIFT Multi-Selection Jumps.
-    protected DynamicDrawSystem<T>.IDynamicEntity? _lastSelected;
-    protected DynamicDrawSystem<T>.IDynamicEntity? _lastAnchor;
+    protected IDynamicNode<T>? _lastSelected;
+    protected IDynamicNode<T>? _lastAnchor;
+    protected IDynamicNode<T>? _hoveredNode; // This will change a lot i feel... lol.
 
-    // The Entity to jump focus to in next draw call (could potentially remove this, dunno)
-    private DynamicDrawSystem<T>.Leaf? _jumpToSelection = null;
 
     // Public Accessor for selection.
-    public IReadOnlySet<DynamicDrawSystem<T>.IDynamicEntity> SelectedEntities
+    public IReadOnlySet<IDynamicNode<T>> SelectedEntities
         => _selected;
     
-    public DynamicDrawSystem<T>.Leaf? SelectedLeaf
+    public DynamicLeaf<T>? SelectedLeaf
         => _selectedLeaves.Count is 1 ? _selectedLeaves[0] : null;
 
+
     // Obtain if a particular node is selected.
-    public bool IsSelected(DynamicDrawSystem<T>.IDynamicEntity entity)
+    public bool IsSelected(IDynamicNode<T> entity)
         => _selected.Contains(entity);
 
     /// <summary>
@@ -66,7 +57,7 @@ public partial class DynamicDrawer<T> where T : class
     }
 
     // Deselect the entity, and remove it from all tracked selection lists.
-    public void Deselect(DynamicDrawSystem<T>.IDynamicEntity entity)
+    public void Deselect(IDynamicNode<T> entity)
         => DeselectInternal(entity);
 
     /// <summary>
@@ -78,7 +69,7 @@ public partial class DynamicDrawer<T> where T : class
     /// <param name="entity"> The entity being selected. </param>
     /// <param name="canAnchorSelect"> If we allow CTRL based multi-selection. </param>
     /// <param name="canRangeSelect"> If we allow SHIFT based range selection. </param>
-    private void SelectItem(DynamicDrawSystem<T>.IDynamicEntity entity, bool canAnchorSelect, bool canRangeSelect)
+    private void SelectItem(IDynamicNode<T> entity, bool canAnchorSelect, bool canRangeSelect)
     {
         bool ctrl = ImGui.GetIO().KeyCtrl;
         bool shift = ImGui.GetIO().KeyShift;
@@ -88,11 +79,10 @@ public partial class DynamicDrawer<T> where T : class
         //  - LastAnchor cannot be the same as the current entity.
         if (shift && _lastAnchor != null && canRangeSelect && _lastAnchor != entity)
         { 
-            var idxTo = _cachedState.IndexOf(s => s.Entity == entity);
-            var depth = _cachedState[idxTo].Depth;
+            var idxTo = _nodeCacheFlat.IndexOf(entity);
 
             // obtain the idx of the last anchor.
-            var idxFrom = _cachedState.IndexOf(s => s.Entity == _lastAnchor);
+            var idxFrom = _nodeCacheFlat.IndexOf(_lastAnchor);
 
             // Ensure correct selection order (top to bottom / bottom to top)
             (idxFrom, idxTo) = idxFrom > idxTo ? (idxTo, idxFrom) : (idxFrom, idxTo);
@@ -104,15 +94,12 @@ public partial class DynamicDrawer<T> where T : class
             bool selecting = !_selected.Contains(entity);
 
             // Perform bulk select/deselect.
-            if (_cachedState.Skip(idxFrom).Take(idxTo - idxFrom + 1).All(s => s.Depth >= depth))
+            for (int i = idxFrom; i <= idxTo; i++)
             {
-                foreach (var e in _cachedState.Skip(idxFrom).Take(idxTo - idxFrom + 1))
-                {
-                    if (selecting)
-                        SelectInternal(e.Entity);
-                    else
-                        DeselectInternal(e.Entity);
-                }
+                if (selecting)
+                    SelectInternal(_nodeCacheFlat[i]);
+                else
+                    DeselectInternal(_nodeCacheFlat[i]);
             }
             // Update last interacted.
             _lastSelected = selecting ? entity : null;
@@ -149,26 +136,26 @@ public partial class DynamicDrawer<T> where T : class
         }
     }
 
-    private void DeselectInternal(DynamicDrawSystem<T>.IDynamicEntity entity)
+    private void DeselectInternal(IDynamicNode<T> entity)
     {
         _selected.Remove(entity);
-        if (entity is DynamicDrawSystem<T>.FolderCollection fc)
+        if (entity is DynamicFolderGroup<T> fc)
         {
             _selectedFolderGroups.Remove(fc);
             _selectedFoldersAll.Remove(fc);
         }
-        else if (entity is DynamicDrawSystem<T>.Folder f)
+        else if (entity is DynamicFolder<T> f)
         {
             _selectedFolders.Remove(f);
             _selectedFoldersAll.Remove(f);
         }
-        else if (entity is DynamicDrawSystem<T>.Leaf l)
+        else if (entity is DynamicLeaf<T> l)
         {
             _selectedLeaves.Remove(l);
         }
     }
 
-    private void DeselectInternal(IEnumerable<DynamicDrawSystem<T>.IDynamicEntity> entities)
+    private void DeselectInternal(IEnumerable<IDynamicNode<T>> entities)
     {
         _selected.RemoveWhere(e => entities.Contains(e));
         _selectedFolderGroups.RemoveAll(fc => entities.Contains(fc));
@@ -177,26 +164,26 @@ public partial class DynamicDrawer<T> where T : class
         _selectedLeaves.RemoveAll(l => entities.Contains(l));
     }
 
-    private void SelectInternal(DynamicDrawSystem<T>.IDynamicEntity entity)
+    private void SelectInternal(IDynamicNode<T> entity)
     {
         _selected.Add(entity);
-        if (entity is DynamicDrawSystem<T>.FolderCollection fc)
+        if (entity is DynamicFolderGroup<T> fc)
         {
             _selectedFolderGroups.Add(fc);
             _selectedFoldersAll.Add(fc);
         }
-        else if (entity is DynamicDrawSystem<T>.Folder f)
+        else if (entity is DynamicFolder<T> f)
         {
             _selectedFolders.Add(f);
             _selectedFoldersAll.Add(f);
         }
-        else if (entity is DynamicDrawSystem<T>.Leaf l)
+        else if (entity is DynamicLeaf<T> l)
         {
             _selectedLeaves.Add(l);
         }
     }
 
-    private void SelectInternal(IEnumerable<DynamicDrawSystem<T>.IDynamicEntity> entities)
+    private void SelectInternal(IEnumerable<IDynamicNode<T>> entities)
     {
         foreach (var entity in entities)
             SelectInternal(entity);

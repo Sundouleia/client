@@ -1,6 +1,5 @@
 using CkCommons;
 using CkCommons.Gui;
-using CkCommons.Gui.Utility;
 using CkCommons.Raii;
 using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
@@ -9,18 +8,11 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
-using OtterGui.Widgets;
 using Sundouleia.Gui.Components;
-using Sundouleia.Gui.Handlers;
 using Sundouleia.Localization;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using System.Drawing;
-using System.Linq;
-using static System.Net.Mime.MediaTypeNames;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ScrollBar;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -121,7 +113,7 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
 
         using (ImRaii.Group())
         {
-            if (FancySearchBar.Draw("SundesmoSearch", width, "filter..", ref _filterMain, 128, rightWidth, RightContent))
+            if (FancySearchBar.Draw("SundesmoSearch", width, ref _filterMain, "filter..", 128, rightWidth, RightContent))
                 foreach (var folder in _mainFolders)
                     folder.UpdateItemsForFilter(_filterMain);
 
@@ -218,7 +210,7 @@ public class WhitelistTab : DisposableMediatorSubscriberBase
     private void DrawGroupSearch()
     {
         var rightWidth = CkGui.IconTextButtonSize(FAI.PeopleGroup, "Groups") + CkGui.IconButtonSize(FAI.Filter).X;
-        if (FancySearchBar.Draw("SundesmoSearch", ImGui.GetContentRegionAvail().X, "filter..", ref _filterGroups, 128, rightWidth, RightContent))
+        if (FancySearchBar.Draw("SundesmoSearch", ImGui.GetContentRegionAvail().X, ref _filterGroups, "filter..", 128, rightWidth, RightContent))
             foreach (var folder in _groupFolders)
                 folder.UpdateItemsForFilter(_filterGroups);
 

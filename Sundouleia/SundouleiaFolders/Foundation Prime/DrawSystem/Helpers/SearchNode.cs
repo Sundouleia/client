@@ -1,6 +1,3 @@
-
-using Dalamud.Interface;
-
 namespace Sundouleia.DrawSystem;
 
 /// <summary> A cheap struct to avoid unnecessary allocations for comparison with nodes. </summary>

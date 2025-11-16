@@ -1,9 +1,10 @@
-
-using Dalamud.Interface;
-
 namespace Sundouleia.DrawSystem;
 
-internal class DynamicLeaf<T> : IDynamicLeaf<T> where T : class
+/// <summary>
+///     Publicly accessible Leaf for a DynamicDrawSystem node. <para />
+///     All functions and setters are only accessible internally to ensure integrity.
+/// </summary>
+public class DynamicLeaf<T> : IDynamicLeaf<T> where T : class
 {
     public DynamicFolder<T> Parent { get; internal set; }
     public uint   ID        { get; }
@@ -11,7 +12,8 @@ internal class DynamicLeaf<T> : IDynamicLeaf<T> where T : class
     public string Name      { get; private set; }
     public string FullPath  { get; private set; } = string.Empty;
 
-    public DynamicLeaf(DynamicFolder<T> parent, string name, T data, uint id)
+    // Only allow creation internally, ensuring integrity within the file system.
+    internal DynamicLeaf(DynamicFolder<T> parent, string name, T data, uint id)
     {
         Parent = parent;
         Data = data;
@@ -20,15 +22,16 @@ internal class DynamicLeaf<T> : IDynamicLeaf<T> where T : class
         UpdateFullPath();
     }
 
-    public bool IsRoot => false;
+    public bool IsRoot 
+        => false;
 
-    public IReadOnlyList<IDynamicFolderNode> GetAncestors()
+    public IReadOnlyList<IDynamicCollection<T>> GetAncestors()
     {
         if (Parent is null || Parent.IsRoot)
-            return Array.Empty<IDynamicFolderNode>();
+            return Array.Empty<IDynamicCollection<T>>();
 
-        var ancestors = new List<IDynamicFolderNode>();
-        for (IDynamicFolderNode cur = Parent; !cur.IsRoot; cur = cur.Parent)
+        var ancestors = new List<IDynamicCollection<T>>();
+        for (IDynamicCollection<T> cur = Parent; !cur.IsRoot; cur = cur.Parent)
             ancestors.Add(cur);
 
         return ancestors;
@@ -45,7 +48,4 @@ internal class DynamicLeaf<T> : IDynamicLeaf<T> where T : class
 
     internal void UpdateFullPath()
         => FullPath = $"{Parent.FullPath}/{Name}";
-
-    // Interface Satisfiers.
-    IDynamicFolder<T> IDynamicLeaf<T>.Parent => Parent;
 }

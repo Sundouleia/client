@@ -26,11 +26,18 @@ public class ConfigFileProvider : IConfigFileProvider
     public readonly string LoadedResources;
     public readonly string FileCacheCsv;
 
+    public string DDS_Requests => Path.Combine(FileSysDirectory, "dds-requests.json");
+    public string DDS_Whitelist => Path.Combine(FileSysDirectory, "dds-whitelist.json");
+    public string DDS_MCDFData => Path.Combine(FileSysDirectory, "dds-mcdfdata.json");
+    public string DDS_Radar => Path.Combine(FileSysDirectory, "dds-radar.json");
+
+
     // Shared Server Configs
     public readonly string NicknameConfig;
     public readonly string AccountConfig;
 
     // Unique Client Configs Per Account.
+    public string DDS_Groups => Path.Combine(CurrentPlayerDirectory, "dds-groups.json");
     public string SundesmoGroups => Path.Combine(CurrentPlayerDirectory, "sundesmo-groups.json"); // could merge this with favorites or something idk.
 
     public string CurrentPlayerDirectory => Path.Combine(SundouleiaDirectory, CurrentUserUID ?? "InvalidFiles");

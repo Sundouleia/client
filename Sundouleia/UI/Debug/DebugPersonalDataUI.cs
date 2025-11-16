@@ -75,7 +75,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
             ImGui.Text($"Visible Rendered: {_pairs.GetVisibleConnected().Count}");
 
             // The search.
-            if (FancySearchBar.Draw("##PairDebugSearch", ImGui.GetContentRegionAvail().X, "Search for Pair..", ref _searchValue, 40))
+            if (FancySearchBar.Draw("##PairDebugSearch", ImGui.GetContentRegionAvail().X, ref _searchValue, "Search for Pair..", 40))
                 UpdateList();
 
             // Separator, then the results.

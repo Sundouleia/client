@@ -1,13 +1,11 @@
 using CkCommons;
-using Sundouleia.DrawSystem.Selector;
 
 namespace Sundouleia.DrawSystem;
 
 // Process Config Saving & Loading.
+// ------------------------
 // In contrast to what is likely assumed, the config does not save or load the entire DrawSystem.
-//
-// Instead, only the hierarchy structure of the FolderCollections & Folders are logged,
-// in addition to their opened states.
+// Instead, only the hierarchy structure of the FolderCollections & Folders is stored.
 //
 // This is because in a DynamicDrawSystem, leaves can be initialized at any time, and are not always
 // present. Instead, other methods in DynamicDrawSystem.Internals & DynamicDrawSystem help quickly
@@ -23,7 +21,7 @@ public partial class DynamicDrawSystem<T> where T : class
         j.Formatting = Formatting.Indented;
 
         // Track which folders are currently opened at the time of saving.
-        var openedFolders = new List<IDynamicFolder<T>>();
+        var openedFolders = new List<IDynamicCollection<T>>();
 
         j.WriteStartObject();
         j.WritePropertyName("FolderHierarchy");
@@ -94,7 +92,7 @@ public partial class DynamicDrawSystem<T> where T : class
     {
         // Reset all data, completely.
         _idCounter = 1;
-        _dataToLeafMap.Clear();
+        _leafMap.Clear();
         Root.Children.Clear();
         // We cleared, so assume changes occurred.
         var changes = true;
@@ -137,7 +135,10 @@ public partial class DynamicDrawSystem<T> where T : class
                 foreach (var openedPath in openedFolders)
                 {
                     if (FindFolder(openedPath, out var folder))
-                        folder .SetIsOpen(true);
+                    {
+                        if (folder is DynamicFolderGroup<T> fc) fc.SetIsOpen(true);
+                        else if (folder is DynamicFolder<T> f) f.SetIsOpen(true);
+                    }
                     else
                         changes = true;
                 }
@@ -159,7 +160,7 @@ public partial class DynamicDrawSystem<T> where T : class
     {
         // Reset all data, completely.
         _idCounter = 1;
-        _dataToLeafMap.Clear();
+        _leafMap.Clear();
         Root.Children.Clear();
         // We cleared, so assume changes occurred.
         var changes = true;
@@ -182,7 +183,10 @@ public partial class DynamicDrawSystem<T> where T : class
                 foreach (var openedPath in openedFolders)
                 {
                     if (FindFolder(openedPath, out var folder))
-                        ((IDynamicWriteFolder)folder).SetIsOpen(true);
+                    {
+                        if (folder is DynamicFolderGroup<T> fc) fc.SetIsOpen(true);
+                        else if (folder is DynamicFolder<T> f) f.SetIsOpen(true);
+                    }
                     else
                         changes = true;
                 }
