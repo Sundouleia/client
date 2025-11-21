@@ -4,7 +4,7 @@ using OtterGui.Extensions;
 namespace Sundouleia.DrawSystem.Selector;
 
 // Focuses on Selections.
-public partial class DynamicDrawer<T> where T : class
+public partial class DynamicDrawer<T>
 {
     // Helps prevent flooding SundouleiaMediator while only having parent classes listen on changes.
     // Alternatively we could make abstract after splitting from partial and having the parent handle it.
@@ -69,7 +69,7 @@ public partial class DynamicDrawer<T> where T : class
     /// <param name="entity"> The entity being selected. </param>
     /// <param name="canAnchorSelect"> If we allow CTRL based multi-selection. </param>
     /// <param name="canRangeSelect"> If we allow SHIFT based range selection. </param>
-    private void SelectItem(IDynamicNode<T> entity, bool canAnchorSelect, bool canRangeSelect)
+    protected void SelectItem(IDynamicNode<T> entity, bool canAnchorSelect, bool canRangeSelect)
     {
         bool ctrl = ImGui.GetIO().KeyCtrl;
         bool shift = ImGui.GetIO().KeyShift;

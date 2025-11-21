@@ -1,234 +1,190 @@
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace Sundouleia.DrawSystem;
 
-// Maybe phase this out as things evolve, possibly make things abstract
-// and force implementation for actions as overrides.
+// Definitely revise this.
 public enum DDSChangeType
 {
     ObjectRenamed,
     ObjectRemoved,
     FolderAdded,
-    LeafAdded,
     ObjectMoved,
     FolderMerged,
     PartialMerge,
+    FlagChange,
+    FolderUpdated,
     Reload,
 }
 
 /// <summary>
-///     A class intended to be used via inheritance for defined implementations,
-///     and composition for the selectors. <para />
-///     
-///     Designed to improve upon the conceptual DynamicFolder, while
-///     providing maximum flexibility and customization. <para />
-///     
-///     This is an effort to fuse the benefits of both Moon's Folder Framework 
-///     and OtterGui/Luna's FileSystem together. <para />
-/// 
-///     The goal is to allow a file system of similar structure, with more robust 
-///     customization points, and allowing a <typeparamref name="T"/> to have multiple associated leaves.
+///     A DynamicDrawSystem works in a similar fashion to CkFileSystem / OtterGui.FileSystem,
+///     except all leaves are managed internally through generators. <para />
+///     Every created folder is assigned with a Generator, which updates the respective leaves in it. <para />
+///     As such, only folders and folder collections can be moved, renamed, or have other actions performed on it. <para />
+///     Update this overtime, or potentially make the dynamic draw system abstract for additional forced implementations.
 /// </summary>
-public partial class DynamicDrawSystem<T> where T : class
+public abstract partial class DynamicDrawSystem<T> where T : class
 {
     // An internal change action event for a selector to link to without overloading
     // the mediator when multiple file systems are active.
     public delegate void ChangeDelegate(DDSChangeType type, IDynamicNode<T> obj, IDynamicCollection<T>? prevParent, IDynamicCollection<T>? newParent);
     public event ChangeDelegate? Changed;
 
-    private readonly Dictionary<T, HashSet<DynamicLeaf<T>>> _leafMap = [];
+    // Internal folder mapping for quick access by name.
+    private readonly Dictionary<string, IDynamicCollection<T>> _folderMap = [];
+    // could do a leaf map as well but do not see any need to.
 
     /// <summary> For comparing Entities by name only. </summary>
     private readonly NameComparer _nameComparer;
 
     /// <summary> The private, incrementing ID counter for this dynamic folder system. </summary>
-    private uint _idCounter = 1;
+    protected uint idCounter { get; private set; } = 1;
+
+    /// <summary> The root folder collection of this dynamic folder system. </summary>
+    protected DynamicFolderGroup<T> root = DynamicFolderGroup<T>.CreateRoot();
 
     public DynamicDrawSystem(IComparer<ReadOnlySpan<char>>? comparer = null)
     {
         _nameComparer = new NameComparer(comparer ?? new OrdinalSpanComparer());
     }
 
-    /// <summary> The root folder collection of this dynamic folder system. </summary>
-    public DynamicFolderGroup<T> Root = DynamicFolderGroup<T>.CreateRoot();
-
-    public bool TryGetValue(T key, [NotNullWhen(true)] out HashSet<DynamicLeaf<T>>? values)
-        => _leafMap.TryGetValue(key, out values);
-
     /// <summary>
-    ///     Find a leaf inside a folder using the given comparer.
+    ///     Read-only Accessor for root via classes desiring inspection while preventing edits.
+    ///     (This is technically already dont via internal setters but whatever).
     /// </summary>
+    public IDynamicFolderGroup<T> Root => root;
+
+    public bool TryGetFolder(string name, [NotNullWhen(true)] out IDynamicCollection<T>? folder)
+        => _folderMap.TryGetValue(name, out folder);
+
     private int Search(DynamicFolder<T> parent, ReadOnlySpan<char> name)
         => CollectionsMarshal.AsSpan(parent.Children).BinarySearch(new SearchNode(_nameComparer, name));
 
-    /// <summary>
-    ///     Find a leaf inside a folder using the given comparer.
-    /// </summary>
     private int Search(DynamicFolderGroup<T> parent, ReadOnlySpan<char> name)
         => CollectionsMarshal.AsSpan(parent.Children).BinarySearch(new SearchNode(_nameComparer, name));
 
-    /// <summary>
-    ///     Check whether two strings are equal according to the DFS name comparer.
-    /// </summary>
     public bool Equal(ReadOnlySpan<char> lhs, ReadOnlySpan<char> rhs)
         => _nameComparer.BaseComparer.Compare(lhs, rhs) is 0;
 
+    // Useful for dynamic folders wanting to contain their own nested folders.
+    protected DynamicFolderGroup<T> GetGroupByName(string parentName)
+       => _folderMap.TryGetValue(parentName, out var f) && f is DynamicFolderGroup<T> fg
+        ? fg : root;
+
+    protected void AddFolder(DynamicFolder<T> folder)
+    {
+        // Ensure Validity
+        if (folder.Parent is null)
+            folder.Parent = root;
+        // Ensure Validity
+        if (folder.ID != idCounter + 1u)
+            folder.ID = idCounter + 1u;
+
+        // If a folder with the same name already exists, return.
+        if (_folderMap.ContainsKey(folder.Name))
+            return;
+
+        // Attempt to assign the folder. If it fails, throw an exception.
+        if (AssignFolder(folder.Parent, folder) is Result.ItemExists)
+            throw new Exception($"Could not add folder [{folder.Name}] to group [{folder.Parent.Name}]: Folder with the same name exists.");
+
+        // Successful, so increment the ID counter.
+        ++idCounter;
+
+        // Could add the folder to a mapping if we wanted but dont really know right now.
+        _folderMap[folder.Name] = folder;
+
+        // Revise later.
+        Changed?.Invoke(DDSChangeType.FolderAdded, folder, null, folder.Parent);
+    }
+
+
+    // Retrieve the updated state of all folders.
+    public void UpdateFolders()
+    {
+        IEnumerable<IDynamicLeaf<T>> removed = [];
+
+        foreach (var folder in _folderMap.Values.OfType<DynamicFolder<T>>())
+            if (folder.Update(_nameComparer, out var rem))
+                removed = removed.Concat(rem);
+
+        // Notify of removed leaves.
+
+        // Notify of the updated state.
+        Changed?.Invoke(DDSChangeType.FolderUpdated, root, null, null);
+    }
+
+    public void UpdateFolder(DynamicFolder<T> folder)
+    {
+        if (folder.Update(_nameComparer, out var removed))
+        {
+            // Notify of removed leaves.
+        }
+
+        // Revise later.
+        Changed?.Invoke(DDSChangeType.FolderUpdated, folder, null, null);
+    }
+
+
+
     // Sets the expanded state of a folder to a new value.
-    public bool SetFolderOpenState(IDynamicCollection<T> folder, bool isOpen)
+    public bool SetOpenState(IDynamicCollection<T> folder, bool isOpen)
     {
         if (folder.IsOpen == isOpen)
             return false;
 
         if (folder is DynamicFolderGroup<T> fc)
-        {
             fc.SetIsOpen(isOpen);
-            // TODO : Mediator Invoke here.
-            return true;
-        }
         else if (folder is DynamicFolder<T> f)
-        {
             f.SetIsOpen(isOpen);
-            // TODO : Mediator Invoke here.
-            return true;
-        }
+        else
+            return false;
 
-        return false;
-    }
-
-    /// <summary>
-    ///     Attempt to locate a defined folder from its folder path.
-    /// </summary>
-    public bool FindFolder(string fullFolderPath, out IDynamicCollection<T> folder)
-    {
-        folder = Root;
-        var segments = ParseSegments(fullFolderPath);
-        foreach (var segment in segments)
-        {
-            if (segment.Type is not (SegmentType.Folder or SegmentType.FolderCollection))
-                return false;
-
-            // If the type is a folder, we found the end segment.
-            if (folder is not DynamicFolderGroup<T> fc)
-            {
-                // we found the end for folder condition.
-                return true;
-            }
-
-            // Search the current segment name.
-            var idx = Search(fc, segment.Name);
-            if (idx < 0)
-            {
-                // Nothing was found, meaning that it doesn't exist, so fail.
-                Svc.Logger.Warning($"Failed to find folder [{segment.Name}] in path [{fullFolderPath}].");
-                return false;
-            }
-
-            // Otherwise it was found so update the child.
-            folder = fc.Children[idx];
-        }
-
-        // If we made it all the way return true.
+        // Revise later.
+        Changed?.Invoke(DDSChangeType.FolderUpdated, folder, null, null);
         return true;
     }
 
     /// <summary>
-    ///     Associates a created leaf with its respective data in the dictionary.
+    ///     Internally rename a defined folder in the DDS.
     /// </summary>
-    internal void AddLeafToMap(T data, DynamicLeaf<T> entity)
+    public void Rename(IDynamicCollection<T> node, string newName)
     {
-        if (!_leafMap.TryGetValue(data, out var leaves))
+        switch (RenameFolder(node, newName))
         {
-            leaves = new HashSet<DynamicLeaf<T>>();
-            _leafMap[data] = leaves;
+            case Result.ItemExists: throw new Exception($"Can't rename {node.Name} to {newName}: another entity in {node.Name}'s Parent has the same name.");
+            case Result.Success:
+                // Revise later.
+                Changed?.Invoke(DDSChangeType.ObjectRenamed, node, null, null);
+                return;
         }
-        leaves.Add(entity);
     }
 
     /// <summary>
-    ///     Removes association of a leaf entity from it's data. (usually upon removal)
-    /// </summary>
-    internal void RemoveLeafFromMap(DynamicLeaf<T> entity)
-    {
-        // Locate the leaf via its value.
-        if (!_leafMap.TryGetValue(entity.Data, out var leaves))
-            return;
-        // Remove the entity from the HashSet.
-        leaves.Remove(entity);
-        // If no more leaves are present, remove the key.
-        if (leaves.Count is 0)
-            _leafMap.Remove(entity.Data);
-    }
-
-    /// <summary>
-    ///     Creates a new Leaf item under the specified parent folder.
-    /// </summary>
-    /// <typeparam name="T"> The type of data for the node. </typeparam>
-    /// <param name="parent"> The parent folder to create the data node in. </param>
-    /// <param name="name"> The name to assign the data node. </param>
-    /// <param name="data"> The data object associated with the node. </param>
-    /// <returns> The newly created data node in <paramref name="parent"/>. </returns>
-    /// <exception cref="Exception"> Throws if a leaf of the name already exists in parent. </exception>
-    public DynamicLeaf<T> CreateEntity(DynamicFolder<T> parent, string name, T data)
-    {
-        var entity = new DynamicLeaf<T>(parent, name, data, _idCounter + 1u);
-        // Attempt to set the entity in the parent folder.
-        if (AssignLeaf(parent, entity) is Result.ItemExists)
-            throw new Exception($"Could not add entity [{entity.Name}] to folder [{parent.Name}]: Node with the same name exists.");
-
-        // Successful, so increment the ID counter and add to the data-leaf map.
-        ++_idCounter;
-        AddLeafToMap(data, entity);
-        // TODO: Invoke mediator change here.
-        return entity;
-    }
-
-    /// <summary>
-    ///     Creates a new folder labeled <paramref name="name"/> under the specified <paramref name="parent"/> folder collection. <para />
-    ///     If any folder throughout the entire hierarchy already exists with the same name, an exception is thrown.
-    /// </summary>
-    /// <param name="folderGroup"> The parent folder to create the data node in. </param>
-    /// <param name="name"> The name to assign the data node. </param>
-    /// <param name="icon"> The icon to assign to the folder. </param>
-    /// <returns> The newly created folder in <paramref name="folderGroup"/>. </returns>
-    /// <exception cref="Exception"> Throws if a folder of the name already exists in parent. </exception>
-    public DynamicFolder<T> CreateFolder(DynamicFolderGroup<T> folderGroup, string name, FAI icon)
-    {
-        var folder = new DynamicFolder<T>(folderGroup, icon, name, _idCounter + 1u);
-        // Attempt to set the folder in the parent folder collection.
-        if (AssignFolder(folderGroup, folder, out _) is Result.ItemExists)
-            throw new Exception($"Could not add folder [{folder.Name}] to folder collection [{folderGroup.Name}]: Folder with the same name exists.");
-        
-        // Successful, so increment the ID counter.
-        ++_idCounter;
-
-        // Could add the folder to a mapping if we wanted but dont really know right now.
-
-        // TODO: Invoke mediator change here.
-        return folder;
-    }
-
-    /// <summary>
-    ///     Splits path into successive subfolders of root and finds or creates the topmost folder.
+    ///     Splits path into successive subfolders of root and finds or creates the topmost folder. <para />
+    ///     <b> WARNING: Very unstable, not tested with non-FolderGroup paths. Could break things. </b>
     /// </summary>
     /// <returns> The topmost folder. </returns>
     /// <exception cref="Exception"> If a folder can't be found or created due to an existing non-folder child with the same name. </exception>
-    public IDynamicCollection<T> FindOrCreateAllFolders(string path)
+    public IDynamicCollection<T> FindOrCreateAllGroups(string path)
     {
-        var retCode = CreateAllFolders(path, out IDynamicCollection<T> topFolder);
         // Respond based on the resulting action.
-        switch (retCode)
+        switch (CreateAllGroups(path, out DynamicFolderGroup<T> topFolder))
         {
             case Result.Success:
-                // Mediator invoke that a folder was added, providing the folder, and its parent.
+                // Revise later.
+                Changed?.Invoke(DDSChangeType.FolderAdded, topFolder, null, topFolder.Parent);
                 break;
 
             case Result.ItemExists:
                 // Throw Exception.
                 throw new Exception($"Could not create new folder for {path}: {topFolder.FullPath} already contains an object with a required name.");
             case Result.PartialSuccess:
-                // Invoke it was added, but also throw an exception.
-                // TODO: Mediator invoke here.
+                // Revise this invoker later.
+                Changed?.Invoke(DDSChangeType.FolderAdded, topFolder, null, topFolder.Parent);
+                // Throw exception due to partial failure, since it expects to create all, but failed before finishing.
                 throw new Exception($"Could not create all new folders for {path}: {topFolder.FullPath} already contains an object with a required name.");
         }
 
@@ -236,140 +192,33 @@ public partial class DynamicDrawSystem<T> where T : class
     }
 
     /// <summary>
-    ///     Can rename and move any entity type in the DFS.
-    /// </summary>
-    /// <param name="entity"> The entity to rename and move. </param>
-    /// <param name="newPath"> The new path to move the entity to. </param>
-    /// <exception cref="Exception"> Throws if the move could not be completed. Which can occur for a multitude of reasons. </exception>
-    public void RenameAndMove(IDynamicNode entity, string newPath)
-    {
-        if (newPath.Length == 0)
-            throw new Exception($"Could not change path of {entity.FullPath} to an empty path.");
-
-        // Store the old entity FullPath.
-        var oldPath = entity.FullPath;
-        // Exit if old and new paths are the same.
-        if (newPath == oldPath)
-            return;
-        // If any folders to the new path are missing, we should create them.
-        var retCode = CreateAllFoldersAndFile(newPath, out IDynamicCollection<T> folder, out string fileName);
-
-        // Handle case where entity is a leaf and output is [Folder]
-        if (entity is DynamicLeaf<T> l && folder is DynamicFolder<T> f)
-        {
-            switch (retCode)
-            {
-                case Result.Success:
-                    // Move the leaf.
-                    MoveLeaf(l, f, out _, fileName);
-                    // TODO: Invoke Mediator of change.
-                    break;
-                case Result.SuccessNothingDone:
-                    // Update the retCode to this move. If the item exists, throw an exception.
-                    retCode = MoveLeaf(l, f, out _, fileName);
-                    if (retCode is Result.ItemExists)
-                        throw new Bagagwa($"Could not move {oldPath} to {newPath}: An object of name {fileName} already exists.");
-                    // Otherwise it worked, so invoke change.
-                    // TODO: Invoke Mediator Change.
-                    return;
-                case Result.ItemExists:
-                    throw new Exception($"Could not create {newPath} for {oldPath}: A pre-existing folder contained an entity with the same name.");
-            }
-        }
-        else if (entity is IDynamicCollection<T> fn && folder is DynamicFolderGroup<T> fc)
-        {
-            // Handle case where entity is a folder and output is [FolderCollection]
-            switch (retCode)
-            {
-                case Result.Success:
-                    // Move the folder.
-                    MoveFolder(fn, fc, out _, fileName);
-                    // TODO: Invoke Mediator of change.
-                    break;
-                case Result.SuccessNothingDone:
-                    // Update the retCode to this move. If the item exists, throw an exception.
-                    retCode = MoveFolder(fn, fc, out _, fileName);
-                    if (retCode is Result.ItemExists)
-                        throw new Bagagwa($"Could not move {oldPath} to {newPath}: An object of name {fileName} already exists.");
-                    // Otherwise it worked, so invoke change.
-                    // TODO: Invoke Mediator Change.
-                    return;
-                case Result.ItemExists:
-                    throw new Exception($"Could not create {newPath} for {oldPath}: A pre-existing folder contained an entity with the same name.");
-            }
-        }
-        else
-            throw new Bagagwa($"Tried to perform an invalid move operation! Entity Type and Expected topmost folder type did not match expected!");
-    }
-
-    /// <summary>
-    ///     Renames an entity to <paramref name="newName"/>. <para />
-    ///     Throws if an item of the same name exists in the Children of <paramref name="entity"/>'s Parent folder.
-    /// </summary>
-    /// <exception cref="Exception"></exception>
-    public void Rename(IDynamicNode entity, string newName)
-    {
-        var retCode = entity switch
-        {
-            DynamicLeaf<T> l => RenameLeaf(l, newName),
-            IDynamicCollection<T> fn => RenameFolder(fn, newName),
-            _ => throw new Exception($"Attempted to rename {entity.Name}, but it had an invalid type!")
-        };
-
-        switch (retCode)
-        {
-            case Result.ItemExists: throw new Exception($"Can't rename {entity.Name} to {newName}: another entity in {entity.Name}'s Parent has the same name.");
-            case Result.Success:
-                // TODO: Mediator invoke.
-                return;
-        }
-    }
-
-    /// <summary>
-    ///     Delete an entity from it's Parent. <para />
+    ///     Delete a folder from it's Parent. Locates the folder by name first. <para />
     ///     An Exception is thrown if the entity is root.
     /// </summary>
-    /// <param name="entity"> The entity to delete </param>
     /// <exception cref="Exception"></exception>
-    public void Delete(IDynamicNode entity)
+    public void Delete(string folderName)
     {
-        var retCode = entity switch
-        {
-            DynamicLeaf<T> l => RemoveLeaf(l),
-            IDynamicCollection<T> fn => RemoveFolder(fn),
-            _ => throw new Exception($"Attempted to remove {entity.Name}, but it had an invalid type!")
-        };
-
-        switch (retCode)
-        {
-            case Result.InvalidOperation: throw new Exception("Can't delete the root entity.");
-            case Result.Success:
-                if (entity is DynamicLeaf<T> l)
-                    RemoveLeafFromMap(l);
-                // TODO: Invoke Mediator Change.
-                return;
-        }
+        if (!_folderMap.TryGetValue(folderName, out var match))
+            return;
+        // Perform the actual deletion.
+        Delete(match);
     }
 
     /// <summary>
-    ///     Move a <paramref name="leaf"/> to <paramref name="newParent"/>. <para />
+    ///     Delete a folder from it's Parent. <para />
+    ///     An Exception is thrown if the entity is root.
     /// </summary>
-    /// <param name="leaf"> The leaf to move. </param>
-    /// <param name="newParent"> the new parent the leaf will be under. </param>
-    /// <exception cref="Exception"> Throws if the leaf name already exists in newParent. </exception>
-    public void Move(DynamicLeaf<T> leaf, DynamicFolder<T> newParent)
+    /// <exception cref="Exception"></exception>
+    public void Delete(IDynamicCollection<T> folder)
     {
-        switch(MoveLeaf(leaf, newParent, out var oldParent))
+        switch (RemoveFolder(folder))
         {
-            case Result.Success:
-                // TODO: Invoke Mediator change.
-                break;
-            case Result.SuccessNothingDone:
-                return;
             case Result.InvalidOperation:
-                throw new Exception("Can not move root directory.");
-            case Result.ItemExists:
-                throw new Exception($"Can't move {leaf.Name} into {newParent.FullPath} because an identical child in the parent already exists.");
+                throw new Exception("Can't delete the root folder.");
+            case Result.Success:
+                // Revise later.
+                Changed?.Invoke(DDSChangeType.ObjectRemoved, folder, folder.Parent, null);
+                return;
         }
     }
 
@@ -378,14 +227,19 @@ public partial class DynamicDrawSystem<T> where T : class
         switch (MoveFolder(folder, newParent, out var oldParent))
         {
             case Result.Success:
-                // TODO: Invoke Mediator change.
+                // Revise later.
+                Changed?.Invoke(DDSChangeType.ObjectMoved, folder, oldParent, newParent);
                 break;
+
             case Result.SuccessNothingDone:
                 return;
+
             case Result.InvalidOperation:
                 throw new Exception("Can not move root directory.");
+
             case Result.CircularReference:
                 throw new Exception($"Can not move {folder.FullPath} into {newParent.FullPath} since folders can not contain themselves.");
+            
             case Result.ItemExists:
                 // if and only if both folders are FolderCollections, should we allow a merge to occur.
                 var matchingIdx = Search(newParent, folder.Name);
@@ -400,6 +254,7 @@ public partial class DynamicDrawSystem<T> where T : class
         }
     }
 
+    // This would technically be something called in an abstract method or whatever so it can be handled externally.
     public void Merge(DynamicFolder<T> from, DynamicFolder<T> to)
     {
         switch (MergeFolders(from, to))
@@ -411,11 +266,13 @@ public partial class DynamicDrawSystem<T> where T : class
                 throw new Exception($"Can not merge root directory into {to.FullPath}.");
 
             case Result.Success:
-                // TODO: Invoke Mediator.
+                // Revise later.
+                Changed?.Invoke(DDSChangeType.FolderMerged, from, from, to);
                 return;
 
             case Result.PartialSuccess:
-                // TODO: Invoke Mediator.
+                // Revise later.
+                Changed?.Invoke(DDSChangeType.PartialMerge, from, from, to);
                 return;
 
             case Result.NoSuccess:
@@ -434,11 +291,13 @@ public partial class DynamicDrawSystem<T> where T : class
                 throw new Exception($"Can not merge root directory into {to.FullPath}.");
             
             case Result.Success:
-                // TODO: Invoke Mediator.
+                // Revise later.
+                Changed?.Invoke(DDSChangeType.FolderMerged, from, from, to);
                 return;
             
             case Result.PartialSuccess:
-                // TODO: Invoke Mediator.
+                // Revise later.
+                Changed?.Invoke(DDSChangeType.PartialMerge, from, from, to);
                 return;
 
             case Result.NoSuccess:

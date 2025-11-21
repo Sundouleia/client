@@ -129,7 +129,6 @@ public static class SundouleiaServiceExtensions
 
         // Draw Systems
         .AddSingleton<GroupsDrawSystem>()
-        .AddSingleton<MCDFDrawSystem>()
         .AddSingleton<RadarDrawSystem>()
         .AddSingleton<RequestsDrawSystem>()
         .AddSingleton<WhitelistDrawSystem>()
@@ -240,7 +239,6 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Drawers
         .AddScoped<GroupsDrawer>()
-        .AddScoped<MCDFDrawer>()
         .AddScoped<RadarDrawer>()
         .AddScoped<RequestsDrawer>()
         .AddScoped<WhitelistDrawer>()
@@ -256,6 +254,7 @@ public static class SundouleiaServiceExtensions
         .AddScoped<WindowMediatorSubscriberBase, InteractionsUI>()
         .AddScoped<HomeTab>()
         .AddScoped<RequestsTab>()
+        .AddScoped<NewWhitelistTab>()
         .AddScoped<WhitelistTab>()
         .AddScoped<RadarTab>()
         .AddScoped<RadarChatTab>()

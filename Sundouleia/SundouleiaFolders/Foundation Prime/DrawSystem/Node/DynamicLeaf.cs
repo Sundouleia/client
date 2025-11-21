@@ -1,29 +1,25 @@
 namespace Sundouleia.DrawSystem;
 
 /// <summary>
-///     Publicly accessible Leaf for a DynamicDrawSystem node. <para />
-///     All functions and setters are only accessible internally to ensure integrity.
+///     A representation of data nodes within a DynamicDrawSystem. <para />
+///     Because they are created at any point in time based off <see cref="DynamicFolder{T}"/>'s 'EnsureLeaves' method,
+///     There is no distinct ID bound to a leaf. <para />
+///     Instead, its purpose is to hold the reference to its parents, it's name, and its data.
 /// </summary>
 public class DynamicLeaf<T> : IDynamicLeaf<T> where T : class
 {
     public DynamicFolder<T> Parent { get; internal set; }
-    public uint   ID        { get; }
     public T      Data      { get; internal set; }
     public string Name      { get; private set; }
-    public string FullPath  { get; private set; } = string.Empty;
+    public string FullPath  => $"{Parent.FullPath}/{Name}";
 
     // Only allow creation internally, ensuring integrity within the file system.
-    internal DynamicLeaf(DynamicFolder<T> parent, string name, T data, uint id)
+    internal DynamicLeaf(DynamicFolder<T> parent, string name, T data)
     {
         Parent = parent;
         Data = data;
         Name = name.FixName();
-        ID = id;
-        UpdateFullPath();
     }
-
-    public bool IsRoot 
-        => false;
 
     public IReadOnlyList<IDynamicCollection<T>> GetAncestors()
     {
@@ -37,15 +33,12 @@ public class DynamicLeaf<T> : IDynamicLeaf<T> where T : class
         return ancestors;
     }
 
-    public override string ToString()
-        => Name;
-
     internal void SetParent(DynamicFolder<T> parent)
         => Parent = parent;
 
     internal void SetName(string name, bool fix)
         => Name = fix ? name.FixName() : name;
 
-    internal void UpdateFullPath()
-        => FullPath = $"{Parent.FullPath}/{Name}";
+    public override string ToString()
+        => Name;
 }

@@ -39,32 +39,6 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         DrawSystem.Changed -= OnDrawSystemChange;
     }
 
-    // Rework these... heavily. Lol, Total visual overhaul required.
-    protected virtual float FilterButtonsWidth(float width) => width;
-    protected virtual void DrawCustomFilters()
-    { }
-
-    /// <summary>
-    ///     Overridable DynamicDrawer 'Header' Element. (Filter Search) <para />
-    ///     Not strictly required for a DynamicDrawer, but modifies what elements are displayed.
-    /// </summary>
-    public virtual void DrawFilter(float width)
-    {
-        using ImRaii.IEndObject group = ImRaii.Group();
-        float searchW = FilterButtonsWidth(width);
-        string tmp = Filter;
-
-        if (FancySearchBar.Draw("Filter", width, ref tmp, string.Empty, 128, width - searchW, DrawCustomFilters))
-        {
-            if (!string.Equals(tmp, Filter, StringComparison.Ordinal))
-                MarkCacheDirty();
-        }
-
-        // could maybe add inline button context here but not really that sure. Think about it later.
-
-        // Draw popup context here for some filter button interactions, but can handle it otherwise later if needed.
-    }
-
     public void DrawContents(float width)
     {
         DrawContentsInternal(width);
@@ -95,6 +69,12 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
 
         // Apply the filter to generate the cache, if dirty.
         ApplyFilters();
+
+        // Draw a debug of the cached node contents.
+        ImGui.Text("FlatList Count: " + _nodeCacheFlat.Count);
+        ImGui.Text("CachedNode Dirty: " + _cacheDirty);
+        ImGui.Text("DrawSystem Node Count: " + DrawSystem.Root.TotalChildren);
+
         // We can update this as we develop further, fine tuning errors where we see them,
         // such as the above style interfering with drawn entities and such.
         DrawAll(flags);

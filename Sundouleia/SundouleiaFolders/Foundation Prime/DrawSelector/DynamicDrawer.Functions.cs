@@ -63,7 +63,7 @@ public partial class DynamicDrawer<T>
     {
         var parentFolders = entity.GetAncestors();
         foreach (var folder in parentFolders)
-            DrawSystem.SetFolderOpenState(folder, true);
+            DrawSystem.SetOpenState(folder, true);
 
         return true;
     }

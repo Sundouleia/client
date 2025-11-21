@@ -3,35 +3,37 @@ using Dalamud.Interface;
 namespace Sundouleia.DrawSystem;
 
 /// <summary>
-///     Publicly accessible Folder for a DynamicDrawSystem node. <para />
-///     All functions and setters are only accessible internally to ensure integrity.
+///     A folder serves as a reference for all generated leaves within it. Refreshed with a refresh call. <para />
+///     Serves as a base class for others to be built upon.
 /// </summary>
-public class DynamicFolder<T> : IDynamicFolder<T> where T : class
+public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
 {
+    private Dictionary<T, DynamicLeaf<T>> _map = new();
+
     public DynamicFolderGroup<T> Parent { get; internal set; }
-    public uint ID { get; }
-    public string Name { get; internal set; }
-    public string FullPath { get; internal set; } = string.Empty;
-    public FolderFlags Flags { get; internal set; } = FolderFlags.None;
+    public uint        ID       { get; internal set; }
+    public string      Name     { get; internal set; }
+    public string      FullPath { get; internal set; } = string.Empty;
+    public FolderFlags Flags    { get; private set; } = FolderFlags.None;
 
     // Stylizations.
-    public uint NameColor { get; internal set; } = uint.MaxValue;
-    public FAI Icon { get; internal set; } = FAI.Folder;
-    public uint IconColor { get; internal set; } = uint.MaxValue;
-    public uint BgColor { get; internal set; } = uint.MinValue;
-    public uint BorderColor { get; internal set; } = uint.MaxValue;
-    public uint GradientColor { get; internal set; } = ColorHelpers.Fade(uint.MaxValue, .9f);
+    // (Can be protected as the cached folder uses the base refernece)
+    public uint NameColor     { get; protected set; } = uint.MaxValue;
+    public FAI  Icon          { get; protected set; } = FAI.Folder;
+    public uint IconColor     { get; protected set; } = uint.MaxValue;
+    public uint BgColor       { get; protected set; } = uint.MinValue;
+    public uint BorderColor   { get; protected set; } = uint.MaxValue;
+    public uint GradientColor { get; protected set; } = ColorHelpers.Fade(uint.MaxValue, .9f);
 
-    // maybe make readonly.
     internal List<ISortMethod<T>> Sorter = [];
-    internal List<DynamicLeaf<T>> Children = [];
+    internal List<DynamicLeaf<T>> Children { get; private set; } = [];
 
     public DynamicFolder(DynamicFolderGroup<T> parent, FAI icon, string name, uint id)
     {
+        ID = id;
         Parent = parent;
         Icon = icon;
         Name = name.FixName();
-        ID = id;
         UpdateFullPath();
     }
 
@@ -42,16 +44,13 @@ public class DynamicFolder<T> : IDynamicFolder<T> where T : class
         => Children.Count;
 
     public bool IsRoot
-        => ID == 0;
+        => false;
 
     public bool IsOpen
         => Flags.HasAny(FolderFlags.Expanded);
 
     public bool ShowIfEmpty
         => Flags.HasAny(FolderFlags.ShowIfEmpty);
-
-    public override string ToString()
-        => Name;
 
     public IReadOnlyList<IDynamicCollection<T>> GetAncestors()
     {
@@ -65,13 +64,44 @@ public class DynamicFolder<T> : IDynamicFolder<T> where T : class
         return ancestors;
     }
 
+    // Internal Helpers.
+    internal bool Update(NameComparer comparer, out List<DynamicLeaf<T>> removed)
+    {
+        removed = [];
+        var latest = GetAllItems();
+
+        // Remove items no longer present.
+        foreach (var key in _map.Keys.ToList())
+        {
+            if (!latest.Contains(key))
+            {
+                removed.Add(_map[key]);
+                _map.Remove(key);
+            }
+        }
+
+        // Add the new items that were not present before.
+        foreach (var item in latest)
+        {
+            if (!_map.ContainsKey(item))
+                _map[item] = ToLeaf(item);
+        }
+
+        // Update the items.
+        Children = _map.Values.OrderBy(x => x, comparer).ToList();
+        return removed.Any();
+    }
+
     internal void SetParent(DynamicFolderGroup<T> parent)
-    => Parent = parent;
+    {
+        Parent = parent;
+        UpdateFullPath();
+    }
 
     internal void SetName(string name, bool fix)
         => Name = fix ? name.FixName() : name;
 
-    internal void SortChildren(NameComparer comparer)
+    internal void Sort(NameComparer comparer)
         => Children.Sort(comparer);
 
     internal void SetIsOpen(bool value)
@@ -89,4 +119,19 @@ public class DynamicFolder<T> : IDynamicFolder<T> where T : class
         // build the string and update it.
         FullPath = sb.ToString();
     }
+
+    /// <summary>
+    ///     Abstract method to obtain all items for the folder.
+    /// </summary>
+    protected abstract IReadOnlyList<T> GetAllItems();
+
+    /// <summary>
+    ///     Abstract method to determine how leaves are generated for this folder. <para />
+    ///     You can technically break the hierarchy if you set the parent to anything 
+    ///     but this folder's parent, so dont do that.
+    /// </summary>
+    protected abstract DynamicLeaf<T> ToLeaf(T item);
+
+    public override string ToString()
+        => Name;
 }

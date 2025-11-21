@@ -38,7 +38,6 @@ public interface IDynamicFolderGroup<T> : IDynamicCollection<T> where T : class
 ///     Public accessor for a folder inside a DynamicDrawSystem. <para />
 ///     Children are always <see cref="IDynamicLeaf{T}"/>s.
 /// </summary>
-/// <typeparam name="T"> The data type contained within the leaves of this folder. </typeparam>
 public interface IDynamicFolder<T> : IDynamicCollection<T> where T : class
 {
     /// <summary>
@@ -64,6 +63,12 @@ public interface IDynamicCollection<T> : IDynamicNode<T> where T : class
     ///     The parent folder of this folder.
     /// </summary>
     public DynamicFolderGroup<T> Parent { get; }
+
+    /// <summary>
+    ///     Unique ID for a node in the DynamicDrawSystem. 
+    ///     Only really implemented for Folders, see how we can define uniqueness for leaves.
+    /// </summary>
+    public uint ID { get; }
 
     /// <summary>
     ///     Associated Flags.
@@ -104,6 +109,11 @@ public interface IDynamicCollection<T> : IDynamicNode<T> where T : class
     ///     How many child nodes are contained within the folder. (Does not include nested folder's children)
     /// </summary>
     public int TotalChildren { get; }
+
+    /// <summary>
+    ///     If this folder is the root folder. (Root has ID 0)
+    /// </summary>
+    public bool IsRoot { get; }
 
     /// <summary>
     ///     If the folder is expanded.
@@ -163,11 +173,6 @@ public interface IDynamicNode<T> : IDynamicNode where T : class
 public interface IDynamicNode
 {
     /// <summary>
-    ///     Unique ID for a node in the DynamicDrawSystem.
-    /// </summary>
-    public uint ID { get; }
-
-    /// <summary>
     ///     The Label associated with this node.
     /// </summary>
     public string Name { get; }
@@ -178,11 +183,4 @@ public interface IDynamicNode
     ///     <b>FolderCollections</b> split paths with '//', while <b>Folders</b> use '/'.
     /// </summary>
     public string FullPath { get; }
-
-    // Depth was here, we can insert it if necessary for line indentations.
-
-    /// <summary>
-    ///     If this folder is the root folder. (Root has ID 0)
-    /// </summary>
-    public bool IsRoot { get; }
 }

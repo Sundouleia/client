@@ -50,7 +50,7 @@ public partial class DynamicDrawer<T>
     ///     Labels are to be defined by the draw function call method.
     /// </summary>
     /// <param name="path"> The Entity being handled as a drag-drop source. </param>
-    private void AsDragDropSource(IDynamicNode<T> entity)
+    protected void AsDragDropSource(IDynamicNode<T> entity)
     {
         using var source = ImUtf8.DragDropSource();
         if (!source)
@@ -69,7 +69,7 @@ public partial class DynamicDrawer<T>
             : $"Moving ...\n\t - {string.Join("\n\t - ", _dragDropCache.Entities.Select(i => i.Name))}");
     }
 
-    private void AsDragDropTarget(IDynamicNode<T> entity)
+    protected void AsDragDropTarget(IDynamicNode<T> entity)
     {
         using var target = ImRaii.DragDropTarget();
         if (!target)
@@ -90,6 +90,10 @@ public partial class DynamicDrawer<T>
     private void ProcessTransfer(List<IDynamicNode<T>> entities, IDynamicNode<T> target)
     {
         Log.LogDebug($"[DynamicDrawer] Processing drag-drop transfer of {entities.Count} entities to target {target.FullPath}.");
+        // Disable all transfer for now.
+        return;
+
+
         // We need to handle transfer logic very carefully here, and need to account for certain cases:
         //  - Moved Leaves MUST resolve to another valid folder, and cannot be moved to a folder collection.
         //  - If the target is a folder, and the selection contains 1 or more folders, they must either be
@@ -139,9 +143,9 @@ public partial class DynamicDrawer<T>
         var movedFolders = entities.OfType<DynamicFolder<T>>().ToList();
         var movedLeaves = entities.OfType<DynamicLeaf<T>>().Where(l => !movedFolders.Contains(l.Parent)).ToList();
 
-        // Move all orphaned leaves.
-        foreach (var leaf in movedLeaves)
-            DrawSystem.Move(leaf, targetFolder);
+        // Move all orphaned leaves. (handle differently, maybe abstraction)
+        //foreach (var leaf in movedLeaves)
+        //    DrawSystem.Move(leaf, targetFolder);
 
         // Now merge all folders into the target folder. (might want to make this configurable lol)
         foreach (var folder in movedFolders)

@@ -19,6 +19,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
     {
         Homepage,
         Requests,
+        NewWhitelist,
         Whitelist,
         Radar,
         RadarChat,
@@ -48,6 +49,8 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
 
         AddDrawButton(FontAwesomeIcon.Inbox, SelectedTab.Requests, "Incoming / Outgoing Requests",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
+        
+        AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.NewWhitelist, "New Whitelist");
 
         AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.Whitelist, "User Whitelist", 
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Whitelist, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
@@ -90,16 +93,14 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
     protected override void DrawTabButton(TabButtonDefinition tab, Vector2 buttonSize, Vector2 spacing, ImDrawListPtr drawList)
     {
         var x = ImGui.GetCursorScreenPos();
-
         var isDisabled = IsTabDisabled(tab.TargetTab);
+
+        using var id = ImRaii.PushId(tab.TargetTab.ToString());
         using (ImRaii.Disabled(isDisabled))
         {
-
             using (ImRaii.PushFont(UiBuilder.IconFont))
-            {
                 if (ImGui.Button(tab.Icon.ToIconString(), buttonSize))
                     TabSelection = tab.TargetTab;
-            }
 
             ImGui.SameLine();
             var xPost = ImGui.GetCursorScreenPos();

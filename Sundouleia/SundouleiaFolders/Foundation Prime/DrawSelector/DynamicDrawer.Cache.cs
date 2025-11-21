@@ -2,10 +2,12 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.DrawSystem.Selector;
 
-public partial class DynamicDrawer<T> where T : class
+public partial class DynamicDrawer<T>
 {
+    // As much as you want to split these into seperate classes for a filter and cache,
+    // keep them together for now to save your sanity and get something thatis functional first.
     private bool _cacheDirty = true;
-    private string _filter;
+    private string _filter = string.Empty;
     protected string Filter
     {
         get => _filter;

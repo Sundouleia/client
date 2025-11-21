@@ -1,5 +1,6 @@
 using CkCommons.Gui;
 using CkCommons.Raii;
+using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility;
@@ -28,18 +29,42 @@ public enum DynamicFlags : short
     GroupArranger = FolderToggle | SelectableFolders | MultiSelect | RangeSelect | DragDropFolders,
     GroupEditor = FolderToggle | SelectableLeaves | MultiSelect | RangeSelect | DragDropLeaves,
     AllEditor = FolderToggle | SelectableLeaves | MultiSelect | RangeSelect | DragDropLeaves | CopyDrag | TrashDrop,
-
+    DragDrop = DragDropFolders | DragDropLeaves,
 }
 
 // Handles the current draw state, and inner functions for drawing entities.
 // This is also where a majority of customization points are exposed.
 public partial class DynamicDrawer<T>
 {
-    /// <summary> If the actual Folder part of Root should be visible. (Children show regardless) </summary>
-    protected virtual bool ShowRootFolder => false;
- 
+    #region TO_REWORK_SEARCHBAR
+    // The below functions will be reworked later.
+    // Draws out the entire filter row.
+    public void DrawFilterRow(float width, int length)
+    {
+        using (ImRaii.Group())
+            DrawSearchBar(width, length);
+        PostSearchBar();
+    }
+
+    /// <summary>
+    ///     Overridable DynamicDrawer 'Header' Element. (Filter Search) <para />
+    ///     By default, no additional options are shown outside of the search filter.
+    /// </summary>
+    protected virtual void DrawSearchBar(float width, int length)
+    {
+        string tmp = Filter;
+        if (FancySearchBar.Draw("Filter", width, ref tmp, string.Empty, length))
+            if (string.Equals(tmp, Filter, StringComparison.Ordinal))
+                Filter = tmp; // Auto-Marks as dirty.
+    }
+
+    protected virtual void PostSearchBar()
+    { }
+
+    #endregion TO_REWORK_SEARCHBAR
+
     // Generic drawer, used across all of sundouleia's needs.
-    public void DrawAll(DynamicFlags flags = DynamicFlags.BasicViewFolder)
+    public void DrawAll(DynamicFlags flags)
     {
         // Note that, it is very, very possible that all of this could go horribly wrong with nested clipping,
         // so we will definitely need to experiment a bit with optimizing where to place our clippers,
@@ -53,6 +78,16 @@ public partial class DynamicDrawer<T>
         DrawCachedFolderNode(_nodeCache, flags);
     }
 
+    public void DrawFolder(string folderName, DynamicFlags flags)
+    {
+        // Locate the item in the dictionary to draw.
+        if (!DrawSystem.TryGetFolder(folderName, out var folder))
+            return;
+        // Otherwise, Draw the folder found within the cache.
+        // (Requires revision of cache to do this, return to later)
+    }
+
+    // The shell of the drawn structure. Return to this later.
     private void DrawCachedFolderNode(ICachedFolderNode<T> cachedNode, DynamicFlags flags)
     {
         if (cachedNode is CachedFolderGroup<T> cfg)
@@ -61,8 +96,7 @@ public partial class DynamicDrawer<T>
             DrawCachedFolderNode(cf, flags);
     }
 
-    // Cached shells define the structure for how items are to be drawn, in which order.
-    // This part of the dynamic display cannot be overridden.
+    // The shell of the drawn structure. Return to this later.
     protected void DrawCachedFolderNode(CachedFolderGroup<T> cfg, DynamicFlags flags)
     {
         DrawFolderGroupBanner(cfg.Folder, flags, _hoveredNode == cfg.Folder || _selected.Contains(cfg.Folder));
@@ -73,8 +107,10 @@ public partial class DynamicDrawer<T>
         DrawFolderGroupFolders(cfg, flags);
     }
 
+    // The shell of the drawn structure. Return to this later.
     protected void DrawCachedFolderNode(CachedFolder<T> cf, DynamicFlags flags)
     {
+        // Maybe revise this to cache the selection state or whatever, if hovered ext, or maybe not.
         DrawFolderBanner(cf.Folder, flags, _hoveredNode == cf.Folder || _selected.Contains(cf.Folder));
         if (!cf.Folder.IsOpen)
             return;
@@ -83,20 +119,21 @@ public partial class DynamicDrawer<T>
         DrawFolderLeaves(cf, flags);
     }
 
+    // Overridable draw method for the folder display.
     protected virtual void DrawFolderGroupBanner(IDynamicFolderGroup<T> fg, DynamicFlags flags, bool selected)
     {
         var width = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
-        var bgCol = _hoveredNode == fg ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : fg.BgColor;
+        var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : fg.BgColor;
         // Display a framed child with stylizations based on the folders preferences.
         using var _ = CkRaii.FramedChildPaddedW($"dfg_{Label}_{fg.ID}", width, ImUtf8.FrameHeight, bgCol, fg.BorderColor, 5f, 1f);
             DrawFolderGroupBanner(fg, _.InnerRegion, flags);
     }
 
     // Where we draw the interactions area and the responses to said items, can be customized.
-    protected virtual void DrawFolderGroupBanner(IDynamicFolderGroup<T> fg, Vector2 innerRegion, DynamicFlags flags)
+    protected virtual void DrawFolderGroupBanner(IDynamicFolderGroup<T> fg, Vector2 region, DynamicFlags flags)
     {
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"{Label}_node_{fg.ID}", innerRegion);
+        ImGui.InvisibleButton($"{Label}_node_{fg.ID}", region);
         HandleInteraction(fg, flags);
 
         // Back to the start of the line, then draw the folder display contents.
@@ -127,10 +164,10 @@ public partial class DynamicDrawer<T>
             DrawFolderBannerInner(f, _.InnerRegion, flags);
     }
 
-    protected virtual void DrawFolderBannerInner(IDynamicFolder<T> f, Vector2 innerRegion, DynamicFlags flags)
+    protected virtual void DrawFolderBannerInner(IDynamicFolder<T> f, Vector2 region, DynamicFlags flags)
     {
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"{Label}_node_{f.ID}", innerRegion);
+        ImGui.InvisibleButton($"{Label}_node_{f.ID}", region);
         HandleInteraction(f, flags);
         // Back to the start of the line, then draw the folder display contents.
         ImGui.SameLine(pos.X);
@@ -166,14 +203,17 @@ public partial class DynamicDrawer<T>
         var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
 
         using (var _ = CkRaii.Child(Label + leaf.Name, size, bgCol, 5f))
-        {
-            var pos = ImGui.GetCursorPos();
-            ImGui.InvisibleButton($"{Label}_node_{leaf.ID}", _.InnerRegion);
-            HandleInteraction(leaf, flags);
+            DrawLeafInner(leaf, _.InnerRegion, flags);
+    }
 
-            ImGui.SameLine(pos.X);
-            CkGui.TextFrameAligned(leaf.Name);
-        }
+    protected virtual void DrawLeafInner(IDynamicLeaf<T> leaf, Vector2 region, DynamicFlags flags)
+    {
+        var pos = ImGui.GetCursorPos();
+        ImGui.InvisibleButton($"{Label}_node_{leaf.Name}", region);
+        HandleInteraction(leaf, flags);
+
+        ImGui.SameLine(pos.X);
+        CkGui.TextFrameAligned(leaf.Name);
     }
 
     private void HandleMainContextActions()
@@ -193,7 +233,11 @@ public partial class DynamicDrawer<T>
         //RightClickMainContext();
     }
 
-    // Interaction Handling.
+    /// <summary>
+    ///     Interaction Handling for nodes. Directing the flow of most updates
+    ///     in the DrawSystem. <para />
+    ///     <b> Override with Caution, and only if you know what you're doing. </b>
+    /// </summary>
     protected void HandleInteraction(IDynamicCollection<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
@@ -202,7 +246,7 @@ public partial class DynamicDrawer<T>
         // Handle Folder Toggle.
         if (flags.HasAny(DynamicFlags.FolderToggle) && clicked)
         {
-            DrawSystem.SetFolderOpenState(node, !node.IsOpen);
+            DrawSystem.SetOpenState(node, !node.IsOpen);
             // Might want to append / remove the descendants here after changing the state.
         }
         // Handle Selection.
@@ -217,7 +261,12 @@ public partial class DynamicDrawer<T>
         }
     }
 
-    protected void HandleInteraction(IDynamicLeaf<T> node, DynamicFlags flags)
+    /// <summary>
+    ///     Interaction Handling for nodes. Directing the flow of most updates
+    ///     in the DrawSystem. <para />
+    ///     <b> Override with Caution, and only if you know what you're doing. </b>
+    /// </summary>
+    protected virtual void HandleInteraction(IDynamicLeaf<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
             _hoveredNode = node;

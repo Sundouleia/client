@@ -1,9 +1,9 @@
 namespace Sundouleia.DrawSystem;
 
 // the internal, private operations for the dynamic file system.
-public partial class DynamicDrawSystem<T> where T : class
+public partial class DynamicDrawSystem<T>
 {
-    private enum Result
+    protected enum Result
     {
         Success,
         SuccessNothingDone,
@@ -39,7 +39,7 @@ public partial class DynamicDrawSystem<T> where T : class
 
         // Otherwise, rename the child and return success.
         leaf.SetName(newName, false);
-        leaf.Parent.SortChildren(_nameComparer);
+        leaf.Parent.Sort(_nameComparer);
         return Result.Success;
     }
 
@@ -76,38 +76,6 @@ public partial class DynamicDrawSystem<T> where T : class
         {
             return Result.InvalidOperation;
         }
-    }
-
-    /// <summary>
-    ///     Try to move a leaf to a new parent Folder, and renaming it if requested. <para />
-    /// </summary>
-    /// <remarks>
-    ///     <see cref="Result.ItemExists"/> is returned if moving a <see cref="Leaf"/> with 
-    ///     <see cref="Leaf.Data"/> that exists in any child of <paramref name="newParent"/>.
-    /// </remarks>
-    private Result MoveLeaf(DynamicLeaf<T> leaf, DynamicFolder<T> newParent, out DynamicFolder<T> oldParent, string? newName = null)
-    {
-        // store the current old parent of the leaf.
-        oldParent = leaf.Parent;
-        // If the parents are the same, return either that nothing we done, or perform a rename.
-        if (newParent == oldParent)
-            return newName == null ? Result.SuccessNothingDone : RenameLeaf(leaf, newName);
-
-        // obtain the true newName.
-        var actualNewName = newName?.FixName() ?? leaf.Name;
-        // prevent the move if anything under the new folder contains a leaf with the same name.
-        if (Search(newParent, actualNewName) >= 0)
-            return Result.ItemExists;
-
-        // Second Pass, ensure no duplicate data if the writeLeaf is a mapped Leaf
-        if (newParent.Children.Any(c => c.Data == leaf.Data))
-            return Result.ItemExists;
-
-        // Otherwise the move operation is valid, so remove the leaf from the old parent, and set it in the new one.
-        RemoveLeaf(leaf);
-        leaf.SetName(actualNewName, false);
-        AssignLeafInternal(newParent, leaf);
-        return Result.Success;
     }
 
     // Try to move a leaf to a new parent Folder, and renaming it if requested.
@@ -154,40 +122,26 @@ public partial class DynamicDrawSystem<T> where T : class
     /// <param name="fullPath"> the entity's FullPath variable, excluding root. </param>
     /// <param name="topFolder"> the topmost available folder or folder collection in the path.</param>
     /// <returns> The result of this function. </returns>
-    private Result CreateAllFolders(string fullPath, out IDynamicCollection<T> topFolder)
-        => CreateAllFoldersInternal(ParseSegments(fullPath), out topFolder);
-
-    private Result CreateAllFoldersInternal(List<(string Name, SegmentType Type)> segments, out IDynamicCollection<T> topFolder)
+    private Result CreateAllGroups(string fullPath, out DynamicFolderGroup<T> topFolder)
     {
-        topFolder = Root;
+        topFolder = root;
         Result res = Result.SuccessNothingDone;
 
-        foreach (var segment in segments)
+        string[] parts = fullPath.Split("//", StringSplitOptions.RemoveEmptyEntries);
+        // Process each part of the path, creating a folder group for each, branching out from root.
+        foreach (var segment in parts)
         {
-            // If the segment type if leaf, or the last entry is [folder], we know we hit the end, so break.
-            if (segment.Type is SegmentType.Leaf || topFolder is not DynamicFolderGroup<T> group)
-                break;
-
-            IDynamicCollection<T> folder = segment.Type is SegmentType.FolderCollection
-                ? new DynamicFolderGroup<T>(group, FAI.FolderTree, segment.Name, _idCounter + 1u)
-                : new DynamicFolder<T>(group, FAI.Folder, segment.Name, _idCounter + 1u);
-
-            // Attempt to assign the folder.
-            var assignRet = AssignFolder(group, folder, out int idx);
-            // Sanity check against existing entries to early break if necessary.
-            if (assignRet is Result.ItemExists)
+            var folder = new DynamicFolderGroup<T>(topFolder, FAI.FolderTree, segment, idCounter + 1u);
+            // If we were able to successfully assign the folder, then update topFolder and res.
+            if (AssignFolder(topFolder, folder) is Result.ItemExists)
             {
-                // If there was a child with the same name, stop here.
-                if (group.Children[idx] is not IDynamicCollection<T> f)
-                    return Result.ItemExists;
-
-                // Otherwise, update the top folder to this folder (which already existed, so dont inc ID)
-                topFolder = f;
+                // If it already exists, then we can skip incrementing the id and just update topFolder.
+                topFolder = folder;
             }
             // Otherwise, it is a new folder to be added, so inc ID, update res, and set topFolder.
             else
             {
-                ++_idCounter;
+                ++idCounter;
                 res = Result.Success;
                 topFolder = folder;
             }
@@ -197,192 +151,119 @@ public partial class DynamicDrawSystem<T> where T : class
         return res;
     }
 
-    private Result CreateAllFoldersAndFile(string path, out IDynamicCollection<T> topFolder, out string fileName)
+    private Result AssignFolder(DynamicFolderGroup<T> parent, DynamicFolder<T> folder)
     {
-        topFolder = Root;
-        fileName = string.Empty;
-        // Exit if no path.
-        if (path.Length is 0)
-            return Result.SuccessNothingDone;
-
-        // If the final path was in root, just return that
-        // (or maybe dont since we dont want to allow a leaf there. IDK)
-        var segments = ParseSegments(path);
-        if (segments.Count is 1)
-        {
-            fileName = segments[0].Name;
-            return Result.SuccessNothingDone;
-        }
-
-        // Otherwise, create all folders for these segments. (May need to adjust this in cases where it
-        // identifies segments[^1] as a non-leaf or something. IDK.
-        fileName = segments[^1].Name;
-        return CreateAllFoldersInternal(segments, out topFolder);
-    }
-
-    /// <summary>
-    ///     Adds a leaf to a parent folder.
-    /// </summary>
-    private Result AssignLeaf(DynamicFolder<T> parent, DynamicLeaf<T> child)
-    {
-        // Ensure the item does not exist before calling the inner Method.
-        if (Search(parent, child.Name) >= 0)
+        if (Search(parent, folder.Name) >= 0)
             return Result.ItemExists;
-        // Assign it.
-        AssignLeafInternal(parent, child);
-        return Result.Success;
-    }
-
-    /// <summary>
-    ///     Add leaf and update that leaf's parent, then sort the parents children. <para />
-    ///     This is all done without search checks.
-    /// </summary>
-    internal void AssignLeafInternal(DynamicFolder<T> parent, DynamicLeaf<T> entity)
-    {
-        parent.Children.Add(entity);
-        entity.Parent = parent;
-        entity.UpdateFullPath();
+        // Otherwise, assign it.
+        parent.Children.Add(folder);
+        folder.Parent = parent;
+        folder.UpdateFullPath();
         parent.SortChildren(_nameComparer);
-        // Can re-add updating the parent's parent up to root here if needed.
-    }
-
-    internal void AssignFolder(DynamicFolderGroup<T> parent, IDynamicCollection<T> folder)
-    {
-        if (folder is DynamicFolderGroup<T> fc)
-        {
-            parent.Children.Add(fc);
-            fc.Parent = parent;
-            fc.UpdateFullPath();
-            parent.SortChildren(_nameComparer);
-        }
-        else if (folder is DynamicFolder<T> f)
-        {
-            parent.Children.Add(f);
-            f.Parent = parent;
-            f.UpdateFullPath();
-            parent.SortChildren(_nameComparer);
-        }
-    }
-
-    // Add a folder to its parent FolderCollection, and out the new idx.
-    // Aim to phase out IDX
-    private Result AssignFolder(DynamicFolderGroup<T> parent, IDynamicCollection<T> folder, out int idx)
-    {
-        if (folder is DynamicFolderGroup<T> fc)
-        {
-            idx = Search(parent, fc.Name);
-            if (idx >= 0)
-                return Result.ItemExists;
-            idx = ~idx;
-            AssignFolder(parent, fc);
-            return Result.Success;
-        }
-        else if (folder is DynamicFolder<T> f)
-        {
-            idx = Search(parent, f.Name);
-            if (idx >= 0)
-                return Result.ItemExists;
-            idx = ~idx;
-            AssignFolder(parent, f);
-            return Result.Success;
-        }
-
-        idx = Search(parent, folder.Name);
-        if (idx >= 0)
-            return Result.ItemExists;
-        idx = ~idx;
-        AssignFolder(parent, folder);
         return Result.Success;
     }
 
-    /// <summary>
-    ///     Removes a leaf from its parent folder. <see cref="DynamicLeaf{T}.Parent"/> remains unchanged.
-    /// </summary>
-    private Result RemoveLeaf(DynamicLeaf<T> leaf)
+    private Result AssignFolder(DynamicFolderGroup<T> parent, DynamicFolderGroup<T> folder)
     {
-        // If the leaf doesn't exist in the folder, the operation was valid, but nothing happened.
-        var idx = Search(leaf.Parent, leaf.Name);
-        if (idx < 0)
-            return Result.SuccessNothingDone;
-        // Otherwise, remove it at the found index.
-        leaf.Parent.Children.RemoveAt(idx);
-        // something about updating parent folder location should go here.
+        if (Search(parent, folder.Name) >= 0)
+            return Result.ItemExists;
+        // Otherwise, assign it.
+        parent.Children.Add(folder);
+        folder.Parent = parent;
+        folder.UpdateFullPath();
+        parent.SortChildren(_nameComparer);
         return Result.Success;
     }
 
     private Result RemoveFolder(IDynamicCollection<T> folder)
-    {
-        if (folder is DynamicFolderGroup<T> fc && !fc.IsRoot)
+        => folder switch
         {
-            var idx = Search(fc.Parent, fc.Name);
-            if (idx < 0)
-                return Result.SuccessNothingDone;
+            DynamicFolderGroup<T> fg => RemoveFolder(fg),
+            DynamicFolder<T> f => RemoveFolder(f),
+            _ => Result.InvalidOperation
+        };
 
-            fc.Parent.Children.RemoveAt(idx);
-            return Result.Success;
-        }
-        else if (folder is DynamicFolder<T> f)
-        {
-            var idx = Search(f.Parent, f.Name);
-            if (idx < 0)
-                return Result.SuccessNothingDone;
-            f.Parent.Children.RemoveAt(idx);
-            return Result.Success;
-        }
-        else
-        {
-            return Result.InvalidOperation;
-        }
-    }
-
-    /// <summary> 
-    ///     Attempts to merge all leaves in <paramref name="from"/> into <paramref name="to"/>. <para />
-    ///     <b> NOTICE: </b>
-    ///     Because mapped <typeparamref name="T"/> objects can associate with one or more leaves, leaves
-    ///     containing data that <paramref name="to"/>'s leaves already map are ignored.
-    /// </summary>
-    private Result MergeFolders(DynamicFolder<T> from, DynamicFolder<T> to)
+    private Result RemoveFolder(DynamicFolder<T> folder)
     {
-        // if the collections are the same, fail.
-        if (from == to)
+        var idx = Search(folder.Parent, folder.Name);
+        if (idx < 0)
             return Result.SuccessNothingDone;
-        // If we are moving from root, fail.
-        if (from.Name.Length is 0)
+        folder.Parent.Children.RemoveAt(idx);
+        // Remove it from the mapping.
+        _folderMap.Remove(folder.Name);
+        // Return successful removal.
+        return Result.Success;
+    }
+
+    private Result RemoveFolder(DynamicFolderGroup<T> folder)
+    {
+        if (folder.IsRoot)
             return Result.InvalidOperation;
 
-        // Otherwise we can proceed to merge.
-        var result = from.TotalChildren is 0 ? Result.Success : Result.NoSuccess;
-        // iterate through the children and move them.
-        for (var i = 0; i < from.TotalChildren;)
-        {
-            var moveRet = MoveLeaf(from.Children[i], to, out _);
-            // If the move was successful,
-            if (moveRet is Result.Success)
-            {
-                // If previous result was NoSuccess, check if this is the first item
-                if (result == Result.NoSuccess)
-                    result = (i == 0) ? Result.Success : Result.PartialSuccess;
-                // Otherwise keep the existing result if not (should be partial success)
-
-                // We moved a child folder out of the list we are iterating through, so dont inc i.
-                // Next child is at current index
-            }
-            else
-            {
-                // Move failed, increment index
-                i++;
-                // Bump success down to partial success, if we were currently set to success.
-                if (result is Result.Success)
-                    result = Result.PartialSuccess;
-            }
-        }
-
-        // return the final result. If it was successful, remove the old folder.
-        if (result is Result.Success)
-            RemoveFolder(from);
-
-        return result;
+        var idx = Search(folder.Parent, folder.Name);
+        if (idx < 0)
+            return Result.SuccessNothingDone;
+        // Remove the folder from the parent & map.
+        folder.Parent.Children.RemoveAt(idx);
+        _folderMap.Remove(folder.Name);
+        // Maybe move all child folders up to the current folder
+        // location, (TODO)
+        return Result.Success;
     }
+
+    /// <summary>
+    ///     Abstract method for folder merging used typically by drag-drop or dissolve operations. <para />
+    ///     Because the folders are abstract, their merge method must also be defined in the 
+    ///     DrawSystem parent, so that by the time MergeFolders is finished, the next refresh 
+    ///     of <paramref name="to"/> will contain the items in <paramref name="from"/>
+    /// </summary>
+    /// <param name="from"> the folder being merged. </param>
+    /// <param name="to"> the folder all items should be in after the function call. </param>
+    protected virtual Result MergeFolders(DynamicFolder<T> from, DynamicFolder<T> to)
+        => Result.Success; // Make abstract after initial testing.
+
+    //private Result MergeFolders(DynamicFolder<T> from, DynamicFolder<T> to)
+    //{
+    //    // if the collections are the same, fail.
+    //    if (from == to)
+    //        return Result.SuccessNothingDone;
+    //    // If we are moving from root, fail.
+    //    if (from.Name.Length is 0)
+    //        return Result.InvalidOperation;
+
+    //    // Otherwise we can proceed to merge.
+    //    var result = from.TotalChildren is 0 ? Result.Success : Result.NoSuccess;
+    //    // iterate through the children and move them.
+    //    for (var i = 0; i < from.TotalChildren;)
+    //    {
+    //        var moveRet = MoveLeaf(from.Children[i], to, out _);
+    //        // If the move was successful,
+    //        if (moveRet is Result.Success)
+    //        {
+    //            // If previous result was NoSuccess, check if this is the first item
+    //            if (result == Result.NoSuccess)
+    //                result = (i == 0) ? Result.Success : Result.PartialSuccess;
+    //            // Otherwise keep the existing result if not (should be partial success)
+
+    //            // We moved a child folder out of the list we are iterating through, so dont inc i.
+    //            // Next child is at current index
+    //        }
+    //        else
+    //        {
+    //            // Move failed, increment index
+    //            i++;
+    //            // Bump success down to partial success, if we were currently set to success.
+    //            if (result is Result.Success)
+    //                result = Result.PartialSuccess;
+    //        }
+    //    }
+
+    //    // return the final result. If it was successful, remove the old folder.
+    //    if (result is Result.Success)
+    //        RemoveFolder(from);
+
+    //    return result;
+    //}
 
 
     /// <summary> 
