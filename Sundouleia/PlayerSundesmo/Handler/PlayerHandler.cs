@@ -39,6 +39,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private Dictionary<string, VerifiedModFile> _replacements = []; // Hash -> VerifiedFile with download link included if necessary.
     private Guid _tempProfile; // CPlus temp profile id.
     private IpcDataPlayerCache? _appearanceData = null;
+    private readonly SemaphoreSlim _dataLock = new(1, 1);
 
     public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
         FileCacheManager fileCache, FileDownloader downloads, CharaObjectWatcher watcher, IpcManager ipc)
@@ -143,18 +144,29 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     private async Task ReInitializeInternal()
     {
-        // Create/Assign this ObjectIdx to the Penumbra Temp Collection if necessary.
-        await TryCreateAssignTempCollection().ConfigureAwait(false);
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // Create/Assign this ObjectIdx to the Penumbra Temp Collection if necessary.
+            await TryCreateAssignTempCollection().ConfigureAwait(false);
 
-        // If they are online and have alterations, reapply them. Otherwise, exit.
-        if (!Sundesmo.IsOnline || !HasAlterations) 
-            return;
+            // If they are online and have alterations, reapply them. Otherwise, exit.
+            if (!Sundesmo.IsOnline || !HasAlterations)
+            {
+                Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] reinit skipped: IsOnline: {Sundesmo.IsOnline}, HasAlterations: {HasAlterations}.", LoggerType.PairHandler);
+                return;
+            }
 
-        // Await until we know the player has absolutely finished loading in.
-        await WaitUntilValidDrawObject().ConfigureAwait(false);
+            // Await until we know the player has absolutely finished loading in.
+            await WaitUntilValidDrawObject().ConfigureAwait(false);
 
-        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
-        await ReapplyAlterations().ConfigureAwait(false);
+            Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
+            await ReapplyAlterationsInternal().ConfigureAwait(false);
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
     }
 
     /// <summary>
@@ -222,20 +234,41 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     /// </summary>
     public async Task RevertRenderedAlterations(CancellationToken ct = default)
     {
-        // Revert any C+ Data if we have any.
-        if (_tempProfile != Guid.Empty)
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-            _tempProfile = Guid.Empty;
+            // Revert any C+ Data if we have any.
+            if (_tempProfile != Guid.Empty)
+            {
+                await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+                _tempProfile = Guid.Empty;
+            }
+            // Revert based on rendered state.
+            if (IsRendered)
+                await RevertAlterationsInternal(Sundesmo.GetNickAliasOrUid(), NameString, Address, ObjIndex, ct).ConfigureAwait(false);
+            else if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
+                await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
         }
-        // Revert based on rendered state.
-        if (IsRendered)
-            await RevertAlterations(Sundesmo.GetNickAliasOrUid(), NameString, Address, ObjIndex, ct).ConfigureAwait(false);
-        else if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
-            await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
+        finally
+        {
+            _dataLock.Release();
+        }
     }
 
     public async Task RevertAlterations(string aliasOrUid, string name, IntPtr address, ushort objIdx, CancellationToken token)
+    {
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await RevertAlterationsInternal(aliasOrUid, name, address, objIdx, token).ConfigureAwait(false);
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
+    }
+
+    private async Task RevertAlterationsInternal(string aliasOrUid, string name, IntPtr address, ushort objIdx, CancellationToken token)
     {
         if (address == IntPtr.Zero)
             return;
@@ -255,52 +288,96 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     // Don't entirely need to await this, but its an option we want it i guess.
     public async Task UpdateAndApplyAlterations(NewModUpdates modChanges, IpcDataPlayerUpdate ipcChanges, bool isInitialData)
     {
-        // If initial data, clear replacements and appearance data.
-        if (isInitialData)
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            _replacements.Clear();
-            _appearanceData = null;
-        }
+            // If initial data, clear replacements and appearance data.
+            if (isInitialData)
+            {
+                _replacements.Clear();
+                _appearanceData = null;
+            }
 
-        // Update Data.
-        var visualDiff = UpdateDataIpc(ipcChanges);
-        var modDiff = UpdateDataMods(modChanges);
-        // Apply Changes if necessary.
-        await ApplyAlterations(visualDiff, modDiff).ConfigureAwait(false);
+            // Update Data.
+            var visualDiff = UpdateDataIpc(ipcChanges);
+            var modDiff = UpdateDataMods(modChanges);
+            // Apply Changes if necessary.
+            await ApplyAlterations(visualDiff, modDiff).ConfigureAwait(false);
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
     }
 
     public async Task UpdateAndApplyMods(NewModUpdates modChanges, string manipString)
     {
-        bool needsRedraw = false;
-        // Update the manipString, and apply if changes occurred.
-        if (!string.IsNullOrEmpty(manipString))
-            if (UpdateDataIpc(IpcKind.ModManips, manipString))
-                needsRedraw |= await ApplyVisualsSingle(IpcKind.ModManips).ConfigureAwait(false);
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            bool needsRedraw = false;
+            // Update the manipString, and apply if changes occurred.
+            if (!string.IsNullOrEmpty(manipString))
+                if (UpdateDataIpc(IpcKind.ModManips, manipString))
+                    needsRedraw |= await ApplyVisualsSingle(IpcKind.ModManips).ConfigureAwait(false);
 
-        // Update the mod data, and apply if changes occurred.
-        if (UpdateDataMods(modChanges))
-            needsRedraw |= await ApplyMods().ConfigureAwait(false);
+            // Update the mod data, and apply if changes occurred.
+            if (UpdateDataMods(modChanges))
+                needsRedraw |= await ApplyMods().ConfigureAwait(false);
 
-        ConditionalRedraw(needsRedraw);
+            ConditionalRedraw(needsRedraw);
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
     }
 
     public async Task UpdateAndApplyIpc(IpcDataPlayerUpdate ipcChanges)
     {
-        var visualDiff = UpdateDataIpc(ipcChanges);
-        if (visualDiff is IpcKind.None)
-            return;
-        // Apply changes.
-        ConditionalRedraw(await ApplyVisuals(visualDiff).ConfigureAwait(false));
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var visualDiff = UpdateDataIpc(ipcChanges);
+            if (visualDiff is IpcKind.None)
+                return;
+            // Apply changes.
+            ConditionalRedraw(await ApplyVisuals(visualDiff).ConfigureAwait(false));
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
     }
 
     public async Task UpdateAndApplyIpc(IpcKind kind, string newData)
     {
-        if (!UpdateDataIpc(kind, newData))
-            return;
-        // Apply changes.
-        ConditionalRedraw(await ApplyVisualsSingle(kind).ConfigureAwait(false));
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (!UpdateDataIpc(kind, newData))
+                return;
+            // Apply changes.
+            ConditionalRedraw(await ApplyVisualsSingle(kind).ConfigureAwait(false));
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
     }
     public async Task ReapplyAlterations()
+    {
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await ReapplyAlterationsInternal();
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
+    }
+    private async Task ReapplyAlterationsInternal()
     {
         // Apply changes, then redraw if necessary.
         bool visualRedrawNeeded = await ReapplyVisuals().ConfigureAwait(false);
@@ -458,7 +535,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 // Recheck missing files.
                 missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _dlWaiterCTS.Token);
 
-                // Delay ~2s with ±15–20% random jitter to avoid synchronized polling
+                // Delay ~2s with ï¿½15ï¿½20% random jitter to avoid synchronized polling
                 var jitter = 0.15 + Random.Shared.NextDouble() * 0.05; // 0.15..0.20
                 if (Random.Shared.Next(2) == 0) jitter = -jitter;
                 var delay = TimeSpan.FromSeconds(2 * (1 + jitter));
