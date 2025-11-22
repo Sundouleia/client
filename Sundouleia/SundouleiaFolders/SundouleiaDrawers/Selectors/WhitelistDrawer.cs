@@ -19,7 +19,7 @@ using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem;
 
-public class WhitelistDrawer : DynamicDrawer<Sundesmo>
+public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
 {
     // Static tooltips for leaves.
     private static readonly string DragDropTooltip =
@@ -179,20 +179,10 @@ public class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private void DrawLeafInner(IDynamicLeaf<Sundesmo> leaf, Vector2 region, DynamicFlags flags, bool editing)
     {
         ImUtf8.SameLineInner();
-        // Icon display and tooltips.
-        var icon = leaf.Data.IsRendered ? FAI.Eye : FAI.User;
-        var col = leaf.Data.IsOnline ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        ImGui.AlignTextToFramePadding();
-        CkGui.IconText(icon, col);
-        CkGui.AttachToolTip($"{leaf.Data.GetNickAliasOrUid()} is " +
-            (leaf.Data.IsRendered ? $"visible ({leaf.Data.PlayerName})--SEP--Click to target this player"
-                          : leaf.Data.IsOnline ? "online" : "offline"));
-        // Target action if not for dragdrop and rendered.
-        if (!flags.HasAny(DynamicFlags.DragDropLeaves) && leaf.Data.IsRendered && ImGui.IsItemClicked())
-            _mediator.Publish(new TargetSundesmoMessage(leaf.Data));
-        
-        // Proceed to next space.
+        DrawLeftSide(leaf.Data, flags);
         ImGui.SameLine();
+        ImGui.SameLine();
+
         // Store current position, then draw the right side.
         var posX = ImGui.GetCursorPosX();
         var rightSide = DrawRightButtons(leaf, flags);
@@ -203,6 +193,17 @@ public class WhitelistDrawer : DynamicDrawer<Sundesmo>
             DrawNameEditor(leaf, region.X);
         else
             DrawNameDisplay(leaf, new(rightSide - posX, region.Y), flags);
+    }
+
+    private void DrawLeftSide(Sundesmo s, DynamicFlags flags)
+    {
+        var icon = s.IsRendered ? FAI.Eye : FAI.User;
+        var color = s.IsOnline ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        ImGui.AlignTextToFramePadding();
+        CkGui.IconText(icon, color);
+        CkGui.AttachToolTip(TooltipText(s));
+        if (!flags.HasAny(DynamicFlags.DragDropLeaves) && s.IsRendered && ImGui.IsItemClicked())
+            _mediator.Publish(new TargetSundesmoMessage(s));
     }
 
     private float DrawRightButtons(IDynamicLeaf<Sundesmo> leaf, DynamicFlags flags)
@@ -246,9 +247,8 @@ public class WhitelistDrawer : DynamicDrawer<Sundesmo>
     {
         // For handling Interactions.
         var pos = ImGui.GetCursorPos();
-        var pressed = ImGui.InvisibleButton($"{leaf.FullPath}-interactable", region);
+        ImGui.InvisibleButton($"{leaf.FullPath}-name-area", region);
         HandleInteraction(leaf, flags);
-        HandleClicks(leaf, flags);
 
         // Then return to the start position and draw out the text.
         ImGui.SameLine(pos.X);
@@ -291,22 +291,45 @@ public class WhitelistDrawer : DynamicDrawer<Sundesmo>
         }
     }
 
-    private void HandleClicks(IDynamicLeaf<Sundesmo> node, DynamicFlags flags)
+    protected override void HandleInteraction(IDynamicLeaf<Sundesmo> node, DynamicFlags flags)
     {
+        if (ImGui.IsItemHovered())
+            _newHoveredNode = node;
+        // Handle Drag and Drop.
         if (flags.HasAny(DynamicFlags.DragDropLeaves))
-            return;
-        // Additional, SundesmoLeaf-Spesific interaction handles.
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
         {
-            // Performs a toggle of state.
-            if (!_showingUID.Remove(node))
-                _showingUID.Add(node);
+            AsDragDropSource(node);
+            AsDragDropTarget(node);
         }
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
-            _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
-        if (KeyMonitor.ShiftPressed() && ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            _renaming = node;
+        else
+        {
+            // Additional, SundesmoLeaf-Spesific interaction handles.
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+            {
+                // Performs a toggle of state.
+                if (!_showingUID.Remove(node))
+                    _showingUID.Add(node);
+            }
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
+                _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
+            if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                _renaming = node;
+        }
+
+        // Handle Selection.
+        if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
+            SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
     }
+
+    private string TooltipText(Sundesmo s)
+    {
+        var str = $"{s.GetNickAliasOrUid()} is ";
+        if (s.IsRendered) str += $"visible ({s.PlayerName})--SEP--Click to target this player";
+        else if (s.IsOnline) str += "online";
+        else str += "offline";
+        return str;
+    }
+
     #endregion SundesmoLeaf
 
     #region Utility

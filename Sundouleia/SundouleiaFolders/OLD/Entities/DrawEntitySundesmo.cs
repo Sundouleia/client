@@ -125,8 +125,8 @@ public class DrawEntitySundesmo : IDrawEntity<Sundesmo>
         // Handle logic according to state.
         if (_parentFolder.Options.DragDropItems)
             AsDragDropSource();
-        else
-            HandleClickLogic();
+        //else
+        //    HandleClickLogic();
 
         // Return to the position and draw out the contents.
         ImGui.SameLine(pos.X);
@@ -135,8 +135,8 @@ public class DrawEntitySundesmo : IDrawEntity<Sundesmo>
         CkGui.AttachToolTip(_parentFolder.Options.DragDropItems ? DragDropTooltip : NormalTooltip, ImGuiColors.DalamudOrange);
         
         // handle hover logic if not a drag-drop item.
-        if (!_parentFolder.Options.DragDropItems)
-            HandleTextHoverLogic(ImGui.IsItemHovered());
+        //if (!_parentFolder.Options.DragDropItems)
+        //    HandleTextHoverLogic(ImGui.IsItemHovered());
 
         return pressed;
     }
@@ -161,7 +161,7 @@ public class DrawEntitySundesmo : IDrawEntity<Sundesmo>
 
     private void HandleTextHoverLogic(bool isHovered)
     {
-        if (isHovered)
+        if (isHovered) 
         {
             // If the profile is not shown, start the timer.
             if (!_popupProfileShown && _lastHoverTime is null)

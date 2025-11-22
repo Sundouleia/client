@@ -128,6 +128,10 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaLoc>()
 
         // Draw Systems
+        .AddSingleton<GroupsDrawer>()
+        .AddSingleton<RadarDrawer>()
+        .AddSingleton<RequestsDrawer>()
+        .AddSingleton<WhitelistDrawer>()
         .AddSingleton<GroupsDrawSystem>()
         .AddSingleton<RadarDrawSystem>()
         .AddSingleton<RequestsDrawSystem>()
@@ -238,10 +242,6 @@ public static class SundouleiaServiceExtensions
         .AddScoped<UiFactory>()
 
         // Scoped Drawers
-        .AddScoped<GroupsDrawer>()
-        .AddScoped<RadarDrawer>()
-        .AddScoped<RequestsDrawer>()
-        .AddScoped<WhitelistDrawer>()
 
         // Scoped Handlers
         .AddScoped<WindowMediatorSubscriberBase, PopupHandler>()

@@ -66,12 +66,9 @@ public partial class DynamicDrawer<T>
         {
             // Firstly, get if the folder itself is visible.
             visible |= IsVisible(fc.Folder);
-            Log.LogInformation($"FolderGroup [{fc.Folder.Name}] Visible: {visible}");
-
             // If the folder is opened, recursively process all children.
             if (fc.Folder.IsOpen)
             {
-                Log.LogInformation($"FolderGroup [{fc.Folder.Name}] is open, processing children.");
                 // Assume we are going to be appending child nodes.
                 var childNodes = new List<ICachedFolderNode<T>>();
                 // Iterate through each one, recursively building the caches.
@@ -90,17 +87,14 @@ public partial class DynamicDrawer<T>
                         childNodes.Add(innerCache);
                     }
                 }
-                Log.LogInformation($"FolderGroup [{fc.Folder.Name}] processed children, Any Visible: {visible}");
                 // Once processed, apply the sorter & update the cached children.
                 fc.Children = [.. ApplySorter(childNodes, fc.Folder.Sorter)];
             }
             // Otherwise, if closed, scan to see if any sub-nodes are visible.
             else
             {
-                Log.LogInformation($"FolderGroup [{fc.Folder.Name}] is closed, scanning for visible sub-nodes.");
                 // Scan to see if any sub-nodes are visible.
                 visible |= IsCollapsedNodeVisible(fc.Folder);
-                Log.LogInformation($"FolderGroup [{fc.Folder.Name}] collapsed scan, Any Visible: {visible}");
             }
         }
         // If the cached group is a Folder

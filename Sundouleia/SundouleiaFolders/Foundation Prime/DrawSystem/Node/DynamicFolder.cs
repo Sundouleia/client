@@ -100,7 +100,10 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
     }
 
     internal void SetName(string name, bool fix)
-        => Name = fix ? name.FixName() : name;
+    {
+        Name = fix ? name.FixName() : name;
+        UpdateFullPath();
+    }
 
     internal void Sort(NameComparer comparer)
         => Children.Sort(comparer);

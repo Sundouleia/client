@@ -222,7 +222,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
         // draw the popout button
         ImUtf8.SameLineInner();
-        if (CkGui.IconButton(FAI.Expand, disabled: disableInput || !KeyMonitor.ShiftPressed()))
+        if (CkGui.IconButton(FAI.Expand, disabled: disableInput || !ImGui.GetIO().KeyShift))
             Mediator.Publish(new UiToggleMessage(typeof(RadarChatPopoutUI)));
         CkGui.AttachToolTip("Open a Popout of the Radar Chat!--SEP--Hold SHIFT to activate!");
     }
@@ -307,8 +307,8 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         if (LastInteractedMsg is null)
             return;
 
-        var shiftHeld = KeyMonitor.ShiftPressed();
-        var ctrlHeld = KeyMonitor.CtrlPressed();
+        var shiftHeld = ImGui.GetIO().KeyShift;
+        var ctrlHeld = ImGui.GetIO().KeyCtrl;
         var isSystemMsg = LastInteractedMsg.UID == "System";
         var isOwnMsg = LastInteractedMsg.UID == MainHub.UID;
         var disableSilence = !ctrlHeld || isSystemMsg || isOwnMsg;

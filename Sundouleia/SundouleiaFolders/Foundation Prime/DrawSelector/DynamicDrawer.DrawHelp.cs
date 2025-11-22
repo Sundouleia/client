@@ -68,6 +68,8 @@ public partial class DynamicDrawer<T>
     // Generic drawer, used across all of sundouleia's needs.
     public void DrawAll(DynamicFlags flags)
     {
+        // REMEMBER TO MAKE THIS WRAPPED INSIDE OF A UNIQUE CLIPPER!
+
         // If there are 0 items to draw, return.
         if (_nodeCacheFlat.Count is 0)
             return;
@@ -190,7 +192,7 @@ public partial class DynamicDrawer<T>
         wdl.ChannelsSetCurrent(1);
 
         // Should make this have variable heights later.
-        ImGuiClip.ClippedDraw(cf.Children, (leaf) => DrawLeaf(leaf, flags, _hoveredNode == leaf || _selected.Contains(leaf)), ImUtf8.FrameHeightSpacing);
+        ClippedDraw(cf.Children, DrawLeafClipped, ImUtf8.FrameHeightSpacing, flags);
 
         wdl.ChannelsSetCurrent(0); // Background.
         var gradientTL = new Vector2(folderMin.X, folderMax.Y);
@@ -198,6 +200,10 @@ public partial class DynamicDrawer<T>
         wdl.AddRectFilledMultiColor(gradientTL, gradientTR, ColorHelpers.Fade(cf.Folder.BorderColor, .9f), ColorHelpers.Fade(cf.Folder.BorderColor, .9f), 0, 0);
         wdl.ChannelsMerge();
     }
+
+    // Adapter used by the clipper so we don't allocate a lambda capturing locals each frame.
+    private void DrawLeafClipped(IDynamicLeaf<T> leaf, DynamicFlags flags)
+        => DrawLeaf(leaf, flags, leaf.Equals(_hoveredNode) || _selected.Contains(leaf));
 
     protected virtual void DrawLeaf(IDynamicLeaf<T> leaf, DynamicFlags flags, bool selected)
     {
@@ -280,6 +286,25 @@ public partial class DynamicDrawer<T>
         {
             AsDragDropSource(node);
             AsDragDropTarget(node);
+        }
+    }
+
+    // Special clipped draw just for the DynamicDrawer.
+    private void ClippedDraw<I>(IReadOnlyList<I> data, Action<I, DynamicFlags> draw, float lineHeight, DynamicFlags flags)
+    {
+        using var clipper = ImUtf8.ListClipper(data.Count, lineHeight);
+        while (clipper.Step())
+        {
+            for (var actualRow = clipper.DisplayStart; actualRow < clipper.DisplayEnd; actualRow++)
+            {
+                if (actualRow >= data.Count)
+                    return;
+
+                if (actualRow < 0)
+                    continue;
+
+                draw(data[actualRow], flags);
+            }
         }
     }
 }
