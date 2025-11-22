@@ -93,16 +93,36 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
 
     private void LoadData()
     {
-        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Whitelist), out _, out List<string> openedCollections))
+        // If the file loads with changes at all, we should re-save it.
+        // (Should technically revise this as any changes from ensure folders
+        // or setOpenedStates should also be considered changes)
+        var loadedChanges = LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Whitelist), out _, out List<string> openedCollections);
+        // Log the result.
+        _logger.LogInformation($"WhitelistDrawSystem load completed. Changes detected: {loadedChanges}");
+        // Ensure all folders are present that should be.
+        EnsureFolders();
+        // Open any folders that should be opened.
+        SetOpenedStates(openedCollections);
+
+        if (loadedChanges)
         {
-            _logger.LogDebug("Loaded WhitelistDrawSystem from file.");
-            // Load in the folders (we dont care about the parent state, they are all root here)
-            VisibleFolderStateUpdate(_folderConfig.Current.VisibleFolder);
-            OfflineFolderStateUpdate(_folderConfig.Current.OfflineFolder);
-            // Now process OpenedState via the OpenedCollections. (could do this in the above method or not, idk. Maybe best to do seperate)
+            _logger.LogInformation("Changes detected during load, saving updated config.");
+            _hybridSaver.Save(this);
         }
-        else
-            _logger.LogDebug("No saved WhitelistDrawSystem file found, starting fresh.");
+    }
+
+    private void EnsureFolders()
+    {
+        // Load in the folders (we dont care about the parent state, they are all root here)
+        VisibleFolderStateUpdate(_folderConfig.Current.VisibleFolder);
+        OfflineFolderStateUpdate(_folderConfig.Current.OfflineFolder);
+        _logger.LogInformation($"Generated {FolderMap.Count} folders.");
+    }
+
+    private void SetOpenedStates(List<string> openedCollections)
+    {
+        // TODO;
+        _logger.LogInformation($"Setting opened states for {openedCollections.Count} folders.");
     }
 
     // Update the FolderSystem folders based on if it should be included or not.

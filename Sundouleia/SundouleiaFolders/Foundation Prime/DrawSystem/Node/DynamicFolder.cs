@@ -28,12 +28,13 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
     internal List<ISortMethod<T>> Sorter = [];
     internal List<DynamicLeaf<T>> Children { get; private set; } = [];
 
-    public DynamicFolder(DynamicFolderGroup<T> parent, FAI icon, string name, uint id)
+    public DynamicFolder(DynamicFolderGroup<T> parent, FAI icon, string name, uint id, FolderFlags flags = FolderFlags.None)
     {
         ID = id;
         Parent = parent;
         Icon = icon;
         Name = name.FixName();
+        Flags = flags;
         UpdateFullPath();
     }
 

@@ -27,8 +27,6 @@ public partial class DynamicDrawer<T>
     // Track history of latest selection to know how to perform CTRL+SHIFT Multi-Selection Jumps.
     protected IDynamicNode<T>? _lastSelected;
     protected IDynamicNode<T>? _lastAnchor;
-    protected IDynamicNode<T>? _hoveredNode; // This will change a lot i feel... lol.
-
 
     // Public Accessor for selection.
     public IReadOnlySet<IDynamicNode<T>> SelectedEntities

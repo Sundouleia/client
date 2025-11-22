@@ -54,7 +54,12 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     ///     Read-only Accessor for root via classes desiring inspection while preventing edits.
     ///     (This is technically already dont via internal setters but whatever).
     /// </summary>
-    public IDynamicFolderGroup<T> Root => root;
+    public IDynamicFolderGroup<T> Root
+        => root;
+
+    // Temporary for debugger assistance.
+    public IReadOnlyDictionary<string, IDynamicCollection<T>> FolderMap 
+        => _folderMap;
 
     public bool TryGetFolder(string name, [NotNullWhen(true)] out IDynamicCollection<T>? folder)
         => _folderMap.TryGetValue(name, out folder);

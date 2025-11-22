@@ -4,8 +4,7 @@ using CkCommons.Helpers;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using Dalamud.Plugin.Services;
-using FFXIVClientStructs.FFXIV.Common.Lua;
+using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.PlayerClient;
@@ -15,8 +14,9 @@ using Sundouleia.Utils;
 
 namespace Sundouleia.Gui;
 
-public class DebugStorageUI : WindowMediatorSubscriberBase
+public partial class DebugStorageUI : WindowMediatorSubscriberBase
 {
+    // Old format.
     private readonly WhitelistTab _whitelistFolders;
     private readonly RadarTab _radarFolders;
     private readonly RequestsTab _requestFolders;
@@ -24,11 +24,23 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
     private readonly GroupsManager _groups;
     private readonly RadarManager _radar;
     private readonly RequestsManager _requests;
-    public DebugStorageUI(ILogger<DebugStorageUI> logger, SundouleiaMediator mediator,
-        WhitelistTab whitelistFolders, RadarTab radarFolders, RequestsTab requestFolders,
-        GroupsUI groupEditorFolders, GroupsManager groups, RadarManager radar,
-        RequestsManager requests)
-        : base(logger, mediator, "Storage Debugger")
+    // New format.
+    private readonly WhitelistDrawer _mainDDSDrawer;
+    private readonly WhitelistDrawSystem _mainDDS;
+
+    public DebugStorageUI(
+        ILogger<DebugStorageUI> logger, 
+        SundouleiaMediator mediator,
+        WhitelistTab whitelistFolders, 
+        RadarTab radarFolders, 
+        RequestsTab requestFolders,
+        GroupsUI groupEditorFolders, 
+        GroupsManager groups, 
+        RadarManager radar,
+        RequestsManager requests,
+        WhitelistDrawer mainDrawer,
+        WhitelistDrawSystem mainDDSDrawer
+        ) : base(logger, mediator, "Storage Debugger")
     {
         _whitelistFolders = whitelistFolders;
         _radarFolders = radarFolders;
@@ -37,6 +49,9 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
         _groups = groups;
         _radar = radar;
         _requests = requests;
+        // New format.
+        _mainDDSDrawer = mainDrawer;
+        _mainDDS = mainDDSDrawer;
 
         IsOpen = false;
         this.SetBoundaries(new(380, 400), ImGui.GetIO().DisplaySize);
@@ -50,26 +65,31 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        if (ImGui.CollapsingHeader("Whitelist Folders"))
-            DrawWhitelistFolders();
+        if (ImGui.CollapsingHeader("DynamicDrawSystems (NEW)"))
+            DrawDDSDebug();
 
-        if (ImGui.CollapsingHeader("Radar Folders"))
-            DrawRadarFolders();
-
-        if (ImGui.CollapsingHeader("Request Folders"))
-            DrawRequestFolders();
-
-        if (ImGui.CollapsingHeader("Group Editor Folders"))
-            DrawGroupEditorFolders();
-
-        if (ImGui.CollapsingHeader("Requests"))
-            DrawRequests();
-
-        if (ImGui.CollapsingHeader("Groups"))
-            DrawGroups();
+        if (ImGui.CollapsingHeader("Dynamic Folders (OLD)"))
+            DrawOldStorages();
 
         if (ImGui.CollapsingHeader("Radar Users"))
             DrawRadarUsers();
+    }
+
+    private void DrawDDSDebug()
+    {
+        DrawMainDrawer();
+        DrawDDSDebug("Main Whitelist DDS", _mainDDS);
+    }
+
+    private void DrawOldStorages()
+    {
+        DrawWhitelistFolders();
+        DrawRadarFolders();
+        DrawRequestFolders();
+        DrawGroupEditorFolders();
+        DrawRequests();
+        DrawGroups();
+        DrawRadarUsers();
     }
 
     private void DrawIconBoolColumn(bool value)
@@ -80,6 +100,9 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
 
     private void DrawWhitelistFolders()
     {
+        using var _ = ImRaii.TreeNode("Whitelist Folders");
+        if (!_) return;
+
         using (var main = ImRaii.TreeNode("Default Folders"))
         {
             if (main)
@@ -91,6 +114,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
                     // Draw the node.
                     DrawPairFolderNode(pairFolder);
                 }
+                CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
             }
         }
 
@@ -105,24 +129,41 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
                     // Draw the node.
                     DrawPairFolderNode(groupFolder);
                 }
+                CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
             }
         }
+
+        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
     }
 
     private void DrawRadarFolders()
     {
+        using var _ = ImRaii.TreeNode("Radar Folders");
+        if (!_)
+            return;
+
         DrawRadarFolderNode(_radarFolders.Paired);
         DrawRadarFolderNode(_radarFolders.Unpaired);
+
+        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
     }
      
     private void DrawRequestFolders()
     {
+        using var _ = ImRaii.TreeNode("Request Folders");
+        if (!_)
+            return;
+
         DrawRequestFolderNode(_requestFolders.Incoming);
         DrawRequestFolderNode(_requestFolders.Pending);
     }
 
     private void DrawGroupEditorFolders()
     {
+        using var _ = ImRaii.TreeNode("Group Editor Folders");
+        if (!_)
+            return;
+
         foreach (var grp in _groupEditorFolders.Groups)
         {
             if (grp is not DynamicPairFolder groupFolder)
@@ -131,6 +172,7 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
             DrawPairFolderNode(groupFolder);
         }
 
+        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
     }
 
     private void DrawPairFolderNode(DynamicPairFolder folder)
@@ -425,6 +467,5 @@ public class DebugStorageUI : WindowMediatorSubscriberBase
                 CkGui.TextFrameAligned(user.IsValid ? user.ObjIndex.ToString() : "N/A");
             }
         }
-
     }
 }

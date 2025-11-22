@@ -71,12 +71,12 @@ public class WhitelistDrawer : DynamicDrawer<Sundesmo>
     #region Search
     protected override void DrawSearchBar(float width, int length)
     {
-        string tmp = Filter;
+        var tmp = Filter;
         var buttonsWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconTextButtonSize(FAI.Globe, "Basic");
         // Update the search bar if things change, like normal.
         if (FancySearchBar.Draw("Filter", width, ref tmp, string.Empty, length, buttonsWidth, DrawButtons))
         {
-            if (string.Equals(tmp, Filter, StringComparison.Ordinal))
+            if (!string.Equals(tmp, Filter, StringComparison.Ordinal))
                 Filter = tmp; // Auto-Marks as dirty.
         }
 
@@ -155,7 +155,7 @@ public class WhitelistDrawer : DynamicDrawer<Sundesmo>
     protected override void DrawLeaf(IDynamicLeaf<Sundesmo> leaf, DynamicFlags flags, bool selected)
     {
         var cursorPos = ImGui.GetCursorPos();
-        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImUtf8.FrameHeight);
+        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - cursorPos.X, ImUtf8.FrameHeight);
         var editing = _renaming == leaf;
         var bgCol = (!editing && selected) ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
         using (var _ = CkRaii.Child(Label + leaf.Name, size, bgCol, 5f))
@@ -248,6 +248,7 @@ public class WhitelistDrawer : DynamicDrawer<Sundesmo>
         var pos = ImGui.GetCursorPos();
         var pressed = ImGui.InvisibleButton($"{leaf.FullPath}-interactable", region);
         HandleInteraction(leaf, flags);
+        HandleClicks(leaf, flags);
 
         // Then return to the start position and draw out the text.
         ImGui.SameLine(pos.X);
@@ -290,33 +291,21 @@ public class WhitelistDrawer : DynamicDrawer<Sundesmo>
         }
     }
 
-    protected override void HandleInteraction(IDynamicLeaf<Sundesmo> node, DynamicFlags flags)
+    private void HandleClicks(IDynamicLeaf<Sundesmo> node, DynamicFlags flags)
     {
-        if (ImGui.IsItemHovered())
-            _hoveredNode = node;
-        // Handle Selection.
-        if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
-            SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
-        // Handle Drag and Drop.
         if (flags.HasAny(DynamicFlags.DragDropLeaves))
+            return;
+        // Additional, SundesmoLeaf-Spesific interaction handles.
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
         {
-            AsDragDropSource(node);
-            AsDragDropTarget(node);
+            // Performs a toggle of state.
+            if (!_showingUID.Remove(node))
+                _showingUID.Add(node);
         }
-        else
-        {
-            // Additional, SundesmoLeaf-Spesific interaction handles.
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            {
-                // Performs a toggle of state.
-                if (!_showingUID.Remove(node))
-                    _showingUID.Add(node);
-            }
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
-                _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
-            if (KeyMonitor.ShiftPressed() && ImGui.IsItemClicked(ImGuiMouseButton.Right))
-                _renaming = node;
-        }
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
+            _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
+        if (KeyMonitor.ShiftPressed() && ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            _renaming = node;
     }
     #endregion SundesmoLeaf
 

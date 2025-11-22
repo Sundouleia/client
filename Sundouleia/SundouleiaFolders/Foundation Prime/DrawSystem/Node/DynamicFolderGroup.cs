@@ -25,12 +25,13 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
     internal List<ISortMethod<IDynamicCollection<T>>> Sorter = [];
     internal List<IDynamicCollection<T>> Children = [];
 
-    internal DynamicFolderGroup(DynamicFolderGroup<T> parent, FAI icon, string name, uint id)
+    internal DynamicFolderGroup(DynamicFolderGroup<T> parent, FAI icon, string name, uint id, FolderFlags flags = FolderFlags.None)
     {
         Parent = parent;
         Icon = icon;
         Name = name.FixName();
         ID = id;
+        Flags = flags;
         UpdateFullPath();
     }
 
@@ -116,5 +117,5 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
 
     // Creates the root folder collection of the dynamic folder system.
     internal static DynamicFolderGroup<T> CreateRoot()
-        => new(null!, FAI.Folder, string.Empty, 0);
+        => new(null!, FAI.Folder, string.Empty, 0, FolderFlags.Expanded | FolderFlags.ShowIfEmpty);
 }

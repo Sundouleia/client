@@ -6,6 +6,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem.Selector;
 
@@ -36,6 +37,7 @@ public enum DynamicFlags : short
 // This is also where a majority of customization points are exposed.
 public partial class DynamicDrawer<T>
 {
+    protected bool ShowRootFolder = false;
     #region TO_REWORK_SEARCHBAR
     // The below functions will be reworked later.
     // Draws out the entire filter row.
@@ -66,16 +68,15 @@ public partial class DynamicDrawer<T>
     // Generic drawer, used across all of sundouleia's needs.
     public void DrawAll(DynamicFlags flags)
     {
-        // Note that, it is very, very possible that all of this could go horribly wrong with nested clipping,
-        // so we will definitely need to experiment a bit with optimizing where to place our clippers,
-        // and how to deal with them appropriately.
-
-        // Definitely Rework this:
-        if (_nodeCache.Children.Count is 0)
+        // If there are 0 items to draw, return.
+        if (_nodeCacheFlat.Count is 0)
             return;
 
-        // Worry about clipping later. For now just get the damn thing to display.
-        DrawCachedFolderNode(_nodeCache, flags);
+        // Otherwise, Draw based on if we show the root or not.
+        if (ShowRootFolder)
+            DrawCachedFolderNode(_nodeCache, flags);
+        else
+            DrawFolderGroupFolders(_nodeCache, flags);
     }
 
     public void DrawFolder(string folderName, DynamicFlags flags)
@@ -99,6 +100,7 @@ public partial class DynamicDrawer<T>
     // The shell of the drawn structure. Return to this later.
     protected void DrawCachedFolderNode(CachedFolderGroup<T> cfg, DynamicFlags flags)
     {
+        using var id = ImRaii.PushId($"DDS_{Label}_{cfg.Folder.ID}");
         DrawFolderGroupBanner(cfg.Folder, flags, _hoveredNode == cfg.Folder || _selected.Contains(cfg.Folder));
         if (!cfg.Folder.IsOpen)
             return;
@@ -110,7 +112,7 @@ public partial class DynamicDrawer<T>
     // The shell of the drawn structure. Return to this later.
     protected void DrawCachedFolderNode(CachedFolder<T> cf, DynamicFlags flags)
     {
-        // Maybe revise this to cache the selection state or whatever, if hovered ext, or maybe not.
+        using var id = ImRaii.PushId($"DDS_{Label}_{cf.Folder.ID}");
         DrawFolderBanner(cf.Folder, flags, _hoveredNode == cf.Folder || _selected.Contains(cf.Folder));
         if (!cf.Folder.IsOpen)
             return;
@@ -241,7 +243,7 @@ public partial class DynamicDrawer<T>
     protected void HandleInteraction(IDynamicCollection<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
-            _hoveredNode = node;
+            _newHoveredNode = node;
         var clicked = ImGui.IsItemClicked();
         // Handle Folder Toggle.
         if (flags.HasAny(DynamicFlags.FolderToggle) && clicked)
@@ -269,7 +271,7 @@ public partial class DynamicDrawer<T>
     protected virtual void HandleInteraction(IDynamicLeaf<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
-            _hoveredNode = node;
+            _newHoveredNode = node;
         // Handle Selection.
         if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
             SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));

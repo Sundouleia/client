@@ -34,6 +34,12 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         DrawSystem.Changed += OnDrawSystemChange;
     }
 
+    // TODO:
+    // Handle this better, maybe make it per-node,
+    // or have a better way to update this on change.
+    protected IDynamicNode? _hoveredNode = null; // From last frame.
+    protected IDynamicNode? _newHoveredNode = null; // Tracked each frame.
+
     public virtual void Dispose()
     {
         DrawSystem.Changed -= OnDrawSystemChange;
@@ -48,14 +54,9 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     // Refactor later.
     private void DrawContentsInternal(float width)
     {
-        using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.Zero);
         using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
-        // Make padding normal after drawing the child.
-        style.Pop();
-        // Avoid drawing if there is no content.
         if (!_)
             return;
-
         HandleMainContextActions();
         Draw();
     }
@@ -63,18 +64,11 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     private void Draw(DynamicFlags flags = DynamicFlags.BasicViewFolder)
     {
         ImGui.SetScrollX(0);
-        using var style = ImRaii.PushStyle(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale)
-            .Push(ImGuiStyleVar.ItemSpacing, new Vector2(ImUtf8.ItemSpacing.X, ImGuiHelpers.GlobalScale))
-            .Push(ImGuiStyleVar.FramePadding, new Vector2(ImGuiHelpers.GlobalScale, ImUtf8.FramePadding.Y));
+        using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
+            .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
 
         // Apply the filter to generate the cache, if dirty.
         ApplyFilters();
-
-        // Draw a debug of the cached node contents.
-        ImGui.Text("FlatList Count: " + _nodeCacheFlat.Count);
-        ImGui.Text("CachedNode Dirty: " + _cacheDirty);
-        ImGui.Text("DrawSystem Node Count: " + DrawSystem.Root.TotalChildren);
-
         // We can update this as we develop further, fine tuning errors where we see them,
         // such as the above style interfering with drawn entities and such.
         DrawAll(flags);
@@ -86,6 +80,11 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     /// </summary>
     private void PostDraw()
     {
+        // Update the hovered nodes.
+        _hoveredNode = _newHoveredNode;
+        _newHoveredNode = null;
+
+        // Process post-draw actions.
         while (_postDrawActions.TryDequeue(out Action? action))
         {
             try
@@ -115,7 +114,7 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
                    ExpandAncestors(obj);
                    MarkCacheDirty();
                });
-                break;
+               break;
             case DDSChangeType.ObjectRemoved:
             case DDSChangeType.Reload:
                 if (obj == SelectedLeaf)
