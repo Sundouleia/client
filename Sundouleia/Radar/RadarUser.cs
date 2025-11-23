@@ -1,6 +1,9 @@
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using Microsoft.VisualBasic.ApplicationServices;
+using Sundouleia.Pairs;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
+using static FFXIVClientStructs.FFXIV.Client.LayoutEngine.LayoutManager;
 
 namespace Sundouleia.Radar;
 
@@ -10,11 +13,15 @@ namespace Sundouleia.Radar;
 /// </summary>
 public unsafe class RadarUser
 {
+    // Used for retrieveing the display name.
+    private readonly SundesmoManager _sundesmos;
+
     private UserData _user;
     private Character* _player;
 
-    public RadarUser(OnlineUser user, IntPtr address)
+    public RadarUser(SundesmoManager sundesmos, OnlineUser user, IntPtr address)
     {
+        _sundesmos = sundesmos;
         _user = user.User;
         HashedIdent = user.Ident;
         _player = address != IntPtr.Zero ? (Character*)address : null;
@@ -27,6 +34,7 @@ public unsafe class RadarUser
 
     public bool IsValid => _player is not null;
     public bool CanSendRequest => !string.IsNullOrEmpty(HashedIdent);
+    public bool IsPair => _sundesmos.GetUserOrDefault(_user) is not null;
 
     // All of the below only works if valid.
     public unsafe IntPtr Address => (nint)_player;
@@ -54,5 +62,24 @@ public unsafe class RadarUser
         if (address == IntPtr.Zero)
             return;
         _player = (Character*)address;
+    }
+
+    public bool MatchesFilter(string filter)
+    {
+        if (filter.Length is 0)
+            return true;
+
+        Sundesmo? pair = _sundesmos.GetUserOrDefault(_user);
+        if (pair is not null)
+        {
+            return pair.UserData.AliasOrUID.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || (pair.GetNickname()?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (pair.PlayerName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
+
+        }
+        else
+        {
+            return AnonymousName.Contains(filter, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

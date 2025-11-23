@@ -15,6 +15,7 @@ public enum DDSChangeType
     PartialMerge,
     FlagChange,
     FolderUpdated,
+    SorterChanged,
     Reload,
 }
 
@@ -98,13 +99,13 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         // Successful, so increment the ID counter.
         ++idCounter;
 
-        // Could add the folder to a mapping if we wanted but dont really know right now.
+        // Update the folder contents and the map refernce.
+        folder.Update(_nameComparer, out _);
         _folderMap[folder.Name] = folder;
 
         // Revise later.
         Changed?.Invoke(DDSChangeType.FolderAdded, folder, null, folder.Parent);
     }
-
 
     // Retrieve the updated state of all folders.
     public void UpdateFolders()
@@ -132,7 +133,17 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         Changed?.Invoke(DDSChangeType.FolderUpdated, folder, null, null);
     }
 
-
+    public void SetSortDirection(IDynamicCollection<T> folder, bool isDescending)
+    {
+        if (folder is DynamicFolderGroup<T> fc)
+            fc.Sorter.FirstDescending = isDescending;
+        else if (folder is DynamicFolder<T> f)
+            f.Sorter.FirstDescending = isDescending;
+        else
+            return;
+        // Revise later.
+        Changed?.Invoke(DDSChangeType.SorterChanged, folder, null, null);
+    }
 
     // Sets the expanded state of a folder to a new value.
     public bool SetOpenState(IDynamicCollection<T> folder, bool isOpen)

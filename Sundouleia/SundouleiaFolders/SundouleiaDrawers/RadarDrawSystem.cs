@@ -10,12 +10,22 @@ namespace Sundouleia.DrawSystem;
 public sealed class RadarFolder : DynamicFolder<RadarUser>
 {
     private Func<IReadOnlyList<RadarUser>> _generator;
-    public RadarFolder(DynamicFolderGroup<RadarUser> parent, uint id, FAI icon, string name, Func<IReadOnlyList<RadarUser>> gen)
+    public RadarFolder(DynamicFolderGroup<RadarUser> parent, uint id, FAI icon, string name,
+        Func<IReadOnlyList<RadarUser>> gen)
         : base(parent, icon, name, id)
     {
         // Can set stylizations here.
         BorderColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
         _generator = gen;
+    }
+
+    public RadarFolder(DynamicFolderGroup<RadarUser> parent, uint id, FAI icon, string name,
+        Func<IReadOnlyList<RadarUser>> generator, IReadOnlyList<ISortMethod<DynamicLeaf<RadarUser>>> sortSteps)
+        : base(parent, icon, name, id, new(sortSteps))
+    {
+        // Can set stylizations here.
+        BorderColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+        _generator = generator;
     }
 
     public int Rendered => Children.Count(s => s.Data.IsValid);
@@ -69,36 +79,41 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
 
     private void LoadData()
     {
-        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Radar), out _, out List<string> opened))
+        // Load in the file, this will be changed overtime as we assertain how to restore data in a more proper manner.
+        var loadedChanges = LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Radar), out _, out List<string> openedCollections);
+        _logger.LogInformation($"RadarDrawSystem load completed. Changes detected: {loadedChanges}");
+        // Ensure all folders are present that should be.
+        EnsureFolders();
+        // Open any folders that should be opened.
+        SetOpenedStates(openedCollections);
+
+        // If any changes occured, re-save the file.
+        if (loadedChanges)
         {
-            _logger.LogDebug("Loaded RadarDrawSystem from file.");
-            InitFolders();
-            OpenExpandedFolders(opened);
-            // Now process OpenedState via the OpenedCollections. (could do this in the above method or not, idk. Maybe best to do seperate)
+            _logger.LogInformation("Changes detected during load, saving updated config.");
+            _hybridSaver.Save(this);
         }
-        else
-            _logger.LogDebug("No saved RadarDrawSystem file found, starting fresh.");
     }
 
 
-
-    private void InitFolders()
+    private void EnsureFolders()
     {
         // Need to create the paired and unpaired folders, these go under root.
         CreateFolder(FAI.Link, Constants.FolderTagRadarPaired, () => [ .. _radar.RadarUsers.Where(u => _sundesmos.ContainsSundesmo(u.UID)) ]);
         CreateFolder(FAI.SatelliteDish, Constants.FolderTagRadarUnpaired, () => [ .. _radar.RadarUsers.Where(u => !_sundesmos.ContainsSundesmo(u.UID)) ]);
     }
 
-    private void CreateFolder(FAI icon, string name, Func<IReadOnlyList<RadarUser>> gen)
-        => AddFolder(new RadarFolder(root, idCounter + 1u, icon, name, gen));
-
-
-    private void OpenExpandedFolders(List<string> openedCollectionNodes)
+    private void SetOpenedStates(List<string> openedCollections)
     {
-        // TODO, or REVISE.
-        // From the folder config, open any folders that contain a name included
-        // in the expanded config.
+        // TODO;
+        _logger.LogInformation($"Setting opened states for {openedCollections.Count} folders.");
     }
+
+    private void CreateFolder(FAI icon, string name, Func<IReadOnlyList<RadarUser>> gen)
+        => AddFolder(new RadarFolder(root, idCounter + 1u, icon, name, gen, [ByName]));
+
+    // Sort Helpers.
+    private static readonly ISortMethod<DynamicLeaf<RadarUser>> ByName = new DynamicSorterEx.RadarName();
 
     // HybridSavable
     public int ConfigVersion => 0;

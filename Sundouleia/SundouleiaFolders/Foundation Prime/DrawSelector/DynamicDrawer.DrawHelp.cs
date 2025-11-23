@@ -38,7 +38,6 @@ public enum DynamicFlags : short
 public partial class DynamicDrawer<T>
 {
     protected bool ShowRootFolder = false;
-    #region TO_REWORK_SEARCHBAR
     // The below functions will be reworked later.
     // Draws out the entire filter row.
     public void DrawFilterRow(float width, int length)
@@ -54,19 +53,19 @@ public partial class DynamicDrawer<T>
     /// </summary>
     protected virtual void DrawSearchBar(float width, int length)
     {
-        string tmp = Filter;
+        var tmp = Filter;
         if (FancySearchBar.Draw("Filter", width, ref tmp, string.Empty, length))
+        {
             if (string.Equals(tmp, Filter, StringComparison.Ordinal))
-                Filter = tmp; // Auto-Marks as dirty.
+                Filter = tmp;
+        }
     }
 
     protected virtual void PostSearchBar()
     { }
 
-    #endregion TO_REWORK_SEARCHBAR
-
     // Generic drawer, used across all of sundouleia's needs.
-    public void DrawAll(DynamicFlags flags)
+    protected void DrawAll(DynamicFlags flags)
     {
         // REMEMBER TO MAKE THIS WRAPPED INSIDE OF A UNIQUE CLIPPER!
 

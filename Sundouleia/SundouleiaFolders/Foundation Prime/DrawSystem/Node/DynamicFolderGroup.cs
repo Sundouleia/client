@@ -22,20 +22,22 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
     public uint BorderColor   { get; internal set; } = uint.MaxValue;
     public uint GradientColor { get; internal set; } = ColorHelpers.Fade(uint.MaxValue, .9f);
 
-    internal List<ISortMethod<IDynamicCollection<T>>> Sorter = [];
+    internal DynamicSorter<IDynamicCollection<T>> Sorter;
     internal List<IDynamicCollection<T>> Children = [];
 
-    internal DynamicFolderGroup(DynamicFolderGroup<T> parent, FAI icon, string name, uint id, FolderFlags flags = FolderFlags.None)
+    internal DynamicFolderGroup(DynamicFolderGroup<T> parent, FAI icon, string name, uint id,
+        DynamicSorter<IDynamicCollection<T>>? sorter = null, FolderFlags flags = FolderFlags.None)
     {
         Parent = parent;
         Icon = icon;
         Name = name.FixName();
         ID = id;
         Flags = flags;
+        Sorter = sorter ?? new();
         UpdateFullPath();
     }
 
-    IReadOnlyList<ISortMethod<IDynamicCollection<T>>> IDynamicFolderGroup<T>.Sorter => Sorter;
+    IReadOnlyDynamicSorter<IDynamicCollection<T>> IDynamicFolderGroup<T>.Sorter => Sorter;
     IReadOnlyList<IDynamicCollection<T>> IDynamicFolderGroup<T>.Children => Children;
 
     public int TotalChildren => Children.Count;
@@ -117,5 +119,5 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
 
     // Creates the root folder collection of the dynamic folder system.
     internal static DynamicFolderGroup<T> CreateRoot()
-        => new(null!, FAI.Folder, string.Empty, 0, FolderFlags.Expanded | FolderFlags.ShowIfEmpty);
+        => new(null!, FAI.Folder, string.Empty, 0, new([DynamicSorterEx.ByFolderName<T>()]), FolderFlags.Expanded | FolderFlags.ShowIfEmpty);
 }

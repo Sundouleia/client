@@ -31,7 +31,7 @@ public interface IDynamicFolderGroup<T> : IDynamicCollection<T> where T : class
     ///     The instructions to be processed by any drawer wishing 
     ///     to display the folder in a sorted manner.
     /// </summary>
-    public IReadOnlyList<ISortMethod<IDynamicCollection<T>>> Sorter { get; }
+    public IReadOnlyDynamicSorter<IDynamicCollection<T>> Sorter { get; }
 }
 
 /// <summary>
@@ -50,7 +50,7 @@ public interface IDynamicFolder<T> : IDynamicCollection<T> where T : class
     ///     to display the folder in a sorted manner.
     ///     (Maybe change this to let both FolderCollections and Folders share a common ISortMethod?)
     /// </summary>
-    public IReadOnlyList<ISortMethod<T>> Sorter { get; }
+    public IReadOnlyDynamicSorter<DynamicLeaf<T>> Sorter { get; }
 }
 
 /// <summary>

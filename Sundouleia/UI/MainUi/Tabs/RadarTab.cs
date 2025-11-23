@@ -4,6 +4,8 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
+using Sundouleia.DrawSystem;
+using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.Radar;
@@ -16,6 +18,7 @@ using System.Collections.Immutable;
 namespace Sundouleia.Gui.MainWindow;
 public class RadarTab : DisposableMediatorSubscriberBase
 {
+    private readonly RadarDrawer _drawer;
     private readonly DrawEntityFactory _factory;
     private readonly SundesmoManager _sundesmos;
     private readonly RadarManager _manager;
@@ -24,10 +27,11 @@ public class RadarTab : DisposableMediatorSubscriberBase
     private DynamicRadarFolder _pairedFolder;
     private DynamicRadarFolder _unpairedFolder;
 
-    public RadarTab(ILogger<RadarTab> logger, SundouleiaMediator mediator, DrawEntityFactory factory,
-        SundesmoManager sundesmos, RadarManager manager, TutorialService guides)
+    public RadarTab(ILogger<RadarTab> logger, SundouleiaMediator mediator, RadarDrawer drawer,
+        DrawEntityFactory factory, SundesmoManager sundesmos, RadarManager manager, TutorialService guides)
         : base(logger, mediator)
     {
+        _drawer = drawer;
         _factory = factory;
         _sundesmos = sundesmos;
         _manager = manager;
@@ -45,17 +49,18 @@ public class RadarTab : DisposableMediatorSubscriberBase
         var unverified = !MainHub.Reputation.IsVerified;
         var usageBlocked = !MainHub.Reputation.RadarUsage;
         // Otherwise, draw the blocked content body.
+        var region = ImGui.GetContentRegionAvail();
         var min = ImGui.GetCursorScreenPos();
-        var max = min + ImGui.GetContentRegionAvail();
+        var max = min + region;
 
         if (!unverified && !usageBlocked)
         {
-            DrawContentBody();
+            DrawContentBody(region.X);
         }
         else
         {
             using (ImRaii.Disabled(usageBlocked || unverified))
-                DrawContentBody();
+                DrawContentBody(region.X);
 
             // Have to make a second child to overcome the conflicting z-ordering on text.
             ImGui.SetCursorScreenPos(min);
@@ -71,7 +76,15 @@ public class RadarTab : DisposableMediatorSubscriberBase
         }
     }
 
-    private void DrawContentBody()
+    private void DrawContentBody(float width)
+    {
+        CkGui.FontTextCentered($"{RadarService.CurrWorldName} - {RadarService.CurrZoneName}", UiFontService.Default150Percent);
+        ImGui.Spacing();
+        _drawer.DrawFilterRow(width, 25);
+        _drawer.DrawContents(width, DynamicFlags.BasicViewFolder);
+    }
+
+    private void DrawOldContentBody()
     {
         CkGui.FontTextCentered($"{RadarService.CurrWorldName} - {RadarService.CurrZoneName}", UiFontService.Default150Percent);
         // Draw paired first, then unpaired, (yes, this is done intentionally to help with things not being 'too automated')

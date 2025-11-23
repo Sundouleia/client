@@ -326,6 +326,13 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         return !string.IsNullOrWhiteSpace(nickAliasUid);
     }
 
+    public bool TryGetNickAliasOrUid(UserData user, [NotNullWhen(true)] out string? nickAliasUid)
+    {
+        nickAliasUid = _allSundesmos.TryGetValue(user, out var s) ? s.GetNickAliasOrUid() : null;
+        return !string.IsNullOrWhiteSpace(nickAliasUid);
+    }
+
+
     /// <summary>
     ///     Attempt to retrieve a sundesmo by <see cref="UserData"/>. If failed, null is returned.
     /// </summary>

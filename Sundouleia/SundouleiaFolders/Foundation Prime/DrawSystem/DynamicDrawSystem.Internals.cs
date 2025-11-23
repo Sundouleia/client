@@ -39,7 +39,6 @@ public partial class DynamicDrawSystem<T>
 
         // Otherwise, rename the child and return success.
         leaf.SetName(newName, false);
-        leaf.Parent.Sort(_nameComparer);
         return Result.Success;
     }
 

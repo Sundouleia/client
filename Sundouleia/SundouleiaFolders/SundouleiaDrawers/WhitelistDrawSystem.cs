@@ -3,6 +3,7 @@ using CkCommons.HybridSaver;
 using Dalamud.Bindings.ImGui;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 
@@ -13,6 +14,18 @@ public sealed class WhitelistFolder : DynamicFolder<Sundesmo>
     public WhitelistFolder(DynamicFolderGroup<Sundesmo> parent, uint id, FAI icon, string name,
         uint iconColor, Func<IReadOnlyList<Sundesmo>> generator)
         : base(parent, icon, name, id)
+    {
+        // Can set stylizations here.
+        NameColor = uint.MaxValue;
+        IconColor = iconColor;
+        BgColor = uint.MinValue;
+        BorderColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+        _generator = generator;
+    }
+
+    public WhitelistFolder(DynamicFolderGroup<Sundesmo> parent, uint id, FAI icon, string name,
+        uint iconColor, Func<IReadOnlyList<Sundesmo>> generator, IReadOnlyList<ISortMethod<DynamicLeaf<Sundesmo>>> sortSteps)
+        : base (parent, icon, name, id, new(sortSteps))
     {
         // Can set stylizations here.
         NameColor = uint.MaxValue;
@@ -93,6 +106,9 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
 
     private void LoadData()
     {
+        // Before we load anything, inverse the sort direction of root.
+        SetSortDirection(root, true);
+
         // If the file loads with changes at all, we should re-save it.
         // (Should technically revise this as any changes from ensure folders
         // or setOpenedStates should also be considered changes)
@@ -154,7 +170,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
     }
 
     private void CreateFolder(FAI icon, string name, uint iconColor, Func<IReadOnlyList<Sundesmo>> generator)
-        => AddFolder(new WhitelistFolder(root, idCounter + 1u, icon, name, iconColor, generator));
+        => AddFolder(new WhitelistFolder(root, idCounter + 1u, icon, name, iconColor, generator, [DynamicSorterEx.ByPairName]));
 
     // HybridSavable
     public int ConfigVersion => 0;
@@ -168,5 +184,107 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
 
     public void WriteToStream(StreamWriter writer) 
         => SaveToFile(writer);
+}
+
+public static class DynamicSorterEx
+{
+    public static ISortMethod<IDynamicCollection<T>> ByFolderName<T>() where T : class
+        => new FolderName<T>();
+    public static ISortMethod<IDynamicCollection<T>> ByTotalChildren<T>() where T : class
+        => new TotalChildren<T>();
+
+    // Used here as Sundesmo is shared commonly across multiple draw systems.
+    public static readonly ISortMethod<DynamicLeaf<Sundesmo>> ByRendered = new Rendered();
+    public static readonly ISortMethod<DynamicLeaf<Sundesmo>> ByOnline = new Online();
+    public static readonly ISortMethod<DynamicLeaf<Sundesmo>> ByFavorite = new Favorite();
+    public static readonly ISortMethod<DynamicLeaf<Sundesmo>> ByPairName = new PairName();
+    public static readonly ISortMethod<DynamicLeaf<Sundesmo>> ByTemporary = new Temporary();
+    public static readonly ISortMethod<DynamicLeaf<Sundesmo>> ByDateAdded = new DateAdded();
+
+    // Converters
+    public static ISortMethod<DynamicLeaf<Sundesmo>> ToSortMethod(this FolderSortFilter filter)
+        => filter switch
+        {
+            FolderSortFilter.Rendered => ByRendered,
+            FolderSortFilter.Online => ByOnline,
+            FolderSortFilter.Favorite => ByFavorite,
+            FolderSortFilter.Alphabetical => ByPairName,
+            FolderSortFilter.Temporary => ByTemporary,
+            FolderSortFilter.DateAdded => ByDateAdded,
+            _ => throw new ArgumentOutOfRangeException(nameof(filter), filter, null)
+        };
+
+    // Sort Helpers
+    public struct TotalChildren<T> : ISortMethod<IDynamicCollection<T>> where T : class
+    {
+        public string Name => "Total Count";
+        public FAI Icon => FAI.SortNumericDown; // Maybe change.
+        public string Tooltip => "Sort by number of items in the folder.";
+        public Func<IDynamicCollection<T>, IComparable?> KeySelector => c => c.TotalChildren;
+    }
+
+    public struct FolderName<T> : ISortMethod<IDynamicCollection<T>> where T : class
+    {
+        public string Name => "Name";
+        public FAI Icon => FAI.SortAlphaDown; // Maybe change.
+        public string Tooltip => "Sort by name.";
+        public Func<IDynamicCollection<T>, IComparable?> KeySelector => c => c.Name;
+    }
+
+    public struct Rendered : ISortMethod<DynamicLeaf<Sundesmo>>
+    {
+        public string Name => "Rendered";
+        public FAI Icon => FAI.Eye; // Maybe change.
+        public string Tooltip => "Sort by rendered status.";
+        public Func<DynamicLeaf<Sundesmo>, IComparable?> KeySelector => l => l.Data.IsRendered ? 0 : 1;
+    }
+
+    public struct Online : ISortMethod<DynamicLeaf<Sundesmo>>
+    {
+        public string Name => "Online";
+        public FAI Icon => FAI.Wifi; // Maybe change.
+        public string Tooltip => "Sort by online status.";
+        public Func<DynamicLeaf<Sundesmo>, IComparable?> KeySelector => l => l.Data.IsOnline ? 0 : 1;
+    }
+
+    public struct Favorite : ISortMethod<DynamicLeaf<Sundesmo>>
+    {
+        public string Name => "Favorite";
+        public FAI Icon => FAI.Star; // Maybe change.
+        public string Tooltip => "Sort by favorite status.";
+        public Func<DynamicLeaf<Sundesmo>, IComparable?> KeySelector => l => l.Data.IsFavorite ? 0 : 1;
+    }
+
+    public struct Temporary : ISortMethod<DynamicLeaf<Sundesmo>>
+    {
+        public string Name => "Temporary";
+        public FAI Icon => FAI.Clock; // Maybe change.
+        public string Tooltip => "Sort temporary pairs.";
+        public Func<DynamicLeaf<Sundesmo>, IComparable?> KeySelector => l => l.Data.IsTemporary ? 0 : 1;
+    }
+
+    public struct DateAdded : ISortMethod<DynamicLeaf<Sundesmo>>
+    {
+        public string Name => "Date Added";
+        public FAI Icon => FAI.Calendar; // Maybe change.
+        public string Tooltip => "Sort by date added.";
+        public Func<DynamicLeaf<Sundesmo>, IComparable?> KeySelector => l => l.Data.UserPair.CreatedAt;
+    }
+
+    public struct PairName : ISortMethod<DynamicLeaf<Sundesmo>>
+    {
+        public string Name => "Name";
+        public FAI Icon => FAI.SortAlphaDown; // Maybe change.
+        public string Tooltip => "Sort by name.";
+        public Func<DynamicLeaf<Sundesmo>, IComparable?> KeySelector => l => l.Data.AlphabeticalSortKey();
+    }
+
+    public struct RadarName : ISortMethod<DynamicLeaf<RadarUser>>
+    {
+        public string Name => "Name";
+        public FAI Icon => FAI.SortAlphaDown; // Maybe change.
+        public string Tooltip => "Sort by name.";
+        public Func<DynamicLeaf<RadarUser>, IComparable?> KeySelector => l => l.Data.PlayerName;
+    }
 }
 

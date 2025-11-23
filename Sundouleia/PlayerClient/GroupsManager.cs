@@ -23,7 +23,7 @@ public class GroupsManager
     }
 
     public IEnumerable<string> GroupLabels => _config.GroupFolderLabels;
-    public GroupsStorage Config => _config.Current;
+    public FolderStorage Config => _config.Current;
     public void SaveConfig() => _config.Save(); // Prefer to faze this out.
 
 

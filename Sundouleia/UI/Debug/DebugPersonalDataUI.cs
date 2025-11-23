@@ -94,7 +94,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
     private void DrawPairData(Sundesmo sundesmo, float width)
     {
         var nick = sundesmo.GetNickAliasOrUid();
-        using var node = ImRaii.TreeNode($"{nick}'s Pair Info");
+        using var node = ImRaii.TreeNode($"{nick}'s Pair Info##{sundesmo.UserData.UID}_info");
         if (!node) return;
 
         DrawSundesmoInfo(sundesmo);

@@ -15,16 +15,17 @@ public enum FolderSortFilter
     DateAdded,      // When the pair was established.
 }
 
-public class GroupsStorage
+public class FolderStorage
 {
     // Basic config options for all folders.
+    // (But only defined in whitelist folder? Maybe move?)
     public bool FavoritesFirst { get; set; } = true;
     public bool NickOverPlayerName { get; set; } = false;
     public bool VisibleFolder { get; set; } = true;
     public bool OfflineFolder { get; set; } = true;
     public bool TargetWithFocus { get; set; } = false;
 
-    // Tracks opened folders from any type.
+    // Can maybe remove this later after we update the drawSystems.
     public HashSet<string> OpenedFolders { get; set; } = new(StringComparer.Ordinal);
 
     // All Created groups. Not tracked as a dictionary with label keys to allow renaming while keeping references.
@@ -109,12 +110,12 @@ public class FolderConfig : IHybridSavable
     {
         if (data is not JObject serverNicknames)
             return;
-        Current = serverNicknames.ToObject<GroupsStorage>() ?? throw new Exception("Failed to load GroupsStorage.");
+        Current = serverNicknames.ToObject<FolderStorage>() ?? throw new Exception("Failed to load GroupsStorage.");
         // Clean up any invalid group entries. Invalid entries have empty names or an FAI value of 0.
         Current.Groups.RemoveAll(g => g.Icon == 0 || g.Label.IsNullOrWhitespace());
     }
 
-    public GroupsStorage Current { get; set; } = new GroupsStorage();
+    public FolderStorage Current { get; set; } = new FolderStorage();
 
     public IEnumerable<string> GroupFolderLabels => Current.Groups.Select(g => g.Label);
     public bool LabelExists(string l) => Constants.OwnedFolders.Contains (l) || Current.Groups.Any(g => g.Label == l);

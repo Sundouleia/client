@@ -25,21 +25,23 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
     public uint BorderColor   { get; protected set; } = uint.MaxValue;
     public uint GradientColor { get; protected set; } = ColorHelpers.Fade(uint.MaxValue, .9f);
 
-    internal List<ISortMethod<T>> Sorter = [];
-    internal List<DynamicLeaf<T>> Children { get; private set; } = [];
+    internal DynamicSorter<DynamicLeaf<T>> Sorter;
+    internal List<DynamicLeaf<T>> Children = [];
 
-    public DynamicFolder(DynamicFolderGroup<T> parent, FAI icon, string name, uint id, FolderFlags flags = FolderFlags.None)
+    public DynamicFolder(DynamicFolderGroup<T> parent, FAI icon, string name, uint id,
+        DynamicSorter<DynamicLeaf<T>>? sorter = null, FolderFlags flags = FolderFlags.None)
     {
         ID = id;
         Parent = parent;
         Icon = icon;
         Name = name.FixName();
         Flags = flags;
+        Sorter = sorter ?? new();
         UpdateFullPath();
     }
 
+    IReadOnlyDynamicSorter<DynamicLeaf<T>> IDynamicFolder<T>.Sorter => Sorter;
     IReadOnlyList<DynamicLeaf<T>> IDynamicFolder<T>.Children => Children;
-    IReadOnlyList<ISortMethod<T>> IDynamicFolder<T>.Sorter => Sorter;
 
     public int TotalChildren
         => Children.Count;
@@ -105,6 +107,8 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
         UpdateFullPath();
     }
 
+    // For manual triggers only, but maybe phase out for a single ISortMethod<T>
+    // one time sort on a fallback or something idk, lol.
     internal void Sort(NameComparer comparer)
         => Children.Sort(comparer);
 

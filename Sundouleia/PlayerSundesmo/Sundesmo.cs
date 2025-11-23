@@ -119,7 +119,7 @@ public class Sundesmo : IComparable<Sundesmo>
         => (IsRendered && !string.IsNullOrEmpty(PlayerName)
             ? (_folderConfig.Current.NickOverPlayerName ? GetNickAliasOrUid() : PlayerName)
             : GetNickAliasOrUid());
-    public string GetDrawEntityName()
+    public string GetDisplayName()
     {
         var condition = IsRendered && !_folderConfig.Current.NickOverPlayerName && !string.IsNullOrEmpty(PlayerName);
         return condition ? PlayerName : GetNickAliasOrUid();

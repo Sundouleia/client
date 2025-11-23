@@ -48,7 +48,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         {
             for (int i = 0; i < 5; i++)
             {
-                var toAdd = new RadarUser(new(new($"Dummy Sender {i}"), $"RandomIdent{i}"), IntPtr.Zero);
+                var toAdd = new RadarUser(_sundesmos, new(new($"Dummy Sender {i}"), $"RandomIdent{i}"), IntPtr.Zero);
                 _allRadarUsers.TryAdd(new($"Dummy Sender {i}"), toAdd);
             }
             RecreateLazy();
@@ -121,7 +121,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
             if (address == IntPtr.Zero && !string.IsNullOrEmpty(user.Ident))
                 _watcher.TryGetExisting(user.Ident, out address);
             // Not create the user.
-            _allRadarUsers.TryAdd(user.User, new RadarUser(user, address));
+            _allRadarUsers.TryAdd(user.User, new RadarUser(_sundesmos, user, address));
         }
         // Could have removed hashedIdent from the User, so we should remove them from the list.
         RecreateLazy();

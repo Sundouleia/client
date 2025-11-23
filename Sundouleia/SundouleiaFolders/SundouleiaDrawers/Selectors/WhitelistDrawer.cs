@@ -29,8 +29,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private static readonly string NormalTooltip =
         "--COL--[L-CLICK]--COL-- Swap Between Name/Nick/Alias & UID." +
         "--NL----COL--[M-CLICK]--COL-- Open Profile" +
-        "--NL----COL--[R-CLICK]--COL-- Edit Nickname";
-
+        "--NL----COL--[SHIFT + R-CLICK]--COL-- Edit Nickname";
 
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
@@ -47,9 +46,13 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     // private vars for renaming items.
     private HashSet<IDynamicNode<Sundesmo>> _showingUID = new(); // Nodes in here show UID.
     private IDynamicNode<Sundesmo>?         _renaming   = null;
-    private string    _nameEditStr = string.Empty; // temp nick text.
-    private bool      _profileShown = false;
-    private DateTime? _lastHoverTime;
+    private string                          _nameEditStr= string.Empty; // temp nick text.
+
+    // Popout Tracking.
+    private IDynamicNode? _hoveredTextNode;     // From last frame.
+    private IDynamicNode? _newHoveredTextNode;  // Tracked each frame.
+    private bool          _profileShown = false;// If currently displaying a popout profile.
+    private DateTime?     _lastHoverTime;       // time until we should show the profile.
 
     public WhitelistDrawer(ILogger<WhitelistDrawer> logger, SundouleiaMediator mediator,
         MainConfig config, FolderConfig folderConfig, FavoritesConfig favoritesConfig,
@@ -63,18 +66,15 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         _serverConfigs = serverConfigs;
         _sundesmos = sundesmos;
         _drawSystem = ds;
-        // We can handle interaction stuff via customizable buttons later that we will figure out as things go on.
     }
 
-    // SearchBar functionality will be revised later, as all filters contain a
-    // config of some kind, so the below logic will be duplicated over all drawers.
     #region Search
     protected override void DrawSearchBar(float width, int length)
     {
         var tmp = Filter;
         var buttonsWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconTextButtonSize(FAI.Globe, "Basic");
         // Update the search bar if things change, like normal.
-        if (FancySearchBar.Draw("Filter", width, ref tmp, string.Empty, length, buttonsWidth, DrawButtons))
+        if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
         {
             if (!string.Equals(tmp, Filter, StringComparison.Ordinal))
                 Filter = tmp; // Auto-Marks as dirty.
@@ -108,6 +108,8 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     {
         if (_configExpanded)
             ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
+        else
+            ImGui.Separator();
     }
 
     private void DrawButtons()
@@ -125,6 +127,31 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         CkGui.AttachToolTip("Configure preferences for default folders.");
     }
     #endregion Search
+
+    protected override void UpdateHoverNode()
+    {
+        // Before we update the nodes we should run a comparison to see if they changed.
+        // If they did we should close any popup if opened.
+        if (_hoveredTextNode != _newHoveredTextNode)
+        {
+            if (!_profileShown)
+                _lastHoverTime = _newHoveredTextNode is null ? null : DateTime.UtcNow.AddSeconds(_config.Current.ProfileDelay);
+            else
+            {
+                _lastHoverTime = null;
+                _profileShown = false;
+                _mediator.Publish(new CloseProfilePopout());
+            }
+        }
+
+        // Update the hovered text node stuff.
+        _hoveredTextNode = _newHoveredTextNode;
+        _newHoveredTextNode = null;
+
+        // Now properly update the hovered node.
+        _hoveredNode = _newHoveredNode;
+        _newHoveredNode = null;
+    }
 
     // Look further into luna for how to cache the runtime type to remove any nessisary casting.
     // AKA Creation of "CachedNodes" of defined types.
@@ -180,7 +207,6 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     {
         ImUtf8.SameLineInner();
         DrawLeftSide(leaf.Data, flags);
-        ImGui.SameLine();
         ImGui.SameLine();
 
         // Store current position, then draw the right side.
@@ -246,6 +272,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private void DrawNameDisplay(IDynamicLeaf<Sundesmo> leaf, Vector2 region, DynamicFlags flags)
     {
         // For handling Interactions.
+        var isDragDrop = flags.HasAny(DynamicFlags.DragDropLeaves);
         var pos = ImGui.GetCursorPos();
         ImGui.InvisibleButton($"{leaf.FullPath}-name-area", region);
         HandleInteraction(leaf, flags);
@@ -254,41 +281,49 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         ImGui.SameLine(pos.X);
 
         // Push the monofont if we should show the UID, otherwise dont.
-        var showUid = _showingUID.Contains(leaf);
-        using (ImRaii.PushFont(UiBuilder.MonoFont, showUid))
-            CkGui.TextFrameAligned(showUid ? leaf.Data.UserData.UID : leaf.Data.GetDrawEntityName());
-        // Based on if the leaf is a drag-drop leaf, handle post-text draw differently.
-        if (flags.HasAny(DynamicFlags.DragDropLeaves))
+        DrawSundesmoName(leaf);
+        CkGui.AttachToolTip(isDragDrop ? DragDropTooltip : NormalTooltip, ImGuiColors.DalamudOrange);
+        if (isDragDrop)
+            return;
+        // Handle hover state.
+        if (ImGui.IsItemHovered())
         {
-            CkGui.AttachToolTip(DragDropTooltip, ImGuiColors.DalamudOrange);
+            _newHoveredTextNode = leaf;
+
+            // If we should show it, and it is not already shown, show it.
+            if (!_profileShown && _lastHoverTime < DateTime.UtcNow && _config.Current.ShowProfiles)
+            {
+                _profileShown = true;
+                _mediator.Publish(new OpenProfilePopout(leaf.Data.UserData));
+            }
+        }
+    }
+
+    private void DrawSundesmoName(IDynamicLeaf<Sundesmo> s)
+    {
+        // Assume we use mono font initially.
+        var useMono = true;
+        // Get if we are set to show the UID over the name.
+        var showUidOverName = _showingUID.Contains(s);
+        // obtain the DisplayName (Player || Nick > Alias/UID).
+        var dispName = string.Empty;
+        // If we should be showing the uid, then set the display name to it.
+        if (_showingUID.Contains(s))
+        {
+            // Mono Font is enabled.
+            dispName = s.Data.UserData.AliasOrUID;
         }
         else
         {
-            CkGui.AttachToolTip(NormalTooltip, ImGuiColors.DalamudOrange);
-            // If not a drag-drop item, and hovered, monitor profile update.
-            if (ImGui.IsItemHovered())
-            {
-                // If the profile is not shown, start the timer.
-                if (!_profileShown && _lastHoverTime is null)
-                    _lastHoverTime = DateTime.UtcNow.AddSeconds(_config.Current.ProfileDelay);
-                // If the time has elapsed and we are not showing the profile, show it.
-                if (!_profileShown && _lastHoverTime < DateTime.UtcNow && _config.Current.ShowProfiles)
-                {
-                    _profileShown = true;
-                    _mediator.Publish(new OpenProfilePopout(leaf.Data.UserData));
-                }
-            }
-            else
-            {
-                if (_profileShown)
-                {
-                    // Reset the hover time and close the popup.
-                    _profileShown = false;
-                    _lastHoverTime = null;
-                    _mediator.Publish(new CloseProfilePopout());
-                }
-            }
+            // Set it to the display name.
+            dispName = s.Data.GetDisplayName();
+            // Update mono to be disabled if the display name is not the alias/uid.
+            useMono = s.Data.UserData.AliasOrUID.Equals(dispName, StringComparison.Ordinal);
         }
+
+        // Display the name.
+        using (ImRaii.PushFont(UiBuilder.MonoFont, useMono))
+            CkGui.TextFrameAligned(dispName);
     }
 
     protected override void HandleInteraction(IDynamicLeaf<Sundesmo> node, DynamicFlags flags)
@@ -313,7 +348,10 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
                 _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
             if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
                 _renaming = node;
+                _nameEditStr = node.Data.GetNickname() ?? string.Empty;
+            }
         }
 
         // Handle Selection.

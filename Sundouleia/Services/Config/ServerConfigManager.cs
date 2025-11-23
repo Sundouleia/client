@@ -29,7 +29,7 @@ public class ServerConfigManager
         _nickConfig = nicksConfig;
     }
 
-    public GroupsStorage Groups => _folderConfig.Current; // try and faze out?
+    public FolderStorage Groups => _folderConfig.Current; // try and faze out?
     public NickStorage NicknameStorage => _nickConfig.Current;
     public AccountStorage AccountStorage => _accountConfig.Current;
 

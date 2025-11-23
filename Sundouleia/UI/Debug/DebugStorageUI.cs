@@ -25,8 +25,8 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
     private readonly RadarManager _radar;
     private readonly RequestsManager _requests;
     // New format.
-    private readonly WhitelistDrawer _mainDDSDrawer;
     private readonly WhitelistDrawSystem _mainDDS;
+    private readonly RadarDrawSystem _radarDDS;
 
     public DebugStorageUI(
         ILogger<DebugStorageUI> logger, 
@@ -38,8 +38,8 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
         GroupsManager groups, 
         RadarManager radar,
         RequestsManager requests,
-        WhitelistDrawer mainDrawer,
-        WhitelistDrawSystem mainDDSDrawer
+        WhitelistDrawSystem mainDDS,
+        RadarDrawSystem radarDDS
         ) : base(logger, mediator, "Storage Debugger")
     {
         _whitelistFolders = whitelistFolders;
@@ -50,8 +50,8 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
         _radar = radar;
         _requests = requests;
         // New format.
-        _mainDDSDrawer = mainDrawer;
-        _mainDDS = mainDDSDrawer;
+        _mainDDS = mainDDS;
+        _radarDDS = radarDDS;
 
         IsOpen = false;
         this.SetBoundaries(new(380, 400), ImGui.GetIO().DisplaySize);
@@ -77,8 +77,8 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
 
     private void DrawDDSDebug()
     {
-        DrawMainDrawer();
         DrawDDSDebug("Main Whitelist DDS", _mainDDS);
+        DrawDDSDebug("Radar DDS", _radarDDS);
     }
 
     private void DrawOldStorages()

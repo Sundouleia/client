@@ -45,7 +45,7 @@ public class DrawEntityRadarUser : IDrawEntity<RadarUser>
     }
 
     public string DistinctId { get; init; }
-    public string DisplayName => _sundesmos.TryGetNickAliasOrUid(new(Item.UID), out var res) ? res : Item.AnonymousName;
+    public string DisplayName => _sundesmos.TryGetNickAliasOrUid(Item.UID, out var res) ? res : Item.AnonymousName;
     public string EntityId => Item.UID;
     public bool IsLinked => _sundesmos.ContainsSundesmo(Item.UID);
     public bool Draw(bool _)
@@ -168,31 +168,6 @@ public class DrawEntityRadarUser : IDrawEntity<RadarUser>
         
         // Return if requesting to draft without quick-send.
         return pressed && !shifting;
-    }
-
-    private void DrawPopupIfValid()
-    {
-        var pos = ImGui.GetItemRectMin() + new Vector2(ImGui.GetItemRectSize().X, 0);
-        ImGui.SetNextWindowPos(pos);
-        using var style = ImRaii.PushStyle(ImGuiStyleVar.PopupRounding, 5f)
-            .Push(ImGuiStyleVar.PopupBorderSize, 2f);
-        using var color = ImRaii.PushColor(ImGuiCol.Border, CkColor.VibrantPink.Uint());
-        using var popup = ImRaii.Popup("Send Request Popup", WFlags.AlwaysAutoResize | WFlags.NoMove);
-        using var id = ImRaii.PushId($"popup_send_request_{Item.UID}");
-        if (!popup) return;
-
-        // NOTE: we could potentially add something like "groups to filter to on accept" but we can do this later.
-        CkGui.ColorTextCentered($"Send Request to {Item.AnonymousName}", ImGuiColors.ParsedGold);
-        ImGui.SameLine(CkGui.IconTextButtonSize(FAI.CloudUploadAlt, "Send"));
-        if (CkGui.IconTextButton(FAI.CloudUploadAlt, "Send"))
-        {
-            SendRequest();
-            ImGui.CloseCurrentPopup();
-        }
-
-        CkGui.Separator(CkColor.VibrantPink.Uint());
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-        ImGui.InputTextWithHint("##sendRequestMessage", "Attached Message (Optional)", ref _requestDesc, 100);
     }
 
     private void SendRequest()

@@ -9,16 +9,6 @@ namespace Sundouleia.Gui;
 
 public partial class DebugStorageUI
 {
-    private void DrawMainDrawer()
-    {
-        using var _ = ImRaii.TreeNode("Main Whitelist Drawer");
-        if (!_)
-            return;
-
-        ImGui.Text($"Nothing yet, WIP");
-        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-    }
-
     private void DrawDDSDebug<T>(string label, DynamicDrawSystem<T> dds) where T : class
     {
         using var _ = ImRaii.TreeNode($"{label} (DDS)");
@@ -117,6 +107,7 @@ public partial class DebugStorageUI
                 ImGui.TableNextRow();
             }
         }
+        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
     }
 
     private void DrawFolderInfo<T>(IDynamicCollection<T> folder) where T : class

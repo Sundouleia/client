@@ -2,6 +2,8 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.DrawSystem.Selector;
 
+
+
 // Can pivot to an abstract base if necessary, but abstracts dont play nice with rendering performance.
 // (Specifically if you interact with the abstract variables during draw frames.
 //  Accessing only inherited parent variables seems to work fine)

@@ -69,6 +69,8 @@ public partial class DynamicDrawer<T>
             // If the folder is opened, recursively process all children.
             if (fc.Folder.IsOpen)
             {
+                // Pre-sort the children until we find a better solution for this.
+                // Computation is minimal performance impact due to it only updating on dirty filters.
                 // Assume we are going to be appending child nodes.
                 var childNodes = new List<ICachedFolderNode<T>>();
                 // Iterate through each one, recursively building the caches.
@@ -87,8 +89,11 @@ public partial class DynamicDrawer<T>
                         childNodes.Add(innerCache);
                     }
                 }
-                // Once processed, apply the sorter & update the cached children.
-                fc.Children = [.. ApplySorter(childNodes, fc.Folder.Sorter)];
+
+                // Sorts the remaining child nodes by their folder's, and then selects the nodes for output.
+                fc.Children = fc.Folder.Sorter
+                    .SortItems(childNodes.Select(c => c.Folder))
+                    .Select(sorted => childNodes.First(c => c.Folder == sorted)).ToList();
             }
             // Otherwise, if closed, scan to see if any sub-nodes are visible.
             else
@@ -106,7 +111,7 @@ public partial class DynamicDrawer<T>
             if (folder.Folder.IsOpen)
             {
                 // Update the cached folder's children.
-                folder.Children = [..ApplySorter(folder.Folder.Children.Where(IsVisible), folder.Folder.Sorter)];
+                folder.Children = folder.Folder.Sorter.SortItems(folder.Folder.Children.Where(IsVisible)).ToList();
                 // If any children were added, the folder is visible.
                 visible |= folder.Children.Any();
             }

@@ -50,7 +50,7 @@ public class DrawEntitySundesmo : IDrawEntity<Sundesmo>
     }
 
     public string DistinctId { get; init; }
-    public string DisplayName => _sundesmo.GetDrawEntityName();
+    public string DisplayName => _sundesmo.GetDisplayName();
     public string EntityId => _sundesmo.UserData.UID;
     public Sundesmo Item => _sundesmo;
 

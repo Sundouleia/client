@@ -45,23 +45,23 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         DrawSystem.Changed -= OnDrawSystemChange;
     }
 
-    public void DrawContents(float width)
+    public void DrawContents(float width, DynamicFlags flags = DynamicFlags.BasicViewFolder)
     {
-        DrawContentsInternal(width);
+        DrawContentsInternal(width, flags);
         PostDraw();
     }
 
     // Refactor later.
-    private void DrawContentsInternal(float width)
+    private void DrawContentsInternal(float width, DynamicFlags flags)
     {
         using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
         if (!_)
             return;
         HandleMainContextActions();
-        Draw();
+        Draw(flags);
     }
 
-    private void Draw(DynamicFlags flags = DynamicFlags.BasicViewFolder)
+    private void Draw(DynamicFlags flags)
     {
         ImGui.SetScrollX(0);
         using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
@@ -76,13 +76,12 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
 
     /// <summary>
     ///     Add post-draw logic that is executed after drawing the full DynamicDrawSelector UI. <para />
-    ///     Reserved for operations that would modify the cache state, or set the filter to dirty.
+    ///     Reserved for operations that would modify the cache state, or set the filter to dirty. <para />
+    ///     If you override this make sure that the base is called, or else post-draw actions will not be processed.
     /// </summary>
-    private void PostDraw()
+    protected void PostDraw()
     {
-        // Update the hovered nodes.
-        _hoveredNode = _newHoveredNode;
-        _newHoveredNode = null;
+        UpdateHoverNode();
 
         // Process post-draw actions.
         while (_postDrawActions.TryDequeue(out Action? action))
@@ -97,6 +96,14 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
             }
         }
     }
+
+    protected virtual void UpdateHoverNode()
+    {
+        _hoveredNode    = _newHoveredNode;
+        _newHoveredNode = null;
+    }
+
+
 
     // Helper for parent classes.
     protected void AddPostDrawLogic(Action act)

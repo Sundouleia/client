@@ -1,48 +1,108 @@
-using Sundouleia.DrawSystem.Selector;
-using ZstdSharp.Unsafe;
-
 namespace Sundouleia.DrawSystem;
 
-public class DynamicSorter<T> : IReadOnlyList<ISortMethod<T>> where T : class
+// Read-Only access to the dynamic sorter, without mutable methods.
+public interface IReadOnlyDynamicSorter<TItem> : IReadOnlyList<ISortMethod<TItem>> where TItem : class
 {
-    private readonly List<ISortMethod<T>> _sortSteps = new();
+    /// <summary>
+    ///     If the first step is in descending order.
+    /// </summary>
+    public bool FirstDescending { get; }
 
     /// <summary>
-    ///     If the sorter does the first step in descending order.
+    ///     The steps of the dynamic sorter.
     /// </summary>
-    public bool FirstDescending = false;
+    IReadOnlyList<ISortMethod<TItem>> Steps { get; }
 
-    // Expose read-only access.
+    /// <summary>
+    ///     Sorts all passed in items with the sorter's steps.
+    ///     Items must match the defined type <typeparamref name="T"/>.
+    /// </summary>
+    /// <param name="items"> The items to sort. </param>
+    /// <param name="fallback"> The fallback to use. </param>
+    IEnumerable<TItem> SortItems(IEnumerable<TItem> items);
+}
+
+public interface IDynamicSorter<TItem> where TItem : class
+{
+    /// <summary>
+    ///     Adds a sort step to the sorter. Duplicate methods are voided.
+    /// </summary>
+    void Add(ISortMethod<TItem> step);
+
+    /// <summary>
+    ///     Appends a series of steps to the sorter.
+    /// </summary>
+    void AddRange(IEnumerable<ISortMethod<TItem>> steps);
+
+    /// <summary>
+    ///     Assigns a series of steps to the sorter, replacing any existing ones.
+    /// </summary>
+    void SetSteps(IEnumerable<ISortMethod<TItem>> steps);
+
+    /// <summary>
+    ///     Removes a sort step.
+    /// </summary>
+    void Remove(ISortMethod<TItem> step);
+    
+    /// <summary>
+    ///     Clears all sort steps.
+    /// </summary>
+    void Clear();
+
+    /// <summary>
+    ///     Reorders a sort step from oldIndex to newIndex.
+    /// </summary>
+    void Move(int oldIndex, int newIndex);
+}
+
+
+public class DynamicSorter<T> : IDynamicSorter<T>, IReadOnlyDynamicSorter<T> where T : class
+{
+    private readonly List<ISortMethod<T>> _sortSteps = [];
+
+    /// <summary>
+    ///     Constructor for optional paramaters, defaulting to nothing being assigned. <para />
+    /// </summary>
+    /// <param name="steps"> The initial sort steps to set in the sorter. <b>If not provided, SortItems returns input.</b></param>
+    public DynamicSorter(IEnumerable<ISortMethod<T>>? steps = null)
+    {
+        if (steps is not null)
+            _sortSteps.AddRange(steps);
+    }
+    // Satisfy ReadOnly
+    public bool FirstDescending { get; set; } = false;
     public int Count => _sortSteps.Count;
     public ISortMethod<T> this[int index] => _sortSteps[index];
+    public IReadOnlyList<ISortMethod<T>> Steps => _sortSteps;
 
     public IEnumerator<ISortMethod<T>> GetEnumerator()
         => _sortSteps.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator()
         => _sortSteps.GetEnumerator();
 
-    // Mutating API.
-    /// <summary>
-    ///     Adds a sort step to the sorter. Duplicate methods are voided.
-    /// </summary>
-    public void Add(ISortMethod<T> sortMethod)
+    // Satify IDynamicSorter
+    public void Add(ISortMethod<T> step)
     {
-        if (!_sortSteps.Contains(sortMethod))
-            return;
-        _sortSteps.Add(sortMethod);
+        if (!_sortSteps.Contains(step))
+            _sortSteps.Add(step);
     }
 
-    /// <summary>
-    ///     Removes a sort step.
-    /// </summary>
+    public void AddRange(IEnumerable<ISortMethod<T>> steps)
+    {
+        foreach (var step in steps)
+            Add(step);
+    }
+
+    public void SetSteps(IEnumerable<ISortMethod<T>> steps)
+    {
+        _sortSteps.Clear();
+        _sortSteps.AddRange(steps);
+    }
+
     public void Remove(ISortMethod<T> sortMethod)
         => _sortSteps.Remove(sortMethod);
 
-    /// <summary>
-    ///     Clears all sort steps.
-    /// </summary>
-    public void Clear()
-        => _sortSteps.Clear();
+    public void Clear() => _sortSteps.Clear();
 
     public void Move(int oldIndex, int newIndex)
     {
@@ -54,33 +114,30 @@ public class DynamicSorter<T> : IReadOnlyList<ISortMethod<T>> where T : class
         _sortSteps.Insert(newIndex, m);
     }
 
-    public IEnumerable<TItem> SortItems<TItem>(IEnumerable<TItem> items, Func<TItem, IComparable?> defaultKey)
+    public IEnumerable<T> SortItems(IEnumerable<T> items)
     {
-        if (_sortSteps.Count == 0)
-            return items.OrderBy(defaultKey);
+        if (_sortSteps.Count is 0)
+            return items;
 
-        IOrderedEnumerable<TItem>? ordered = null;
+        IOrderedEnumerable<T>? ordered = null;
 
         for (int i = 0; i < _sortSteps.Count; i++)
         {
-            var method = _sortSteps[i];
-
-            Func<TItem, IComparable?> selector = it =>
-                method.KeySelector((T)(object)it)!;
+            var key = _sortSteps[i].KeySelector;
 
             if (ordered == null)
             {
                 ordered = FirstDescending
-                    ? items.OrderByDescending(selector)
-                    : items.OrderBy(selector);
+                    ? items.OrderByDescending(key)
+                    : items.OrderBy(key);
             }
             else
             {
-                ordered = ordered.ThenBy(selector);
+                ordered = ordered.ThenBy(key);
             }
         }
 
-        return ordered!;
+        return ordered ?? items;
     }
 }
 
