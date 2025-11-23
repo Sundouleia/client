@@ -20,10 +20,4 @@ public sealed class BlockedUserManager : DisposableMediatorSubscriberBase
         _serverConfigs = serverConfigs;
         _fileNames = fileNames;
     }
-
-    private void OnLogout()
-    {
-        Logger.LogInformation("Clearing Client Data for Profile on Logout!");
-        _fileNames.ClearUidConfigs();
-    }
 }

@@ -34,9 +34,7 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         DrawSystem.Changed += OnDrawSystemChange;
     }
 
-    // TODO:
-    // Handle this better, maybe make it per-node,
-    // or have a better way to update this on change.
+    // Manages all nodes hover state over a 2 setters per drawframe outside updates.
     protected IDynamicNode? _hoveredNode = null; // From last frame.
     protected IDynamicNode? _newHoveredNode = null; // Tracked each frame.
 

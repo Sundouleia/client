@@ -10,9 +10,12 @@ namespace Sundouleia.DrawSystem;
 [Flags]
 public enum FolderFlags : byte
 {
-    None = 0,
-    Expanded = 1 << 0,
-    ShowIfEmpty = 1 << 1,
+    None        = 0 << 0,
+    Expanded    = 1 << 0, // If the folder is expanded.
+    ShowIfEmpty = 1 << 1, // If the folder should display even with 0 children.
+    AutoSort    = 1 << 2, // Auto-Sort children after moves or renames. For FolderGroups.
+
+    RootFlags = Expanded | ShowIfEmpty, // Default flags for the root folder.
 }
 
 /// <summary>

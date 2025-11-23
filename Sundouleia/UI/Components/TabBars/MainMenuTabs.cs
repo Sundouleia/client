@@ -19,7 +19,6 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
     {
         Homepage,
         Requests,
-        NewWhitelist,
         Whitelist,
         Radar,
         RadarChat,
@@ -50,8 +49,6 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         AddDrawButton(FontAwesomeIcon.Inbox, SelectedTab.Requests, "Incoming / Outgoing Requests",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
         
-        AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.NewWhitelist, "New Whitelist");
-
         AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.Whitelist, "User Whitelist", 
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Whitelist, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
 

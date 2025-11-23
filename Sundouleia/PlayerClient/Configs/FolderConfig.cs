@@ -4,35 +4,23 @@ using Sundouleia.Services.Configs;
 
 namespace Sundouleia.PlayerClient;
 
-// Can rearrange the order these are listed in the folder to adjust sort priority.
-public enum FolderSortFilter
-{
-    Rendered,       // Rendered sundesmos first.
-    Online,         // Online sundesmos first.
-    Favorite,       // Favorite sundesmos first.
-    Alphabetical,   // Default behavior.
-    Temporary,      // Temporary sundesmos first.
-    DateAdded,      // When the pair was established.
-}
-
 public class FolderStorage
 {
-    // Basic config options for all folders.
-    // (But only defined in whitelist folder? Maybe move?)
+    // All Created groups. Not tracked as a dictionary with label keys to allow renaming while keeping references.
+    public List<SundesmoGroup> Groups { get; set; } = new();
+
+    // Cached sort order filters. Maybe revise later idk.
+    public List<FolderSortPreset> SortPresets { get; set; } = new();
+
+    // WhitelistFolder Swapper
+    public bool ViewingGroups { get; set; } = false;
+
+    // Main WhitelistFolders config.
     public bool FavoritesFirst { get; set; } = true;
     public bool NickOverPlayerName { get; set; } = false;
     public bool VisibleFolder { get; set; } = true;
     public bool OfflineFolder { get; set; } = true;
     public bool TargetWithFocus { get; set; } = false;
-
-    // Can maybe remove this later after we update the drawSystems.
-    public HashSet<string> OpenedFolders { get; set; } = new(StringComparer.Ordinal);
-
-    // All Created groups. Not tracked as a dictionary with label keys to allow renaming while keeping references.
-    public List<SundesmoGroup> Groups { get; set; } = new();
-
-    // Cached sort order filters.
-    public List<FolderSortPreset> SortPresets { get; set; } = new();
 }
 
 public class SundesmoGroup
@@ -117,21 +105,6 @@ public class FolderConfig : IHybridSavable
 
     public FolderStorage Current { get; set; } = new FolderStorage();
 
-    public IEnumerable<string> GroupFolderLabels => Current.Groups.Select(g => g.Label);
-    public bool LabelExists(string l) => Constants.OwnedFolders.Contains (l) || Current.Groups.Any(g => g.Label == l);
-    public bool IsFolderOpen(string id) => Current.OpenedFolders.Contains(id);
-    
-    public void ToggleFolder(string id)
-    {
-        Current.OpenedFolders.SymmetricExceptWith([ id ]);
-        Save();
-    }
-
-    public void SetFolder(string id, bool open)
-    {
-        if (open && Current.OpenedFolders.Add(id))
-            Save();
-        else if (!open && Current.OpenedFolders.Remove(id))
-            Save();
-    }
+    public bool LabelExists(string l) 
+         => Constants.OwnedFolders.Contains (l) || Current.Groups.Any(g => g.Label == l);
 }

@@ -25,7 +25,7 @@ public sealed class WhitelistFolder : DynamicFolder<Sundesmo>
 
     public WhitelistFolder(DynamicFolderGroup<Sundesmo> parent, uint id, FAI icon, string name,
         uint iconColor, Func<IReadOnlyList<Sundesmo>> generator, IReadOnlyList<ISortMethod<DynamicLeaf<Sundesmo>>> sortSteps)
-        : base (parent, icon, name, id, new(sortSteps))
+        : base(parent, icon, name, id, new(sortSteps))
     {
         // Can set stylizations here.
         NameColor = uint.MaxValue;
@@ -108,68 +108,64 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
     {
         // Before we load anything, inverse the sort direction of root.
         SetSortDirection(root, true);
-
-        // If the file loads with changes at all, we should re-save it.
-        // (Should technically revise this as any changes from ensure folders
-        // or setOpenedStates should also be considered changes)
-        var loadedChanges = LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Whitelist), out _, out List<string> openedCollections);
-        // Log the result.
-        _logger.LogInformation($"WhitelistDrawSystem load completed. Changes detected: {loadedChanges}");
-        // Ensure all folders are present that should be.
-        EnsureFolders();
-        // Open any folders that should be opened.
-        SetOpenedStates(openedCollections);
-
-        if (loadedChanges)
+        // If any changes occured, re-save the file.
+        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Whitelist)))
         {
-            _logger.LogInformation("Changes detected during load, saving updated config.");
+            _logger.LogInformation("WhitelistDrawSystem folder structure changed on load, saving updated structure.");
             _hybridSaver.Save(this);
         }
     }
 
-    private void EnsureFolders()
+    protected override bool EnsureAllFolders(Dictionary<string, string> _)
     {
-        // Load in the folders (we dont care about the parent state, they are all root here)
-        VisibleFolderStateUpdate(_folderConfig.Current.VisibleFolder);
-        OfflineFolderStateUpdate(_folderConfig.Current.OfflineFolder);
-        _logger.LogInformation($"Generated {FolderMap.Count} folders.");
-    }
-
-    private void SetOpenedStates(List<string> openedCollections)
-    {
-        // TODO;
-        _logger.LogInformation($"Setting opened states for {openedCollections.Count} folders.");
+        // Load in the folders, they are all descendants of root.
+        bool anyChanged = false;
+        anyChanged |= UpdateVisibleFolderState(_folderConfig.Current.VisibleFolder);
+        anyChanged |= UpdateOfflineFolderState(_folderConfig.Current.OfflineFolder);
+        _logger.LogInformation($"Ensured all folders, total now {FolderMap.Count} folders.");
+        return anyChanged;
     }
 
     // Update the FolderSystem folders based on if it should be included or not.
-    public void VisibleFolderStateUpdate(bool showFolder)
+    public bool UpdateVisibleFolderState(bool showFolder)
     {
-        if (showFolder)
-            CreateFolder(FAI.Eye, Constants.FolderTagVisible, CkColor.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(u => u.IsRendered && u.IsOnline)]);
-        else
-            Delete(Constants.FolderTagVisible);
-    }
-
-    public void OfflineFolderStateUpdate(bool showFolder)
-    {
+        // If we want to show the folder and it already exists then change nothing.
         if (showFolder)
         {
-            // Remove the AllFolder, if it was present.
-            Delete(Constants.FolderTagAll);
-            // Then add online and offline.
-            CreateFolder(FAI.Link, Constants.FolderTagOnline, CkColor.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => s.IsOnline)]);
-            CreateFolder(FAI.Link, Constants.FolderTagOffline, CkColor.TriStateCross.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => !s.IsOnline)]);
+            if (FolderMap.ContainsKey(Constants.FolderTagVisible))
+                return false;
+            // Try to add it.
+            return TryAdd(FAI.Eye, Constants.FolderTagVisible, CkColor.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(u => u.IsRendered && u.IsOnline)]);
         }
-        else
-        {
-            // Delete Online/Offline, then add All.
-            Delete(Constants.FolderTagOnline);
-            Delete(Constants.FolderTagOffline);
-            CreateFolder(FAI.Globe, Constants.FolderTagAll, uint.MaxValue, () => _sundesmos.DirectPairs);
-        }
+        // Otherwise attempt to remove it.
+        return Delete(Constants.FolderTagVisible);
     }
 
-    private void CreateFolder(FAI icon, string name, uint iconColor, Func<IReadOnlyList<Sundesmo>> generator)
+    // Not too worried about additional work here since it only happens on recalculations.
+    public bool UpdateOfflineFolderState(bool showFolder)
+    {
+        // Assume no changes.
+        bool anyChanges = false;
+        // If we wanted to show offline/online..
+        if (showFolder)
+        {
+            anyChanges |= Delete(Constants.FolderTagAll);
+            anyChanges |= TryAdd(FAI.Link, Constants.FolderTagOnline, CkColor.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => s.IsOnline)]);
+            anyChanges |= TryAdd(FAI.Link, Constants.FolderTagOffline, CkColor.TriStateCross.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => !s.IsOnline)]);
+        }
+        // Otherwise we wanted to only show ALL.
+        else
+        {
+            anyChanges |= Delete(Constants.FolderTagOnline);
+            anyChanges |= Delete(Constants.FolderTagOffline);
+            anyChanges |= AddFolder(new WhitelistFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll, 
+                                        uint.MaxValue, () => _sundesmos.DirectPairs, DynamicSorterEx.AllFolderSorter));
+        }
+        // Return if anything was modified.
+        return anyChanges;
+    }
+
+    private bool TryAdd(FAI icon, string name, uint iconColor, Func<IReadOnlyList<Sundesmo>> generator)
         => AddFolder(new WhitelistFolder(root, idCounter + 1u, icon, name, iconColor, generator, [DynamicSorterEx.ByPairName]));
 
     // HybridSavable
@@ -213,6 +209,12 @@ public static class DynamicSorterEx
             FolderSortFilter.DateAdded => ByDateAdded,
             _ => throw new ArgumentOutOfRangeException(nameof(filter), filter, null)
         };
+
+    /// <summary>
+    ///     Preset for the AllFolder, to sort by name -> visible -> online -> favorite.
+    /// </summary>
+    public static readonly IReadOnlyList<ISortMethod<DynamicLeaf<Sundesmo>>> AllFolderSorter
+        = [ ByRendered, ByOnline, ByFavorite, ByPairName ];
 
     // Sort Helpers
     public struct TotalChildren<T> : ISortMethod<IDynamicCollection<T>> where T : class

@@ -95,22 +95,14 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
         return removed.Any();
     }
 
-    internal void SetParent(DynamicFolderGroup<T> parent)
-    {
-        Parent = parent;
-        UpdateFullPath();
-    }
-
-    internal void SetName(string name, bool fix)
+    internal void SetName(string name, bool fix, bool forceSort = false)
     {
         Name = fix ? name.FixName() : name;
         UpdateFullPath();
+        // Sort the parents children if desired.
+        if (forceSort || Parent.Flags.HasAny(FolderFlags.AutoSort))
+            Parent.SortChildren();
     }
-
-    // For manual triggers only, but maybe phase out for a single ISortMethod<T>
-    // one time sort on a fallback or something idk, lol.
-    internal void Sort(NameComparer comparer)
-        => Children.Sort(comparer);
 
     internal void SetIsOpen(bool value)
         => Flags = value ? Flags | FolderFlags.Expanded : Flags & ~FolderFlags.Expanded;

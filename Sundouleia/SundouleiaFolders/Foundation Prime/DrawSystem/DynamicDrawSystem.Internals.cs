@@ -14,61 +14,62 @@ public partial class DynamicDrawSystem<T>
         NoSuccess,
     }
 
+    // Refactor later?...
+    //private Result RenameLeaf(DynamicLeaf<T> leaf, string newName)
+    //{
+    //    // Prevent allowing a Leaf to behave as Root.
+    //    if (string.IsNullOrEmpty(leaf.Name) || string.IsNullOrEmpty(newName))
+    //        return Result.InvalidOperation;
+
+    //    // correct the newName to work with the dynamic file system.
+    //    newName = newName.FixName();
+    //    // if the names are identical just return that nothing was done.
+    //    if (newName == leaf.Name)
+    //        return Result.SuccessNothingDone;
+
+    //    // an entity with the same name already exists, so fail it.
+    //    // (if we run into edge cases with this we can just mimic OtterGui FileSystem)
+    //    if (Search(leaf.Parent, newName) >= 0)
+    //        return Result.ItemExists;
+
+    //    // Otherwise, rename the child and return success.
+    //    leaf.SetName(newName, false);
+    //    return Result.Success;
+    //}
+
     /// <summary>
-    ///     Try to rename an entity in the dynamic file system, 
-    ///     while also fixing any invalid symbols in the new name.
+    ///     Internally rename a Folder or FolderGroup to a new name. <para />
+    ///     Fails if the new name is invalid, or the name exists in the drawSystem already.
     /// </summary>
-    /// <param name="leaf"> The entity to rename. </param>
-    /// <param name="newName"> The new name to assign to the leaf. </param>
-    private Result RenameLeaf(DynamicLeaf<T> leaf, string newName)
-    {
-        // Prevent allowing a Leaf to behave as Root.
-        if (string.IsNullOrEmpty(leaf.Name) || string.IsNullOrEmpty(newName))
-            return Result.InvalidOperation;
-
-        // correct the newName to work with the dynamic file system.
-        newName = newName.FixName();
-        // if the names are identical just return that nothing was done.
-        if (newName == leaf.Name)
-            return Result.SuccessNothingDone;
-
-        // an entity with the same name already exists, so fail it.
-        // (if we run into edge cases with this we can just mimic OtterGui FileSystem)
-        if (Search(leaf.Parent, newName) >= 0)
-            return Result.ItemExists;
-
-        // Otherwise, rename the child and return success.
-        leaf.SetName(newName, false);
-        return Result.Success;
-    }
-
+    /// <param name="folder"> the folder to rename. </param>
+    /// <param name="newName"> the new name. </param>
     private Result RenameFolder(IDynamicCollection<T> folder, string newName)
     {
-        // Prevent allowing a folder to behave as Root.
-        if (string.IsNullOrEmpty(folder.Name) || string.IsNullOrEmpty(newName))
+        // Prevent renaming to root.
+        if (string.IsNullOrEmpty(newName))
             return Result.InvalidOperation;
 
-        // correct the newName to work with the DFS.
-        newName = newName.FixName();
+        var fixedNewName = newName.FixName();
 
-        // Return early if names are identical.
-        if (newName == folder.Name)
+        // If the name is no different, return success with nothing done.
+        if (fixedNewName == folder.Name)
             return Result.SuccessNothingDone;
 
+        // Mark the item as existing if it is present in the drawSystem already.
+        if (_folderMap.ContainsKey(fixedNewName))
+            return Result.ItemExists;
+
+        // Otherwise, update the name of the folder.
+        // (Do not sort, leave that to the folder's AutoSort function)
         if (folder is DynamicFolderGroup<T> fc)
         {
-            if (Search(fc.Parent, newName) >= 0)
-                return Result.ItemExists;
             fc.SetName(newName, false);
-            fc.Parent.SortChildren(_nameComparer);
             return Result.Success;
         }
+        // works on any folder kind becuz abstract yes yes.
         else if (folder is DynamicFolder<T> f)
         {
-            if (Search(f.Parent, newName) >= 0)
-                return Result.ItemExists;
             f.SetName(newName, false);
-            f.Parent.SortChildren(_nameComparer);
             return Result.Success;
         }
         else
@@ -77,41 +78,20 @@ public partial class DynamicDrawSystem<T>
         }
     }
 
-    // Try to move a leaf to a new parent Folder, and renaming it if requested.
-    // Concrete to folders because leaf entities can only exist under Folder entities.
-    // Try to phase out the idx.
-    private Result MoveFolder(IDynamicCollection<T> folder, DynamicFolderGroup<T> newParent, out DynamicFolderGroup<T> oldParent, string? newName = null)
+    // Moves a Folder to a new location within the DDS.
+    private Result MoveFolder(IDynamicCollection<T> folder, DynamicFolderGroup<T> newParent, out DynamicFolderGroup<T> oldParent)
     {
-        // store the current old parent of the leaf.
+        // store the old parent for reference on out param.
         oldParent = folder.Parent;
-        // If the parents are the same, return either that nothing we done, or perform a rename.
-        if (newParent == oldParent)
-            return newName == null ? Result.SuccessNothingDone : RenameFolder(folder, newName);
+        // If the old and new parents are the same, do nothing.
+        if (oldParent == newParent)
+            return Result.SuccessNothingDone;
 
-        // obtain the true newName.
-        var actualNewName = newName?.FixName() ?? folder.Name;
-        // prevent the move if anything under the new folder contains a leaf with the same name.
-        if (Search(newParent, actualNewName) >= 0)
-            return Result.ItemExists;
-
-        // Otherwise the move operation is valid, so remove the folder from the old FolderCollection, and assign it to the new one.
+        // Remove the child from the old parent, and add it to the new parent.
         oldParent.Children.Remove(folder);
-        if (folder is DynamicFolderGroup<T> fc)
-        {
-            fc.SetName(actualNewName, false);
-            AssignFolder(newParent, fc);
-            return Result.Success;
-        }
-        else if (folder is DynamicFolder<T> f)
-        {
-            f.SetName(actualNewName, false);
-            AssignFolder(newParent, f);
-            return Result.Success;
-        }
-        else
-        {
-            return Result.InvalidOperation;
-        }
+        // Assign it to the new one.
+        // If it failed, it is because the item exists.
+        return newParent.AddChild(folder) ? Result.Success : Result.ItemExists;
     }
 
 
@@ -132,16 +112,15 @@ public partial class DynamicDrawSystem<T>
         {
             var folder = new DynamicFolderGroup<T>(topFolder, FAI.FolderTree, segment, idCounter + 1u);
             // If we were able to successfully assign the folder, then update topFolder and res.
-            if (AssignFolder(topFolder, folder) is Result.ItemExists)
-            {
-                // If it already exists, then we can skip incrementing the id and just update topFolder.
-                topFolder = folder;
-            }
-            // Otherwise, it is a new folder to be added, so inc ID, update res, and set topFolder.
-            else
+            if (topFolder.AddChild(folder))
             {
                 ++idCounter;
                 res = Result.Success;
+                topFolder = folder;
+            }
+            else
+            {
+                // It already exists, then we can skip incrementing the id and just update topFolder.
                 topFolder = folder;
             }
         }
@@ -150,64 +129,28 @@ public partial class DynamicDrawSystem<T>
         return res;
     }
 
-    private Result AssignFolder(DynamicFolderGroup<T> parent, DynamicFolder<T> folder)
-    {
-        if (Search(parent, folder.Name) >= 0)
-            return Result.ItemExists;
-        // Otherwise, assign it.
-        parent.Children.Add(folder);
-        folder.Parent = parent;
-        folder.UpdateFullPath();
-        parent.SortChildren(_nameComparer);
-        return Result.Success;
-    }
-
-    private Result AssignFolder(DynamicFolderGroup<T> parent, DynamicFolderGroup<T> folder)
-    {
-        if (Search(parent, folder.Name) >= 0)
-            return Result.ItemExists;
-        // Otherwise, assign it.
-        parent.Children.Add(folder);
-        folder.Parent = parent;
-        folder.UpdateFullPath();
-        parent.SortChildren(_nameComparer);
-        return Result.Success;
-    }
-
     private Result RemoveFolder(IDynamicCollection<T> folder)
-        => folder switch
+    {
+        // If the folder is not found, it was technically removed lol.
+        if (!_folderMap.TryGetValue(folder.Name, out var match))
+            return Result.SuccessNothingDone;
+
+        // Otherwise, it does exist, and we should remove it.
+        if (folder is DynamicFolderGroup<T> fg)
         {
-            DynamicFolderGroup<T> fg => RemoveFolder(fg),
-            DynamicFolder<T> f => RemoveFolder(f),
-            _ => Result.InvalidOperation
-        };
+            fg.Parent.Children.Remove(match);
+            _folderMap.Remove(folder.Name);
+            return Result.Success;
+        }
+        else if (folder is DynamicFolder<T> f)
+        {
+            f.Parent.Children.Remove(match);
+            _folderMap.Remove(folder.Name);
+            return Result.Success;
+        }
 
-    private Result RemoveFolder(DynamicFolder<T> folder)
-    {
-        var idx = Search(folder.Parent, folder.Name);
-        if (idx < 0)
-            return Result.SuccessNothingDone;
-        folder.Parent.Children.RemoveAt(idx);
-        // Remove it from the mapping.
-        _folderMap.Remove(folder.Name);
-        // Return successful removal.
-        return Result.Success;
-    }
-
-    private Result RemoveFolder(DynamicFolderGroup<T> folder)
-    {
-        if (folder.IsRoot)
-            return Result.InvalidOperation;
-
-        var idx = Search(folder.Parent, folder.Name);
-        if (idx < 0)
-            return Result.SuccessNothingDone;
-        // Remove the folder from the parent & map.
-        folder.Parent.Children.RemoveAt(idx);
-        _folderMap.Remove(folder.Name);
-        // Maybe move all child folders up to the current folder
-        // location, (TODO)
-        return Result.Success;
+        // Invalid otherwise.
+        return Result.InvalidOperation;
     }
 
     /// <summary>

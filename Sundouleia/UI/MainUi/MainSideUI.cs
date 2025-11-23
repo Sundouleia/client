@@ -19,13 +19,17 @@ using SundouleiaAPI.Util;
 using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.MainWindow;
-public class InteractionsUI : WindowMediatorSubscriberBase
+
+// The UI element that will be continuously drawn alongside the MainUI under certain conditions.
+// This can house various displays based on the selected tab, under spesific conditions.
+// Overtime the conditions that trigger displays will be expanded upon.
+public class MainSideUI : WindowMediatorSubscriberBase
 {
     private readonly MainMenuTabs _mainUiTabs;
     private readonly MainHub _hub;
     private readonly SundesmoManager _sundesmos;
 
-    public InteractionsUI(ILogger<InteractionsUI> logger, SundouleiaMediator mediator,
+    public MainSideUI(ILogger<MainSideUI> logger, SundouleiaMediator mediator,
         MainMenuTabs tabs, MainHub hub, SundesmoManager sundesmos)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {

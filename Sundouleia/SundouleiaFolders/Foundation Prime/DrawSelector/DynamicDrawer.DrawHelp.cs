@@ -156,7 +156,6 @@ public partial class DynamicDrawer<T>
             DrawCachedFolderNode(child, flags);
     }
 
-    // Might merge outer and inner if too difficult to navigate internals later.
     protected virtual void DrawFolderBanner(IDynamicFolder<T> f, DynamicFlags flags, bool selected)
     {
         // We could likely reduce this by a lot if we had a override for this clipped draw within the dynamic draw system.

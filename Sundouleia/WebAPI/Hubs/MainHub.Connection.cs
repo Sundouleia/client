@@ -85,7 +85,7 @@ public partial class MainHub
                 await LoadOnlineSundesmos().ConfigureAwait(false);
                 await LoadRequests().ConfigureAwait(false);
                 // Load in all local data for the current profile.
-                // TODO: Update for logged in profile.
+                _serverConfigs.UpdateFileProviderForConnection(ConnectionResponse!);
 
                 // once data is synchronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;

@@ -34,7 +34,6 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly SundesmoManager _sundesmos;
     private readonly TutorialService _guides;
     private readonly HomeTab _homeTab;
-    private readonly NewWhitelistTab _newWhitelist;
     private readonly WhitelistTab _whitelist;
     private readonly RadarTab _radar;
     private readonly RadarChatTab _radarChat;
@@ -48,7 +47,7 @@ public class MainUI : WindowMediatorSubscriberBase
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
         ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
         SundesmoManager sundesmos, TutorialService guides, HomeTab homeTab, WhitelistTab whitelist,
-        NewWhitelistTab newWhitelist, RadarTab radar, RadarChatTab chat, RequestsTab requestsTab) 
+        RadarTab radar, RadarChatTab chat, RequestsTab requestsTab) 
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
@@ -60,7 +59,6 @@ public class MainUI : WindowMediatorSubscriberBase
         _guides = guides;
 
         _homeTab = homeTab;
-        _newWhitelist = newWhitelist;
         _whitelist = whitelist;
         _radar = radar;
         _radarChat = chat;
@@ -188,13 +186,10 @@ public class MainUI : WindowMediatorSubscriberBase
                 _homeTab.DrawSection();
                 break;
             case MainMenuTabs.SelectedTab.Requests:
-                _requestsTab.DrawRequestsSection();
-                break;
-            case MainMenuTabs.SelectedTab.NewWhitelist:
-                _newWhitelist.DrawWhitelistSection();
+                _requestsTab.DrawSection();
                 break;
             case MainMenuTabs.SelectedTab.Whitelist:
-                _whitelist.DrawWhitelistSection();
+                _whitelist.DrawSection();
                 break;
             case MainMenuTabs.SelectedTab.Radar:
                 _radar.DrawSection();

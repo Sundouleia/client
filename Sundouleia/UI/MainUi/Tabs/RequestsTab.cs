@@ -31,7 +31,7 @@ public class RequestsTab
     public DynamicRequestFolder Incoming => _incomingFolder;
     public DynamicRequestFolder Pending => _pendingFolder;
 
-    public void DrawRequestsSection()
+    public void DrawSection()
     {
 
         using var _ = CkRaii.Child("content", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);

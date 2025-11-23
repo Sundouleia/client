@@ -1,6 +1,7 @@
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem;
 
@@ -44,7 +45,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     protected uint idCounter { get; private set; } = 1;
 
     /// <summary> The root folder collection of this dynamic folder system. </summary>
-    protected DynamicFolderGroup<T> root = DynamicFolderGroup<T>.CreateRoot();
+    protected DynamicFolderGroup<T> root = DynamicFolderGroup<T>.CreateRoot([DynamicSorterEx.ByFolderName<T>()]);
 
     public DynamicDrawSystem(IComparer<ReadOnlySpan<char>>? comparer = null)
     {
@@ -62,49 +63,56 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     public IReadOnlyDictionary<string, IDynamicCollection<T>> FolderMap 
         => _folderMap;
 
+    // Attempts to get a DynamicFolderGroup by its name, returning true if found.
+    public bool TryGetFolderGroup(string name, [NotNullWhen(true)] out DynamicFolderGroup<T>? folderGroup)
+    {
+        if (_folderMap.TryGetValue(name, out var folder) && folder is DynamicFolderGroup<T> fg)
+        {
+            folderGroup = fg;
+            return true;
+        }
+        folderGroup = null;
+        return false;
+    }
+
     public bool TryGetFolder(string name, [NotNullWhen(true)] out IDynamicCollection<T>? folder)
         => _folderMap.TryGetValue(name, out folder);
 
-    private int Search(DynamicFolder<T> parent, ReadOnlySpan<char> name)
-        => CollectionsMarshal.AsSpan(parent.Children).BinarySearch(new SearchNode(_nameComparer, name));
-
-    private int Search(DynamicFolderGroup<T> parent, ReadOnlySpan<char> name)
-        => CollectionsMarshal.AsSpan(parent.Children).BinarySearch(new SearchNode(_nameComparer, name));
-
-    public bool Equal(ReadOnlySpan<char> lhs, ReadOnlySpan<char> rhs)
-        => _nameComparer.BaseComparer.Compare(lhs, rhs) is 0;
+    // Dunno why this is needed anymore.
+    //public bool Equal(ReadOnlySpan<char> lhs, ReadOnlySpan<char> rhs)
+    //    => _nameComparer.BaseComparer.Compare(lhs, rhs) is 0;
 
     // Useful for dynamic folders wanting to contain their own nested folders.
     protected DynamicFolderGroup<T> GetGroupByName(string parentName)
        => _folderMap.TryGetValue(parentName, out var f) && f is DynamicFolderGroup<T> fg
         ? fg : root;
 
-    protected void AddFolder(DynamicFolder<T> folder)
+    // Could make this return Result instead but its more for internal stuff.
+    protected bool AddFolder(DynamicFolder<T> folder)
     {
-        // Ensure Validity
-        if (folder.Parent is null)
-            folder.Parent = root;
-        // Ensure Validity
-        if (folder.ID != idCounter + 1u)
-            folder.ID = idCounter + 1u;
-
-        // If a folder with the same name already exists, return.
+        // If the folder under the same name already exists, abort creation.
         if (_folderMap.ContainsKey(folder.Name))
-            return;
+            return false;
 
-        // Attempt to assign the folder. If it fails, throw an exception.
-        if (AssignFolder(folder.Parent, folder) is Result.ItemExists)
+        // Ensure Validity. If parent is null or the id counter is off, fail creation.
+        if (folder.Parent is null)
+            return false;
+        
+        if (folder.ID != idCounter + 1u)
+            return false;
+
+        // Folder is valid, so attempt to assign it. If it fails, throw an exception.
+        if (!folder.Parent.AddChild(folder))
             throw new Exception($"Could not add folder [{folder.Name}] to group [{folder.Parent.Name}]: Folder with the same name exists.");
 
-        // Successful, so increment the ID counter.
+        // Successful, so increment the ID counter and update the map and contents.
         ++idCounter;
-
-        // Update the folder contents and the map refernce.
         folder.Update(_nameComparer, out _);
         _folderMap[folder.Name] = folder;
 
-        // Revise later.
+        // Revise later, this would fire a ton of changes during a reload and could possibly overload fileIO.
         Changed?.Invoke(DDSChangeType.FolderAdded, folder, null, folder.Parent);
+        return true;
     }
 
     // Retrieve the updated state of all folders.
@@ -163,6 +171,31 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         return true;
     }
 
+
+    /// <summary>
+    ///     Sets the opened state of multiple folders by name. <para />
+    ///     This works on <b>FolderGroup's AND Folder's</b>.
+    /// </summary>
+    protected void OpenFolders(List<string> toOpen, bool newState)
+    {
+        foreach (var collectionName in toOpen)
+        {
+            // Attempt to locate the collection.
+            if (!_folderMap.TryGetValue(collectionName, out var match))
+                continue;
+
+            // Set the open state.
+            if (match is DynamicFolderGroup<T> fc)
+                fc.SetIsOpen(newState);
+            else if (match is DynamicFolder<T> f)
+                f.SetIsOpen(newState);
+        }
+
+        // Revise later.
+        Changed?.Invoke(DDSChangeType.FolderUpdated, root, null, null);
+    }
+
+
     /// <summary>
     ///     Internally rename a defined folder in the DDS.
     /// </summary>
@@ -212,12 +245,13 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     ///     An Exception is thrown if the entity is root.
     /// </summary>
     /// <exception cref="Exception"></exception>
-    public void Delete(string folderName)
+    public bool Delete(string folderName)
     {
         if (!_folderMap.TryGetValue(folderName, out var match))
-            return;
+            return false;
         // Perform the actual deletion.
         Delete(match);
+        return true; // Assumed? Could be proven wrong.
     }
 
     /// <summary>
@@ -258,13 +292,16 @@ public abstract partial class DynamicDrawSystem<T> where T : class
             
             case Result.ItemExists:
                 // if and only if both folders are FolderCollections, should we allow a merge to occur.
-                var matchingIdx = Search(newParent, folder.Name);
-                // If we meet criteria to merge, do so.
-                if (folder is DynamicFolderGroup<T> fc && newParent.Children[matchingIdx] is DynamicFolderGroup<T> destFolder)
-                {
-                    Merge(fc, destFolder);
-                    return;
-                }
+                
+                // Fix this as we tackle the merging territory.
+                
+                //var matchingIdx = Search(newParent, folder.Name);
+                //// If we meet criteria to merge, do so.
+                //if (folder is DynamicFolderGroup<T> fc && newParent.Children[matchingIdx] is DynamicFolderGroup<T> destFolder)
+                //{
+                //    Merge(fc, destFolder);
+                //    return;
+                //}
 
                 throw new Exception($"Can't move {folder.Name} into {newParent.FullPath}, another folder inside it already exists.");
         }

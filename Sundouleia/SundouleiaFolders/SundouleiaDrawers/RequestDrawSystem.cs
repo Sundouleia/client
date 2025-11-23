@@ -1,6 +1,4 @@
 using CkCommons.HybridSaver;
-using OtterGui.Text.Widget.Editors;
-using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
@@ -22,10 +20,12 @@ public sealed class RequestsDrawSystem : DynamicDrawSystem<RequestEntry>, IMedia
         Mediator = mediator;
         _manager = manager;
         _hybridSaver = saver;
-        // Perform an initial reload of the folder structure.
-        Reload();
-        // Subscribe to the changes (which is to change very, very soon, with overrides.
+
+        // Load the hierarchy and initialize the folders.
+        LoadData();
+
         Mediator.Subscribe<FolderUpdateRequests>(this, _ => UpdateFolders());
+
         Changed += OnChange;
     }
 
@@ -45,13 +45,19 @@ public sealed class RequestsDrawSystem : DynamicDrawSystem<RequestEntry>, IMedia
         }
     }
 
-    private void Reload()
+    private void LoadData()
     {
-        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Requests), out _, out _))
+        // If any changes occured, re-save the file.
+        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Requests)))
+        {
+            _logger.LogInformation("RequestsDrawSystem folder structure changed on load, saving updated structure.");
             _hybridSaver.Save(this);
-        // The above will simply load in any saved structure and folder opened state, if we cannot get a way to
-        // Generate the folders we want to have generated before, then modify the structure, but we will add it soon™.
-        _logger.LogDebug("Reloaded RequestsDrawSystem.");
+        }
+    }
+
+    protected override bool EnsureAllFolders(Dictionary<string, string> folderMap)
+    {
+        return false;
     }
 
     // HybridSavable

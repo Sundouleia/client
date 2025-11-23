@@ -63,7 +63,6 @@ public class DynamicSorter<T> : IDynamicSorter<T>, IReadOnlyDynamicSorter<T> whe
     /// <summary>
     ///     Constructor for optional paramaters, defaulting to nothing being assigned. <para />
     /// </summary>
-    /// <param name="steps"> The initial sort steps to set in the sorter. <b>If not provided, SortItems returns input.</b></param>
     public DynamicSorter(IEnumerable<ISortMethod<T>>? steps = null)
     {
         if (steps is not null)
@@ -126,15 +125,9 @@ public class DynamicSorter<T> : IDynamicSorter<T>, IReadOnlyDynamicSorter<T> whe
             var key = _sortSteps[i].KeySelector;
 
             if (ordered == null)
-            {
-                ordered = FirstDescending
-                    ? items.OrderByDescending(key)
-                    : items.OrderBy(key);
-            }
+                ordered = FirstDescending ? items.OrderByDescending(key) : items.OrderBy(key);
             else
-            {
                 ordered = ordered.ThenBy(key);
-            }
         }
 
         return ordered ?? items;

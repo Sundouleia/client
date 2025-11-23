@@ -57,7 +57,6 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
 
         Mediator.Subscribe<FolderUpdateRadar>(this, _ => UpdateFolders());
 
-        // Subscribe to the changes (which is to change very, very soon, with overrides.
         Changed += OnChange;
     }
 
@@ -79,37 +78,24 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
 
     private void LoadData()
     {
-        // Load in the file, this will be changed overtime as we assertain how to restore data in a more proper manner.
-        var loadedChanges = LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Radar), out _, out List<string> openedCollections);
-        _logger.LogInformation($"RadarDrawSystem load completed. Changes detected: {loadedChanges}");
-        // Ensure all folders are present that should be.
-        EnsureFolders();
-        // Open any folders that should be opened.
-        SetOpenedStates(openedCollections);
-
         // If any changes occured, re-save the file.
-        if (loadedChanges)
+        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Radar)))
         {
             _logger.LogInformation("Changes detected during load, saving updated config.");
             _hybridSaver.Save(this);
         }
     }
 
-
-    private void EnsureFolders()
+    protected override bool EnsureAllFolders(Dictionary<string, string> _)
     {
-        // Need to create the paired and unpaired folders, these go under root.
-        CreateFolder(FAI.Link, Constants.FolderTagRadarPaired, () => [ .. _radar.RadarUsers.Where(u => _sundesmos.ContainsSundesmo(u.UID)) ]);
-        CreateFolder(FAI.SatelliteDish, Constants.FolderTagRadarUnpaired, () => [ .. _radar.RadarUsers.Where(u => !_sundesmos.ContainsSundesmo(u.UID)) ]);
+        // Add both folders accordingly if nessisary.
+        bool anyAdded = false;
+        anyAdded |= TryAddFolder(FAI.Link, Constants.FolderTagRadarPaired, () => [.. _radar.RadarUsers.Where(u => _sundesmos.ContainsSundesmo(u.UID))]);
+        anyAdded |= TryAddFolder(FAI.SatelliteDish, Constants.FolderTagRadarUnpaired, () => [.. _radar.RadarUsers.Where(u => !_sundesmos.ContainsSundesmo(u.UID))]);
+        return anyAdded;
     }
 
-    private void SetOpenedStates(List<string> openedCollections)
-    {
-        // TODO;
-        _logger.LogInformation($"Setting opened states for {openedCollections.Count} folders.");
-    }
-
-    private void CreateFolder(FAI icon, string name, Func<IReadOnlyList<RadarUser>> gen)
+    private bool TryAddFolder(FAI icon, string name, Func<IReadOnlyList<RadarUser>> gen)
         => AddFolder(new RadarFolder(root, idCounter + 1u, icon, name, gen, [ByName]));
 
     // Sort Helpers.

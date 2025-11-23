@@ -24,9 +24,6 @@ public record SwitchToIntroUiMessage : MessageBase;
 /// <summary> Forcefully opens Main UI, and closes the Introduction UI if opened. </summary>
 public record SwitchToMainUiMessage : MessageBase;
 
-/// <summary> Swaps the displayed whitelist FolderSystem between the GroupFolderSystem and WhitelistFolderSystem. </summary>
-public record SwapWhitelistDDS : MessageBase;
-
 /// <summary> Requests to the popup handler to display a report profile prompt. </summary>
 public record OpenReportUIMessage(UserData UserToReport, ReportKind Kind) : MessageBase;
 

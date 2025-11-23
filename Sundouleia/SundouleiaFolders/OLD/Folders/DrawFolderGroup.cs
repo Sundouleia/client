@@ -65,12 +65,10 @@ public class DrawFolderGroup : DynamicPairFolder
         {
             var pos = ImGui.GetCursorPos();
             ImGui.InvisibleButton($"folder_click_area_{Label}", new Vector2(folderWidth - rightWidth, _.InnerRegion.Y));
-            if (ImGui.IsItemClicked())
-                _groups.ToggleState(Label);
 
             // Back to start and then draw.
             ImGui.SameLine(pos.X);
-            CkGui.FramedIconText(_groups.IsOpen(Label) ? FAI.CaretDown : FAI.CaretRight);
+            CkGui.FramedIconText(FAI.CaretDown);
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
             CkGui.IconText(Icon, IconColor);

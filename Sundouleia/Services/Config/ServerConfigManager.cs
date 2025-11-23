@@ -13,25 +13,25 @@ namespace Sundouleia.Services.Configs;
 public class ServerConfigManager
 {
     private readonly ILogger<ServerConfigManager> _logger;
-    private readonly SundouleiaMediator _mediator;
-    private readonly FolderConfig _folderConfig;
-    private readonly NickConfig _nickConfig;
+    private readonly NickConfig _nickConfig; // phase this out.
     private readonly AccountConfig _accountConfig;
+    private readonly ConfigFileProvider _fileProvider;
 
     // Migrate group config later.
-    public ServerConfigManager(ILogger<ServerConfigManager> logger, SundouleiaMediator mediator,
-        FolderConfig folderConfig, AccountConfig accountConfig, NickConfig nicksConfig)
+    public ServerConfigManager(ILogger<ServerConfigManager> logger, NickConfig nicks, 
+        AccountConfig accounts, ConfigFileProvider files)
     {
         _logger = logger;
-        _mediator = mediator;
-        _folderConfig = folderConfig;
-        _accountConfig = accountConfig;
-        _nickConfig = nicksConfig;
+        _nickConfig = nicks;
+        _accountConfig = accounts;
+        _fileProvider = files;
     }
 
-    public FolderStorage Groups => _folderConfig.Current; // try and faze out?
     public NickStorage NicknameStorage => _nickConfig.Current;
     public AccountStorage AccountStorage => _accountConfig.Current;
+
+    public void UpdateFileProviderForConnection(ConnectionResponse response)
+        => _fileProvider.UpdateConfigs(response.User.UID);
 
     /// <summary>
     ///     Returns the CharaAuthentication for the current player.

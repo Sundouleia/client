@@ -24,6 +24,18 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
         ApplyGroupData();
     }
 
+    public GroupFolder(DynamicFolderGroup<Sundesmo> parent, uint id, SundesmoManager sundesmos, 
+        SundesmoGroup g, IReadOnlyList<ISortMethod<DynamicLeaf<Sundesmo>>> sortSteps)
+        : base(parent, g.Icon, g.Label, id, new(sortSteps))
+    {
+        // Store the group.
+        _group = g;
+        // Define the generator.
+        _generator = () => [.. sundesmos.DirectPairs.Where(u => g.LinkedUids.Contains(u.UserData.UID))];
+        // Apply Stylizations.
+        ApplyGroupData();
+    }
+
     public int Rendered => Children.Count(s => s.Data.IsRendered);
     public int Online => Children.Count(s => s.Data.IsOnline);
     protected override IReadOnlyList<Sundesmo> GetAllItems() => _generator();
@@ -75,6 +87,9 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
         _sundesmos = sundesmos;
         _hybridSaver = saver;
 
+        // Before loading the data, re-define root with no sorter.
+        root = DynamicFolderGroup<Sundesmo>.CreateRoot();
+
         // Load the hierarchy and initialize the folders.
         LoadData();
 
@@ -82,7 +97,6 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
 
         // TODO: Revise this to listen for spesific group changes, and perform respective changes to those folders only.
         Mediator.Subscribe<FolderUpdateGroups>(this, _ => UpdateFolders());
-
         Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => UpdateFolders());
 
         // Subscribe to the changes (which is to change very, very soon, with overrides.
@@ -106,32 +120,67 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
 
     private void LoadData()
     {
-        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Whitelist), out Dictionary<string, string> folderMap, out List<string> openedCollections))
+        // Handles loading, folder assignment, and setting opened states all in one.
+        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Groups)))
         {
-            _logger.LogDebug("Loaded WhitelistDrawSystem from file.");
-            // Load in the folders (we dont care about the parent state, they are all root here)
-            LoadGroupFolders(folderMap);
-            // Now process OpenedState via the OpenedCollections. (could do this in the above method or not, idk. Maybe best to do seperate)
-            OpenFolders(openedCollections);
+            _logger.LogWarning("Loaded GroupDrawSystem from file.");
             // Re-Save the file after all data is loaded and applied.
             _hybridSaver.Save(this);
         }
         else
-            _logger.LogDebug("No saved WhitelistDrawSystem file found, starting fresh.");
+            _logger.LogWarning("No saved GroupDrawSystem file found, starting fresh.");
     }
 
-    private void LoadGroupFolders(Dictionary<string, string> folderMap)
+    protected override bool EnsureAllFolders(Dictionary<string, string> map)
     {
-        // TODO:
-        // - Load in all folders from the GroupManager.
-        // - For all of the folders, assign them the parent defined in the folder map, or root if not in the map.
+        // Grab all groups from the group manager.
+        var toCreate = _groups.Groups;
+        var anyCreated = false;
+
+        // For each existing group, ensure its folder exists.
+        // If it is in the folder map, assign it to the respective parent, otherwise root.
+        foreach (var groupToAdd in toCreate)
+        {
+            // If the folder exists, continue to prevent unnecessary work.
+            if (FolderExists(groupToAdd.Label))
+                continue;
+
+            // It does not exist, so try and obtain it via mapping, with root as fallback.
+            var parent = map.TryGetValue(groupToAdd.Label, out var pn) && TryGetFolderGroup(pn, out var match)
+                ? match : root;
+            // Now that we have defined the parent, ensure we are creating with the next peeked id.
+            anyCreated |= TryAddFolder(parent, groupToAdd);
+        }
+
+        // Dont forget to add the 'AllSundesmos' folder at the end, the WhitelistFolder.
+        anyCreated |= TryAddAllFolder();
+
+        // Return true if any folders were created.
+        return anyCreated;
     }
 
-    private void OpenFolders(List<string> openedCollections)
-    {
-        // TODO:
-        // - Open all folders matching the name in the list.
-    }
+    /// <summary>
+    ///     Helper to get if a folder already exists to skip excessive computation.
+    /// </summary>
+    private bool FolderExists(string folderName)
+        => FolderMap.ContainsKey(folderName);
+
+    /// <summary>
+    ///     Attempts to add a folder to the DrawSystem.
+    /// </summary>
+    private bool TryAddFolder(DynamicFolderGroup<Sundesmo> parent, SundesmoGroup group)
+        => AddFolder(new GroupFolder(parent, idCounter + 1u, _sundesmos, group, FromGroup(group)));
+
+    // Special 'All Sundesmos' folder addition for the groups system.
+    private bool TryAddAllFolder()
+        => AddFolder(new WhitelistFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll,
+            uint.MaxValue, () => _sundesmos.DirectPairs, DynamicSorterEx.AllFolderSorter));
+
+    /// <summary>
+    ///     Parses out a DynamicSorter Constructor from a FolderGroup's SortOrder.
+    /// </summary>
+    private List<ISortMethod<DynamicLeaf<Sundesmo>>> FromGroup(SundesmoGroup group)
+        => group.SortOrder.Select(f => f.ToSortMethod()).ToList();
 
     // HybridSavable
     public int ConfigVersion => 0;

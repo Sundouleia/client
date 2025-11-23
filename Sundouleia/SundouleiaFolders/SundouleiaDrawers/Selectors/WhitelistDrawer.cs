@@ -72,7 +72,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     protected override void DrawSearchBar(float width, int length)
     {
         var tmp = Filter;
-        var buttonsWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconTextButtonSize(FAI.Globe, "Basic");
+        var buttonsWidth = CkGui.IconButtonSize(FAI.Wrench).X + CkGui.IconTextButtonSize(FAI.Globe, "Basic");
         // Update the search bar if things change, like normal.
         if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
         {
@@ -108,8 +108,6 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     {
         if (_configExpanded)
             ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
-        else
-            ImGui.Separator();
     }
 
     private void DrawButtons()
@@ -117,12 +115,13 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         if (CkGui.IconTextButton(FAI.Globe, "Basic", null, true, _configExpanded))
         {
             _configExpanded = false;
-            _mediator.Publish(new SwapWhitelistDDS());
+            _folderConfig.Current.ViewingGroups = !_folderConfig.Current.ViewingGroups;
+            _folderConfig.Save();
         }
         CkGui.AttachToolTip("Switch to Groups View");
 
         ImGui.SameLine(0, 0);
-        if (CkGui.IconButton(FAI.Cog, inPopup: !_configExpanded))
+        if (CkGui.IconButton(FAI.Wrench, inPopup: !_configExpanded))
             _configExpanded = !_configExpanded;
         CkGui.AttachToolTip("Configure preferences for default folders.");
     }
@@ -393,7 +392,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             _folderConfig.Save();
             Log.LogInformation("Regenerating Basic Folders due to Visible Folder setting change.");
             // Update the folder structure to reflect this change.
-            _drawSystem.VisibleFolderStateUpdate(showVisible);
+            _drawSystem.UpdateVisibleFolderState(showVisible);
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.ShowVisibleSeparateTT);
 
@@ -402,7 +401,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         {
             _folderConfig.Current.OfflineFolder = showOffline;
             _folderConfig.Save();
-            _drawSystem.OfflineFolderStateUpdate(showOffline);
+            _drawSystem.UpdateOfflineFolderState(showOffline);
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.ShowOfflineSeparateTT);
 

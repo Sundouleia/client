@@ -8,9 +8,6 @@ namespace Sundouleia.PlayerClient;
 /// </summary>
 public class GroupsManager
 {
-    public static readonly IEnumerable<string> BasicLabels = [Constants.FolderTagAll, Constants.FolderTagVisible, Constants.FolderTagOnline, Constants.FolderTagOffline];
-    public static readonly IEnumerable<string> RadarLabels = [Constants.FolderTagRadarPaired, Constants.FolderTagRadarUnpaired];
-
     private readonly ILogger<GroupsManager> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly FolderConfig _config;
@@ -22,18 +19,12 @@ public class GroupsManager
         _config = config;
     }
 
-    public IEnumerable<string> GroupLabels => _config.GroupFolderLabels;
     public FolderStorage Config => _config.Current;
-    public void SaveConfig() => _config.Save(); // Prefer to faze this out.
 
+    public List<SundesmoGroup> Groups => _config.Current.Groups;
 
-    public bool IsOpen(string label) => _config.IsFolderOpen(label);
-    public bool IsOpen(SundesmoGroup group) => _config.IsFolderOpen(group.Label);
+    // Slowly migrate the below methods into helper functions for group interactions performed via the GroupsDDS
 
-    public void ToggleState(SundesmoGroup group) => _config.ToggleFolder(group.Label);
-    public void ToggleState(string label) => _config.ToggleFolder(label);
-
-    public IEnumerable<string> ActiveGroups() => Config.Groups.Where(g => g.LinkedUids.Count > 0).Select(g => g.Label);
 
     // Attempts to add a new sundesmoGroup to the config.
     // Fails if the name already exists. 

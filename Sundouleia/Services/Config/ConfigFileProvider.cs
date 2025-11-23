@@ -8,6 +8,7 @@ public interface IHybridSavable : IHybridConfig<ConfigFileProvider> { }
 /// <summary> Helps encapsulate all the configuration file names into a single place. </summary>
 public class ConfigFileProvider : IConfigFileProvider
 {
+    private readonly ILogger<ConfigFileProvider> _logger;
     // Shared Config Directories
     public static string AssemblyLocation       => Svc.PluginInterface.AssemblyLocation.FullName;
     public static string AssemblyDirectoryName  => Svc.PluginInterface.AssemblyLocation.DirectoryName ?? string.Empty;
@@ -17,7 +18,7 @@ public class ConfigFileProvider : IConfigFileProvider
     public static string EventDirectory     { get; private set; } = string.Empty;
     public static string FileSysDirectory   { get; private set; } = string.Empty;
     
-    // Shared Client Configs
+    // Shared Configs
     public readonly string MainConfig;
     public readonly string TransientCache;
     public readonly string PlzNoCrashFriends;
@@ -25,28 +26,27 @@ public class ConfigFileProvider : IConfigFileProvider
     public readonly string Favorites;
     public readonly string LoadedResources;
     public readonly string FileCacheCsv;
-
+    public readonly string NicknameConfig;
+    public readonly string AccountConfig;
     public string DDS_Requests => Path.Combine(FileSysDirectory, "dds-requests.json");
     public string DDS_Whitelist => Path.Combine(FileSysDirectory, "dds-whitelist.json");
     public string DDS_MCDFData => Path.Combine(FileSysDirectory, "dds-mcdfdata.json");
     public string DDS_Radar => Path.Combine(FileSysDirectory, "dds-radar.json");
 
+    // Per Account-Profile Configs.
+    public string DDS_Groups => Path.Combine(CurrentProfileDirectory, "dds-groups.json");
+    public string SundesmoGroups => Path.Combine(CurrentProfileDirectory, "sundesmo-groups.json"); // could merge this with favorites or something idk.
 
-    // Shared Server Configs
-    public readonly string NicknameConfig;
-    public readonly string AccountConfig;
-
-    // Unique Client Configs Per Account.
-    public string DDS_Groups => Path.Combine(CurrentPlayerDirectory, "dds-groups.json");
-    public string SundesmoGroups => Path.Combine(CurrentPlayerDirectory, "sundesmo-groups.json"); // could merge this with favorites or something idk.
-
-    public string CurrentPlayerDirectory => Path.Combine(SundouleiaDirectory, CurrentUserUID ?? "InvalidFiles");
-    public string? CurrentUserUID { get; private set; } = null;
+    // Profile Helpers.
+    public string CurrentProfileDirectory => Path.Combine(SundouleiaDirectory, CurrentProfileUID ?? "InvalidFiles");
+    public string? CurrentProfileUID { get; private set; } = null;
 
     // Previously profiles was determined by the logged in UID but now it is determined by the secret key IDX. 
     // We will need to update how this is handled later.
-    public ConfigFileProvider()
+    public ConfigFileProvider(ILogger<ConfigFileProvider> logger)
     {
+        _logger = logger;
+
         ChatDirectory = Path.Combine(SundouleiaDirectory, "chatData");
         EventDirectory = Path.Combine(SundouleiaDirectory, "eventlog");
         FileSysDirectory = Path.Combine(SundouleiaDirectory, "filesystem");
@@ -72,37 +72,37 @@ public class ConfigFileProvider : IConfigFileProvider
         {
             var json = File.ReadAllText(MainConfig);
             var configJson = JObject.Parse(json);
-            CurrentUserUID = configJson["Config"]!["LastUidLoggedIn"]?.Value<string>() ?? "UNKNOWN_VOID";
+            CurrentProfileUID = configJson["Config"]!["LastUidLoggedIn"]?.Value<string>() ?? string.Empty;
+            // Set it is valid if the string is not empty.
+            HasValidProfileConfigs = !string.IsNullOrEmpty(CurrentProfileUID);
+            // Ensure the directory exists for this profile.
+            if (!Directory.Exists(CurrentProfileDirectory) && HasValidProfileConfigs)
+                Directory.CreateDirectory(CurrentProfileDirectory);
+
+            _logger.LogInformation($"Loaded LastUidLoggedIn [{CurrentProfileUID}] from MainConfig.");
         }
     }
 
     // If this is not true, we should not be saving our configs anyways.
     public bool HasValidProfileConfigs { get; private set; } = false;
 
-    public void ClearUidConfigs()
+    // Updates the CurrentProfileDirectory to match the provided profile UID.
+    public void UpdateConfigs(string profileUID)
     {
-        HasValidProfileConfigs = false;
-        UpdateUserUID(null);
-    }
-
-    public void UpdateConfigs(string uid)
-    {
-        Svc.Logger.Information("Updating Configs for UID: " + uid);
-        UpdateUserUID(uid);
-
-        if (!Directory.Exists(CurrentPlayerDirectory))
-            Directory.CreateDirectory(CurrentPlayerDirectory);
-
-        Svc.Logger.Information("Configs Updated.");
-        HasValidProfileConfigs = true;
-    }
-
-    private void UpdateUserUID(string? uid)
-    {
-        if (CurrentUserUID != uid)
+        bool isDifferent = CurrentProfileUID != profileUID;
+        // If the profile UID changed, update latest in MainConfig and this provider.
+        if (isDifferent)
         {
-            CurrentUserUID = uid;
-            UpdateUidInConfig(uid);
+            _logger.LogInformation($"Updating Configs for Profile UID [{profileUID}]");
+            CurrentProfileUID = profileUID;
+            UpdateUidInConfig(profileUID);
+
+            // If the directory doesnt yet exist for this profile, create it.
+            if (!Directory.Exists(CurrentProfileDirectory))
+                Directory.CreateDirectory(CurrentProfileDirectory);
+
+            _logger.LogInformation("Configs Updated.");
+            HasValidProfileConfigs = !string.IsNullOrEmpty(profileUID);
         }
     }
 

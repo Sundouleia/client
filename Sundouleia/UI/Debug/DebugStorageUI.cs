@@ -5,8 +5,6 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Sundouleia.DrawSystem;
-using Sundouleia.Gui.Components;
-using Sundouleia.Gui.MainWindow;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
 using Sundouleia.Services.Mediator;
@@ -17,41 +15,35 @@ namespace Sundouleia.Gui;
 public partial class DebugStorageUI : WindowMediatorSubscriberBase
 {
     // Old format.
-    private readonly WhitelistTab _whitelistFolders;
-    private readonly RadarTab _radarFolders;
-    private readonly RequestsTab _requestFolders;
-    private readonly GroupsUI _groupEditorFolders;
     private readonly GroupsManager _groups;
     private readonly RadarManager _radar;
     private readonly RequestsManager _requests;
     // New format.
     private readonly WhitelistDrawSystem _mainDDS;
+    private readonly GroupsDrawSystem _groupsDDS;
     private readonly RadarDrawSystem _radarDDS;
+    private readonly RequestsDrawSystem _requestsDDS;
 
     public DebugStorageUI(
         ILogger<DebugStorageUI> logger, 
         SundouleiaMediator mediator,
-        WhitelistTab whitelistFolders, 
-        RadarTab radarFolders, 
-        RequestsTab requestFolders,
-        GroupsUI groupEditorFolders, 
         GroupsManager groups, 
         RadarManager radar,
         RequestsManager requests,
         WhitelistDrawSystem mainDDS,
-        RadarDrawSystem radarDDS
+        GroupsDrawSystem groupsDDS,
+        RadarDrawSystem radarDDS,
+        RequestsDrawSystem requestsDDS
         ) : base(logger, mediator, "Storage Debugger")
     {
-        _whitelistFolders = whitelistFolders;
-        _radarFolders = radarFolders;
-        _requestFolders = requestFolders;
-        _groupEditorFolders = groupEditorFolders;
         _groups = groups;
         _radar = radar;
         _requests = requests;
         // New format.
         _mainDDS = mainDDS;
         _radarDDS = radarDDS;
+        _groupsDDS = groupsDDS;
+        _requestsDDS = requestsDDS;
 
         IsOpen = false;
         this.SetBoundaries(new(380, 400), ImGui.GetIO().DisplaySize);
@@ -78,15 +70,13 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
     private void DrawDDSDebug()
     {
         DrawDDSDebug("Main Whitelist DDS", _mainDDS);
+        DrawDDSDebug("Groups DDS", _groupsDDS);
         DrawDDSDebug("Radar DDS", _radarDDS);
+        DrawDDSDebug("Requests DDS", _requestsDDS);
     }
 
     private void DrawOldStorages()
     {
-        DrawWhitelistFolders();
-        DrawRadarFolders();
-        DrawRequestFolders();
-        DrawGroupEditorFolders();
         DrawRequests();
         DrawGroups();
         DrawRadarUsers();
@@ -96,237 +86,6 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
     {
         ImGui.TableNextColumn();
         CkGui.IconText(value ? FAI.Check : FAI.Times, value ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-    }
-
-    private void DrawWhitelistFolders()
-    {
-        using var _ = ImRaii.TreeNode("Whitelist Folders");
-        if (!_) return;
-
-        using (var main = ImRaii.TreeNode("Default Folders"))
-        {
-            if (main)
-            {
-                foreach (var folder in _whitelistFolders.MainFolders)
-                {
-                    if (folder is not DynamicPairFolder pairFolder)
-                        continue;
-                    // Draw the node.
-                    DrawPairFolderNode(pairFolder);
-                }
-                CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-            }
-        }
-
-        using (var group = ImRaii.TreeNode("Group Folders"))
-        {
-            if (group)
-            {
-                foreach (var grp in _whitelistFolders.GroupFolders)
-                {
-                    if (grp is not DynamicPairFolder groupFolder)
-                        continue;
-                    // Draw the node.
-                    DrawPairFolderNode(groupFolder);
-                }
-                CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-            }
-        }
-
-        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-    }
-
-    private void DrawRadarFolders()
-    {
-        using var _ = ImRaii.TreeNode("Radar Folders");
-        if (!_)
-            return;
-
-        DrawRadarFolderNode(_radarFolders.Paired);
-        DrawRadarFolderNode(_radarFolders.Unpaired);
-
-        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-    }
-     
-    private void DrawRequestFolders()
-    {
-        using var _ = ImRaii.TreeNode("Request Folders");
-        if (!_)
-            return;
-
-        DrawRequestFolderNode(_requestFolders.Incoming);
-        DrawRequestFolderNode(_requestFolders.Pending);
-    }
-
-    private void DrawGroupEditorFolders()
-    {
-        using var _ = ImRaii.TreeNode("Group Editor Folders");
-        if (!_)
-            return;
-
-        foreach (var grp in _groupEditorFolders.Groups)
-        {
-            if (grp is not DynamicPairFolder groupFolder)
-                continue;
-            // Draw the node.
-            DrawPairFolderNode(groupFolder);
-        }
-
-        CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-    }
-
-    private void DrawPairFolderNode(DynamicPairFolder folder)
-    {
-        using var _ = ImRaii.TreeNode($"{folder.Label}##{folder.DistinctId}");
-        if (!_)
-            return;
-
-        folder.DrawFolder();
-        using (var t = ImRaii.Table($"TableOverview-{folder.DistinctId}", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
-        {
-            ImGui.TableSetupColumn("ID");
-            ImGui.TableSetupColumn("Total");
-            ImGui.TableSetupColumn("Rendered");
-            ImGui.TableSetupColumn("Online");
-            ImGui.TableSetupColumn("ShowIfEmpty");
-            ImGui.TableSetupColumn("DragDropTarget");
-            ImGui.TableSetupColumn("DragDropItems");
-            ImGui.TableSetupColumn("MultiSelect");
-            ImGui.TableHeadersRow();
-
-            ImGui.TableNextColumn();
-            ImGui.Text(folder.DistinctId);
-            ImGui.TableNextColumn();
-            CkGui.ColorText(folder.Total.ToString(), ImGuiColors.TankBlue);
-            ImGui.TableNextColumn();
-            CkGui.ColorText(folder.Rendered.ToString(), ImGuiColors.TankBlue);
-            ImGui.TableNextColumn();
-            CkGui.ColorText(folder.Online.ToString(), ImGuiColors.TankBlue);
-            DrawIconBoolColumn(folder.Options.ShowIfEmpty);
-            DrawIconBoolColumn(folder.Options.IsDropTarget);
-            DrawIconBoolColumn(folder.Options.DragDropItems);
-            DrawIconBoolColumn(folder.Options.MultiSelect);
-        }
-        using (var t = ImRaii.Table($"DrawEntities-{folder.DistinctId}-table", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
-        {
-            ImGui.TableSetupColumn("UID");
-            ImGui.TableSetupColumn("DisplayName");
-            ImGui.TableSetupColumn("Distinct ID");
-            ImGui.TableHeadersRow();
-
-            foreach (var item in folder.DrawEntities)
-            {
-                ImGui.TableNextColumn();
-                ImGui.Text(item.EntityId);
-                ImGui.TableNextColumn();
-                ImGui.Text(item.DisplayName);
-                ImGui.TableNextColumn();
-                ImGui.Text(item.DistinctId);
-                ImGui.TableNextRow();
-            }
-        }
-        ImGui.Separator();
-    }
-
-    private void DrawRadarFolderNode(DynamicRadarFolder folder)
-    {
-        using var _ = ImRaii.TreeNode($"{folder.Label}##{folder.DistinctId}");
-        if (!_)
-            return;
-
-        folder.DrawFolder();
-        using (var t = ImRaii.Table($"TableOverview-{folder.DistinctId}", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
-        {
-            ImGui.TableSetupColumn("ID");
-            ImGui.TableSetupColumn("Total");
-            ImGui.TableSetupColumn("Rendered");
-            ImGui.TableSetupColumn("Lurkers");
-            ImGui.TableSetupColumn("ShowIfEmpty");
-            ImGui.TableSetupColumn("DragDropTarget");
-            ImGui.TableSetupColumn("DragDropItems");
-            ImGui.TableSetupColumn("MultiSelect");
-            ImGui.TableHeadersRow();
-
-            ImGui.TableNextColumn();
-            ImGui.Text(folder.DistinctId);
-            ImGui.TableNextColumn();
-            CkGui.ColorText(folder.Total.ToString(), ImGuiColors.TankBlue);
-            ImGui.TableNextColumn();
-            CkGui.ColorText(folder.Rendered.ToString(), ImGuiColors.TankBlue);
-            ImGui.TableNextColumn();
-            CkGui.ColorText(folder.Lurkers.ToString(), ImGuiColors.TankBlue);
-            DrawIconBoolColumn(folder.Options.ShowIfEmpty);
-            DrawIconBoolColumn(folder.Options.IsDropTarget);
-            DrawIconBoolColumn(folder.Options.DragDropItems);
-            DrawIconBoolColumn(folder.Options.MultiSelect);
-        }
-
-        ImGui.Separator();
-        using (var t = ImRaii.Table($"DrawEntities-{folder.DistinctId}-table", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
-        {
-            ImGui.TableSetupColumn("Distinct ID");
-            ImGui.TableSetupColumn("UID");
-            ImGui.TableSetupColumn("DisplayName");
-            ImGui.TableHeadersRow();
-
-            foreach (var item in folder.DrawEntities)
-            {
-                ImGui.TableNextColumn();
-                ImGui.Text(item.DistinctId);
-                ImGui.TableNextColumn();
-                ImGui.Text(item.EntityId);
-                ImGui.TableNextColumn();
-                ImGui.Text(item.DisplayName);
-                ImGui.TableNextRow();
-            }
-        }
-    }
-
-    private void DrawRequestFolderNode(DynamicRequestFolder folder)
-    {
-        using var _ = ImRaii.TreeNode($"{folder.Label}##{folder.DistinctId}");
-        if (!_)
-            return;
-
-        folder.DrawFolder();
-        using (var t = ImRaii.Table($"TableOverview-{folder.DistinctId}", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
-        {
-            ImGui.TableSetupColumn("ID");
-            ImGui.TableSetupColumn("Total");
-            ImGui.TableSetupColumn("ShowIfEmpty");
-            ImGui.TableSetupColumn("DragDropTarget");
-            ImGui.TableSetupColumn("DragDropItems");
-            ImGui.TableSetupColumn("MultiSelect");
-            ImGui.TableHeadersRow();
-
-            ImGui.TableNextColumn();
-            ImGui.Text(folder.DistinctId);
-            ImGui.TableNextColumn();
-            CkGui.ColorText(folder.Total.ToString(), ImGuiColors.TankBlue);
-            DrawIconBoolColumn(folder.Options.ShowIfEmpty);
-            DrawIconBoolColumn(folder.Options.IsDropTarget);
-            DrawIconBoolColumn(folder.Options.DragDropItems);
-            DrawIconBoolColumn(folder.Options.MultiSelect);
-        }
-
-        using (var t = ImRaii.Table($"DrawEntities-{folder.DistinctId}-table", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
-        {
-            ImGui.TableSetupColumn("Distinct ID");
-            ImGui.TableSetupColumn("UID");
-            ImGui.TableSetupColumn("DisplayName");
-            ImGui.TableHeadersRow();
-
-            foreach (var item in folder.DrawEntities)
-            {
-                ImGui.TableNextColumn();
-                ImGui.Text(item.DistinctId);
-                ImGui.TableNextColumn();
-                ImGui.Text(item.EntityId);
-                ImGui.TableNextColumn();
-                ImGui.Text(item.DisplayName);
-                ImGui.TableNextRow();
-            }
-        }
     }
 
     private void DrawRequests()
