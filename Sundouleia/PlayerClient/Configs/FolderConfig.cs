@@ -12,6 +12,9 @@ public class FolderStorage
     // Cached sort order filters. Maybe revise later idk.
     public List<FolderSortPreset> SortPresets { get; set; } = new();
 
+    // RequestFolder Swapper
+    public bool ViewingIncoming { get; set; } = true;
+
     // WhitelistFolder Swapper
     public bool ViewingGroups { get; set; } = false;
 
@@ -25,7 +28,6 @@ public class FolderStorage
 
 public class SundesmoGroup
 {
-    public bool Visible { get; set; } = true;
     public FAI Icon { get; set; } = FAI.User;
     public string Label { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -34,7 +36,7 @@ public class SundesmoGroup
     public uint BorderColor { get; set; } = ImGui.GetColorU32(ImGuiCol.TextDisabled);
     public bool ShowIfEmpty { get; set; } = true;
     public bool ShowOffline { get; set; } = true;
-    public List<FolderSortFilter> SortOrder { get; set; } = new(); // Empty == Alphabetical
+    public List<FolderSortFilter> SortOrder { get; set; } = new(); // Refactor?
     public HashSet<string> LinkedUids { get; set; } = new();
 }
 

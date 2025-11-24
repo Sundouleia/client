@@ -25,7 +25,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private static readonly string DragDropTooltip =
         "--COL--[L-CLICK & DRAG]--COL-- Drag-Drop this User to another Folder." +
         "--NL----COL--[CTRL + L-CLICK]--COL-- Single-Select this item for multi-select Drag-Drop" +
-        "--NL----COL--[SHIFT + L-CLICK]--COL-- Select/Deselect all users between current and last selection";
+        "--NL----COL--[SHIFT + L-CLICK]--COL-- Select/Deselect all from last selected";
     private static readonly string NormalTooltip =
         "--COL--[L-CLICK]--COL-- Swap Between Name/Nick/Alias & UID." +
         "--NL----COL--[M-CLICK]--COL-- Open Profile" +

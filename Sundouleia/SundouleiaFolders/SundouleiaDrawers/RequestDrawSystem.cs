@@ -1,24 +1,52 @@
 using CkCommons.HybridSaver;
+using Dalamud.Bindings.ImGui;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.DrawSystem;
 
+// All folders are a descendant of root.
+public sealed class RequestFolder : DynamicFolder<RequestEntry>
+{
+    private Func<IReadOnlyList<RequestEntry>> _generator;
+    public RequestFolder(DynamicFolderGroup<RequestEntry> parent, uint id, FAI icon, string name, 
+        Func<IReadOnlyList<RequestEntry>> gen)
+        : base(parent, icon, name, id, null, FolderFlags.Expanded)
+    {
+        // Can set stylizations here.
+        BorderColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+        _generator = gen;
+    }
+
+    public RequestFolder(DynamicFolderGroup<RequestEntry> parent, uint id, FAI icon, string name,
+        Func<IReadOnlyList<RequestEntry>> generator, IReadOnlyList<ISortMethod<DynamicLeaf<RequestEntry>>> sortSteps)
+        : base(parent, icon, name, id, new(sortSteps), FolderFlags.Expanded)
+    {
+        // Can set stylizations here.
+        BorderColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+        _generator = generator;
+    }
+
+    protected override IReadOnlyList<RequestEntry> GetAllItems() => _generator();
+    protected override DynamicLeaf<RequestEntry> ToLeaf(RequestEntry item) 
+        => new(this, item.FromClient ? item.RecipientUID : item.SenderUID, item);
+}
+
 public sealed class RequestsDrawSystem : DynamicDrawSystem<RequestEntry>, IMediatorSubscriber, IDisposable, IHybridSavable
 {
     private readonly ILogger<RadarDrawSystem> _logger;
-    private readonly RequestsManager _manager;
+    private readonly RequestsManager _requests;
     private readonly HybridSaveService _hybridSaver;
 
     public SundouleiaMediator Mediator { get; }
 
     public RequestsDrawSystem(ILogger<RadarDrawSystem> logger, SundouleiaMediator mediator,
-        RequestsManager manager, HybridSaveService saver)
+        RequestsManager requests, HybridSaveService saver)
     {
         _logger = logger;
         Mediator = mediator;
-        _manager = manager;
+        _requests = requests;
         _hybridSaver = saver;
 
         // Load the hierarchy and initialize the folders.
@@ -55,10 +83,17 @@ public sealed class RequestsDrawSystem : DynamicDrawSystem<RequestEntry>, IMedia
         }
     }
 
-    protected override bool EnsureAllFolders(Dictionary<string, string> folderMap)
+    // We dont care about the icons since we won't be showing them.
+    protected override bool EnsureAllFolders(Dictionary<string, string> _)
     {
-        return false;
+        bool anyAdded = false;
+        anyAdded |= AddFolder(new RequestFolder(root, idCounter + 1u, FAI.Folder, Constants.FolderTagRequestIncoming, () => _requests.Incoming, [ByTime]));
+        anyAdded |= AddFolder(new RequestFolder(root, idCounter + 1u, FAI.Folder, Constants.FolderTagRequestPending, () => _requests.Outgoing, [ByTime]));
+        return anyAdded;
     }
+
+    private static readonly ISortMethod<DynamicLeaf<RequestEntry>> ByTime = new DynamicSorterEx.ByRequestTime();
+
 
     // HybridSavable
     public int ConfigVersion => 0;

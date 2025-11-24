@@ -288,5 +288,13 @@ public static class DynamicSorterEx
         public string Tooltip => "Sort by name.";
         public Func<DynamicLeaf<RadarUser>, IComparable?> KeySelector => l => l.Data.PlayerName;
     }
+
+    public struct ByRequestTime : ISortMethod<DynamicLeaf<RequestEntry>>
+    {
+        public string Name => "Request Time";
+        public FAI Icon => FAI.Stopwatch;
+        public string Tooltip => "Sort by request time.";
+        public Func<DynamicLeaf<RequestEntry>, IComparable?> KeySelector => l => l.Data.ExpireTime;
+    }
 }
 

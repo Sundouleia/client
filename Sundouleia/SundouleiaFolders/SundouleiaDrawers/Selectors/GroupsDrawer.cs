@@ -471,9 +471,6 @@ public class GroupFolderFilterEditor
 
     }
 
-    private void DrawOption
-
-
 }
 
 
