@@ -234,14 +234,8 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Components
         .AddScoped<ProfileHelper>()
-        .AddScoped<SharedFolderMemory>()
         .AddScoped<UiFileCacheShared>()
-
-        // Scoped Factories
-        .AddScoped<DrawEntityFactory>()
         .AddScoped<UiFactory>()
-
-        // Scoped Drawers
 
         // Scoped Handlers
         .AddScoped<WindowMediatorSubscriberBase, PopupHandler>()

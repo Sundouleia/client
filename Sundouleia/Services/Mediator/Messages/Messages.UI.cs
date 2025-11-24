@@ -30,9 +30,6 @@ public record OpenReportUIMessage(UserData UserToReport, ReportKind Kind) : Mess
 /// <summary> Sets the tab of the MainUI. </summary>
 public record MainWindowTabChangeMessage(MainMenuTabs.SelectedTab NewTab) : MessageBase;
 
-/// <summary> Should fire whenever the Main UI closes. Useful for the interactions popout. </summary>
-public record FolderDragDropComplete(IDynamicFolder Source, IDynamicFolder Dest, List<IDrawEntity> Transferred) : MessageBase;
-
 /// <summary> When we want a specific window removed. Most beneficial for profiles. </summary>
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
 

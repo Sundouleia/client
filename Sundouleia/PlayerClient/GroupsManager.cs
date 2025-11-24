@@ -23,6 +23,76 @@ public class GroupsManager
 
     public List<SundesmoGroup> Groups => _config.Current.Groups;
 
+
+    // Moves the sort filters of selected indexes to a new target index location in the list
+    public bool MoveFilters(string groupName, int[] fromIndices, int targetIdx)
+    {
+        // If the group cannot be found return false
+        if (Groups.FirstOrDefault(g => g.Label.Equals(groupName, StringComparison.Ordinal)) is not { } group)
+            return false;
+
+        // Get the current SortOrder list
+        var sortOrder = group.SortOrder;
+
+        // Sort in descending order for efficient removal
+        Array.Sort(fromIndices);
+        Array.Reverse(fromIndices);
+
+        // Collect items to move
+        var toMove = new List<FolderSortFilter>(fromIndices.Length);
+        foreach (var item in fromIndices)
+            toMove.Add(sortOrder[item]);
+
+        // Remove from the list in descending order
+        foreach (var idx in fromIndices)
+            sortOrder.RemoveAt(idx);
+
+        // Apply change.
+        sortOrder.InsertRange(Math.Min(targetIdx, sortOrder.Count), toMove);
+        _config.Save();
+        return true;
+    }
+
+    public bool RemoveFilter(string groupName, int filterIdx)
+    {
+        if (Groups.FirstOrDefault(g => g.Label.Equals(groupName, StringComparison.Ordinal)) is not { } group)
+            return false;
+
+        // If the filter index is out of range return false
+        if (filterIdx < 0 || filterIdx >= group.SortOrder.Count)
+            return false;
+
+        // Apply change.
+        group.SortOrder.RemoveAt(filterIdx);
+        _config.Save();
+        return true;
+    }
+
+    public bool AddFilter(string groupName, FolderSortFilter filter)
+    {
+        if (Groups.FirstOrDefault(g => g.Label.Equals(groupName, StringComparison.Ordinal)) is not { } group)
+            return false;
+
+        // ret false if it already contains the same filter.
+        if (group.SortOrder.Contains(filter))
+            return false;
+
+        // Apply change.
+        group.SortOrder.Add(filter);
+        _config.Save();
+        return true;
+    }
+
+    public bool ClearFilters(string groupName)
+    {
+        if (Groups.FirstOrDefault(g => g.Label.Equals(groupName, StringComparison.Ordinal)) is not { } group)
+            return false;
+        // Apply change.
+        group.SortOrder.Clear();
+        _config.Save();
+        return true;
+    }
+
     // Slowly migrate the below methods into helper functions for group interactions performed via the GroupsDDS
 
 

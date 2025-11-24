@@ -2,44 +2,35 @@ using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
-using Sundouleia.Gui.Components;
-using Sundouleia.Gui.Handlers;
+using Sundouleia.DrawSystem;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 
 namespace Sundouleia.Gui;
 
+// Might phase out this window in favor of a our GroupsDrawer later.
 public class GroupsUI : WindowMediatorSubscriberBase
 {
+    private readonly GroupsDrawer _drawer;
     private readonly GroupsManager _manager;
-    private readonly DrawEntityFactory _factory;
     private readonly TutorialService _guides;
 
     private FAIconCombo _iconGalleryCombo;
-    private List<DrawFolderGroup> _groups;
-    private DrawFolderDefault _allSundesmos;
 
     private SundesmoGroup _creator = new SundesmoGroup();
     public GroupsUI(ILogger<GroupsUI> logger, SundouleiaMediator mediator,
-        GroupsManager manager, DrawEntityFactory factory, TutorialService guides) 
-        : base(logger, mediator, "Group Manager###Sundouleia_GroupUI")
+        GroupsDrawer drawer, GroupsManager manager, TutorialService guides) 
+        : base(logger, mediator, "Group Manager###SundouleiaGroups")
     {
+        _drawer = drawer;
         _manager = manager;
-        _factory = factory;
         _guides = guides;
 
         _iconGalleryCombo = new FAIconCombo(logger);
-
-        CreateGroupFolders();
-        _allSundesmos = _factory.CreateDefaultFolder(Constants.FolderTagAllDragDrop, FolderOptions.FolderEditor);
-
-        Mediator.Subscribe<FolderUpdateGroups>(this, _ => CreateGroupFolders());
 
         this.PinningClickthroughFalse();
         this.SetBoundaries(new(550, 470), ImGui.GetIO().DisplaySize);        
@@ -47,8 +38,6 @@ public class GroupsUI : WindowMediatorSubscriberBase
             .AddTutorial(guides, TutorialType.Groups)
             .Build();
     }
-
-    public List<DrawFolderGroup> Groups => _groups;
 
     protected override void PreDrawInternal()
     { }
@@ -70,19 +59,17 @@ public class GroupsUI : WindowMediatorSubscriberBase
 
         using (CkRaii.Child("GroupManagerEditor_Groups", childSize))
         {
-            foreach (var group in _groups)
-                group.DrawContents();
+            // TBD: Draw the groups.
         }
 
         ImUtf8.SameLineInner();
 
         using (CkRaii.Child("GroupManagerEditor_AllSundesmos", childSize))
         {
-            _allSundesmos.DrawContents();
+            // TBD: Draw all sundesmos.
         }
     }
 
-    #region Creator
     private void DrawGroupEditor()
     {
         // Icon & Name Line. (with create button)
@@ -133,14 +120,5 @@ public class GroupsUI : WindowMediatorSubscriberBase
         ImUtf8.SameLineInner();
         if (ImGui.Checkbox("Show Offline", ref seeOffline))
             _creator.ShowOffline = seeOffline;
-    }
-    #endregion Creator
-    private void CreateGroupFolders()
-    {
-        // Create the folders based on the current config options.
-        var groupFolders = new List<DrawFolderGroup>();
-        foreach (var group in _manager.Config.Groups)
-            groupFolders.Add(_factory.CreateGroupFolder(group, FolderOptions.FolderEditor));
-        _groups = groupFolders;
     }
 }

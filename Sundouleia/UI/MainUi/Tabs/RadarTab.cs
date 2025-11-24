@@ -1,48 +1,28 @@
 using CkCommons.Gui;
-using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.DrawSystem.Selector;
-using Sundouleia.Gui.Components;
-using Sundouleia.Pairs;
-using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.WebAPI;
-using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.MainWindow;
 public class RadarTab : DisposableMediatorSubscriberBase
 {
     private readonly RadarDrawer _drawer;
-    private readonly DrawEntityFactory _factory;
-    private readonly SundesmoManager _sundesmos;
-    private readonly RadarManager _manager;
     private readonly TutorialService _guides;
 
-    private DynamicRadarFolder _pairedFolder;
-    private DynamicRadarFolder _unpairedFolder;
-
-    public RadarTab(ILogger<RadarTab> logger, SundouleiaMediator mediator, RadarDrawer drawer,
-        DrawEntityFactory factory, SundesmoManager sundesmos, RadarManager manager, TutorialService guides)
+    public RadarTab(ILogger<RadarTab> logger, SundouleiaMediator mediator, 
+        RadarDrawer drawer, TutorialService guides)
         : base(logger, mediator)
     {
         _drawer = drawer;
-        _factory = factory;
-        _sundesmos = sundesmos;
-        _manager = manager;
         _guides = guides;
-
-        _pairedFolder = _factory.CreateRadarFolder(Constants.FolderTagRadarPaired, FolderOptions.Default);
-        _unpairedFolder = _factory.CreateRadarFolder(Constants.FolderTagRadarUnpaired, FolderOptions.Default);
     }
-
-    public DynamicRadarFolder Paired => _pairedFolder;
-    public DynamicRadarFolder Unpaired => _unpairedFolder;
 
     public void DrawSection()
     {
@@ -53,10 +33,10 @@ public class RadarTab : DisposableMediatorSubscriberBase
         var min = ImGui.GetCursorScreenPos();
         var max = min + region;
 
+        // If we are verified and not blocked, draw the UI are normal.
         if (!unverified && !usageBlocked)
-        {
             DrawContentBody(region.X);
-        }
+        // Otherwise draw the UI in disabled mode with the overlay message.
         else
         {
             using (ImRaii.Disabled(usageBlocked || unverified))
@@ -82,17 +62,6 @@ public class RadarTab : DisposableMediatorSubscriberBase
         ImGui.Spacing();
         _drawer.DrawFilterRow(width, 25);
         _drawer.DrawContents(width, DynamicFlags.BasicViewFolder);
-    }
-
-    private void DrawOldContentBody()
-    {
-        CkGui.FontTextCentered($"{RadarService.CurrWorldName} - {RadarService.CurrZoneName}", UiFontService.Default150Percent);
-        // Draw paired first, then unpaired, (yes, this is done intentionally to help with things not being 'too automated')
-        ImGui.Spacing();
-
-        using var _ = CkRaii.Child("radarTabPaired", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-        _pairedFolder.DrawContents();
-        _unpairedFolder.DrawContents();
     }
 
     private void DrawUnverifiedOverlay()
