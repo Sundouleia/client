@@ -30,13 +30,16 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
         // Store the group.
         _group = g;
         // Define the generator.
-        _generator = () => [.. sundesmos.DirectPairs.Where(u => g.LinkedUids.Contains(u.UserData.UID))];
+        _generator = () => ShowOffline 
+            ? [.. sundesmos.DirectPairs.Where(u => g.LinkedUids.Contains(u.UserData.UID))]
+            : [.. sundesmos.DirectPairs.Where(u => g.LinkedUids.Contains(u.UserData.UID) && u.IsOnline)];
         // Apply Stylizations.
         ApplyLatestStyle();
         // Set initial unsorted steps.
         UnusedSteps = DynamicSorterEx.AllGroupSteps.Except(Sorter).ToList();
     }
 
+    public bool ShowOffline => _group.ShowOffline;
     public int Rendered => Children.Count(s => s.Data.IsRendered);
     public int Online => Children.Count(s => s.Data.IsOnline);
     protected override IReadOnlyList<Sundesmo> GetAllItems() => _generator();
@@ -58,6 +61,7 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
         IconColor = _group.IconColor;
         NameColor = _group.LabelColor;
         BorderColor = _group.BorderColor;
+        GradientColor = _group.GradientColor;
     }
 
     /// <summary>

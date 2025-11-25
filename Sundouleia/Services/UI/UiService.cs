@@ -1,6 +1,5 @@
 using Dalamud.Interface.Windowing;
 using Sundouleia.Gui;
-using Sundouleia.Gui.Components;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.PlayerClient;
@@ -11,9 +10,9 @@ namespace Sundouleia.Services;
 /// <summary> A sealed class dictating the UI service for the plugin. </summary>
 public sealed class UiService : DisposableMediatorSubscriberBase
 {
+    // Created windows for pop-up profile displays.
     private static readonly List<WindowMediatorSubscriberBase> _createdWindows = [];
 
-    private readonly MainMenuTabs _mainTabMenu;
     private readonly MainConfig _config;
     private readonly AccountConfig _accountConfig;
     private readonly UiFactory _uiFactory;
@@ -24,11 +23,11 @@ public sealed class UiService : DisposableMediatorSubscriberBase
     public static Task? UiTask { get; private set; }
     public static bool DisableUI => UiTask is not null && !UiTask.IsCompleted;
 
-    public UiService(ILogger<UiService> logger, SundouleiaMediator mediator, MainMenuTabs menuTabs, 
-        MainConfig config, AccountConfig serverConfig, WindowSystem windowSystem, IEnumerable<WindowMediatorSubscriberBase> windows,
+    // Never directly called yet, but we can process it via the Hoster using GetServices<WindowMediatorSubscriberBase>() to load all windows.
+    public UiService(ILogger<UiService> logger, SundouleiaMediator mediator, MainConfig config,
+        AccountConfig serverConfig, WindowSystem windowSystem, IEnumerable<WindowMediatorSubscriberBase> windows,
         UiFactory uiFactory, UiFileDialogService fileDialog) : base(logger, mediator)
     {
-        _mainTabMenu = menuTabs;
         _config = config;
         _accountConfig = serverConfig;
         _windowSystem = windowSystem;
@@ -48,19 +47,6 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         foreach (var window in windows)
             _windowSystem.AddWindow(window);
 
-        // subscribe to the event message for removing a window
-        Mediator.Subscribe<RemoveWindowMessage>(this, (msg) =>
-        {
-            // Check if the window is registered in the WindowSystem before removing it
-            if (_windowSystem.Windows.Contains(msg.Window))
-                _windowSystem.RemoveWindow(msg.Window);
-            else
-                Logger.LogWarning($"Attempted to remove window not in WindowSystem {{{msg.Window.WindowName}}}");
-
-            _createdWindows.Remove(msg.Window);
-            msg.Window.Dispose();
-        });
-
         /* ---------- The following subscribers are for factory made windows, meant to be unique to each pair ---------- */
         Mediator.Subscribe<ProfileOpenMessage>(this, (msg) =>
         {
@@ -74,8 +60,6 @@ public sealed class UiService : DisposableMediatorSubscriberBase
             }
         });
     }
-
-    public static bool IsMainUiOpen => _createdWindows.OfType<MainUI>().FirstOrDefault() is { } mainUi && mainUi.IsOpen;
 
     /// <summary>
     ///     Offloads a UI task to the thread pool to not halt ImGui. 
@@ -157,6 +141,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
 
         Logger.LogTrace("Disposing "+GetType().Name, LoggerType.UIManagement);
         _windowSystem.RemoveAllWindows();
+        // Created Profile UIs need to be disposed of manually here.
         foreach (var window in _createdWindows)
             window.Dispose();
 

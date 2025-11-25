@@ -8,8 +8,9 @@ namespace Sundouleia.DrawSystem.Selector;
 public partial class DynamicDrawer<T> : IDisposable where T : class
 {
     protected readonly ILogger Log;
-    protected readonly DynamicDrawSystem<T> DrawSystem;
+    protected readonly DynamicDrawSystem<T>  DrawSystem;
     protected readonly DynamicFilterCache<T> Cache;
+    protected readonly DynamicSelections<T>  Selector;
 
     // Queue of all actions to perform after completely drawing the list,
     // to avoid processing operations that would modify the filter mid-draw. (Can be reworked later if we need to)
@@ -17,26 +18,26 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
 
     protected string Label = string.Empty;
 
-    public DynamicDrawer(string label, ILogger log, DynamicDrawSystem<T> drawSystem, DynamicFilterCache<T>? cache = null)
+    public DynamicDrawer(string label, ILogger log, DynamicDrawSystem<T> drawSystem, 
+        DynamicFilterCache<T>? cache = null)
     {
         Label = label;
 
         Log        = log;
         DrawSystem = drawSystem;
         Cache      = cache ?? new(drawSystem);
+        Selector   = new(drawSystem, Cache);
+    }
 
-        // Listen to changes from the draw system.
-        DrawSystem.Changed += OnDrawSystemChange;
+    public virtual void Dispose()
+    {
+        Selector.Dispose();
+        Cache.Dispose();
     }
 
     // Manages all nodes hover state over a 2 setters per drawframe outside updates.
     protected IDynamicNode? _hoveredNode = null; // From last frame.
     protected IDynamicNode? _newHoveredNode = null; // Tracked each frame.
-
-    public virtual void Dispose()
-    {
-        DrawSystem.Changed -= OnDrawSystemChange;
-    }
 
     public void DrawContents(float width, DynamicFlags flags = DynamicFlags.BasicViewFolder)
     {
@@ -98,29 +99,4 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     // Helper for parent classes.
     protected void AddPostDrawLogic(Action act)
         => _postDrawActions.Enqueue(act);
-
-    // Vastly change this overtime.
-    private void OnDrawSystemChange(DDSChangeType type, IDynamicNode<T> obj, IDynamicCollection<T>? prevParent, IDynamicCollection<T>? newParent)
-    {
-        switch (type)
-        {
-            case DDSChangeType.ObjectMoved:
-               // Enqueue the move operation as a post - draw action.
-               _postDrawActions.Enqueue(() =>
-               {
-                   ExpandAncestors(obj);
-                   Cache.MarkCacheDirty();
-               });
-               break;
-            case DDSChangeType.ObjectRemoved:
-            case DDSChangeType.Reload:
-                if (obj == SelectedLeaf)
-                    ClearSelected();
-                Cache.MarkCacheDirty();
-                break;
-            default:
-                Cache.MarkCacheDirty();
-                break;
-        }
-    }
 }

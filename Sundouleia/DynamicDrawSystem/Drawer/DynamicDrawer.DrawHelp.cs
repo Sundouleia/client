@@ -99,7 +99,7 @@ public partial class DynamicDrawer<T>
     protected void DrawCachedFolderNode(DynamicFolderGroupCache<T> cfg, DynamicFlags flags)
     {
         using var id = ImRaii.PushId($"DDS_{Label}_{cfg.Folder.ID}");
-        DrawFolderGroupBanner(cfg.Folder, flags, _hoveredNode == cfg.Folder || _selected.Contains(cfg.Folder));
+        DrawFolderGroupBanner(cfg.Folder, flags, _hoveredNode == cfg.Folder || Selector.Selected.Contains(cfg.Folder));
         if (!cfg.Folder.IsOpen)
             return;
         // Draw the children objects.
@@ -111,7 +111,7 @@ public partial class DynamicDrawer<T>
     protected void DrawCachedFolderNode(DynamicFolderCache<T> cf, DynamicFlags flags)
     {
         using var id = ImRaii.PushId($"DDS_{Label}_{cf.Folder.ID}");
-        DrawFolderBanner(cf.Folder, flags, _hoveredNode == cf.Folder || _selected.Contains(cf.Folder));
+        DrawFolderBanner(cf.Folder, flags, _hoveredNode == cf.Folder || Selector.Selected.Contains(cf.Folder));
         if (!cf.Folder.IsOpen)
             return;
         // Draw the children objects.
@@ -192,13 +192,13 @@ public partial class DynamicDrawer<T>
         wdl.ChannelsSetCurrent(0); // Background.
         var gradientTL = new Vector2(folderMin.X, folderMax.Y);
         var gradientTR = new Vector2(folderMax.X, ImGui.GetItemRectMax().Y);
-        wdl.AddRectFilledMultiColor(gradientTL, gradientTR, ColorHelpers.Fade(cf.Folder.BorderColor, .9f), ColorHelpers.Fade(cf.Folder.BorderColor, .9f), 0, 0);
+        wdl.AddRectFilledMultiColor(gradientTL, gradientTR, ColorHelpers.Fade(cf.Folder.GradientColor, .9f), ColorHelpers.Fade(cf.Folder.GradientColor, .9f), 0, 0);
         wdl.ChannelsMerge();
     }
 
     // Adapter used by the clipper so we don't allocate a lambda capturing locals each frame.
     private void DrawLeafClipped(IDynamicLeaf<T> leaf, DynamicFlags flags)
-        => DrawLeaf(leaf, flags, leaf.Equals(_hoveredNode) || _selected.Contains(leaf));
+        => DrawLeaf(leaf, flags, leaf.Equals(_hoveredNode) || Selector.Selected.Contains(leaf));
 
     protected virtual void DrawLeaf(IDynamicLeaf<T> leaf, DynamicFlags flags, bool selected)
     {
@@ -254,7 +254,7 @@ public partial class DynamicDrawer<T>
         }
         // Handle Selection.
         if (flags.HasAny(DynamicFlags.SelectableFolders) && clicked)
-            SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
 
         // Handle Drag and Drop.
         if (flags.HasAny(DynamicFlags.DragDropFolders))
@@ -275,7 +275,7 @@ public partial class DynamicDrawer<T>
             _newHoveredNode = node;
         // Handle Selection.
         if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
-            SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
         // Handle Drag and Drop.
         if (flags.HasAny(DynamicFlags.DragDropLeaves))
         {

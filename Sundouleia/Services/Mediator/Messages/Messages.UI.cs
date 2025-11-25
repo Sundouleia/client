@@ -1,4 +1,5 @@
 using Sundouleia.Gui.Components;
+using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
@@ -30,16 +31,8 @@ public record OpenReportUIMessage(UserData UserToReport, ReportKind Kind) : Mess
 /// <summary> Sets the tab of the MainUI. </summary>
 public record MainWindowTabChangeMessage(MainMenuTabs.SelectedTab NewTab) : MessageBase;
 
-/// <summary> When we want a specific window removed. Most beneficial for profiles. </summary>
-public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
-
 /// <summary> When a standalone profile UI is created. </summary>
 public record ProfileOpenMessage(UserData UserData) : MessageBase;
-
-public record CloseInteractionUi : MessageBase;
-
-/// <summary> When a standalone profile UI is created. </summary>
-public record ToggleSundesmoInteractionUI(Sundesmo Sundesmo, ToggleType NewState) : MessageBase;
 
 /// <summary> When the whitelist has a User hovered long enough and displays a profile, this is fired. </summary>
 public record OpenProfilePopout(UserData UserData) : MessageBase;

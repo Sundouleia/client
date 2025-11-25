@@ -33,7 +33,8 @@ public sealed class FAIconCombo : CkFilterComboGalleryCache<FAI>
     {
         ItemsPerRow = iconsPerRow;
         _previewFAI.Push(Svc.PluginInterface.UiBuilder.FontIcon);
-        return base.Draw($"##{label}", preview.ToIconString(), ImUtf8.FrameHeightSpacing, flags);
+        var width = (flags & CFlags.NoArrowButton) == 0 ? (ImUtf8.FrameHeight * 2 + ImUtf8.ItemInnerSpacing.X) : ImUtf8.FrameHeight;
+        return base.Draw($"##{label}", preview.ToIconString(), width, flags);
     }
 
     public bool DrawPopup(string label, int iconsPerRow, Vector2 drawPos, uint? searchBg = null)

@@ -2,19 +2,23 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.DrawSystem;
 
-// Definitely revise this.
-public enum DDSChangeType
+public enum DDSChange
 {
-    ObjectRenamed,
-    ObjectRemoved,
-    FolderAdded,
-    ObjectMoved,
-    FolderMerged,
-    PartialMerge,
-    FlagChange,
-    FolderUpdated,
-    SorterChanged,
-    Reload,
+    CollectionAdded,   // [Listener for FileSaving & FilterCache Reload] A Collection was added, and could be attached to a FolderGroup.
+    CollectionRemoved, // [Listener for FileSaving & FilterCache Remove/Dirty] A Collection was removed from the hierarchy.
+    CollectionMoved,   // [Listener for FileSaving & FilterCache Reload] A Collection moved from one FolderGroup to another.
+    CollectionMerged,  // [Listener for FileSaving & FilterCache Reload] A Collection was merged into a FolderGroup.
+    CollectionRenamed, // [Listener for FileSaving & FilterCache Reload] Collection was renamed.
+    FullReloadStarting,// [Listener for Selections ] A full reload is starting. Good idea to store any names of selected nodes before they are cleared.
+    FullReloadFinished,// [Listener for Selections ] Full reload finished, and is ready for selections to be updated.
+}
+
+public enum CollectionUpdate
+{
+    FolderUpdated,      // [Listener for Selections ] Re-processed GetAllItems(). For listeners wanting to track removed leaves. Auto-Sorting was handled already.
+    SortDirectionChange,// [FilterCache Sort Listener] The sort direction was changed (Asc/Desc) for the folder's children.
+    SorterChange,       // [FilterCache Sort Listener] The DynamicSorter of an IDynamicCollection changed.
+    OpenStateChange,    // [FilterCache Reload Listener] A Collection was opened or closed.
 }
 
 /// <summary>
@@ -26,10 +30,14 @@ public enum DDSChangeType
 /// </summary>
 public abstract partial class DynamicDrawSystem<T> where T : class
 {
-    // An internal change action event for a selector to link to without overloading
-    // the mediator when multiple file systems are active.
-    public delegate void ChangeDelegate(DDSChangeType type, IDynamicNode<T> obj, IDynamicCollection<T>? prevParent, IDynamicCollection<T>? newParent);
-    public event ChangeDelegate? Changed;
+    // For essential, structure-altering changes within the DDS.
+    public delegate void DDSChangeDelegate(DDSChange kind, IDynamicNode<T> node, IDynamicCollection<T>? prevParent, IDynamicCollection<T>? newParent);
+    public event DDSChangeDelegate? DDSChanged;
+
+    // Whenever a notable update occurs to a collection that external sources should be notified for.
+    // (Maybe change to IDynamicNode<T> for the enumerable if we need it.
+    public delegate void CollectionUpdateDelegate(CollectionUpdate kind, IDynamicCollection<T> collection, IEnumerable<DynamicLeaf<T>>? affectedLeaves);
+    public event CollectionUpdateDelegate? CollectionUpdated;
 
     // Internal folder mapping for quick access by name.
     private readonly Dictionary<string, IDynamicCollection<T>> _folderMap = [];
@@ -108,64 +116,59 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         _folderMap[folder.Name] = folder;
 
         // Revise later, this would fire a ton of changes during a reload and could possibly overload fileIO.
-        Changed?.Invoke(DDSChangeType.FolderAdded, folder, null, folder.Parent);
+        DDSChanged?.Invoke(DDSChange.CollectionAdded, folder, null, folder.Parent);
         return true;
     }
 
     // Retrieve the updated state of all folders.
     public void UpdateFolders()
     {
-        IEnumerable<IDynamicLeaf<T>> removed = [];
+        IEnumerable<DynamicLeaf<T>> removed = [];
 
         foreach (var folder in _folderMap.Values.OfType<DynamicFolder<T>>())
             if (folder.Update(_nameComparer, out var rem))
                 removed = removed.Concat(rem);
-
         // Notify of removed leaves.
-
-        // Notify of the updated state.
-        Changed?.Invoke(DDSChangeType.FolderUpdated, root, null, null);
+        CollectionUpdated?.Invoke(CollectionUpdate.FolderUpdated, root, removed);
     }
 
     public void UpdateFolder(DynamicFolder<T> folder)
     {
-        if (folder.Update(_nameComparer, out var removed))
-        {
-            // Notify of removed leaves.
-        }
-
-        // Revise later.
-        Changed?.Invoke(DDSChangeType.FolderUpdated, folder, null, null);
+        folder.Update(_nameComparer, out var removed);
+        CollectionUpdated?.Invoke(CollectionUpdate.FolderUpdated, folder, removed);
     }
 
     public void SetSortDirection(IDynamicCollection<T> folder, bool isDescending)
     {
         if (folder is DynamicFolderGroup<T> fc)
+        {
             fc.Sorter.FirstDescending = isDescending;
+            CollectionUpdated?.Invoke(CollectionUpdate.SortDirectionChange, folder, null);
+        }
         else if (folder is DynamicFolder<T> f)
+        {
             f.Sorter.FirstDescending = isDescending;
-        else
-            return;
-        // Revise later.
-        Changed?.Invoke(DDSChangeType.SorterChanged, folder, null, null);
+            CollectionUpdated?.Invoke(CollectionUpdate.SortDirectionChange, folder, null);
+        }
     }
 
     // Sets the expanded state of a folder to a new value.
     public bool SetOpenState(IDynamicCollection<T> folder, bool isOpen)
     {
-        if (folder.IsOpen == isOpen)
-            return false;
-
-        if (folder is DynamicFolderGroup<T> fc)
+        if (folder is DynamicFolderGroup<T> fc && fc.IsOpen != isOpen)
+        {
             fc.SetIsOpen(isOpen);
-        else if (folder is DynamicFolder<T> f)
+            CollectionUpdated?.Invoke(CollectionUpdate.OpenStateChange, folder, null);
+            return true;
+        }
+        else if (folder is DynamicFolder<T> f && f.IsOpen != isOpen)
+        {
             f.SetIsOpen(isOpen);
-        else
-            return false;
-
-        // Revise later.
-        Changed?.Invoke(DDSChangeType.FolderUpdated, folder, null, null);
-        return true;
+            CollectionUpdated?.Invoke(CollectionUpdate.OpenStateChange, folder, null);
+            return true;
+        }
+        // Fail otherwise.
+        return false;
     }
 
 
@@ -175,26 +178,29 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     /// </summary>
     protected void OpenFolders(List<string> toOpen, bool newState)
     {
+        bool anyOpened = false;
         foreach (var collectionName in toOpen)
         {
             // Attempt to locate the collection.
-            if (!_folderMap.TryGetValue(collectionName, out var match))
+            if (!_folderMap.TryGetValue(collectionName, out var collection) || collection.IsOpen)
                 continue;
 
             // Set the open state.
-            if (match is DynamicFolderGroup<T> fc)
+            if (collection is DynamicFolderGroup<T> fc)
                 fc.SetIsOpen(newState);
-            else if (match is DynamicFolder<T> f)
+            else if (collection is DynamicFolder<T> f)
                 f.SetIsOpen(newState);
-        }
 
-        // Revise later.
-        Changed?.Invoke(DDSChangeType.FolderUpdated, root, null, null);
+            anyOpened = true;
+        }
+        // Invoke if any opened. Just do root for simplicity, but if we wanted to we could change every single opened folder individually lol.
+        CollectionUpdated?.Invoke(CollectionUpdate.OpenStateChange, root, null);
     }
 
 
     /// <summary>
-    ///     Internally rename a defined folder in the DDS.
+    ///     Internally rename a defined folder in the DDS. <para />
+    ///     Auto-Sorts the parent folder's children if enabled. <para />
     /// </summary>
     public void Rename(IDynamicCollection<T> node, string newName)
     {
@@ -202,8 +208,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         {
             case Result.ItemExists: throw new Exception($"Can't rename {node.Name} to {newName}: another entity in {node.Name}'s Parent has the same name.");
             case Result.Success:
-                // Revise later.
-                Changed?.Invoke(DDSChangeType.ObjectRenamed, node, null, null);
+                DDSChanged?.Invoke(DDSChange.CollectionRenamed, node, null, null);
                 return;
         }
     }
@@ -220,20 +225,18 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         switch (CreateAllGroups(path, out DynamicFolderGroup<T> topFolder))
         {
             case Result.Success:
-                // Revise later.
-                Changed?.Invoke(DDSChangeType.FolderAdded, topFolder, null, topFolder.Parent);
+                DDSChanged?.Invoke(DDSChange.CollectionAdded, topFolder, null, topFolder.Parent);
                 break;
 
             case Result.ItemExists:
                 // Throw Exception.
                 throw new Exception($"Could not create new folder for {path}: {topFolder.FullPath} already contains an object with a required name.");
             case Result.PartialSuccess:
-                // Revise this invoker later.
-                Changed?.Invoke(DDSChangeType.FolderAdded, topFolder, null, topFolder.Parent);
+                DDSChanged?.Invoke(DDSChange.CollectionAdded, topFolder, null, topFolder.Parent);
                 // Throw exception due to partial failure, since it expects to create all, but failed before finishing.
                 throw new Exception($"Could not create all new folders for {path}: {topFolder.FullPath} already contains an object with a required name.");
         }
-
+        // Return the top level folder.
         return topFolder;
     }
 
@@ -263,8 +266,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
             case Result.InvalidOperation:
                 throw new Exception("Can't delete the root folder.");
             case Result.Success:
-                // Revise later.
-                Changed?.Invoke(DDSChangeType.ObjectRemoved, folder, folder.Parent, null);
+                DDSChanged?.Invoke(DDSChange.CollectionRemoved, folder, folder.Parent, null);
                 return;
         }
     }
@@ -274,8 +276,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         switch (MoveFolder(folder, newParent, out var oldParent))
         {
             case Result.Success:
-                // Revise later.
-                Changed?.Invoke(DDSChangeType.ObjectMoved, folder, oldParent, newParent);
+                DDSChanged?.Invoke(DDSChange.CollectionMoved, folder, oldParent, newParent);
                 break;
 
             case Result.SuccessNothingDone:
@@ -316,13 +317,11 @@ public abstract partial class DynamicDrawSystem<T> where T : class
                 throw new Exception($"Can not merge root directory into {to.FullPath}.");
 
             case Result.Success:
-                // Revise later.
-                Changed?.Invoke(DDSChangeType.FolderMerged, from, from, to);
+                DDSChanged?.Invoke(DDSChange.CollectionMerged, from, from, to);
                 return;
 
             case Result.PartialSuccess:
-                // Revise later.
-                Changed?.Invoke(DDSChangeType.PartialMerge, from, from, to);
+                DDSChanged?.Invoke(DDSChange.CollectionMerged, from, from, to);
                 return;
 
             case Result.NoSuccess:
@@ -341,13 +340,11 @@ public abstract partial class DynamicDrawSystem<T> where T : class
                 throw new Exception($"Can not merge root directory into {to.FullPath}.");
             
             case Result.Success:
-                // Revise later.
-                Changed?.Invoke(DDSChangeType.FolderMerged, from, from, to);
+                DDSChanged?.Invoke(DDSChange.CollectionMerged, from, from, to);
                 return;
             
             case Result.PartialSuccess:
-                // Revise later.
-                Changed?.Invoke(DDSChangeType.PartialMerge, from, from, to);
+                DDSChanged?.Invoke(DDSChange.CollectionMerged, from, from, to);
                 return;
 
             case Result.NoSuccess:

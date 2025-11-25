@@ -5,9 +5,9 @@ using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using Microsoft.VisualBasic;
 using OtterGui;
 using OtterGui.Text;
+using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
@@ -20,89 +20,43 @@ using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.MainWindow;
 
-// The UI element that will be continuously drawn alongside the MainUI under certain conditions.
-// This can house various displays based on the selected tab, under spesific conditions.
-// Overtime the conditions that trigger displays will be expanded upon.
-public class MainSideUI : WindowMediatorSubscriberBase
+// We could idealy have this continuously running but never drawing much
+// if anything at all while not expected.
+// It would allow us to process the logic in the drawloop like we want.
+public class MainUISidePanel : WindowMediatorSubscriberBase
 {
-    private readonly MainMenuTabs _mainUiTabs;
     private readonly MainHub _hub;
+    private readonly MainMenuTabs _mainUiTabs;
+    private readonly GroupsDrawer _groupsDrawer;
     private readonly SundesmoManager _sundesmos;
+    private readonly StickyUIService _service;
 
-    public MainSideUI(ILogger<MainSideUI> logger, SundouleiaMediator mediator,
-        MainMenuTabs tabs, MainHub hub, SundesmoManager sundesmos)
+    public MainUISidePanel(ILogger<MainUISidePanel> logger, SundouleiaMediator mediator, MainHub hub, 
+        MainMenuTabs tabs, GroupsDrawer drawer, SundesmoManager sundesmos, StickyUIService service)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
         _mainUiTabs = tabs;
         _hub = hub;
         _sundesmos = sundesmos;
+        _groupsDrawer = drawer;
+        _service = service;
 
         Flags = WFlags.NoCollapse | WFlags.NoTitleBar | WFlags.NoResize | WFlags.NoScrollbar;
-        IsOpen = false;
-
-        Mediator.Subscribe<DisconnectedMessage>(this, (msg) =>
-        {
-            // Set the sundesmo to null, clearing draw functionality.
-            // Do not restore this between loads, as the window is not that critical to keep alive (yet)
-            _sundesmo = null;
-            // Force close the UI.
-            IsOpen = false;
-        });
-
-        Mediator.Subscribe<CloseInteractionUi>(this, _ =>
-        {
-            _logger.LogInformation("Closing InteractionsUI via CloseInteractionUi Message.");
-            _sundesmo = null;
-            IsOpen = false;
-        });
-
-        Mediator.Subscribe<MainWindowTabChangeMessage>(this, _ =>
-        {
-            if (_.NewTab is not MainMenuTabs.SelectedTab.Whitelist && IsOpen)
-            {
-                _logger.LogTrace("Closing InteractionsUI via MainWindowTabChangeMessage.");
-                _sundesmo = null;
-                IsOpen = false;
-            }
-        });
-
-        Mediator.Subscribe<ToggleSundesmoInteractionUI>(this, _ =>
-        {
-            if (_sundesmos.GetUserOrDefault(_.Sundesmo.UserData) is not { } match)
-                return;
-            // Get if this is different.
-            var isDiffSundesmo = _sundesmo is null || _sundesmo.UserData.UID != match.UserData.UID;
-
-            // Update if different.
-            if (isDiffSundesmo)
-                _sundesmo = match;
-
-            // If we satisfy any condition to open the UI, we need to make sure all prerequisites are met.
-            var shouldOpen = (_.NewState is ToggleType.Show) || (_.NewState is ToggleType.Toggle && !IsOpen) || isDiffSundesmo;
-
-            // Do open logic if we should open
-            if (shouldOpen)
-            {
-                _logger.LogTrace("Showing InteractionsUI via ToggleSundesmoInteractionUI Message.");
-                // Ensure MainUI is open
-                Mediator.Publish(new UiToggleMessage(typeof(MainUI), ToggleType.Show));
-                // Set the tab selection
-                if (_mainUiTabs.TabSelection != MainMenuTabs.SelectedTab.Whitelist)
-                    _mainUiTabs.TabSelection = MainMenuTabs.SelectedTab.Whitelist;
-                // Open the window.
-                IsOpen = true;
-            }
-            else if (_.NewState is ToggleType.Toggle)
-                IsOpen = !IsOpen;
-            else
-                IsOpen = false;
-        });
     }
 
-    // The current user. Will not draw the window if null.
-    private Sundesmo? _sundesmo = null;
-    private string _dispName = string.Empty;
-    private float _windowWidth = 0f;
+    // Magic Voodoo that can force the window open and is ran every frame
+    // prior to deciding if the window should be drawn or not.
+    // We can use this to our advantage to dictate if it should open/close
+    // based on if there is a mode to display.
+    public override void PreOpenCheck()
+    {
+        if (_service.DisplayMode is SidePanelMode.None)
+            IsOpen = false;
+        else
+            IsOpen = true;
+    }
+
+
     protected override void PreDrawInternal()
     {
         // Magic that makes the sticky pair window move with the main UI.
@@ -110,14 +64,10 @@ public class MainSideUI : WindowMediatorSubscriberBase
         position.X += MainUI.LastSize.X;
         position.Y += ImGui.GetFrameHeightWithSpacing();
         ImGui.SetNextWindowPos(position);
-
         Flags |= WFlags.NoMove;
 
-        // Define the drawn parameters used so they are only calculated once per draw frame.
-        _dispName = _sundesmo?.GetNickAliasOrUid() ?? "Anon. User";
-        _windowWidth = (ImGui.CalcTextSize($"Preventing animations from {_dispName}").X + ImGui.GetFrameHeightWithSpacing()).AddWinPadX();
-        // Set the size.
-        ImGui.SetNextWindowSize(new Vector2(_windowWidth, MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2));
+        var width = _service.DisplayWidth;
+        ImGui.SetNextWindowSize(new Vector2(width, MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2));
     }
 
     protected override void PostDrawInternal()
@@ -125,102 +75,133 @@ public class MainSideUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        // Shouldnt even be drawing at all if the sundesmo is null.
-        if (_sundesmo is not { } s)
+        // If there is no mode to draw, do not draw.
+        if (_service.DisplayMode is SidePanelMode.None)
             return;
 
-        using var _ = CkRaii.Child("InteractionsUI", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-        var width = _.InnerRegion.X;
-        DrawHeader();
+        if (!_service.IsModeValid())
+            return;
 
-        DrawCommon(width);
+        // Display the correct mode.
+        switch (_service.DisplayMode)
+        {
+            case SidePanelMode.GroupEditor:
+                DrawGroupOrganizer();
+                return;
+            case SidePanelMode.Interactions:
+                DrawSundesmoInteractions();
+                return;
+        }
+    }
+
+    private void DrawGroupOrganizer()
+    {
+        // Should be relatively simple to display this outside of some headers and stylizations.
+        using var _ = CkRaii.Child("GroupOrganizer", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+        CkGui.FontTextCentered("Group Organizer", UiFontService.Default150Percent);
+        ImGui.Separator();
+    }
+
+    #region Interactions
+    private void DrawSundesmoInteractions()
+    { 
+        if (_service.Interactions.Sundesmo is not { } s)
+            return;
+
+        using var _ = CkRaii.Child("InteractionsDisplay", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+        var dispName = _service.Interactions.DisplayName;
+        DrawHeader(s, dispName);
+
+        DrawCommon(s, dispName, width);
         ImGui.Separator();
 
         ImGui.Text("Permissions");
-        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowAnimations), s.OwnPerms.AllowAnimations);
-        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowSounds), s.OwnPerms.AllowSounds);
-        DrawDistinctPermRow(s, _dispName, width, nameof(PairPerms.AllowVfx), s.OwnPerms.AllowVfx);
+        DrawDistinctPermRow(s, dispName, width, nameof(PairPerms.AllowAnimations), s.OwnPerms.AllowAnimations);
+        DrawDistinctPermRow(s, dispName, width, nameof(PairPerms.AllowSounds), s.OwnPerms.AllowSounds);
+        DrawDistinctPermRow(s, dispName, width, nameof(PairPerms.AllowVfx), s.OwnPerms.AllowVfx);
 
         ImGui.Separator();
 
         ImGui.Text("Pair Options");
-        DrawPairOptions(_.InnerRegion.X);
+        DrawPairOptions(s, dispName, _.InnerRegion.X);
     }
 
-    private void DrawHeader()
+    private void DrawHeader(Sundesmo s, string dispName)
     {
-        CkGui.CenterText($"{_dispName}'s Interactions");
+        CkGui.CenterText($"{dispName}'s Interactions");
         var width = CkGui.IconSize(FAI.VolumeUp).X + CkGui.IconSize(FAI.Running).X + CkGui.IconSize(FAI.PersonBurst).X + ImUtf8.ItemInnerSpacing.X * 2;
         CkGui.SetCursorXtoCenter(width);
 
-        var sounds = _sundesmo!.PairPerms.AllowSounds;
-        var anims = _sundesmo.PairPerms.AllowAnimations;
-        var vfx = _sundesmo.PairPerms.AllowVfx;
+        var sounds = s.PairPerms.AllowSounds;
+        var anims = s.PairPerms.AllowAnimations;
+        var vfx = s.PairPerms.AllowVfx;
 
         CkGui.IconText(FAI.VolumeUp, sounds ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{_dispName} {(sounds ? "can hear your modded SFX/Music." : "disabled your modded SFX/Music.")}");
+        CkGui.AttachToolTip($"{dispName} {(sounds ? "can hear your modded SFX/Music." : "disabled your modded SFX/Music.")}");
         ImUtf8.SameLineInner();
         CkGui.IconText(FAI.Running, anims ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{_dispName} {(anims ? "can see your modded animations." : "disabled your modded animations.")}");
+        CkGui.AttachToolTip($"{dispName} {(anims ? "can see your modded animations." : "disabled your modded animations.")}");
         ImUtf8.SameLineInner();
         CkGui.IconText(FAI.PersonBurst, vfx ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{_dispName} {(vfx ? "can see your modded VFX." : "disabled your modded VFX.")}");
+        CkGui.AttachToolTip($"{dispName} {(vfx ? "can see your modded VFX." : "disabled your modded VFX.")}");
 
         ImGui.Separator(); 
     }
 
-    private void DrawCommon(float width)
+    private void DrawCommon(Sundesmo s, string dispName, float width)
     {
-        var isPaused = _sundesmo!.IsPaused;
+        var isPaused = s.IsPaused;
         if (!isPaused)
         {
             if (CkGui.IconTextButton(FAI.User, "Open Profile", width, true, UiService.DisableUI))
-                Mediator.Publish(new ProfileOpenMessage(_sundesmo.UserData));
-            CkGui.AttachToolTip($"Opens {_dispName}'s profile!");
+                Mediator.Publish(new ProfileOpenMessage(s.UserData));
+            CkGui.AttachToolTip($"Opens {dispName}'s profile!");
 
-            if (CkGui.IconTextButton(FAI.ExclamationTriangle, $"Report {_dispName}'s Profile", width, true, UiService.DisableUI))
-                Mediator.Publish(new OpenReportUIMessage(_sundesmo.UserData, ReportKind.Profile));
-            CkGui.AttachToolTip($"Snapshot {_dispName}'s Profile and make a report with its state.");
+            if (CkGui.IconTextButton(FAI.ExclamationTriangle, $"Report {dispName}'s Profile", width, true, UiService.DisableUI))
+                Mediator.Publish(new OpenReportUIMessage(s.UserData, ReportKind.Profile));
+            CkGui.AttachToolTip($"Snapshot {dispName}'s Profile and make a report with its state.");
         }
 
-        DrawDistinctPermRow(_sundesmo, _dispName, width, nameof(PairPerms.PauseVisuals), isPaused, false, true);
-        CkGui.AttachToolTip($"{(!isPaused ? "Pause" : "Resume")} the rendering of {_dispName}'s modded appearance.");
+        DrawDistinctPermRow(s, dispName, width, nameof(PairPerms.PauseVisuals), isPaused, false, true);
+        CkGui.AttachToolTip($"{(!isPaused ? "Pause" : "Resume")} the rendering of {dispName}'s modded appearance.");
     }
 
-    private void DrawPairOptions(float width)
+    private void DrawPairOptions(Sundesmo s, string dispName, float width)
     {
-        if (_sundesmo!.IsTemporary)
+        if (s.IsTemporary)
         {
-            var blockButton = _sundesmo.UserPair.TempAccepterUID != MainHub.UID;
+            var blockButton = s.UserPair.TempAccepterUID != MainHub.UID;
             if (CkGui.IconTextButton(FAI.Link, "Convert to Permanent Pair", width, true, blockButton))
                 UiService.SetUITask(async () =>
                 {
-                    var res = await _hub.UserPersistPair(new(_sundesmo.UserData));
+                    var res = await _hub.UserPersistPair(new(s.UserData));
                     if (res.ErrorCode is not SundouleiaApiEc.Success)
-                        _logger.LogWarning($"Failed to convert temporary pair for {_sundesmo.GetNickAliasOrUid()}. Reason: {res.ErrorCode}");
+                        _logger.LogWarning($"Failed to convert temporary pair for {dispName}. Reason: {res.ErrorCode}");
                     else
                     {
-                        _logger.LogInformation($"Successfully converted temporary pair for {_sundesmo.GetNickAliasOrUid()}.");
-                        _sundesmo.MarkAsPermanent();
+                        _logger.LogInformation($"Successfully converted temporary pair for {dispName}.");
+                        s.MarkAsPermanent();
                     }
                 });
 
-            var timeLeft = TimeSpan.FromDays(1) - (DateTime.UtcNow - _sundesmo.UserPair.CreatedAt);
+            var timeLeft = TimeSpan.FromDays(1) - (DateTime.UtcNow - s.UserPair.CreatedAt);
             var autoDeleteText = $"Temp. Pairing Expires in --COL--{timeLeft.Days}d {timeLeft.Hours}h {timeLeft.Minutes}m--COL--";
             var ttStr = $"Makes a temporary pair permanent. --NL--{autoDeleteText}" +
                 $"{(blockButton ? "--SEP----COL--Only the user who accepted the request can use this.--COL--" : string.Empty)}";
             CkGui.AttachToolTip(ttStr, color: ImGuiColors.DalamudYellow);
         }
 
-        if (CkGui.IconTextButton(FAI.Trash, $"Remove {_dispName} from your Pairs", width, true, !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
+        if (CkGui.IconTextButton(FAI.Trash, $"Remove {dispName} from your Pairs", width, true, !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
             UiService.SetUITask(async () =>
             {
-                var res = await _hub.UserRemovePair(new(_sundesmo.UserData));
+                var res = await _hub.UserRemovePair(new(s.UserData));
                 if (res.ErrorCode is not SundouleiaApiEc.Success)
-                    _logger.LogWarning($"Failed to remove pair {_sundesmo.GetNickAliasOrUid()}. Reason: {res.ErrorCode}");
+                    _logger.LogWarning($"Failed to remove pair {dispName}. Reason: {res.ErrorCode}");
                 else
                 {
-                    _logger.LogInformation($"Successfully removed pair {_sundesmo.GetNickAliasOrUid()}.");
+                    _logger.LogInformation($"Successfully removed pair {dispName}.");
                     ImGui.CloseCurrentPopup();
                 }
             });
@@ -243,7 +224,7 @@ public class MainSideUI : WindowMediatorSubscriberBase
 
             UiService.SetUITask(async () =>
             {
-                if (await ChangeOwnUnique(permName, !current).ConfigureAwait(false))
+                if (await ChangeOwnUnique(sundesmo, permName, !current).ConfigureAwait(false))
                     _logger.LogInformation($"Successfully changed own permission {permName} to {!current} for {sundesmo.GetNickAliasOrUid()}.");
             });
         }
@@ -251,7 +232,7 @@ public class MainSideUI : WindowMediatorSubscriberBase
         ImGui.SetCursorScreenPos(pos);
         PrintButtonRichText(txtData, dispName, current, trueCol, falseCol);
         if (defaultTT)
-            CkGui.AttachToolTip($"Toggle this preference for {_dispName}.");
+            CkGui.AttachToolTip($"Toggle this preference for {dispName}.");
 
     }
 
@@ -293,29 +274,29 @@ public class MainSideUI : WindowMediatorSubscriberBase
     ///     After the client-side change is made, it requests the change server side.
     ///     If any error occurs from the server-call, the value is reverted to its state before the change.
     /// </summary>
-    public async Task<bool> ChangeOwnUnique(string propertyName, object newValue)
+    public async Task<bool> ChangeOwnUnique(Sundesmo sundesmo, string propertyName, object newValue)
     {
-        if (_sundesmo is null) return false;
+        if (sundesmo is null) return false;
 
-        var type = _sundesmo.OwnPerms.GetType();
+        var type = sundesmo.OwnPerms.GetType();
         var property = type.GetProperty(propertyName);
         if (property is null || !property.CanRead || !property.CanWrite)
             return false;
 
         // Initially, Before sending it off, store the current value.
-        var currentValue = property.GetValue(_sundesmo.OwnPerms);
+        var currentValue = property.GetValue(sundesmo.OwnPerms);
 
         try
         {
             // Update it before we send off for validation.
-            if (!PropertyChanger.TrySetProperty(_sundesmo.OwnPerms, propertyName, newValue, out object? finalVal))
+            if (!PropertyChanger.TrySetProperty(sundesmo.OwnPerms, propertyName, newValue, out object? finalVal))
                 throw new InvalidOperationException($"Failed to set property {propertyName} for self in PairPerms with value {newValue}.");
 
             if (finalVal is null)
                 throw new InvalidOperationException($"Property {propertyName} in PairPerms, has the finalValue was null, which is not allowed.");
 
             // Now that it is updated client-side, attempt to make the change on the server, and get the hub response.
-            HubResponse response = await _hub.ChangeUniquePerm(_sundesmo.UserData, propertyName, (bool)newValue);
+            HubResponse response = await _hub.ChangeUniquePerm(sundesmo.UserData, propertyName, (bool)newValue);
 
             if (response.ErrorCode is not SundouleiaApiEc.Success)
                 throw new InvalidOperationException($"Failed to change {propertyName} to {finalVal} for self. Reason: {response.ErrorCode}");
@@ -323,10 +304,11 @@ public class MainSideUI : WindowMediatorSubscriberBase
         catch (InvalidOperationException ex)
         {
             Svc.Logger.Warning(ex.Message + "(Resetting to Previous Value)");
-            property.SetValue(_sundesmo.OwnPerms, currentValue);
+            property.SetValue(sundesmo.OwnPerms, currentValue);
             return false;
         }
 
         return true;
     }
+    #endregion Interactions
 }

@@ -59,8 +59,8 @@ public partial class DynamicDrawer<T>
         // If we fail to set the payload, it implies we have started to move it, so update the cache.
         if (!DragDropSource.SetPayload($"{Label}_Move"))
         {
-            SelectInternal(entity);
-            _dragDropCache.UpdateCache($"{Label}_Move", [.. _selected]);
+            Selector.SelectSingle(entity);
+            _dragDropCache.UpdateCache($"{Label}_Move", [.. Selector.Selected]);
         }
 
         // Customize display text later, maybe allow a custom virtual func for display text or something.

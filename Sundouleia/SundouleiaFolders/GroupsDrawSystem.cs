@@ -36,23 +36,31 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
         Mediator.Subscribe<FolderUpdateGroups>(this, _ => UpdateFolders());
         Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => UpdateFolders());
 
-        // Subscribe to the changes (which is to change very, very soon, with overrides.
-        Changed += OnChange;
+        DDSChanged += OnChange;
+        CollectionUpdated += OnCollectionUpdate;
     }
 
     public void Dispose()
     {
-        Changed -= OnChange;
+        Mediator.UnsubscribeAll(this);
+        DDSChanged -= OnChange;
+        CollectionUpdated -= OnCollectionUpdate;
     }
 
     // Note that this will change very soon, as saves should only occur for certain changes.
-    private void OnChange(DDSChangeType type, IDynamicNode<Sundesmo> obj, IDynamicCollection<Sundesmo>? prevParent, IDynamicCollection<Sundesmo>? newParent)
+    private void OnChange(DDSChange type, IDynamicNode<Sundesmo> obj, IDynamicCollection<Sundesmo>? _, IDynamicCollection<Sundesmo>? __)
     {
-        if (type != DDSChangeType.Reload)
+        if (type is not (DDSChange.FullReloadStarting or DDSChange.FullReloadFinished))
         {
             _logger.LogInformation($"DDS Change [{type}] for node [{obj.Name} ({obj.FullPath})] occured. Saving Config.");
             _hybridSaver.Save(this);
         }
+    }
+
+    private void OnCollectionUpdate(CollectionUpdate kind, IDynamicCollection<Sundesmo> collection, IEnumerable<DynamicLeaf<Sundesmo>>? _)
+    {
+        if (kind is CollectionUpdate.OpenStateChange)
+            _hybridSaver.Save(this);
     }
 
     private void LoadData()
@@ -61,11 +69,8 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
         if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Groups)))
         {
             _logger.LogWarning("Loaded GroupDrawSystem from file.");
-            // Re-Save the file after all data is loaded and applied.
             _hybridSaver.Save(this);
         }
-        else
-            _logger.LogWarning("No saved GroupDrawSystem file found, starting fresh.");
     }
 
     protected override bool EnsureAllFolders(Dictionary<string, string> map)

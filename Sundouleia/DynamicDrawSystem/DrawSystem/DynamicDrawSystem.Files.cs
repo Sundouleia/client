@@ -88,6 +88,8 @@ public partial class DynamicDrawSystem<T>
     /// <returns> If any FolderGroups, or folders were created. </returns>
     protected bool LoadObject(JObject? jObject)
     {
+        // Invoke the reload is beginning
+        DDSChanged?.Invoke(DDSChange.FullReloadStarting, root, null, null);
         // Reset all data, completely.
         idCounter = 1;
         _folderMap.Clear();
@@ -134,8 +136,9 @@ public partial class DynamicDrawSystem<T>
         {
             Svc.Logger.Warning("No DDS JObject found during load, starting fresh with only root folder.");
         }
-        // Revise later.
-        Changed?.Invoke(DDSChangeType.Reload, root, null, null);
+        
+        // The entire reload process is now complete, and we can notify listeners of such.
+        DDSChanged?.Invoke(DDSChange.FullReloadFinished, root, null, null);
         return foldersCreated;
     }
 

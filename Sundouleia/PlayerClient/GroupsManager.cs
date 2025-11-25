@@ -1,4 +1,6 @@
+using Sundouleia.DrawSystem;
 using Sundouleia.Services.Mediator;
+using System.Collections.Generic;
 
 namespace Sundouleia.PlayerClient;
 
@@ -12,28 +14,29 @@ public class GroupsManager
     private readonly SundouleiaMediator _mediator;
     private readonly FolderConfig _config;
 
+    private Dictionary<string, SundesmoGroup> _lookupMap = new();
+
     public GroupsManager(ILogger<GroupsManager> logger, SundouleiaMediator mediator, FolderConfig config)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
+
+        _lookupMap = Config.Groups.ToDictionary(g => g.Label, g => g);
     }
 
     public FolderStorage Config => _config.Current;
 
     public List<SundesmoGroup> Groups => _config.Current.Groups;
 
-
+    #region Filter Edits
     // Moves the sort filters of selected indexes to a new target index location in the list
     public bool MoveFilters(string groupName, int[] fromIndices, int targetIdx)
     {
-        // If the group cannot be found return false
-        if (Groups.FirstOrDefault(g => g.Label.Equals(groupName, StringComparison.Ordinal)) is not { } group)
+        if (!_lookupMap.TryGetValue(groupName, out var group))
             return false;
 
-        // Get the current SortOrder list
         var sortOrder = group.SortOrder;
-
         // Sort in descending order for efficient removal
         Array.Sort(fromIndices);
         Array.Reverse(fromIndices);
@@ -47,37 +50,24 @@ public class GroupsManager
         foreach (var idx in fromIndices)
             sortOrder.RemoveAt(idx);
 
-        // Apply change.
         sortOrder.InsertRange(Math.Min(targetIdx, sortOrder.Count), toMove);
         _config.Save();
         return true;
     }
 
-    public bool RemoveFilter(string groupName, int filterIdx)
+    public bool RemoveFilter(string groupName, int idx)
     {
-        if (Groups.FirstOrDefault(g => g.Label.Equals(groupName, StringComparison.Ordinal)) is not { } group)
+        if (!_lookupMap.TryGetValue(groupName, out var group) || (idx < 0 || idx >= group.SortOrder.Count))
             return false;
-
-        // If the filter index is out of range return false
-        if (filterIdx < 0 || filterIdx >= group.SortOrder.Count)
-            return false;
-
-        // Apply change.
-        group.SortOrder.RemoveAt(filterIdx);
+        group.SortOrder.RemoveAt(idx);
         _config.Save();
         return true;
     }
 
     public bool AddFilter(string groupName, FolderSortFilter filter)
     {
-        if (Groups.FirstOrDefault(g => g.Label.Equals(groupName, StringComparison.Ordinal)) is not { } group)
+        if (!_lookupMap.TryGetValue(groupName, out var group) || group.SortOrder.Contains(filter))
             return false;
-
-        // ret false if it already contains the same filter.
-        if (group.SortOrder.Contains(filter))
-            return false;
-
-        // Apply change.
         group.SortOrder.Add(filter);
         _config.Save();
         return true;
@@ -85,16 +75,88 @@ public class GroupsManager
 
     public bool ClearFilters(string groupName)
     {
-        if (Groups.FirstOrDefault(g => g.Label.Equals(groupName, StringComparison.Ordinal)) is not { } group)
+        if (!_lookupMap.TryGetValue(groupName, out var group))
             return false;
-        // Apply change.
         group.SortOrder.Clear();
         _config.Save();
         return true;
     }
+    #endregion FilterEdits
 
-    // Slowly migrate the below methods into helper functions for group interactions performed via the GroupsDDS
+    public bool TryRename(string groupName, string newName)
+    {
+        if (!_lookupMap.TryGetValue(groupName, out var group))
+            return false;
+        return TryRename(group, newName);
+    }
 
+    public bool TryRename(SundesmoGroup group, string newName)
+    {
+        if (_config.LabelExists(newName))
+        {
+            _logger.LogWarning($"A group with the name {{{newName}}} already exists!");
+            return false;
+        }
+
+        // Remove the old lookup.
+        _lookupMap.Remove(group.Label);
+        // Update the name.
+        group.Label = newName;
+        // Update lookup map
+        _lookupMap[newName] = group;
+        _config.Save();
+        return true;
+    }
+
+    #region Style Edits
+    public bool TrySetIcon(string groupName, FAI newIcon, uint newColor)
+    {
+        if (!_lookupMap.TryGetValue(groupName, out var group))
+            return false;
+        SetIcon(group, newIcon, newColor);
+        return true;
+    }
+
+    public void SetIcon(SundesmoGroup group, FAI newIcon, uint newColor)
+    {
+        group.Icon = newIcon;
+        group.IconColor = newColor;
+        _config.Save();
+    }
+
+    public bool TrySetStyle(string groupName, uint icon, uint label, uint border, uint gradient)
+    {
+        if (!_lookupMap.TryGetValue(groupName, out var group))
+            return false;
+        SetStyle(group, icon, label, border, gradient);
+        return true;
+    }
+
+    public void SetStyle(SundesmoGroup group, uint icon, uint label, uint border, uint gradient)
+    {
+        group.IconColor = icon;
+        group.LabelColor = label;
+        group.BorderColor = border;
+        group.GradientColor = gradient;
+        _config.Save();
+    }
+
+    public bool TrySetState(string groupName, bool showOffline, bool showIfEmpty)
+    {
+        if (!_lookupMap.TryGetValue(groupName, out var group))
+            return false;
+        SetState(group, showOffline, showIfEmpty);
+        return true;
+    }
+
+    public void SetState(SundesmoGroup group, bool showOffline, bool showIfEmpty)
+    {
+        group.ShowOffline = showOffline;
+        group.ShowIfEmpty = showIfEmpty;
+        _config.Save();
+    }
+
+    #endregion Style Edits
 
     // Attempts to add a new sundesmoGroup to the config.
     // Fails if the name already exists. 
@@ -108,69 +170,6 @@ public class GroupsManager
         // Default the linked UID's.
         group.LinkedUids = new();
         Config.Groups.Add(group);
-        _config.Save();
-        return true;
-    }
-
-    public void UpdateIcon(SundesmoGroup group, FAI newIcon, uint newColor)
-    {
-        group.Icon = newIcon;
-        group.IconColor = newColor;
-        _config.Save();
-    }
-
-    public bool UpdateLabel(SundesmoGroup group, string newLabel, uint newColor)
-    {
-        if (_config.LabelExists(group.Label))
-        {
-            _logger.LogWarning($"A group with the name {{{group.Label}}} already exists!");
-            return false;
-        }
-
-        group.Label = newLabel;
-        group.LabelColor = newColor;
-        _config.Save();
-        return true;
-    }
-
-    public void UpdateDescription(SundesmoGroup group, string newDesc)
-    {
-        group.Description = newDesc;
-        _config.Save();
-    }
-
-    public bool UpdateDetails(string existing, SundesmoGroup updated)
-    {
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(existing, StringComparison.Ordinal)) is not { } match)
-        {
-            _logger.LogWarning($"No group found with the name {{{existing}}} to update.");
-            return false;
-        }
-
-        match.Icon = updated.Icon;
-        match.IconColor = updated.IconColor;
-        match.Label = updated.Label;
-        match.LabelColor = updated.LabelColor;
-        match.Description = updated.Description;
-        match.ShowOffline = updated.ShowOffline;
-        _config.Save();
-        return true;
-    }
-
-    public bool UpdateDetails(SundesmoGroup group, SundesmoGroup updated)
-    {
-        if (_config.LabelExists(updated.Label))
-        {
-            _logger.LogWarning($"A group with the name {{{updated.Label}}} already exists!");
-            return false;
-        }
-
-        group.Icon = updated.Icon;
-        group.IconColor = updated.IconColor;
-        group.Label = updated.Label;
-        group.LabelColor = updated.LabelColor;
-        group.Description = updated.Description;
-        group.ShowOffline = updated.ShowOffline;
         _config.Save();
         return true;
     }

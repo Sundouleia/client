@@ -38,6 +38,7 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly RadarTab _radar;
     private readonly RadarChatTab _radarChat;
     private readonly RequestsTab _requestsTab;
+    private readonly StickyUIService _stickyService;
 
     // Some temp values used for sending requests.
     private bool  _creatingRequest  = false;
@@ -47,7 +48,7 @@ public class MainUI : WindowMediatorSubscriberBase
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
         ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
         SundesmoManager sundesmos, TutorialService guides, HomeTab homeTab, WhitelistTab whitelist,
-        RadarTab radar, RadarChatTab chat, RequestsTab requestsTab) 
+        RadarTab radar, RadarChatTab chat, RequestsTab requestsTab, StickyUIService stickyService)
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
@@ -63,6 +64,7 @@ public class MainUI : WindowMediatorSubscriberBase
         _radar = radar;
         _radarChat = chat;
         _requestsTab = requestsTab;
+        _stickyService = stickyService;
 
         // display info about the folders
         var ver = Assembly.GetExecutingAssembly().GetName().Version!;
@@ -117,7 +119,7 @@ public class MainUI : WindowMediatorSubscriberBase
     public override void OnClose()
     {
         base.OnClose();
-        Mediator.Publish(new CloseInteractionUi());
+        _stickyService.ClearAllData();
     }
 
     protected override void DrawInternal()

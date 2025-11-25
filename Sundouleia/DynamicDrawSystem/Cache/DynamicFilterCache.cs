@@ -6,13 +6,35 @@ namespace Sundouleia.DrawSystem.Selector;
 ///     set your own filter overrides.
 /// </summary>
 /// <remarks> Considering allowing custom funcs in other constructors later maybe. </remarks>
-public class DynamicFilterCache<T>(DynamicDrawSystem<T> parent) where T : class
+public class DynamicFilterCache<T> : IDisposable where T : class
 {
-    private bool    _cacheDirty = true;
-    private string  _filter     = string.Empty;
+    private readonly DynamicDrawSystem<T> _parent;
 
+    // Generic Utility
+    private string _filter = string.Empty;
+    
+    // Cleanup Utility
+    private bool                      _isDirty  = true;
+    private HashSet<IDynamicCache<T>> _toReload = [];
+    private HashSet<IDynamicCache<T>> _toSort   = [];
+
+    // Mapping and Identification
     private List<IDynamicNode<T>>                               _flatNodeCache   = [];
     private Dictionary<IDynamicCollection<T>, IDynamicCache<T>> _cachedFolderMap = new();
+
+    public DynamicFilterCache(DynamicDrawSystem<T> parent)
+    {
+        _parent = parent;
+        // Monitor the changes from the parents events.
+        _parent.DDSChanged += OnDrawSystemChange;
+        _parent.CollectionUpdated += OnCollectionChange;
+    }
+
+    public void Dispose()
+    {
+        _parent.DDSChanged -= OnDrawSystemChange;
+        _parent.CollectionUpdated -= OnCollectionChange;
+    }
 
     /// <summary>
     ///     The Filter string used to generate the DynamicCache. <para />
@@ -27,7 +49,7 @@ public class DynamicFilterCache<T>(DynamicDrawSystem<T> parent) where T : class
             if (_filter != value)
             {
                 _filter = value;
-                _cacheDirty = true;
+                _isDirty = true;
             }
         }
     }
@@ -56,16 +78,29 @@ public class DynamicFilterCache<T>(DynamicDrawSystem<T> parent) where T : class
     ///     Generic call to mark the entire cache as dirty, requiring a full recalculation.
     /// </summary>
     public void MarkCacheDirty()
-        => _cacheDirty = true;
+        => _isDirty = true;
 
     /// <summary>
     ///     Marks a single cached folder as dirty, requiring the cache update to
     ///     only recalculate one folder and its children over the entire cache.
     /// </summary>
-    public void MarkFolderDirty(IDynamicCollection<T> folder)
+    public void MarkForReload(IDynamicCollection<T> folder)
     {
-        // for now mark the whole thing.
-        _cacheDirty = true;
+        // Identify the cache for the folder via the map.
+        if (_cachedFolderMap.TryGetValue(folder, out var cachedNode))
+            _toReload.Add(cachedNode);
+    }
+
+    /// <summary>
+    ///     Marks a sorter for a particular folder as dirty, 
+    ///     forcing a re-sort of this folder's children only, saving on computation time.
+    /// </summary>
+    public void MarkForSortUpdate(IDynamicCollection<T> folder)
+    {
+        // Identify the cache for the folder via the map.
+        // This will reference to the empty cache and/or the item in the root cache.
+        if (_cachedFolderMap.TryGetValue(folder, out var cachedNode))
+            _toSort.Add(cachedNode);
     }
 
     /// <summary>
@@ -75,33 +110,60 @@ public class DynamicFilterCache<T>(DynamicDrawSystem<T> parent) where T : class
     /// </summary>
     public void UpdateCache()
     {
-        if (!_cacheDirty)
+        if (_isDirty)
+        {
+            // Perform a full recalculation, nullifying all other changes.
+            _toSort.Clear();
+            _toReload.Clear();
+            RootCache = new DynamicFolderGroupCache<T>(_parent.Root);
+            BuildDynamicCache(RootCache);
+            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetChildren() ];
+            _isDirty = false;
             return;
+        }
 
-        // If we ever add per-folder dirty handling,
-        // we can clear it here since we would be doing a full rebuild.
+        // Otherwise, if we had any folders marked for reloading, process them recursively.
+        if (_toReload.Count > 0)
+        {
+            // This will go through each folder and grab the filtered children again.
+            // Also sorts the filtered result, and recursively calls BuildCachedFolder
+            // on all subchildren.
+            foreach (var cachedNode in _toReload)
+                BuildDynamicCache(cachedNode);
+            // Clear the nodes to reload.
+            _toReload.Clear();
+            // Update the flat cache.
+            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetChildren() ];
+        }
 
-        // Recreate the entire root cache.
-        RootCache = new DynamicFolderGroupCache<T>(parent.Root);
-        // Recreate the map.
-        _cachedFolderMap.Clear();
-        // Recursively build the cached folder from the root.
-        BuildCachedFolder(RootCache);
-        // Rebuild the flat cache.
-        _flatNodeCache = [ RootCache.Folder, ..RootCache.GetChildren() ];
-
-        // Maybe something here to ensure correct selections idk anymore lol.
-        // Add as time goes on.
-
-        // Mark cache as no longer dirty.
-        _cacheDirty = false;
+        // Finally, if we had any folders marked for re-sorting, process them non-recursively.
+        if (_toSort.Count > 0)
+        {
+            foreach (var cachedNode in _toSort)
+            {
+                if (cachedNode is DynamicFolderGroupCache<T> fc)
+                {
+                    fc.Children = fc.Folder.Sorter
+                        .SortItems(fc.Children.Select(c => c.Folder))
+                        .Select(sorted => fc.Children.First(c => c.Folder == sorted)).ToList();
+                }
+                else if (cachedNode is DynamicFolderCache<T> f)
+                {
+                    f.Children = f.Folder.Sorter.SortItems(f.Folder.Children.Where(IsVisible)).ToList();
+                }
+            }
+            // Clear the nodes to sort.
+            _toSort.Clear();
+            // Update the flat cache.
+            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetChildren() ];
+        }
     }
 
     /// <summary>
     ///     Recursively constructs a <paramref name="cachedNode"/>, filtering
     ///     out non-visible nodes, sorting remaining, and updating the map.
     /// </summary>
-    private bool BuildCachedFolder(IDynamicCache<T> cachedNode)
+    private bool BuildDynamicCache(IDynamicCache<T> cachedNode)
     {
         // Assume visibility fails until proven otherwise.
         bool visible = false;
@@ -131,7 +193,7 @@ public class DynamicFilterCache<T>(DynamicDrawSystem<T> parent) where T : class
                         _ => throw new InvalidOperationException("UNK CachedNodeType"),
                     };
                     // Build another CachedFolderNode for the child.
-                    if (BuildCachedFolder(innerCache))
+                    if (BuildDynamicCache(innerCache))
                     {
                         visible = true;
                         childNodes.Add(innerCache);
@@ -199,4 +261,48 @@ public class DynamicFilterCache<T>(DynamicDrawSystem<T> parent) where T : class
     /// </summary>
     protected virtual bool IsVisible(IDynamicNode<T> node)
         => Filter.Length is 0 || node.FullPath.Contains(Filter, StringComparison.OrdinalIgnoreCase);
+
+
+    /// <summary>
+    ///     Primarily to automatically update the cache whenever an 
+    ///     internal change to the hierarchy occurs.
+    /// </summary>
+    private void OnDrawSystemChange(DDSChange type, IDynamicNode<T> obj, IDynamicCollection<T>? _, IDynamicCollection<T>? __)
+    {
+        switch (type)
+        {
+            case DDSChange.CollectionAdded:
+            case DDSChange.CollectionRemoved:
+            case DDSChange.CollectionMoved:
+            case DDSChange.CollectionMerged:
+            case DDSChange.CollectionRenamed:
+                // Mark the entire cache as dirty, because nested children
+                // could be added and we dont have a way to update spesific nodes yet.
+                _isDirty = true;
+                break;
+        }
+    }
+
+    /// <summary>
+    ///     Ensure only the parts of the cache that should be updated, are updated. <para />
+    ///     Helps save on computation time for recalculations.
+    /// </summary>
+    private void OnCollectionChange(CollectionUpdate kind, IDynamicCollection<T> collection, IEnumerable<DynamicLeaf<T>>? _)
+    {
+        switch (kind)
+        {
+            case CollectionUpdate.FolderUpdated:
+                MarkForReload(collection);
+                break;
+            case CollectionUpdate.SortDirectionChange:
+            case CollectionUpdate.SorterChange:
+                MarkForSortUpdate(collection);
+                break;
+            case CollectionUpdate.OpenStateChange:
+                // Reload the parent, incase the folder is now to be shown.
+                MarkForReload(collection.Parent);
+                break;
+        }
+    }
+
 }

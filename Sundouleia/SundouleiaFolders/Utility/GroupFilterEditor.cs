@@ -1,6 +1,9 @@
 using CkCommons.Gui;
+using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Extensions;
 using OtterGui.Text;
@@ -23,14 +26,44 @@ public class GroupFilterEditor(GroupsManager manager)
     private List<ISortMethod<DynamicLeaf<Sundesmo>>>? _dragDropSteps;
     private readonly HashSet<ISortMethod<DynamicLeaf<Sundesmo>>> _selectedSteps = new();
 
-    public bool DrawFilterOptions(GroupFolder group, float width)
+    /// <summary>
+    ///     Draws the popup display to the topright of the last drawn item. <para />
+    ///     The popup draws the filter options, that are drag-drop re-orderable.
+    ///     Additionally checkboxes can enable/disable filters. <para />
+    /// </summary>
+    /// <returns> True if <paramref name="group"/>'s Sorter in <see cref="FolderConfig"/> updated. </returns>
+    public bool DrawPopup(string popupId, GroupFolder folder, float width)
     {
-        CkGui.ColorText("Filters", ImGuiColors.ParsedGold);
+        // Set next popup position, style, color, and display.
+        ImGui.SetNextWindowPos(ImGui.GetItemRectMin() + new Vector2(ImGui.GetItemRectSize().X, 0));
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.PopupBorderSize, 1f)
+            .Push(ImGuiStyleVar.PopupRounding, 5f)
+            .Push(ImGuiStyleVar.WindowPadding, ImGuiHelpers.ScaledVector2(4f, 1f));
+        using var c = ImRaii.PushColor(ImGuiCol.Border, ImGuiColors.ParsedGold);
+        using var popup = ImRaii.Popup(popupId, WFlags.NoMove | WFlags.NoResize | WFlags.NoCollapse | WFlags.NoScrollbar);
+        if (!popup)
+            return false;
+
+        // Display the filter editor inside, after drawing the filter popup display.
+        CkGui.InlineSpacingInner();
+        CkGui.ColorTextFrameAligned("Filters:", ImGuiColors.ParsedGold);
         ImGui.Separator();
 
+        // If this returns true it means that the sort filters changed and we should update the folder's sorter.
+        // Additionally we should refresh the folder, not the entire cache.
+        return DrawFilterOptions(folder, width);
+    }
+
+    /// <summary>
+    ///     Draws the filter options, that are drag-drop re-orderable.
+    ///     Additionally checkboxes can enable/disable filters. <para />
+    /// </summary>
+    /// <returns> True if <paramref name="group"/>'s Sorter in <see cref="FolderConfig"/> updated. </returns>
+    public bool DrawFilterOptions(GroupFolder group, float width)
+    {
         // Need to draw out the included options first, then the unincluded options.
         var sorter = (IReadOnlyDynamicSorter<DynamicLeaf<Sundesmo>>)group.Sorter;
-        var selectableSize = new Vector2(width - ImUtf8.FrameHeight, ImUtf8.FrameHeight);
+        var selectableSize = new Vector2(width - ImUtf8.FrameHeight, ImUtf8.TextHeight);
         foreach (var (sortStep, stepIdx) in sorter.WithIndex())
         {
             using var id = ImRaii.PushId(stepIdx);
@@ -56,6 +89,8 @@ public class GroupFilterEditor(GroupsManager manager)
                 _postDrawAction = () => manager.AddFilter(group.Name, step.ToFolderSortFilter());
         }
 
+        ImGui.Spacing();
+
         // Process any post draw actions.
         bool updated = false;
         // If the action is not null, execute it then clear it.
@@ -72,7 +107,8 @@ public class GroupFilterEditor(GroupsManager manager)
     {
         using var _ = ImRaii.Group();
         var posX = ImGui.GetCursorPosX();
-        var clicked = ImGui.Selectable("##" + step.Name, _selectedSteps.Contains(step), size: size);
+        ImGui.AlignTextToFramePadding();
+        var clicked = ImGui.Selectable("##" + step.Name, _selectedSteps.Contains(step), ImGuiSelectableFlags.DontClosePopups, size);
         // Mark the selectable as a dragdrop target and source.
         if (idx != int.MaxValue)
         {

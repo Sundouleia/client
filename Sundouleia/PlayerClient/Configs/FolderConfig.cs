@@ -1,5 +1,7 @@
 using CkCommons.HybridSaver;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
+using Sundouleia.DrawSystem;
 using Sundouleia.Services.Configs;
 
 namespace Sundouleia.PlayerClient;
@@ -30,10 +32,10 @@ public class SundesmoGroup
 {
     public FAI Icon { get; set; } = FAI.User;
     public string Label { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
     public uint IconColor { get; set; } = 0xFFFFFFFF;
     public uint LabelColor { get; set; } = 0xFFFFFFFF;
     public uint BorderColor { get; set; } = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+    public uint GradientColor { get; set; } = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.TextDisabled), .9f);
     public bool ShowIfEmpty { get; set; } = true;
     public bool ShowOffline { get; set; } = true;
     public List<FolderSortFilter> SortOrder { get; set; } = new(); // Refactor?

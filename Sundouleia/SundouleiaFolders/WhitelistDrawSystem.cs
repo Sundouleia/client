@@ -30,25 +30,32 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
 
         Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => UpdateFolders());
 
-        // On change notifications, we should save the config.
-        // Note that this will change very soon, as saves should only occur for certain changes.
-        Changed += OnChange;
+        // Subscribe to the changes (which is to change very, very soon, with overrides.
+        DDSChanged += OnChange;
+        CollectionUpdated += OnCollectionUpdate;
     }
 
     public void Dispose()
     {
         Mediator.UnsubscribeAll(this);
-        Changed -= OnChange;
+        DDSChanged -= OnChange;
+        CollectionUpdated -= OnCollectionUpdate;
     }
 
     // Note that this will change very soon, as saves should only occur for certain changes.
-    private void OnChange(DDSChangeType type, IDynamicNode<Sundesmo> obj, IDynamicCollection<Sundesmo>? prevParent, IDynamicCollection<Sundesmo>? newParent)
+    private void OnChange(DDSChange type, IDynamicNode<Sundesmo> obj, IDynamicCollection<Sundesmo>? _, IDynamicCollection<Sundesmo>? __)
     {
-        if (type != DDSChangeType.Reload)
+        if (type is not (DDSChange.FullReloadStarting or DDSChange.FullReloadFinished))
         {
             _logger.LogInformation($"DDS Change [{type}] for node [{obj.Name} ({obj.FullPath})] occured. Saving Config.");
             _hybridSaver.Save(this);
         }
+    }
+
+    private void OnCollectionUpdate(CollectionUpdate kind, IDynamicCollection<Sundesmo> collection, IEnumerable<DynamicLeaf<Sundesmo>>? _)
+    {
+        if (kind is CollectionUpdate.OpenStateChange)
+            _hybridSaver.Save(this);
     }
 
     private void LoadData()

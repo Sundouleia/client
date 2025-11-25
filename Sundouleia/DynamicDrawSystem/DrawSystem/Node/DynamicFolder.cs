@@ -23,7 +23,7 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
     public uint IconColor     { get; protected set; } = uint.MaxValue;
     public uint BgColor       { get; protected set; } = uint.MinValue;
     public uint BorderColor   { get; protected set; } = uint.MaxValue;
-    public uint GradientColor { get; protected set; } = ColorHelpers.Fade(uint.MaxValue, .9f);
+    public uint GradientColor { get; protected set; } = uint.MaxValue;
 
     internal DynamicSorter<DynamicLeaf<T>> Sorter;
     internal List<DynamicLeaf<T>> Children = [];
@@ -109,6 +109,9 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
 
     internal void SetShowEmpty(bool value)
         => Flags = value ? Flags | FolderFlags.ShowIfEmpty : Flags & ~FolderFlags.ShowIfEmpty;
+
+    internal void SetAutoSort(bool value)
+        => Flags = value ? Flags | FolderFlags.AutoSort : Flags & ~FolderFlags.AutoSort;
 
     internal void UpdateFullPath()
     {

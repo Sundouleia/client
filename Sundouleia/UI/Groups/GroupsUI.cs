@@ -76,7 +76,6 @@ public class GroupsUI : WindowMediatorSubscriberBase
         var createButtonWidth = CkGui.IconTextButtonSize(FAI.Plus, "Create Group");
         var rightArea = createButtonWidth + ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X * 2;
         var label = _creator.Label;
-        var desc = _creator.Description;
         var iconCol = ImGui.ColorConvertU32ToFloat4(_creator.IconColor);
         var labelCol = ImGui.ColorConvertU32ToFloat4(_creator.LabelColor);
         var seeOffline = _creator.ShowOffline;
@@ -109,12 +108,6 @@ public class GroupsUI : WindowMediatorSubscriberBase
                 _logger.LogWarning($"Failed to create new group {{{_creator.Label}}}");
         }
         CkGui.AttachToolTip("Create the group with these current settings.");
-
-        // Next Line, the Description.
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - rightArea);
-        if (ImGui.InputTextWithHint("##GroupDescInput", "Short Description of Group..", ref desc, 150))
-            _creator.Description = desc;
-        CkGui.AttachToolTip("The description of this group.");
         
         // Then the offline checkbox.
         ImUtf8.SameLineInner();

@@ -1,3 +1,4 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Services;
@@ -22,7 +23,7 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
     public uint IconColor     { get; internal set; } = uint.MaxValue;
     public uint BgColor       { get; internal set; } = uint.MinValue;
     public uint BorderColor   { get; internal set; } = uint.MaxValue;
-    public uint GradientColor { get; internal set; } = ColorHelpers.Fade(uint.MaxValue, .9f);
+    public uint GradientColor { get; internal set; } = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.TextDisabled), .9f);
 
     internal DynamicSorter<IDynamicCollection<T>> Sorter;
     internal List<IDynamicCollection<T>> Children = [];

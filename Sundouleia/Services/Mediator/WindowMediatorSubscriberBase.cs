@@ -37,8 +37,9 @@ public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
                 }
             }
         });
-
     }
+
+    public bool IsOpened => this.IsOpen;
 
     public SundouleiaMediator Mediator { get; }
 

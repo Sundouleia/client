@@ -1,5 +1,6 @@
 using CkCommons.HybridSaver;
 using Dalamud.Bindings.ImGui;
+using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
@@ -27,23 +28,30 @@ public sealed class RequestsDrawSystem : DynamicDrawSystem<RequestEntry>, IMedia
 
         Mediator.Subscribe<FolderUpdateRequests>(this, _ => UpdateFolders());
 
-        Changed += OnChange;
+        DDSChanged += OnChange;
+        CollectionUpdated += OnCollectionUpdate;
     }
 
     public void Dispose()
     {
         Mediator.UnsubscribeAll(this);
-        Changed -= OnChange;
+        DDSChanged -= OnChange;
+        CollectionUpdated -= OnCollectionUpdate;
     }
 
-    // Note that this will change very soon, as saves should only occur for certain changes.
-    private void OnChange(DDSChangeType type, IDynamicNode<RequestEntry> obj, IDynamicCollection<RequestEntry>? prevParent, IDynamicCollection<RequestEntry>? newParent)
+    private void OnChange(DDSChange type, IDynamicNode<RequestEntry> obj, IDynamicCollection<RequestEntry>? _, IDynamicCollection<RequestEntry>? __)
     {
-        if (type != DDSChangeType.Reload)
+        if (type is not (DDSChange.FullReloadStarting or DDSChange.FullReloadFinished))
         {
             _logger.LogInformation($"DDS Change [{type}] for node [{obj.Name} ({obj.FullPath})] occured. Saving Config.");
             _hybridSaver.Save(this);
         }
+    }
+
+    private void OnCollectionUpdate(CollectionUpdate kind, IDynamicCollection<RequestEntry> collection, IEnumerable<DynamicLeaf<RequestEntry>>? _)
+    {
+        if (kind is CollectionUpdate.OpenStateChange)
+            _hybridSaver.Save(this);
     }
 
     private void LoadData()

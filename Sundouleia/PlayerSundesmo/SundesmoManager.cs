@@ -1,8 +1,10 @@
 using CkCommons;
 using Dalamud.Game.Gui.ContextMenu;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.ImGuiNotification;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
@@ -28,20 +30,22 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     private readonly FolderConfig _folderConfig;
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoFactory _pairFactory;
+    private readonly StickyUIService _stickyService;
 
     private Lazy<List<Sundesmo>> _directPairsInternal;  // the internal direct pairs lazy list for optimization
     public List<Sundesmo> DirectPairs => _directPairsInternal.Value; // the direct pairs the client has with other users.
 
-    public SundesmoManager(ILogger<SundesmoManager> logger, SundouleiaMediator mediator,
-        SundesmoFactory factory, MainConfig config, FolderConfig folderConfig,
-        ServerConfigManager serverConfigs)
+    public SundesmoManager(ILogger<SundesmoManager> logger, SundouleiaMediator mediator, 
+        MainConfig config, FolderConfig folderConfig, ServerConfigManager serverConfigs, 
+        SundesmoFactory factory, StickyUIService stickyService)
         : base(logger, mediator)
     {
         _allSundesmos = new(UserDataComparer.Instance);
-        _pairFactory = factory;
         _config = config;
         _folderConfig = folderConfig;
         _serverConfigs = serverConfigs;
+        _pairFactory = factory;
+        _stickyService = stickyService; 
 
         Mediator.Subscribe<ConnectedMessage>(this, _ => OnClientConnected());
         Mediator.Subscribe<ReconnectedMessage>(this, _ => OnClientConnected());
@@ -72,8 +76,25 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         subMenu.Name = "Sundouleia";
         subMenu.PrefixChar = 'S';
         subMenu.PrefixColor = 708;
-        subMenu.OnClicked += match.OpenSundouleiaSubMenu;
+        subMenu.OnClicked += (args) => OpenSubMenu(match, args);
         args.AddMenuItem(subMenu);
+    }
+
+    private void OpenSubMenu(Sundesmo sundesmo, IMenuItemClickedArgs args)
+    {
+        args.OpenSubmenu("Sundouleia Options", [ new MenuItem()
+        {
+            Name = new SeStringBuilder().AddText("Open Profile").Build(),
+            PrefixChar = 'S',
+            PrefixColor = 708,
+            OnClicked = (a) => { Mediator.Publish(new ProfileOpenMessage(sundesmo.UserData)); },
+        }, new MenuItem()
+        {
+            Name = new SeStringBuilder().AddText("Open Permissions").Build(),
+            PrefixChar = 'S',
+            PrefixColor = 708,
+            OnClicked = (a) => _stickyService.ForInteractions(sundesmo, true),
+        }]);
     }
 
     protected override void Dispose(bool disposing)

@@ -165,11 +165,10 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
         ImGui.Text("Total Groups:");
         CkGui.ColorTextInline(_groups.Config.Groups.Count.ToString(), ImGuiColors.DalamudViolet);
 
-        using (var _ = ImRaii.Table("Groups-table", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        using (var _ = ImRaii.Table("Groups-table", 7, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
             ImGui.TableSetupColumn("Icon");
             ImGui.TableSetupColumn("Label");
-            ImGui.TableSetupColumn("Description");
             ImGui.TableSetupColumn("BorderCol");
             ImGui.TableSetupColumn("ShowIfEmpty");
             ImGui.TableSetupColumn("ShowOffline");
@@ -183,8 +182,6 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
                 CkGui.IconText(group.Icon, group.IconColor);
                 ImGui.TableNextColumn();
                 CkGui.ColorText(group.Label, group.LabelColor);
-                ImGui.TableNextColumn();
-                ImGui.Text(group.Description);
                 ImGui.TableNextColumn();
                 var borderCol = ImGui.ColorConvertU32ToFloat4(group.BorderColor);
                 ImGui.ColorEdit4($"##BorderCol-{group.Label}", ref borderCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.NoOptions | ImGuiColorEditFlags.NoPicker);

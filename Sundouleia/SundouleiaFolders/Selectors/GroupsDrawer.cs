@@ -1,4 +1,5 @@
 using CkCommons;
+using CkCommons.Classes;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using CkCommons.Widgets;
@@ -7,8 +8,11 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using Dalamud.Plugin.Services;
 using OtterGui.Text;
+using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem.Selector;
+using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
@@ -17,8 +21,10 @@ using Sundouleia.Services.Textures;
 
 namespace Sundouleia.DrawSystem;
 
-public class GroupsDrawer : DynamicDrawer<Sundesmo>
+public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDisposable
 {
+    private static readonly IconCheckboxEx CheckboxOffline = new(FAI.Unlink);
+    private static readonly IconCheckboxEx CheckboxShowEmpty = new(FAI.FolderOpen);
     // Used when arranging Groups.
     private static readonly string DragDropTooltip =
         "--COL--[L-CLICK & DRAG]--COL-- Drag folder to a new place in the hierarchy." +
@@ -31,19 +37,25 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         "--NL----COL--[M-CLICK]--COL-- Open Profile" +
         "--NL----COL--[SHIFT + R-CLICK]--COL-- Edit Nickname";
 
-    private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favoritesConfig;
-    // maybe make seperate config for nicks idk.
     private readonly ServerConfigManager _serverConfigs;
     private readonly GroupsManager _groups;
     private readonly SundesmoManager _sundesmos;
+    private readonly StickyUIService _stickyService;
 
-    private GroupFilterEditor _filterEditor { get; init; }
+
+    public SundouleiaMediator Mediator { get; }
+
+    // Widgets
+    private GroupFilterEditor _filterEditor;
+    private FAIconCombo       _iconSelector;
 
     // If we have the group editor window open.
     private bool _editorShown = false;
+    // Single Group editor temp name storage.
+    private string _nameEditTmp = string.Empty;
 
     // Track which folder has its config open.
     private IDynamicCollection<Sundesmo>? _folderInEditor;
@@ -60,18 +72,28 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
 
     public GroupsDrawer(ILogger<GroupsDrawer> logger, SundouleiaMediator mediator, MainConfig config, 
         FolderConfig folderConfig, FavoritesConfig favorites, ServerConfigManager serverConfig, 
-        GroupsManager groups, SundesmoManager sundesmos, GroupsDrawSystem ds)
+        GroupsManager groups, SundesmoManager sundesmos, StickyUIService stickyService, GroupsDrawSystem ds)
         : base("##GroupsDrawer", logger, ds, new SundesmoCache(ds))
     {
-        _mediator = mediator;
+        Mediator = mediator;
         _config = config;
         _folderConfig = folderConfig;
         _favoritesConfig = favorites;
         _serverConfigs = serverConfig;
         _groups = groups;
         _sundesmos = sundesmos;
+        _stickyService = stickyService;
         // Init the filter editor.
         _filterEditor = new GroupFilterEditor(groups);
+        _iconSelector = new FAIconCombo(logger);
+
+        // Mediator.Subscribe<SetSidePanel>(this, _ => _editorShown = _.Mode is SidePanelMode.GroupEditor);
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        Mediator.UnsubscribeAll(this);
     }
 
     #region Search
@@ -96,7 +118,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
 
         ImGui.SameLine(0, 0);
         if (CkGui.IconButton(FAI.Wrench, inPopup: !_editorShown))
-            _editorShown = !_editorShown;
+            _stickyService.ForOrganizer();
         CkGui.AttachToolTip("Edit, Add, Rearrange, or Remove Groups.");
     }
     #endregion Search
@@ -114,7 +136,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             {
                 _lastHoverTime = null;
                 _profileShown = false;
-                _mediator.Publish(new CloseProfilePopout());
+                Mediator.Publish(new CloseProfilePopout());
             }
         }
 
@@ -139,21 +161,21 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         // Otherwise draw the group folder.
         var editing = _folderInEditor == f;
         var width = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
-        // Encapsulate within a group.
-        using (ImRaii.Group())
+        // If we are editing, draw both, otherwise, draw only the header.
+        if (!editing)
+            DrawFolderRow(gf, width, flags, selected);
+        else
         {
-            DrawFolderHeaderRow(gf, width, flags, selected);
-            DrawFolderEditor(gf, width, flags, editing);
-        }
-        // If editing, border everything.
-        if (editing)
+            using (ImRaii.Group())
+            {
+                DrawFolderRowEditing(gf, width, flags, selected);
+                DrawFolderEditor(gf, width, flags, editing);
+            }
             ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
+        }
     }
 
-    // Group folders are very special in the way that they function.
-    // Unlike other draw folders, groups are fully customizable even after initial creation.
-    // Must allow filtering and configuration, similar to how the whitelist folder config functions.
-    private void DrawFolderHeaderRow(GroupFolder folder, float width, DynamicFlags flags, bool selected)
+    private void DrawFolderRow(GroupFolder folder, float width, DynamicFlags flags, bool selected)
     {
         // We could likely reduce this by a lot if we had a override for this clipped draw within the dynamic draw system.
         var rWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconButtonSize(FAI.Filter).X;
@@ -181,19 +203,130 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         DrawFolderOptions(folder);
     }
 
-    private void DrawFolderEditor(GroupFolder folder, float width, DynamicFlags flags, bool editing)
+    private void DrawFolderRowEditing(GroupFolder folder, float width, DynamicFlags flags, bool selected)
     {
-        if (!editing)
-            return;
-        var bgCol = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f);
-        using var child = CkRaii.ChildPaddedW("BasicExpandedChild", width, CkStyle.TwoRowHeight(), bgCol, 5f);
+        // We could likely reduce this by a lot if we had a override for this clipped draw within the dynamic draw system.
+        var rWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconButtonSize(FAI.Filter).X;
+        var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : folder.BgColor;
+        // Display a framed child with stylizations based on the folders preferences.
+        using var _ = CkRaii.FramedChildPaddedW($"df_header_{folder.ID}", width, ImUtf8.FrameHeight, bgCol, folder.BorderColor, 5f, 1f);
 
-        // Options stuff would go here.
-        CkGui.ColorText("Placeholder Text", ImGuiColors.DalamudYellow);
+        ImUtf8.SameLineInner();
+        CkGui.FramedIconText(folder.IsOpen ? FAI.CaretDown : FAI.CaretRight);
+        ImGui.SameLine();
+        // Display the editor version of this groups icon, allowing it to be changed.
+        if (_iconSelector.Draw("IconSel", folder.Icon, 10))
+        {
+            // Update the icon within the group manager.
+            if (_groups.TrySetIcon(folder.Name, _iconSelector.Current, folder.IconColor))
+                folder.ApplyLatestStyle();
+        }
+        CkGui.AttachToolTip("Edit the icon for your group.");
+
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth((ImGui.GetContentRegionAvail().X - rWidth) / 2);
+        var nameTmp = folder.Name;
+        ImGui.InputTextWithHint("##GroupNameEdit", "Set Name..", ref _nameEditTmp, 40);
+        if (ImGui.IsItemDeactivatedAfterEdit())
+        {
+            if (_groups.TryRename(folder.Name, _nameEditTmp))
+            {
+                DrawSystem.Rename(folder, _nameEditTmp);
+                // Mark the parent for a reload, since its new name may not be filtered anymore.
+                Cache.MarkForReload(folder.Parent);
+            }
+        }
+        CkGui.AttachToolTip("The name of this group.");
+
+        ImGui.SameLine();
+        var posX = ImGui.GetCursorPosX();
+        var rightX = DrawFolderOptions(folder);
+
+        // Fill in remaining area with interactable space.
+        ImGui.SameLine(posX);
+        ImGui.InvisibleButton($"{Label}_node_{folder.ID}", new(rightX - posX, ImUtf8.FrameHeight));
+        HandleInteraction(folder, flags);
     }
 
-    private void DrawFolderOptions(GroupFolder folder)
+    private void DrawFolderEditor(GroupFolder f, float width, DynamicFlags flags, bool editing)
     {
+        var bgCol = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f);
+        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.CellPadding, ImGui.GetStyle().CellPadding with { Y = 0 })
+            .Push(ImGuiStyleVar.WindowPadding, new Vector2(4f));
+        using var child = CkRaii.ChildPaddedW("FolderEditView", width, CkStyle.TwoRowHeight(), bgCol, 5f);
+        using var _ = ImRaii.Table("FolderEditTable", 3, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.BordersInnerV);
+
+        if (!_)
+            return;
+
+        ImGui.TableSetupColumn("Colors");
+        ImGui.TableSetupColumn("Flags");
+        ImGui.TableNextRow();
+
+        ImGui.TableNextColumn();
+        var iconCol = ImGui.ColorConvertU32ToFloat4(f.IconColor);
+        if (ImGui.ColorEdit4("Icon Color", ref iconCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+        {
+
+            if (_groups.TrySetStyle(f.Name, ImGui.ColorConvertFloat4ToU32(iconCol), f.NameColor, f.BorderColor, f.GradientColor))
+                f.ApplyLatestStyle();
+        }
+        CkGui.AttachToolTip("Change the color of the folder icon.");
+
+
+        var labelCol = ImGui.ColorConvertU32ToFloat4(f.NameColor);
+        if (ImGui.ColorEdit4("Label Color", ref labelCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+        {
+            if (_groups.TrySetStyle(f.Name, f.IconColor, ImGui.ColorConvertFloat4ToU32(labelCol), f.BorderColor, f.GradientColor))
+                f.ApplyLatestStyle();
+        }
+        CkGui.AttachToolTip("Change the color of the folder label.");
+
+        // Other two colors.
+        ImGui.TableNextColumn();
+        var borderCol = ImGui.ColorConvertU32ToFloat4(f.BorderColor);
+        if (ImGui.ColorEdit4("Border Color", ref borderCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+        {
+            if (_groups.TrySetStyle(f.Name, f.IconColor, f.NameColor, ImGui.ColorConvertFloat4ToU32(borderCol), f.GradientColor))
+                f.ApplyLatestStyle();
+        }
+        CkGui.AttachToolTip("Change the color of the folder border.");
+
+        var gradCol = ImGui.ColorConvertU32ToFloat4(f.GradientColor);
+        if (ImGui.ColorEdit4("Gradient Color", ref gradCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+        {
+            if (_groups.TrySetStyle(f.Name, f.IconColor, f.NameColor, f.BorderColor, ImGui.ColorConvertFloat4ToU32(gradCol)))
+                f.ApplyLatestStyle();
+        }
+        CkGui.AttachToolTip("Change the color of the folder gradient.");
+
+        ImGui.TableNextColumn();
+        var showOffline = f.ShowOffline;
+        if (CheckboxOffline.Draw("Show Offline"u8, ref showOffline))
+        {
+            if (_groups.TrySetState(f.Name, showOffline, f.ShowIfEmpty))
+            {
+                // Update the folder within the file system and mark things for a reload.
+                DrawSystem.UpdateFolder(f);
+                Cache.MarkForReload(f);
+            }
+        }
+        CkGui.AttachToolTip("Show offline pairs in this folder.");
+
+        var showIfEmpty = f.Flags.HasAny(FolderFlags.ShowIfEmpty);
+        if (CheckboxShowEmpty.Draw("Show If Empty"u8, ref showIfEmpty))
+        {
+            f.SetShowEmpty(showIfEmpty);
+            if (_groups.TrySetState(f.Name, f.ShowOffline, f.ShowIfEmpty))
+                Cache.MarkForReload(f);
+        }
+        CkGui.AttachToolTip("Folder is shown even with 0 items are filtered");
+    }
+
+    private float DrawFolderOptions(GroupFolder folder)
+    {
+        var inFilterEditor = ImGui.IsPopupOpen($"{folder.ID}_filterEdit");
         var isFolderInEditor = _folderInEditor == folder;
         var config = CkGui.IconButtonSize(FAI.Cog);
         var filter = CkGui.IconButtonSize(FAI.Filter);
@@ -203,38 +336,36 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         if (CkGui.IconButton(FAI.Cog, inPopup: !isFolderInEditor))
-            _folderInEditor = isFolderInEditor ? null : folder;
+            ToggleEditor(folder);
         CkGui.AttachToolTip("Edit Group");
 
         currentRightSide -= filter.X;
         ImGui.SameLine(currentRightSide);
-        DrawFilterEditor(folder);
+        if (CkGui.IconButton(FAI.Filter, null, folder.ID.ToString(), false, !inFilterEditor))
+            ImGui.OpenPopup($"{folder.ID}_filterEdit");
         CkGui.AttachToolTip("Change filters or sort order.");
-    }
 
-    // Update this to function similar to the logic we use for the selector in GS.
-    private bool DrawFilterEditor(GroupFolder folder)
-    {
-        // Button Combo for editing the filters of a folder. is Vector2.FrameHeight in size.
-        using var combo = ImUtf8.Combo($"##{folder.ID}_filterEdit", ""u8, CFlags.NoPreview | CFlags.PopupAlignLeft | CFlags.HeightLarge);
-
-        // Clears all applied filters
-        var cleared = ImGui.IsItemClicked(ImGuiMouseButton.Right);
-
-        // If the combo is not open, just return if we right clicked it or not.
-        if (!combo)
-            return cleared;
-
-        // If this is true, then we performed an update that requires an update to the folders sorter.
-        if(_filterEditor.DrawFilterOptions(folder, 150f * ImGuiHelpers.GlobalScale))
+        // If right clicked, we should clear the folders filters and refresh.
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
         {
+            _groups.ClearFilters(folder.Name);
             folder.ApplyLatestSorter();
-            Cache.MarkCacheDirty(); // Update to mark folder dirty after we add it.
+            Cache.MarkForSortUpdate(folder);
         }
 
-        return cleared;
-    }
+        // Early exit if the popup is not open.
+        if (!inFilterEditor)
+            return currentRightSide;
 
+        // Otherwise process the popup logic.
+        if (_filterEditor.DrawPopup($"{folder.ID}_filterEdit", folder, 150f * ImGuiHelpers.GlobalScale))
+        {
+            folder.ApplyLatestSorter();
+            Cache.MarkForSortUpdate(folder);
+        }
+
+        return currentRightSide;
+    }
     #endregion Folders
 
     #region Leaves
@@ -289,7 +420,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         CkGui.IconText(icon, color);
         CkGui.AttachToolTip(TooltipText(s));
         if (!flags.HasAny(DynamicFlags.DragDropLeaves) && s.IsRendered && ImGui.IsItemClicked())
-            _mediator.Publish(new TargetSundesmoMessage(s));
+            Mediator.Publish(new TargetSundesmoMessage(s));
     }
 
     private float DrawLeafButtons(IDynamicLeaf<Sundesmo> leaf, DynamicFlags flags)
@@ -303,7 +434,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         {
             ImGui.AlignTextToFramePadding();
             if (CkGui.IconButton(FAI.ChevronRight, inPopup: true))
-                _mediator.Publish(new ToggleSundesmoInteractionUI(leaf.Data, ToggleType.Toggle));
+                _stickyService.ForInteractions(leaf.Data);
 
             currentRightSide -= interactionsSize.X;
             ImGui.SameLine(currentRightSide);
@@ -354,7 +485,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             if (!_profileShown && _lastHoverTime < DateTime.UtcNow && _config.Current.ShowProfiles)
             {
                 _profileShown = true;
-                _mediator.Publish(new OpenProfilePopout(leaf.Data.UserData));
+                Mediator.Publish(new OpenProfilePopout(leaf.Data.UserData));
             }
         }
     }
@@ -380,7 +511,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
                     _showingUID.Add(node);
             }
             if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
-                _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
+                Mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
             if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
                 _renaming = node;
@@ -390,11 +521,24 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
 
         // Handle Selection.
         if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
-            SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
     }
     #endregion Leaves
 
     #region Utility
+    private void ToggleEditor(GroupFolder folder)
+    {
+        if (_folderInEditor == folder)
+        {
+            _folderInEditor = null;
+            _nameEditTmp = string.Empty;
+        }
+        else
+        {
+            _folderInEditor = folder;
+            _nameEditTmp = folder.Name;
+        }
+    }
     private void DrawSundesmoName(IDynamicLeaf<Sundesmo> s)
     {
         // Assume we use mono font initially.

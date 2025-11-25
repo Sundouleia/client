@@ -1,8 +1,6 @@
 using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.Gui.ContextMenu;
-using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -96,23 +94,6 @@ public class Sundesmo : IComparable<Sundesmo>
     {
         if (other is null) return 1;
         return string.Compare(UserData.UID, other.UserData.UID, StringComparison.Ordinal);
-    }
-
-    public void OpenSundouleiaSubMenu(IMenuItemClickedArgs args)
-    {
-        args.OpenSubmenu("Sundouleia Options", [ new MenuItem()
-        {
-            Name = new SeStringBuilder().AddText("Open Profile").Build(),
-            PrefixChar = 'S',
-            PrefixColor = 708,
-            OnClicked = (a) => { _mediator.Publish(new ProfileOpenMessage(UserData)); },
-        }, new MenuItem()
-        {
-            Name = new SeStringBuilder().AddText("Open Permissions").Build(),
-            PrefixChar = 'S',
-            PrefixColor = 708,
-            OnClicked = (a) => _mediator.Publish(new ToggleSundesmoInteractionUI(this, ToggleType.Show)),
-        }]);
     }
 
     public string? AlphabeticalSortKey()

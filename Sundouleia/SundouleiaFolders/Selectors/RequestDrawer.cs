@@ -62,7 +62,7 @@ public class RequestsDrawer : DynamicDrawer<RequestEntry>
     }
 
     public bool ViewingIncoming => _config.Current.ViewingIncoming;
-    public bool BulkSelecting => _selectedLeaves.Count != 0;
+    public bool BulkSelecting => Selector.SelectedLeaves.Count != 0;
 
     // Wishlist:
     // - Button to quick-add a new group for the area.
@@ -94,7 +94,7 @@ public class RequestsDrawer : DynamicDrawer<RequestEntry>
                 _config.Current.ViewingIncoming = !ViewingIncoming;
                 _config.Save();
                 // also clear selection when swapping.
-                ClearSelected();
+                Selector.ClearSelected();
             }
             CkGui.AttachToolTip($"Switch to {(ViewingIncoming ? "Outgoing" : "Incoming")} requests.");
 
@@ -175,9 +175,9 @@ public class RequestsDrawer : DynamicDrawer<RequestEntry>
         if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
         {
             // If there are no other items selected at the time of selection, mark it as the node in the responder.
-            _inResponder = (_inResponder == node || _selectedLeaves.Count > 1) ? null : node;
+            _inResponder = (_inResponder == node || BulkSelecting) ? null : node;
             // Then perform the selection.
-            SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
         }
         // Handle Drag and Drop.
         if (flags.HasAny(DynamicFlags.DragDropLeaves))

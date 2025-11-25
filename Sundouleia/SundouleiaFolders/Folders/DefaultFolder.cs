@@ -15,6 +15,7 @@ public sealed class DefaultFolder : DynamicFolder<Sundesmo>
         IconColor = iconColor;
         BgColor = uint.MinValue;
         BorderColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+        GradientColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
         _generator = generator;
     }
 

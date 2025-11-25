@@ -9,6 +9,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.DrawSystem.Selector;
+using Sundouleia.Gui.MainWindow;
 using Sundouleia.Localization;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -39,6 +40,8 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoManager _sundesmos;
     private readonly WhitelistDrawSystem _drawSystem;
+    private readonly StickyUIService _stickyService;
+
 
     // If the FilterRow is to be expanded.
     private bool _configExpanded = false;
@@ -56,7 +59,8 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
 
     public WhitelistDrawer(ILogger<WhitelistDrawer> logger, SundouleiaMediator mediator,
         MainConfig config, FolderConfig folderConfig, FavoritesConfig favoritesConfig,
-        ServerConfigManager serverConfigs, SundesmoManager sundesmos, WhitelistDrawSystem ds) 
+        ServerConfigManager serverConfigs, SundesmoManager sundesmos,
+        StickyUIService stickyService, WhitelistDrawSystem ds)
         : base("##WhitelistDrawer", logger, ds, new SundesmoCache(ds))
     {
         _mediator = mediator;
@@ -65,6 +69,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         _favoritesConfig = favoritesConfig;
         _serverConfigs = serverConfigs;
         _sundesmos = sundesmos;
+        _stickyService = stickyService;
         _drawSystem = ds;
     }
 
@@ -221,7 +226,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         {
             ImGui.AlignTextToFramePadding();
             if (CkGui.IconButton(FAI.ChevronRight, inPopup: true))
-                _mediator.Publish(new ToggleSundesmoInteractionUI(leaf.Data, ToggleType.Toggle));
+                _stickyService.ForInteractions(leaf.Data);
 
             currentRightSide -= interactionsSize.X;
             ImGui.SameLine(currentRightSide);
@@ -334,7 +339,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
 
         // Handle Selection.
         if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
-            SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
     }
 
     private string TooltipText(Sundesmo s)
