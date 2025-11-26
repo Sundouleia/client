@@ -1,6 +1,9 @@
+using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using OtterGui.Text;
+using static Sundouleia.DrawSystem.DynamicSorterEx;
 
 namespace Sundouleia.DrawSystem.Selector;
 
@@ -39,30 +42,110 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     protected IDynamicNode? _hoveredNode = null; // From last frame.
     protected IDynamicNode? _newHoveredNode = null; // Tracked each frame.
 
-    public void DrawContents(float width, DynamicFlags flags = DynamicFlags.BasicViewFolder)
-    {
-        DrawContentsInternal(width, flags);
-        PostDraw();
-    }
-
-    // Refactor later.
-    private void DrawContentsInternal(float width, DynamicFlags flags)
+    /// <summary>
+    ///     Draws the full hierarchy of a DynamicDrawSystem's Root folder. <para />
+    ///     Can define the width of this display, and the flags.
+    /// </summary>
+    public void DrawFullCache(float width, DynamicFlags flags = DynamicFlags.None)
     {
         using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
         if (!_)
             return;
+
         HandleMainContextActions();
-        Draw(flags);
+        Cache.UpdateCache();
+
+        // Set the style for the draw logic.
+        ImGui.SetScrollX(0);
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
+             .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
+
+        DrawFolderGroupChildren(Cache.RootCache, flags);
+        PostDraw();
     }
 
-    private void Draw(DynamicFlags flags)
+    /// <inheritdoc cref="DrawFullCache(float, DynamicFlags)"/>
+    /// <remarks> Only <see cref="DynamicFolder{T}"/>'s of type <typeparamref name="TFolder"/> are drawn. </remarks>
+    public void DrawFullCache<TFolder>(float width, DynamicFlags flags = DynamicFlags.None) where TFolder : DynamicFolder<T>
     {
+        using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
+        if (!_)
+            return;
+
+        HandleMainContextActions();
+        Cache.UpdateCache();
+
+        // Set the style for the draw logic.
+        ImGui.SetScrollX(0);
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
+             .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
+
+        DrawFolderGroupChildren<TFolder>(Cache.RootCache, flags);
+        PostDraw();
+    }
+
+    /// <summary>
+    ///     Attempts to draw a IDynamicCache Folder or FolderGroup by its name. <para />
+    ///     Can provide width and flags for the draw. <para />
+    ///     <b> Cannot be whitelisted to a single folder type. No reason to. </b>
+    /// </summary>
+    /// <param name="folderName"> The name of the folder to draw. </param>
+    /// <param name="width"> The width of the draw area. </param>
+    /// <param name="flags"> The flags to use for drawing. </param>
+    /// <remarks> If the folder is not found, nothing is drawn. </remarks>
+    public void DrawFolder(string folderName, float width, DynamicFlags flags = DynamicFlags.None)
+    {
+        using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
+        if (!_)
+            return;
+
+        HandleMainContextActions();
+        Cache.UpdateCache();
+
+        if (!DrawSystem.TryGetFolder(folderName, out var node))
+            return;
+        if (!Cache.CacheMap.TryGetValue(node, out var cachedNode))
+            return;
+
+        // Set the style for the draw logic.
+        ImGui.SetScrollX(0);
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
+             .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
+
+        DrawClippedCacheNode(cachedNode, flags);
+        PostDraw();
+    }
+
+    /// <summary>
+    ///     Attempts to draw a IDynamicCache Folder or FolderGroup by its IDynamicCollection counterpart. <para />
+    ///     <b> Cannot be whitelisted to a single folder type. No reason to. </b>
+    /// </summary>
+    /// <param name="folder"> The Folder we want to draw the cached version of </param>
+    /// <param name="width"> The width of the draw area. </param>
+    /// <param name="flags"> The flags to use for drawing. </param>
+    /// <remarks> If the folder is not found, nothing is drawn. </remarks>
+    public void DrawFolder(IDynamicCollection<T> folder, float width, DynamicFlags flags = DynamicFlags.None)
+    {
+        // Ensure the child is at least draw to satisfy the expected drawn content region.
+        using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
+        if (!_)
+            return;
+
+        // Handle any main context interactions such as right-click menus and the like.
+        HandleMainContextActions();
+        // Update the cache to its latest state.
+        Cache.UpdateCache();
+
+        if (!Cache.CacheMap.TryGetValue(folder, out var cachedNode))
+            return;
+
+        // Set the style for the draw logic.
         ImGui.SetScrollX(0);
         using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
             .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
-
-        Cache.UpdateCache();
-        DrawAll(flags);
+        // Draw out the node, for folders only.
+        DrawClippedCacheNode(cachedNode, flags);
+        PostDraw();
     }
 
     /// <summary>
@@ -73,7 +156,12 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     protected void PostDraw()
     {
         UpdateHoverNode();
-
+        ImGui.Text($"Selected: {Selector.Collections.Count} Collections");
+        ImGui.Text($"Selected: {Selector.Leaves.Count} Leaves");
+        ImGui.Text($"Selected: {Selector.Selected.Count} Nodes");
+        ImGui.Text($"CacheMapSize: {Cache.CacheMap.Count}");
+        ImGui.Text($"FlatCacheSize: {Cache.FlatList.Count}");
+        ImGui.Text($"Total Cache Children: {Cache.RootCache.GetAllDescendants().Count()}");
         // Process post-draw actions.
         while (_postDrawActions.TryDequeue(out Action? action))
         {

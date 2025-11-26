@@ -117,7 +117,7 @@ public class DynamicFilterCache<T> : IDisposable where T : class
             _toReload.Clear();
             RootCache = new DynamicFolderGroupCache<T>(_parent.Root);
             BuildDynamicCache(RootCache);
-            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetChildren() ];
+            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetAllDescendants() ];
             _isDirty = false;
             return;
         }
@@ -133,7 +133,7 @@ public class DynamicFilterCache<T> : IDisposable where T : class
             // Clear the nodes to reload.
             _toReload.Clear();
             // Update the flat cache.
-            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetChildren() ];
+            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetAllDescendants() ];
         }
 
         // Finally, if we had any folders marked for re-sorting, process them non-recursively.
@@ -155,7 +155,7 @@ public class DynamicFilterCache<T> : IDisposable where T : class
             // Clear the nodes to sort.
             _toSort.Clear();
             // Update the flat cache.
-            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetChildren() ];
+            _flatNodeCache = [ RootCache.Folder, ..RootCache.GetAllDescendants() ];
         }
     }
 

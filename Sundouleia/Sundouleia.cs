@@ -128,6 +128,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaLoc>()
 
         // Draw Systems
+        .AddSingleton<GroupsFolderDrawer>()
         .AddSingleton<GroupsDrawer>()
         .AddSingleton<RadarDrawer>()
         .AddSingleton<RequestsDrawer>()

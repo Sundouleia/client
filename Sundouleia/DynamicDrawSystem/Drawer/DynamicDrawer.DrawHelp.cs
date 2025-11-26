@@ -14,7 +14,6 @@ namespace Sundouleia.DrawSystem.Selector;
 public enum DynamicFlags : short
 {
     None                = 0 << 0, // No behaviors are set for this draw.
-    FolderToggle        = 1 << 0, // Folder Expand/Collapse is allowed.
     SelectableFolders   = 1 << 1, // Folder Single-Select is allowed.
     SelectableLeaves    = 1 << 2, // Leaf Single-Select is allowed.
     MultiSelect         = 1 << 3, // Multi-Selection (anchoring / CTRL) is allowed.
@@ -22,14 +21,13 @@ public enum DynamicFlags : short
     DragDropFolders     = 1 << 5, // Folder Drag-Drop is allowed.
     DragDropLeaves      = 1 << 6, // Leaf Drag-Drop is allowed.
     CopyDrag            = 1 << 7, // Drag-Drop performs copy on the dragged items over a move.
-    TrashDrop           = 1 << 8, // Drag-Drop removes the source items on drop into another target, instead of moving.
+    TrashDrop           = 1 << 8,// Drag-Drop removes the source items on drop into another target, instead of moving.
 
     // Masks
-    BasicViewFolder = FolderToggle, // Maybe add multi-select for bulk permission setting?
-    RequestsList = FolderToggle | SelectableLeaves | MultiSelect | RangeSelect,
-    GroupArranger = FolderToggle | SelectableFolders | MultiSelect | RangeSelect | DragDropFolders,
-    GroupEditor = FolderToggle | SelectableLeaves | MultiSelect | RangeSelect | DragDropLeaves,
-    AllEditor = FolderToggle | SelectableLeaves | MultiSelect | RangeSelect | DragDropLeaves | CopyDrag | TrashDrop,
+    RequestsList = SelectableLeaves | MultiSelect | RangeSelect,
+    Organizer = SelectableFolders | MultiSelect | RangeSelect | DragDropFolders,
+    GroupEditor = SelectableLeaves | MultiSelect | RangeSelect | DragDropLeaves,
+    AllEditor = SelectableLeaves | MultiSelect | RangeSelect | DragDropLeaves | CopyDrag | TrashDrop,
     DragDrop = DragDropFolders | DragDropLeaves,
 }
 
@@ -37,7 +35,6 @@ public enum DynamicFlags : short
 // This is also where a majority of customization points are exposed.
 public partial class DynamicDrawer<T>
 {
-    protected bool ShowRootFolder = false;
     // The below functions will be reworked later.
     // Draws out the entire filter row.
     public void DrawFilterRow(float width, int length)
@@ -61,59 +58,77 @@ public partial class DynamicDrawer<T>
     protected virtual void PostSearchBar()
     { }
 
-    // Generic drawer, used across all of sundouleia's needs.
-    protected void DrawAll(DynamicFlags flags)
-    {
-        if (Cache.FlatList.Count is 0)
-            return;
 
-        // REMEMBER TO MAKE THIS WRAPPED INSIDE OF A UNIQUE CLIPPER!
-
-
-        // Otherwise, Draw based on if we show the root or not.
-        if (ShowRootFolder)
-            DrawCachedFolderNode(Cache.RootCache, flags);
-        else
-            DrawFolderGroupFolders(Cache.RootCache, flags);
-    }
-
-    public void DrawFolder(string folderName, DynamicFlags flags)
-    {
-        // Locate the item in the dictionary to draw.
-        if (!DrawSystem.TryGetFolder(folderName, out var folder))
-            return;
-        // Otherwise, Draw the folder found within the cache.
-        // (Requires revision of cache to do this, return to later)
-    }
-
-    // The shell of the drawn structure. Return to this later.
-    private void DrawCachedFolderNode(IDynamicCache<T> cachedNode, DynamicFlags flags)
+    /// <summary>
+    ///     Draws a <see cref="IDynamicCache{T}"/> node, with the defined flags.
+    /// </summary>
+    /// <param name="cachedNode"> The cached node to draw. </param>
+    /// <param name="flags"> The dynamic draw flags. </param>
+    private void DrawClippedCacheNode(IDynamicCache<T> cachedNode, DynamicFlags flags)
     {
         if (cachedNode is DynamicFolderGroupCache<T> cfg)
-            DrawCachedFolderNode(cfg, flags);
+            DrawClippedCacheNode(cfg, flags);
         else if (cachedNode is DynamicFolderCache<T> cf)
-            DrawCachedFolderNode(cf, flags);
+            DrawClippedCacheNode(cf, flags);
     }
 
-    // The shell of the drawn structure. Return to this later.
-    protected void DrawCachedFolderNode(DynamicFolderGroupCache<T> cfg, DynamicFlags flags)
+    /// <inheritdoc cref="DrawClippedCacheNode(IDynamicCache{T},DynamicFlags)"/>
+    /// <remarks> Only allows <see cref="DynamicFolder{T}"/>'s matching <typeparamref name="TFolder"/> </remarks>
+    private void DrawClippedCacheNode<TFolder>(IDynamicCache<T> cachedNode, DynamicFlags flags)
+        where TFolder : DynamicFolder<T>
     {
-        using var id = ImRaii.PushId($"DDS_{Label}_{cfg.Folder.ID}");
+        if (cachedNode is DynamicFolderGroupCache<T> cfg)
+            DrawClippedCacheNode(cfg, flags);
+        else if (cachedNode is DynamicFolderCache<T> cf && cf.Folder is TFolder)
+            DrawClippedCacheNode(cf, flags);
+    }
+
+    /// <summary>
+    ///     The clipped draw method for folder groups.
+    /// </summary>
+    /// <param name="cfg"> The cached folder group to draw. </param>
+    /// <param name="flags"> The dynamic draw flags. </param>
+    protected void DrawClippedCacheNode(DynamicFolderGroupCache<T> cfg, DynamicFlags flags)
+    {
+        using var id = ImRaii.PushId(Label + cfg.Folder.ID);
         DrawFolderGroupBanner(cfg.Folder, flags, _hoveredNode == cfg.Folder || Selector.Selected.Contains(cfg.Folder));
-        if (!cfg.Folder.IsOpen)
-            return;
+        if (flags.HasAny(DynamicFlags.DragDropFolders))
+            AsDragDropTarget(cfg.Folder);
+        // Dont need to worry about checking for opened state as cache handles this?
+
         // Draw the children objects.
         using var indent = ImRaii.PushIndent(ImUtf8.FrameHeight);
-        DrawFolderGroupFolders(cfg, flags);
+        DrawFolderGroupChildren(cfg, flags);
     }
 
-    // The shell of the drawn structure. Return to this later.
-    protected void DrawCachedFolderNode(DynamicFolderCache<T> cf, DynamicFlags flags)
+
+    /// <inheritdoc cref="DrawClippedCacheNode(DynamicFolderGroupCache{T},DynamicFlags)"/>
+    /// <remarks> Only allows <see cref="DynamicFolder{T}"/>'s matching <typeparamref name="TFolder"/> </remarks>
+    protected void DrawClippedCacheNode<TFolder>(DynamicFolderGroupCache<T> cfg, DynamicFlags flags)
+        where TFolder : DynamicFolder<T>
+    {
+        using var id = ImRaii.PushId(Label + cfg.Folder.ID);
+        DrawFolderGroupBanner(cfg.Folder, flags, _hoveredNode == cfg.Folder || Selector.Selected.Contains(cfg.Folder));
+        if (flags.HasAny(DynamicFlags.DragDropFolders))
+            AsDragDropTarget(cfg.Folder);
+        // Dont need to worry about checking for opened state as cache handles this?
+
+        // Draw the children objects.
+        using var indent = ImRaii.PushIndent(ImUtf8.FrameHeight);
+        DrawFolderGroupChildren<TFolder>(cfg, flags);
+    }
+
+    /// <summary>
+    ///     The clipped draw method for folder groups. <para />
+    ///     The parent's children are not drawn if the parent's children are not visible.
+    /// </summary>
+    /// <returns> True if the parent folder was visible, false otherwise. </returns>
+    protected void DrawClippedCacheNode(DynamicFolderCache<T> cf, DynamicFlags flags)
     {
         using var id = ImRaii.PushId($"DDS_{Label}_{cf.Folder.ID}");
         DrawFolderBanner(cf.Folder, flags, _hoveredNode == cf.Folder || Selector.Selected.Contains(cf.Folder));
-        if (!cf.Folder.IsOpen)
-            return;
+        if (flags.HasAny(DynamicFlags.DragDropFolders))
+            AsDragDropTarget(cf.Folder);
         // Draw the children objects.
         using var _ = ImRaii.PushIndent(ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X);
         DrawFolderLeaves(cf, flags);
@@ -145,13 +160,29 @@ public partial class DynamicDrawer<T>
         CkGui.ColorTextFrameAlignedInline(fg.Name, fg.NameColor);
     }
 
-    // By default, no distinct stylization is applied, but this can be customized.
-    protected virtual void DrawFolderGroupFolders(DynamicFolderGroupCache<T> cfg, DynamicFlags flags)
+    /// <summary>
+    ///     Draws the children of a <see cref="DynamicFolderGroup{T}"/>. No Stylization by default. Can be customized.
+    /// </summary>
+    /// <param name="cfg"> The cached folder group to draw. </param>
+    /// <param name="flags"> The dynamic draw flags. </param>
+    protected virtual void DrawFolderGroupChildren(DynamicFolderGroupCache<T> cfg, DynamicFlags flags)
     {
-        // Could do a clipped list, but for now will just do a for-each loop.
+        // Simple foreach loop, if things ever really become a problem we can cliprect this, but not much of an issue for now.
         foreach (var child in cfg.Children)
-            DrawCachedFolderNode(child, flags);
+            DrawClippedCacheNode(child, flags);
     }
+
+    /// <inheritdoc cref="DrawFolderGroupChildren(DynamicFolderGroupCache{T},DynamicFlags)"/>
+    /// <remarks> Only allows <see cref="DynamicFolder{T}"/>'s matching <typeparamref name="TFolder"/> </remarks>
+    protected virtual void DrawFolderGroupChildren<TFolder>(DynamicFolderGroupCache<T> cfg, DynamicFlags flags) 
+        where TFolder : DynamicFolder<T>
+    {
+        // Simple foreach loop, if things ever really become a problem we can cliprect this, but not much of an issue for now.
+        foreach (var child in cfg.Children)
+            DrawClippedCacheNode<TFolder>(child, flags);
+    }
+
+
 
     protected virtual void DrawFolderBanner(IDynamicFolder<T> f, DynamicFlags flags, bool selected)
     {
@@ -241,13 +272,13 @@ public partial class DynamicDrawer<T>
     ///     in the DrawSystem. <para />
     ///     <b> Override with Caution, and only if you know what you're doing. </b>
     /// </summary>
-    protected void HandleInteraction(IDynamicCollection<T> node, DynamicFlags flags)
+    protected virtual void HandleInteraction(IDynamicCollection<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
             _newHoveredNode = node;
         var clicked = ImGui.IsItemClicked();
         // Handle Folder Toggle.
-        if (flags.HasAny(DynamicFlags.FolderToggle) && clicked)
+        if (clicked)
         {
             DrawSystem.SetOpenState(node, !node.IsOpen);
             // Might want to append / remove the descendants here after changing the state.
@@ -300,6 +331,36 @@ public partial class DynamicDrawer<T>
 
                 draw(data[actualRow], flags);
             }
+        }
+    }
+
+    // For drawing recursive FolderGroups
+    public void DynamicClippedDraw<I>(IReadOnlyList<I> data, Action<I, DynamicFlags> draw, DynamicFlags flags)
+    {
+        using IEnumerator<I> enumerator = data.GetEnumerator();
+
+        int index = 0;
+        int firstVisible = -1;
+        int lastVisible = -1;
+
+        while (enumerator.MoveNext())
+        {
+            // draw to check for visibility.
+            draw(enumerator.Current, flags);
+            // If the item is not visible, we can skip it.
+            if (ImGui.IsItemVisible())
+            {
+                if (firstVisible == -1)
+                    firstVisible = index;
+
+                lastVisible = index;
+            }
+            else if (firstVisible != -1)
+            {
+                // went beyond the total visible range, so break out.
+                break;
+            }
+            index++;
         }
     }
 }

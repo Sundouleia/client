@@ -8,6 +8,7 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
+using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
@@ -27,35 +28,29 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly MainMenuTabs _mainUiTabs;
-    private readonly GroupsDrawer _groupsDrawer;
+    private readonly GroupsFolderDrawer _folderDrawer;
     private readonly SundesmoManager _sundesmos;
     private readonly StickyUIService _service;
 
     public MainUISidePanel(ILogger<MainUISidePanel> logger, SundouleiaMediator mediator, MainHub hub, 
-        MainMenuTabs tabs, GroupsDrawer drawer, SundesmoManager sundesmos, StickyUIService service)
+        MainMenuTabs tabs, GroupsFolderDrawer drawer, SundesmoManager sundesmos, StickyUIService service)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
         _mainUiTabs = tabs;
         _hub = hub;
         _sundesmos = sundesmos;
-        _groupsDrawer = drawer;
+        _folderDrawer = drawer;
         _service = service;
 
         Flags = WFlags.NoCollapse | WFlags.NoTitleBar | WFlags.NoResize | WFlags.NoScrollbar;
     }
 
-    // Magic Voodoo that can force the window open and is ran every frame
-    // prior to deciding if the window should be drawn or not.
-    // We can use this to our advantage to dictate if it should open/close
-    // based on if there is a mode to display.
+    /// <summary>
+    ///     Internal logic performed every draw frame regardless of if the window is open or not. <para />
+    ///     Lets us Open/Close the window based on logic in the service using minimal computation.
+    /// </summary>
     public override void PreOpenCheck()
-    {
-        if (_service.DisplayMode is SidePanelMode.None)
-            IsOpen = false;
-        else
-            IsOpen = true;
-    }
-
+        => IsOpen = _service.DisplayMode is not SidePanelMode.None;
 
     protected override void PreDrawInternal()
     {
@@ -100,7 +95,12 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
         using var _ = CkRaii.Child("GroupOrganizer", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
         CkGui.FontTextCentered("Group Organizer", UiFontService.Default150Percent);
+
+        _folderDrawer.DrawButtonHeader(width);
         ImGui.Separator();
+
+
+        _folderDrawer.DrawFullCache<GroupFolder>(width, DynamicFlags.Organizer);
     }
 
     #region Interactions

@@ -40,7 +40,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     public event CollectionUpdateDelegate? CollectionUpdated;
 
     // Internal folder mapping for quick access by name.
-    private readonly Dictionary<string, IDynamicCollection<T>> _folderMap = [];
+    private readonly Dictionary<string, IDynamicCollection<T>> _folderMap = new(StringComparer.OrdinalIgnoreCase);
     // could do a leaf map as well but do not see any need to.
 
     /// <summary> For comparing Entities by name only. </summary>
@@ -88,9 +88,29 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     //    => _nameComparer.BaseComparer.Compare(lhs, rhs) is 0;
 
     // Useful for dynamic folders wanting to contain their own nested folders.
-    protected DynamicFolderGroup<T> GetGroupByName(string parentName)
+    protected DynamicFolderGroup<T> GetFolderGroupByName(string parentName)
        => _folderMap.TryGetValue(parentName, out var f) && f is DynamicFolderGroup<T> fg
         ? fg : root;
+
+    protected bool AddFolderGroup(string name, DynamicFolderGroup<T>? requestedParent = null, FolderFlags flags = FolderFlags.None)
+    {
+        // If the folder under the same name already exists, abort creation.
+        if (_folderMap.ContainsKey(name))
+            return false;
+
+        var parent = requestedParent != null ? GetFolderGroupByName(requestedParent.Name) : root;
+        var folderGroup = new DynamicFolderGroup<T>(parent, FAI.FolderTree, name, idCounter + 1u, flags: flags);
+
+        // Folder is valid, attempt to assign it. If it fails, throw an exception.
+        if (!folderGroup.Parent.AddChild(folderGroup))
+            throw new Exception($"Could not add folder group [{folderGroup.Name}] to group [{folderGroup.Parent.Name}]: Folder with the same name exists.");
+
+        // Successful, so increment the ID counter and update the map and contents.
+        ++idCounter;
+        _folderMap[folderGroup.Name] = folderGroup;
+        DDSChanged?.Invoke(DDSChange.CollectionAdded, folderGroup, null, folderGroup.Parent);
+        return true;
+    }
 
     // Could make this return Result instead but its more for internal stuff.
     protected bool AddFolder(DynamicFolder<T> folder)
@@ -114,8 +134,6 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         ++idCounter;
         folder.Update(_nameComparer, out _);
         _folderMap[folder.Name] = folder;
-
-        // Revise later, this would fire a ton of changes during a reload and could possibly overload fileIO.
         DDSChanged?.Invoke(DDSChange.CollectionAdded, folder, null, folder.Parent);
         return true;
     }

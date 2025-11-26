@@ -1,5 +1,6 @@
 using Dalamud.Bindings.ImGui;
 using OtterGui.Extensions;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem.Selector;
 
@@ -42,10 +43,9 @@ public class DynamicSelections<T> : IDisposable where T : class
     }
 
     // Public Accessor for selection.
-    public IReadOnlyList<DynamicLeaf<T>> SelectedLeaves
-        => _selectedLeaves;
-    public IReadOnlySet<IDynamicNode<T>> Selected
-        => _selected;
+    public IReadOnlyList<IDynamicCollection<T>> Collections => _selectedFoldersAll;
+    public IReadOnlyList<DynamicLeaf<T>> Leaves => _selectedLeaves;
+    public IReadOnlySet<IDynamicNode<T>> Selected => _selected;
     
     public DynamicLeaf<T>? SelectedLeaf
         => _selectedLeaves.Count is 1 ? _selectedLeaves[0] : null;
@@ -83,6 +83,8 @@ public class DynamicSelections<T> : IDisposable where T : class
     /// <param name="canRangeSelect"> If we allow SHIFT based range selection. </param>
     public void SelectItem(IDynamicNode<T> entity, bool canAnchorSelect, bool canRangeSelect)
     {
+        Svc.Logger.Information($"Flat List: [{string.Join(", ", _cache.FlatList.Select(n => n.Name))}]");
+        Svc.Logger.Information($"Selecting item: {entity.Name} (Anchor:{_lastAnchor?.Name ?? "null"}, Selected:{entity.Name ?? "null"})");
         bool ctrl = ImGui.GetIO().KeyCtrl;
         bool shift = ImGui.GetIO().KeyShift;
 
@@ -90,23 +92,17 @@ public class DynamicSelections<T> : IDisposable where T : class
         //  - LastAnchor must be valid.
         //  - LastAnchor cannot be the same as the current entity.
         if (shift && _lastAnchor != null && canRangeSelect && _lastAnchor != entity)
-        { 
-            var idxTo = _cache.FlatList.IndexOf(entity);
+        {
+            var fromIdx = _cache.FlatList.IndexOf(_lastAnchor);
+            var toIdx = _cache.FlatList.IndexOf(entity);
 
-            // obtain the idx of the last anchor.
-            var idxFrom = _cache.FlatList.IndexOf(_lastAnchor);
+            int start = Math.Min(fromIdx, toIdx);
+            int end = Math.Max(fromIdx, toIdx);
+            Svc.Logger.Information($"Range Selecting from {start} to {end} (Anchor:{_lastAnchor.Name}, Current:{entity.Name})");
+            Svc.Logger.Information($"FlatList Count: {_cache.FlatList.Count}");
 
-            // Ensure correct selection order (top to bottom / bottom to top)
-            (idxFrom, idxTo) = idxFrom > idxTo ? (idxTo, idxFrom) : (idxFrom, idxTo);
-
-            // Determine if bulk selecting or deselecting.
-            // NOTICE: This causes behavior where outcome depends on what's shift selected and not anchored
-            // when performing a shift select multiple times back to back.
-            // It's nothing to worry about, and can be easily changed from entity to _lastAnchor if more prefer that.
             bool selecting = !_selected.Contains(entity);
-
-            // Perform bulk select/deselect.
-            for (int i = idxFrom; i <= idxTo; i++)
+            for (int i = start; i <= end; i++)
             {
                 if (selecting)
                     SelectSingle(_cache.FlatList[i]);
@@ -115,6 +111,7 @@ public class DynamicSelections<T> : IDisposable where T : class
             }
             // Update last interacted.
             _lastSelected = selecting ? entity : null;
+            _lastAnchor = entity;
         }
         // Single-Selection toggle
         else if (ctrl && canAnchorSelect)

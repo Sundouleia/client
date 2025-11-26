@@ -36,13 +36,13 @@ public class WhitelistTab
         if (_config.Current.ViewingGroups)
         {
             _groupsDrawer.DrawFilterRow(width, 64);
-            _groupsDrawer.DrawContents(width);
+            _groupsDrawer.DrawFullCache(width);
         }
         // The BaseFoldersDrawer
         else
         {
             _defaultDrawer.DrawFilterRow(width, 64);
-            _defaultDrawer.DrawContents(width);
+            _defaultDrawer.DrawFullCache(width);
         }
     }
 }

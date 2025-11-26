@@ -168,6 +168,7 @@ public class GroupsManager
             return false;
         }
         // Default the linked UID's.
+        _logger.LogInformation($"Adding new group {{{group.Label}}} to config.");
         group.LinkedUids = new();
         Config.Groups.Add(group);
         _config.Save();

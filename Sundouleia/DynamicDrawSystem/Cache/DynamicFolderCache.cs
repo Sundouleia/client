@@ -1,3 +1,5 @@
+using OtterGui.Text;
+
 namespace Sundouleia.DrawSystem.Selector;
 
 /// <summary>
@@ -11,7 +13,7 @@ public class DynamicFolderCache<T>(IDynamicFolder<T> folder) : IDynamicCache<T> 
 
     public bool IsEmpty
         => Folder is null;
-    public IEnumerable<IDynamicNode<T>> GetChildren()
+    public IEnumerable<IDynamicNode<T>> GetAllDescendants()
         => Children;
 
     IDynamicCollection<T> IDynamicCache<T>.Folder => Folder;

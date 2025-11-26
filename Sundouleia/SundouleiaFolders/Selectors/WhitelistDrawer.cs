@@ -77,7 +77,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     protected override void DrawSearchBar(float width, int length)
     {
         var tmp = Cache.Filter;
-        var buttonsWidth = CkGui.IconButtonSize(FAI.Wrench).X + CkGui.IconTextButtonSize(FAI.Globe, "Basic");
+        var buttonsWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconTextButtonSize(FAI.Globe, "Basic");
         // Update the search bar if things change, like normal.
         if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
             Cache.Filter = tmp;
@@ -99,13 +99,13 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         if (CkGui.IconTextButton(FAI.Globe, "Basic", null, true, _configExpanded))
         {
             _configExpanded = false;
-            _folderConfig.Current.ViewingGroups = !_folderConfig.Current.ViewingGroups;
+            _folderConfig.Current.ViewingGroups = true;
             _folderConfig.Save();
         }
         CkGui.AttachToolTip("Switch to Groups View");
 
         ImGui.SameLine(0, 0);
-        if (CkGui.IconButton(FAI.Wrench, inPopup: !_configExpanded))
+        if (CkGui.IconButton(FAI.Cog, inPopup: !_configExpanded))
             _configExpanded = !_configExpanded;
         CkGui.AttachToolTip("Configure preferences for default folders.");
     }

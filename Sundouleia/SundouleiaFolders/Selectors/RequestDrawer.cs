@@ -62,7 +62,7 @@ public class RequestsDrawer : DynamicDrawer<RequestEntry>
     }
 
     public bool ViewingIncoming => _config.Current.ViewingIncoming;
-    public bool BulkSelecting => Selector.SelectedLeaves.Count != 0;
+    public bool BulkSelecting => Selector.Leaves.Count != 0;
 
     // Wishlist:
     // - Button to quick-add a new group for the area.

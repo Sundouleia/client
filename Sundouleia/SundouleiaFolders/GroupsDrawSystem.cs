@@ -107,6 +107,13 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
     private bool FolderExists(string folderName)
         => FolderMap.ContainsKey(folderName);
 
+    // Public method that can be accessed for direct folder creation.
+    public bool TryAddGroup(SundesmoGroup newGroup)
+        => TryAddFolder(root, newGroup);
+
+    public bool TryAddFolderGroup(string name)
+        => AddFolderGroup(name);
+
     /// <summary>
     ///     Attempts to add a folder to the DrawSystem.
     /// </summary>

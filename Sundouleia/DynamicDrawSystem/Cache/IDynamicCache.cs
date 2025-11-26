@@ -1,3 +1,5 @@
+using CkCommons.Gui;
+
 namespace Sundouleia.DrawSystem.Selector;
 
 /// <summary>
@@ -9,5 +11,5 @@ public interface IDynamicCache<T> where T : class
     IDynamicCollection<T> Folder { get; }
     public bool IsEmpty { get; }
 
-    public IEnumerable<IDynamicNode<T>> GetChildren();
+    public IEnumerable<IDynamicNode<T>> GetAllDescendants();
 }

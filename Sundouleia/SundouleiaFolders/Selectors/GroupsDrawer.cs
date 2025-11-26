@@ -21,22 +21,18 @@ using Sundouleia.Services.Textures;
 
 namespace Sundouleia.DrawSystem;
 
-public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDisposable
+public class GroupsDrawer : DynamicDrawer<Sundesmo>
 {
     private static readonly IconCheckboxEx CheckboxOffline = new(FAI.Unlink);
     private static readonly IconCheckboxEx CheckboxShowEmpty = new(FAI.FolderOpen);
-    // Used when arranging Groups.
-    private static readonly string DragDropTooltip =
-        "--COL--[L-CLICK & DRAG]--COL-- Drag folder to a new place in the hierarchy." +
-        "--NL----COL--[CTRL + L-CLICK]--COL-- Single-Select this folder." +
-        "--NL----COL--[SHIFT + L-CLICK]--COL-- Select/Deselect all users between current and last selection";
 
     // Used for normal leaf interaction.
-    private static readonly string NormalTooltip =
+    private static readonly string Tooltip =
         "--COL--[L-CLICK]--COL-- Swap Between Name/Nick/Alias & UID." +
         "--NL----COL--[M-CLICK]--COL-- Open Profile" +
         "--NL----COL--[SHIFT + R-CLICK]--COL-- Edit Nickname";
 
+    private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favoritesConfig;
@@ -44,9 +40,6 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
     private readonly GroupsManager _groups;
     private readonly SundesmoManager _sundesmos;
     private readonly StickyUIService _stickyService;
-
-
-    public SundouleiaMediator Mediator { get; }
 
     // Widgets
     private GroupFilterEditor _filterEditor;
@@ -75,7 +68,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
         GroupsManager groups, SundesmoManager sundesmos, StickyUIService stickyService, GroupsDrawSystem ds)
         : base("##GroupsDrawer", logger, ds, new SundesmoCache(ds))
     {
-        Mediator = mediator;
+        _mediator = mediator;
         _config = config;
         _folderConfig = folderConfig;
         _favoritesConfig = favorites;
@@ -86,15 +79,9 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
         // Init the filter editor.
         _filterEditor = new GroupFilterEditor(groups);
         _iconSelector = new FAIconCombo(logger);
-
-        // Mediator.Subscribe<SetSidePanel>(this, _ => _editorShown = _.Mode is SidePanelMode.GroupEditor);
     }
 
-    public override void Dispose()
-    {
-        base.Dispose();
-        Mediator.UnsubscribeAll(this);
-    }
+    public bool InOrganizer => _stickyService.DisplayMode is SidePanelMode.GroupEditor;
 
     #region Search
     protected override void DrawSearchBar(float width, int length)
@@ -111,14 +98,15 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
         if (CkGui.IconTextButton(FAI.PeopleGroup, "Groups", null, true, _editorShown))
         {
             _editorShown = false;
-            _folderConfig.Current.ViewingGroups = !_folderConfig.Current.ViewingGroups;
+            _folderConfig.Current.ViewingGroups = false;
             _folderConfig.Save();
         }
         CkGui.AttachToolTip("Switch to Basic View");
 
         ImGui.SameLine(0, 0);
-        if (CkGui.IconButton(FAI.Wrench, inPopup: !_editorShown))
-            _stickyService.ForOrganizer();
+        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGold, InOrganizer))
+            if (CkGui.IconButton(FAI.Wrench, inPopup: !InOrganizer))
+                _stickyService.ForOrganizer();
         CkGui.AttachToolTip("Edit, Add, Rearrange, or Remove Groups.");
     }
     #endregion Search
@@ -136,7 +124,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
             {
                 _lastHoverTime = null;
                 _profileShown = false;
-                Mediator.Publish(new CloseProfilePopout());
+                _mediator.Publish(new CloseProfilePopout());
             }
         }
 
@@ -186,7 +174,6 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
         var pos = ImGui.GetCursorPos();
         ImGui.InvisibleButton($"{Label}_node_{folder.ID}", new(width - rWidth, ImUtf8.FrameHeight));
         HandleInteraction(folder, flags);
-        CkGui.AttachToolTip(DragDropTooltip, !flags.HasAny(DynamicFlags.DragDropFolders), ImGuiColors.DalamudOrange);
 
         // Back to the start, then draw.
         ImGui.SameLine(pos.X);
@@ -420,7 +407,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
         CkGui.IconText(icon, color);
         CkGui.AttachToolTip(TooltipText(s));
         if (!flags.HasAny(DynamicFlags.DragDropLeaves) && s.IsRendered && ImGui.IsItemClicked())
-            Mediator.Publish(new TargetSundesmoMessage(s));
+            _mediator.Publish(new TargetSundesmoMessage(s));
     }
 
     private float DrawLeafButtons(IDynamicLeaf<Sundesmo> leaf, DynamicFlags flags)
@@ -473,7 +460,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
 
         // Push the monofont if we should show the UID, otherwise dont.
         DrawSundesmoName(leaf);
-        CkGui.AttachToolTip(isDragDrop ? DragDropTooltip : NormalTooltip, ImGuiColors.DalamudOrange);
+        CkGui.AttachToolTip(Tooltip, ImGuiColors.DalamudOrange);
         if (isDragDrop)
             return;
         // Handle hover state.
@@ -485,7 +472,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
             if (!_profileShown && _lastHoverTime < DateTime.UtcNow && _config.Current.ShowProfiles)
             {
                 _profileShown = true;
-                Mediator.Publish(new OpenProfilePopout(leaf.Data.UserData));
+                _mediator.Publish(new OpenProfilePopout(leaf.Data.UserData));
             }
         }
     }
@@ -506,12 +493,11 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>, IMediatorSubscriber, IDispo
             // Additional, SundesmoLeaf-Spesific interaction handles.
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
-                // Performs a toggle of state.
                 if (!_showingUID.Remove(node))
                     _showingUID.Add(node);
             }
             if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
-                Mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
+                _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
             if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
                 _renaming = node;

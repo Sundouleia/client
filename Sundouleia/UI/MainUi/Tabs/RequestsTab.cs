@@ -22,6 +22,6 @@ public class RequestsTab
     {
         var width = ImGui.GetContentRegionAvail().X;
         _drawer.DrawFilterRow(width, 100);
-        _drawer.DrawContents(width); // Need to update cache to draw single folders if possible.=
+        _drawer.DrawFullCache(width); // Need to update cache to draw single folders if possible.=
     }
 }

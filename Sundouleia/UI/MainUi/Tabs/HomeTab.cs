@@ -20,12 +20,6 @@ namespace Sundouleia.Gui.MainWindow;
 
 public class HomeTab
 {
-    private const byte BUTTON_ACTIVE_OPACITY = 170;
-    private const byte BUTTON_HOVER_OPACITY = 170;
-    private const byte BUTTON_TRANSPARENCY = 100;
-    private const int BUTTON_SHADOW_SIZE = 1;
-    private const int BUTTON_BORDER_SIZE = 2;
-
     private readonly SundouleiaMediator _mediator;
     private readonly ProfileService _service;
     private readonly TutorialService _guides;
@@ -146,43 +140,40 @@ public class HomeTab
     private void DrawMenuOptions()
     {
         var region = ImGui.GetContentRegionAvail();
-        // PreCalculations to safe on draw-time performance.
-        var borderSize = ImGuiHelpers.ScaledVector2(BUTTON_BORDER_SIZE);
-        var shadowSize = ImGuiHelpers.ScaledVector2(BUTTON_SHADOW_SIZE);
-        var buttonHeight = ImUtf8.FrameHeight + 2 * borderSize.Y + 2 * shadowSize.Y;
+        var buttonH = CkGui.GetFancyButtonHeight();
         // The threshold to draw 2 or 1 rows.
-        var thresholdHeight = buttonHeight * 8 + ImUtf8.ItemSpacing.Y * 7;
+        var thresholdHeight = buttonH * 8 + ImUtf8.ItemSpacing.Y * 7;
         // if we draw compact (2 columns) or full (1 column)
         var showCompact = region.Y < thresholdHeight;
         // Finalized Height of the child.
-        var finalHeight = buttonHeight * (showCompact ? 4 : 8) + ImUtf8.ItemSpacing.Y * (showCompact ? 3 : 7);
+        var finalHeight = buttonH * (showCompact ? 4 : 8) + ImUtf8.ItemSpacing.Y * (showCompact ? 3 : 7);
 
         if (showCompact)
-            DrawCompactButtons(region, buttonHeight, borderSize, shadowSize);
+            DrawCompactButtons(region);
         else
-            DrawButtonList(region, buttonHeight, borderSize, shadowSize);
+            DrawButtonList(region);
     }
 
-    private void DrawCompactButtons(Vector2 region, float buttonHeight, Vector2 borderSize, Vector2 shadowSize)
+    private void DrawCompactButtons(Vector2 region)
     {
-        var buttonSize = new Vector2((region.X - ImUtf8.ItemInnerSpacing.X) / 2, buttonHeight);
+        var buttonWidth = (region.X - ImUtf8.ItemInnerSpacing.X) / 2;
         using (ImRaii.Group())
         {
-            if (FancyButtonCentered(buttonSize, FAI.PeopleGroup, "Manage Groups", borderSize, shadowSize))
+            if (CkGui.FancyButton(FAI.PeopleGroup, "Manage Groups", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(GroupsUI)));
             CkGui.AttachToolTip("Create, arrange, delete, and manage Groups.");
 
-            if (FancyButtonCentered(buttonSize, FAI.MagnifyingGlassChart, "Actor Analyzer", borderSize, shadowSize))
+            if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", buttonWidth, true))
                 _mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
             CkGui.AttachToolTip("Inspect data of owned actors!");
 
-            if (FancyButtonCentered(buttonSize, FAI.FileExport, "MCDF Controller", borderSize, shadowSize))
+            if (CkGui.FancyButton(FAI.FileExport, "MCDF Controller", buttonWidth, true))
             {
                 // Something.
             }
             CkGui.AttachToolTip("Export and Organize MCDF's.");
 
-            if (FancyButtonCentered(buttonSize, FAI.Trophy, "Achievements", borderSize, shadowSize))
+            if (CkGui.FancyButton(FAI.Trophy, "Achievements", buttonWidth, true))
             {
                 // Something.
             }
@@ -192,22 +183,22 @@ public class HomeTab
         ImUtf8.SameLineInner();
         using (ImRaii.Group())
         {
-            if (FancyButtonCentered(buttonSize, FAI.Cog, "Open Settings", borderSize, shadowSize))
+            if (CkGui.FancyButton(FAI.Cog, "Open Settings", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
             CkGui.AttachToolTip("Opens the Settings UI.");
 
-            if (FancyButtonCentered(buttonSize, FAI.Bell, "Events Viewer", borderSize, shadowSize))
+            if (CkGui.FancyButton(FAI.Bell, "Events Viewer", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(DataEventsUI)));
             CkGui.AttachToolTip("View fired events for pair updates.");
 
-            if (FancyButtonCentered(buttonSize, FAI.Coffee, "Support Sundouleia", borderSize, shadowSize))
+            if (CkGui.FancyButton(FAI.Coffee, "Support Sundouleia", buttonWidth, false))
             {
                 try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/cw/Sundouleia", UseShellExecute = true }); }
                 catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Patreon link. {e.Message}"); }
             }
             CkGui.AttachToolTip("If you like my work, you can toss any support here ♥");
 
-            if (FancyButtonCentered(buttonSize, FAI.Wrench, "Open Config", borderSize, shadowSize))
+            if (CkGui.FancyButton(FAI.Wrench, "Open Config", buttonWidth, false))
             {
                 try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.SundouleiaDirectory, UseShellExecute = true }); }
                 catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
@@ -216,114 +207,48 @@ public class HomeTab
         }
     }
 
-    private void DrawButtonList(Vector2 region, float buttonHeight, Vector2 borderSize, Vector2 shadowSize)
+    private void DrawButtonList(Vector2 region)
     {
-        var buttonSize = new Vector2(region.X, buttonHeight);
-        if (FancyButton(buttonSize, FAI.PeopleGroup, "Manage Groups", borderSize, shadowSize))
+        if (CkGui.FancyButton(FAI.PeopleGroup, "Manage Groups", region.X, false))
             _mediator.Publish(new UiToggleMessage(typeof(GroupsUI)));
         CkGui.AttachToolTip("Create, arrange, delete, and manage Groups.");
 
-        if (FancyButton(buttonSize, FAI.MagnifyingGlassChart, "Actor Analyzer", borderSize, shadowSize))
+        if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", region.X, true))
             _mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
         CkGui.AttachToolTip("Inspect data of owned actors!");
 
-        if (FancyButton(buttonSize, FAI.FileExport, "MCDF Controller", borderSize, shadowSize))
+        if (CkGui.FancyButton(FAI.FileExport, "MCDF Controller", region.X, true))
         {
             // Something.
         }
         CkGui.AttachToolTip("Export and Organize MCDF's.");
 
-        if (FancyButton(buttonSize, FAI.Trophy, "Achievements", borderSize, shadowSize))
+        if (CkGui.FancyButton(FAI.Trophy, "Achievements", region.X, true))
         {
             // Something.
         }
         CkGui.AttachToolTip("View Achievement Progress & Rewards.--SEP--Still WIP, Coming in future updates.");
 
-        if (FancyButton(buttonSize, FAI.Cog, "Open Settings", borderSize, shadowSize))
+        if (CkGui.FancyButton(FAI.Cog, "Open Settings", region.X, false))
             _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
         CkGui.AttachToolTip("Opens the Settings UI.");
 
-        if (FancyButton(buttonSize, FAI.Bell, "Events Viewer", borderSize, shadowSize))
+        if (CkGui.FancyButton(FAI.Bell, "Events Viewer", region.X, false))
             _mediator.Publish(new UiToggleMessage(typeof(DataEventsUI)));
         CkGui.AttachToolTip("View fired events for pair updates.");
 
-        if (FancyButton(buttonSize, FAI.Coffee, "Support Sundouleia", borderSize, shadowSize))
+        if (CkGui.FancyButton(FAI.Coffee, "Support Sundouleia", region.X, false))
         {
             try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/cw/Sundouleia", UseShellExecute = true }); }
             catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Patreon link. {e.Message}"); }
         }
         CkGui.AttachToolTip("If you like my work, you can toss any support here ♥");
 
-        if (FancyButton(buttonSize, FAI.Wrench, "Open Config", borderSize, shadowSize))
+        if (CkGui.FancyButton(FAI.Wrench, "Open Config", region.X, false))
         {
             try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.SundouleiaDirectory, UseShellExecute = true }); }
             catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
         }
         CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
-    }
-
-    private bool FancyButtonCentered(Vector2 size, FAI icon, string text, Vector2 borderSize, Vector2 shadowSize)
-    {
-        // Button Contents.
-        var pressed = ImGui.InvisibleButton($"##OptionButton{text}", size);
-        var hovered = ImGui.IsItemHovered();
-        var active = ImGui.IsItemActive();
-        var min = ImGui.GetItemRectMin();
-        var max = ImGui.GetItemRectMax();
-        var hoverAlpha = hovered ? BUTTON_HOVER_OPACITY : BUTTON_TRANSPARENCY;
-        var activeAlpha = active ? BUTTON_ACTIVE_OPACITY : BUTTON_TRANSPARENCY;
-
-        var iconWidth = ImUtf8.FrameHeight;
-        var textSize = ImGui.CalcTextSize(text);
-        var fullTextWidth = iconWidth + textSize.X;
-        var iconStart = min + new Vector2((size.X - fullTextWidth) / 2f, (size.Y - textSize.Y) / 2f);
-        var textStart = iconStart + new Vector2(iconWidth, 0);
-        // Visuals.
-        var drawList = ImGui.GetWindowDrawList();
-        // The Outer Border drop shadow.
-        drawList.AddRectFilled(min, max, CkGui.Color(0, 0, 0, BUTTON_TRANSPARENCY), 25f, ImDrawFlags.RoundCornersAll);
-        // Inner Border, Greyish
-        drawList.AddRectFilled(min + Vector2.One, max - Vector2.One, CkGui.Color(220, 220, 220, hoverAlpha), 25f, ImDrawFlags.RoundCornersAll);
-        // The progress bar background
-        drawList.AddRectFilled(min + borderSize + shadowSize, max - borderSize - shadowSize, CkGui.Color(0, 0, 0, activeAlpha), 25f, ImDrawFlags.RoundCornersAll);
-        // Try draw font text.
-        using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            drawList.OutlinedFont(icon.ToIconString(), iconStart, uint.MaxValue, CkGui.Color(53, 24, 39, 255), BUTTON_SHADOW_SIZE);
-        drawList.OutlinedFont(text, textStart, uint.MaxValue, CkGui.Color(53, 24, 39, 255), BUTTON_SHADOW_SIZE);
-
-        return pressed;
-    }
-
-    private bool FancyButton(Vector2 size, FAI icon, string text, Vector2 borderSize, Vector2 shadowSize)
-    {
-        // Button Contents.
-        var pressed = ImGui.InvisibleButton($"##OptionButton{text}", size);
-        var hovered = ImGui.IsItemHovered();
-        var active = ImGui.IsItemClicked();
-        var min = ImGui.GetItemRectMin();
-        var max = ImGui.GetItemRectMax();
-
-        // Pre-Calculations.
-        var iconWidth = ImUtf8.FrameHeight;
-        var hoverAlpha = hovered ? BUTTON_HOVER_OPACITY : BUTTON_TRANSPARENCY;
-        var activeAlpha = active ? BUTTON_ACTIVE_OPACITY : BUTTON_TRANSPARENCY;
-
-        var iconStart = min + new Vector2(ImUtf8.ItemSpacing.X, (size.Y - ImUtf8.TextHeight) / 2f);
-        var textStart = iconStart + new Vector2(iconWidth, 0);
-        // Visuals.
-        var drawList = ImGui.GetWindowDrawList();
-        // The Outer Border drop shadow.
-        drawList.AddRectFilled(min, max, CkGui.Color(0, 0, 0, BUTTON_TRANSPARENCY), 25f, ImDrawFlags.RoundCornersAll);
-        // Inner Border, Greyish
-        drawList.AddRectFilled(min + Vector2.One, max - Vector2.One, CkGui.Color(220, 220, 220, hoverAlpha), 25f, ImDrawFlags.RoundCornersAll);
-        // The progress bar background
-        drawList.AddRectFilled(min + borderSize + shadowSize, max - borderSize - shadowSize, CkGui.Color(0, 0, 0, activeAlpha), 25f, ImDrawFlags.RoundCornersAll);
-
-        // Try draw font text.
-        using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            drawList.OutlinedFont(icon.ToIconString(), iconStart, uint.MaxValue, CkGui.Color(53, 24, 39, 255), BUTTON_SHADOW_SIZE);
-        drawList.OutlinedFont(text, textStart, uint.MaxValue, CkGui.Color(53, 24, 39, 255), BUTTON_SHADOW_SIZE);
-
-        return pressed;
     }
 }

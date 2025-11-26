@@ -1,8 +1,12 @@
+using CkCommons;
 using CkCommons.Gui;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui;
 using OtterGui.Text;
 using OtterGui.Text.EndObjects;
+using Sundouleia.Services;
 
 namespace Sundouleia.DrawSystem.Selector;
 
@@ -12,7 +16,7 @@ public partial class DynamicDrawer<T>
     // Internal structure for an active drag-drop cache.
     // could potentially be reworked if we are all using labels bound to specific drawers.
     // It also would make more sense now that we can have direct control over which draw methods allow for which drag-drops.
-    internal class DragDropOperation
+    protected class DragDropOperation
     {
         public string ID { get; set; } = string.Empty;
         public List<IDynamicNode<T>> Entities = [];
@@ -21,6 +25,15 @@ public partial class DynamicDrawer<T>
         {
             ID = label;
         }
+
+        // Maybe remove these, just wanted helpers but idk
+
+        public bool OnlyLeaves { get; private set; } = false;
+        public bool OnlyCollections { get; private set; } = false;
+        public bool OnlyFolders { get; private set; } = false;
+        public bool OnlyGroups { get; private set; } = false;
+
+        public string MoveString = string.Empty;
 
         public bool IsActive() => ID.Length > 0 && Entities.Count > 0;
 
@@ -33,6 +46,24 @@ public partial class DynamicDrawer<T>
             Svc.Logger.Verbose($"[DynamicDrawer] Setting drag-drop for ({id}) with {entities.Count} selections.");
             ID = id;
             Entities = entities;
+            MoveString = GetMoveString();
+            OnlyLeaves = !Entities.Any(e => e is not IDynamicLeaf<T>);
+            OnlyCollections = !Entities.Any(e => e is not IDynamicCollection<T>);
+            OnlyFolders = !Entities.Any(e => e is not IDynamicFolder<T>);
+            OnlyGroups = !Entities.Any(e => e is not IDynamicFolderGroup<T>);
+        }
+
+        private string GetMoveString()
+        {
+            if (Entities.Count is 0)
+                return string.Empty;
+            else if (Entities.Count == 1)
+                return $"Moving {Entities[0].Name}...";
+            else
+            {
+                var names = string.Join("\n\t - ", Entities.Select(e => e.Name));
+                return $"Moving ...\n\t - {names}";
+            }
         }
 
         public void Clear()
@@ -40,10 +71,13 @@ public partial class DynamicDrawer<T>
             Svc.Logger.Verbose($"[DynamicDrawer] Clearing drag-drop for ({ID}) with {Entities.Count} selections.");
             ID = string.Empty;
             Entities.Clear();
+            MoveString = string.Empty;
         }
     }
 
-    private DragDropOperation _dragDropCache;
+    protected bool IsDragging => DragDropCache is not null && DragDropCache.IsActive();
+
+    protected DragDropOperation DragDropCache;
 
     /// <summary>
     ///     Attaches a Drag-Drop source to the previously drawn item, with the given label. <para />
@@ -60,14 +94,19 @@ public partial class DynamicDrawer<T>
         if (!DragDropSource.SetPayload($"{Label}_Move"))
         {
             Selector.SelectSingle(entity);
-            _dragDropCache.UpdateCache($"{Label}_Move", [.. Selector.Selected]);
+            DragDropCache ??= new DragDropOperation($"{Label}_Move");
+            DragDropCache.UpdateCache($"{Label}_Move", [.. Selector.Selected]);
         }
 
+        // Hover text for the drag drop can be shown here.
         // Customize display text later, maybe allow a custom virtual func for display text or something.
-        CkGui.TextFrameAligned(_dragDropCache.Entities.Count == 1
-            ? $"Moving {_dragDropCache.Entities.First().Name}..."
-            : $"Moving ...\n\t - {string.Join("\n\t - ", _dragDropCache.Entities.Select(i => i.Name))}");
+        CkGui.InlineSpacing();
+        ImGui.Text(DragDropCache.MoveString);
+        PostDragSourceText(entity);
     }
+
+    protected virtual void PostDragSourceText(IDynamicNode<T> entity)
+    { }
 
     protected void AsDragDropTarget(IDynamicNode<T> entity)
     {
@@ -76,14 +115,16 @@ public partial class DynamicDrawer<T>
             return;
 
         // If we are not dropping the opLabel, or the cache is not active, ignore this.
-        if (!ImGuiUtil.IsDropping($"{Label}_Move") || !_dragDropCache.IsActive())
+        if (!ImGuiUtil.IsDropping($"{Label}_Move") || !DragDropCache.IsActive())
             return;
+
+        // If we hit this point, a drop occurred. We do not care if it was successful.
 
         // Enqueue after this draw-frame the full transfer of all paths.
         _postDrawActions.Enqueue(() =>
         {
-            ProcessTransfer(_dragDropCache.Entities, entity);
-            _dragDropCache.Clear();
+            ProcessTransfer(DragDropCache.Entities, entity);
+            DragDropCache.Clear();
         });
     }
 

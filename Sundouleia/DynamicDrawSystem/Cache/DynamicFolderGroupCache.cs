@@ -11,8 +11,8 @@ public class DynamicFolderGroupCache<T>(IDynamicFolderGroup<T> folder) : IDynami
 
     public bool IsEmpty
         => Folder is null;
-    public IEnumerable<IDynamicNode<T>> GetChildren()
-        => Children.SelectMany(c => c.GetChildren());
+    public IEnumerable<IDynamicNode<T>> GetAllDescendants()
+        => Children.SelectMany(c => c.GetAllDescendants().Prepend(c.Folder));
 
     IDynamicCollection<T> IDynamicCache<T>.Folder => Folder;
 }
