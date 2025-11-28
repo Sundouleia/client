@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using CkCommons;
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
@@ -14,7 +15,6 @@ using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
 using SundouleiaAPI.Util;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.Pairs;
 
@@ -60,7 +60,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
     private void OnOpenContextMenu(IMenuOpenedArgs args)
     {
-        Logger.LogInformation("Opening Pair Context Menu of type "+args.MenuType, LoggerType.PairManagement);
+        Logger.LogInformation("Opening Pair Context Menu of type " + args.MenuType, LoggerType.PairManagement);
         if (args.MenuType is ContextMenuType.Inventory) return;
         if (!_config.Current.ShowContextMenus) return;
         if (args.Target is not MenuTargetDefault target || target.TargetObjectId == 0) return;
@@ -109,7 +109,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         var exists = _allSundesmos.ContainsKey(dto.User);
         var msg = $"User ({dto.User.UID}) {(exists ? "found, applying latest!" : "not found. Creating!")}.";
         Logger.LogDebug(msg, LoggerType.PairManagement);
-        if (exists) 
+        if (exists)
             _allSundesmos[dto.User].ReapplyAlterations();
         else
             _allSundesmos[dto.User] = _pairFactory.Create(dto);
@@ -129,6 +129,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             }
             else
             {
+                _allSundesmos[dto.User].ReapplyAlterations();
                 refreshed.Add(dto.User.UID);
             }
         }
@@ -145,8 +146,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             return;
 
         // Remove the pair, marking it offline then disposing of its handler resources, and finally removing it from the manager.
-        sundesmo.MarkOffline();
-        sundesmo.DisposeData();
+        DisposeSundesmo(sundesmo);
         _allSundesmos.TryRemove(dto.User, out _);
         RecreateLazy();
     }
@@ -182,10 +182,18 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             s.Value.MarkOffline();
             // If it was a hard disconnect, we should dispose of the data.
             if (intent is DisconnectIntent.LogoutShutdown)
-                s.Value.DisposeData();
+                DisposeSundesmo(s.Value);
         });
         // Recreate the lazy list.
         RecreateLazy();
+    }
+
+    private void DisposeSundesmo(Sundesmo sundesmo)
+    {
+        Logger.LogTrace($"Disposing {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
+        sundesmo.MarkOffline();
+        sundesmo.Dispose();
+        _allSundesmos.TryRemove(sundesmo.UserData, out _);
     }
 
     /// <summary>
@@ -198,15 +206,9 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         var pairCount = _allSundesmos.Count;
         foreach (var sundesmo in _allSundesmos.Values)
         {
-            Logger.LogTrace($"Disposing {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
-            sundesmo.MarkOffline();
-            sundesmo.DisposeData();
+            DisposeSundesmo(sundesmo);
         }
-        //Parallel.ForEach(_allSundesmos, item =>
-        //{
-        //    item.Value.MarkOffline();
-        //    item.Value.DisposeData();
-        //});
+        _allSundesmos.Clear();
         Logger.LogDebug($"Marked {pairCount} sundesmos as offline", LoggerType.PairManagement);
         RecreateLazy();
     }
@@ -222,7 +224,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         // Attempt to get the sundesmo via the UserData.
         if (!_allSundesmos.TryGetValue(dto.User, out var sundesmo))
             throw new InvalidOperationException($"No user found [{dto}]");
-        
+
         // They were found, so refresh any existing profile data.
         Mediator.Publish(new ClearProfileDataMessage(dto.User));
 
