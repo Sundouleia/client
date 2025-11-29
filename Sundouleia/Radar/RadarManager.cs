@@ -9,7 +9,6 @@ using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Network;
 using System.Diagnostics.CodeAnalysis;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Radar;
 

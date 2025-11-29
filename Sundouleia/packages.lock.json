@@ -616,6 +616,9 @@
       "penumbra.api": {
         "type": "Project"
       },
+      "penumbra.string": {
+        "type": "Project"
+      },
       "sundouleiaapi": {
         "type": "Project",
         "dependencies": {

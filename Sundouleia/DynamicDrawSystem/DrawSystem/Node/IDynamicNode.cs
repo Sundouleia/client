@@ -13,9 +13,8 @@ public enum FolderFlags : byte
     None        = 0 << 0,
     Expanded    = 1 << 0, // If the folder is expanded.
     ShowIfEmpty = 1 << 1, // If the folder should display even with 0 children.
-    AutoSort    = 1 << 2, // Auto-Sort children after moves or renames. For FolderGroups.
 
-    RootFlags = Expanded | ShowIfEmpty, // Default flags for the root folder.
+    All = Expanded | ShowIfEmpty, // Default flags for the root folder.
 }
 
 /// <summary>
@@ -25,6 +24,11 @@ public enum FolderFlags : byte
 /// <remarks> A FolderCollection can be the Root folder if <see cref="IDynamicNode.Name"/> is string.Empty </remarks>
 public interface IDynamicFolderGroup<T> : IDynamicCollection<T> where T : class
 {
+    /// <summary>
+    ///     The FontAwesomeIcon 5 icon associated with this folder when opened, because why not.
+    /// </summary>
+    public FAI IconOpen { get; }
+
     /// <summary>
     ///     The FolderCollections and Folders contained by this collection, exposed for read-only access.
     /// </summary>
@@ -175,6 +179,11 @@ public interface IDynamicNode<T> : IDynamicNode where T : class
 /// </summary>
 public interface IDynamicNode
 {
+    /// <summary>
+    ///     Precedence this node has if being filtered by folder groups or other node hierarchies.
+    /// </summary>
+    public int Priority { get; }
+
     /// <summary>
     ///     The Label associated with this node.
     /// </summary>

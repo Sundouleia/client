@@ -1,5 +1,4 @@
 using CkCommons.HybridSaver;
-using OtterGui;
 using Sundouleia.Services.Configs;
 
 namespace Sundouleia.PlayerClient;

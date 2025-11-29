@@ -1,9 +1,7 @@
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using Microsoft.VisualBasic.ApplicationServices;
 using Sundouleia.Pairs;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
-using static FFXIVClientStructs.FFXIV.Client.LayoutEngine.LayoutManager;
 
 namespace Sundouleia.Radar;
 

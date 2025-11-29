@@ -1,5 +1,3 @@
-using OtterGui.Text;
-
 namespace Sundouleia.DrawSystem.Selector;
 
 /// <summary>

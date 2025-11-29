@@ -14,29 +14,6 @@ public partial class DynamicDrawSystem<T>
         NoSuccess,
     }
 
-    // Refactor later?...
-    //private Result RenameLeaf(DynamicLeaf<T> leaf, string newName)
-    //{
-    //    // Prevent allowing a Leaf to behave as Root.
-    //    if (string.IsNullOrEmpty(leaf.Name) || string.IsNullOrEmpty(newName))
-    //        return Result.InvalidOperation;
-
-    //    // correct the newName to work with the dynamic file system.
-    //    newName = newName.FixName();
-    //    // if the names are identical just return that nothing was done.
-    //    if (newName == leaf.Name)
-    //        return Result.SuccessNothingDone;
-
-    //    // an entity with the same name already exists, so fail it.
-    //    // (if we run into edge cases with this we can just mimic OtterGui FileSystem)
-    //    if (Search(leaf.Parent, newName) >= 0)
-    //        return Result.ItemExists;
-
-    //    // Otherwise, rename the child and return success.
-    //    leaf.SetName(newName, false);
-    //    return Result.Success;
-    //}
-
     /// <summary>
     ///     Internally rename a Folder or FolderGroup to a new name. <para />
     ///     Fails if the new name is invalid, or the name exists in the drawSystem already.
@@ -45,11 +22,11 @@ public partial class DynamicDrawSystem<T>
     /// <param name="newName"> the new name. </param>
     private Result RenameFolder(IDynamicCollection<T> folder, string newName)
     {
-        // Prevent renaming to root.
-        if (string.IsNullOrEmpty(newName))
-            return Result.InvalidOperation;
-
         var fixedNewName = newName.FixName();
+
+        // Prevent renaming to root.
+        if (string.Equals(newName, DDSHelpers.RootName, StringComparison.Ordinal))
+            return Result.InvalidOperation;
 
         // If the name is no different, return success with nothing done.
         if (fixedNewName == folder.Name)
@@ -78,20 +55,101 @@ public partial class DynamicDrawSystem<T>
         }
     }
 
-    // Moves a Folder to a new location within the DDS.
-    private Result MoveFolder(IDynamicCollection<T> folder, DynamicFolderGroup<T> newParent, out DynamicFolderGroup<T> oldParent)
+    // Moves multiple folders at once to a new destination.
+    // Moved folders can be Folders or FolderGroups.
+    // Destination location can also be defined for matches.
+    private Result BulkMoveCollections(IEnumerable<IDynamicCollection<T>> toMove, DynamicFolderGroup<T> newParent, IDynamicCollection<T>? destChild = null)
     {
-        // store the old parent for reference on out param.
-        oldParent = folder.Parent;
-        // If the old and new parents are the same, do nothing.
-        if (oldParent == newParent)
-            return Result.SuccessNothingDone;
+        // If the destChild is not null and it's parent is not the destination return invalid operation.
+        if (destChild is not null && destChild.Parent != newParent)
+            return Result.InvalidOperation;
 
-        // Remove the child from the old parent, and add it to the new parent.
-        oldParent.Children.Remove(folder);
-        // Assign it to the new one.
-        // If it failed, it is because the item exists.
-        return newParent.AddChild(folder) ? Result.Success : Result.ItemExists;
+        // Partition into same-parent and foreign-parent within a single loop.
+        var spNodes = new List<IDynamicCollection<T>>();
+        var otherNodes = new List<IDynamicCollection<T>>();
+        foreach (var node in toMove)
+        {
+            if (node == newParent)
+                continue;
+
+            if (node.Parent == newParent)
+                spNodes.Add(node);
+            else
+                otherNodes.Add(node);
+        }
+
+        // Only update them if a valid dest was provided, otherwise do nothing for them.
+        if (spNodes.Count > 0)
+        {
+            // If there were any nodes under the same parent, we should move them.
+            if (destChild is not null)
+            {
+                int destIdx = newParent.Children.IndexOf(destChild);
+                // Collect & sort source indices
+                int count = spNodes.Count;
+                int[] fromIndices = new int[spNodes.Count];
+                for (int i = 0; i < spNodes.Count; i++)
+                    fromIndices[i] = newParent.Children.IndexOf(spNodes[i]);
+
+                Array.Sort(fromIndices);
+                // Calculate the shift
+                int shift = 0;
+                for (int i = 0; i < spNodes.Count; i++)
+                    if (fromIndices[i] < destIdx)
+                        shift++;
+                // Determine the final insertion index
+                int insertIndex = destIdx - shift;
+                // remove from highest index downward
+                for (int i = count - 1; i >= 0; i--)
+                    newParent.Children.RemoveAt(fromIndices[i]);
+                // Insert same-parent nodes
+                newParent.Children.InsertRange(insertIndex, spNodes);
+                // Now we should also insert the other nodes.
+                if (otherNodes.Count > 0)
+                    newParent.InsertChildren(otherNodes, insertIndex);
+            }
+            else
+            {
+                newParent.AddChildren(otherNodes);
+            }
+            // Perform the post-sort.
+            newParent.SortChildren();
+            return Result.Success;
+        }
+        // Otherwise, if the otherNodes were present, do it the same way but without the same-parent logic.
+        if (otherNodes.Count > 0)
+        {
+            if (destChild is not null)
+            {
+                int destIdx = newParent.Children.IndexOf(destChild);
+                newParent.InsertChildren(otherNodes, destIdx);
+            }
+            else
+            {
+                newParent.AddChildren(otherNodes);
+            }
+            // Perform the post-sort.
+            newParent.SortChildren();
+            return Result.Success;
+        }
+
+        return Result.SuccessNothingDone;
+    }
+
+    // Moves a Folder to a new location within the DDS.
+    private Result MoveCollection(IDynamicCollection<T> folder, DynamicFolderGroup<T> newParent)
+    {
+        if (folder == newParent)
+            return Result.InvalidOperation;
+        // If the old and new parents are the same, do nothing.
+        if (folder.Parent == newParent)
+            return Result.SuccessNothingDone;
+        // Fail if the new parent already has this child.
+        if (newParent.Children.Contains(folder))
+            return Result.ItemExists;
+        // Transfer the child from the previous parent to the new one.
+        newParent.AddChild(folder);
+        return Result.Success;
     }
 
 
@@ -108,20 +166,31 @@ public partial class DynamicDrawSystem<T>
 
         string[] parts = fullPath.Split("//", StringSplitOptions.RemoveEmptyEntries);
         // Process each part of the path, creating a folder group for each, branching out from root.
-        foreach (var segment in parts)
+        foreach (var rawSegment in parts)
         {
-            var folder = new DynamicFolderGroup<T>(topFolder, FAI.FolderTree, segment, idCounter + 1u);
-            // If we were able to successfully assign the folder, then update topFolder and res.
-            if (topFolder.AddChild(folder))
+            var segment = rawSegment.FixName();
+            // Attempt to locate the FolderGroup by name.
+            if (TryGetFolderGroup(segment, out var existing))
             {
-                ++idCounter;
-                res = Result.Success;
-                topFolder = folder;
+                if (existing.Parent == topFolder)
+                {
+                    topFolder = existing;
+                    continue;
+                }
+                else
+                {
+                    return Result.ItemExists;
+                }
             }
             else
             {
-                // It already exists, then we can skip incrementing the id and just update topFolder.
-                topFolder = folder;
+                // The folder is not found, so we can create a new one.
+                var newFolder = new DynamicFolderGroup<T>(topFolder, idCounter + 1u, segment);
+                topFolder.AddChild(newFolder);
+                _folderMap[newFolder.Name] = newFolder;
+                ++idCounter;
+                res = Result.Success;
+                topFolder = newFolder;
             }
         }
 
@@ -153,61 +222,6 @@ public partial class DynamicDrawSystem<T>
         return Result.InvalidOperation;
     }
 
-    /// <summary>
-    ///     Abstract method for folder merging used typically by drag-drop or dissolve operations. <para />
-    ///     Because the folders are abstract, their merge method must also be defined in the 
-    ///     DrawSystem parent, so that by the time MergeFolders is finished, the next refresh 
-    ///     of <paramref name="to"/> will contain the items in <paramref name="from"/>
-    /// </summary>
-    /// <param name="from"> the folder being merged. </param>
-    /// <param name="to"> the folder all items should be in after the function call. </param>
-    protected virtual Result MergeFolders(DynamicFolder<T> from, DynamicFolder<T> to)
-        => Result.Success; // Make abstract after initial testing.
-
-    //private Result MergeFolders(DynamicFolder<T> from, DynamicFolder<T> to)
-    //{
-    //    // if the collections are the same, fail.
-    //    if (from == to)
-    //        return Result.SuccessNothingDone;
-    //    // If we are moving from root, fail.
-    //    if (from.Name.Length is 0)
-    //        return Result.InvalidOperation;
-
-    //    // Otherwise we can proceed to merge.
-    //    var result = from.TotalChildren is 0 ? Result.Success : Result.NoSuccess;
-    //    // iterate through the children and move them.
-    //    for (var i = 0; i < from.TotalChildren;)
-    //    {
-    //        var moveRet = MoveLeaf(from.Children[i], to, out _);
-    //        // If the move was successful,
-    //        if (moveRet is Result.Success)
-    //        {
-    //            // If previous result was NoSuccess, check if this is the first item
-    //            if (result == Result.NoSuccess)
-    //                result = (i == 0) ? Result.Success : Result.PartialSuccess;
-    //            // Otherwise keep the existing result if not (should be partial success)
-
-    //            // We moved a child folder out of the list we are iterating through, so dont inc i.
-    //            // Next child is at current index
-    //        }
-    //        else
-    //        {
-    //            // Move failed, increment index
-    //            i++;
-    //            // Bump success down to partial success, if we were currently set to success.
-    //            if (result is Result.Success)
-    //                result = Result.PartialSuccess;
-    //        }
-    //    }
-
-    //    // return the final result. If it was successful, remove the old folder.
-    //    if (result is Result.Success)
-    //        RemoveFolder(from);
-
-    //    return result;
-    //}
-
-
     /// <summary> 
     ///     Try to merge all children <paramref name="from"/> into <paramref name="to"/>.
     /// </summary>
@@ -228,7 +242,7 @@ public partial class DynamicDrawSystem<T>
         // iterate through the children and move them.
         for (var i = 0; i < from.TotalChildren;)
         {
-            var moveRet = MoveFolder(from.Children[i], to, out _);
+            var moveRet = MoveCollection(from.Children[i], to);
             // If the move was successful,
             if (moveRet is Result.Success)
             {
@@ -263,7 +277,7 @@ public partial class DynamicDrawSystem<T>
     {
         var parent = potentialParent;
         // Root is an empty string.
-        while (parent.Name.Length > 0)
+        while (!string.Equals(parent.Name, DDSHelpers.RootName))
         {
             if (parent == folder)
                 return false;
@@ -274,67 +288,67 @@ public partial class DynamicDrawSystem<T>
         return true;
     }
 
-    public enum SegmentType
-    {
-        FolderCollection,
-        Folder,
-        Leaf
-    }
+    //public enum SegmentType
+    //{
+    //    FolderCollection,
+    //    Folder,
+    //    Leaf
+    //}
 
-    public static List<(string Name, SegmentType Type)> ParseSegments(string path)
-    {
-        var segments = new List<(string Name, SegmentType Type)>();
-        if (path.Length is 0)
-            return segments;
+    //public static List<(string Name, SegmentType Type)> ParseSegments(string path)
+    //{
+    //    var segments = new List<(string Name, SegmentType Type)>();
+    //    if (path.Length is 0)
+    //        return segments;
 
-        SegmentType lastType = SegmentType.FolderCollection; // Root is always FolderCollection
+    //    SegmentType lastType = SegmentType.FolderCollection; // Root is always FolderCollection
 
-        while (path.Length > 0)
-        {
-            int idxSingle = path.IndexOf('/');
-            bool isDouble = idxSingle >= 0 && idxSingle + 1 < path.Length && path[idxSingle + 1] == '/';
-            int sepIndex = idxSingle;
+    //    while (path.Length > 0)
+    //    {
+    //        int idxSingle = path.IndexOf('/');
+    //        bool isDouble = idxSingle >= 0 && idxSingle + 1 < path.Length && path[idxSingle + 1] == '/';
+    //        int sepIndex = idxSingle;
 
-            string segment;
-            if (sepIndex < 0)
-            {
-                segment = path;
-                path = string.Empty;
-            }
-            else
-            {
-                segment = path[..sepIndex];
-                path = path[(sepIndex + (isDouble ? 2 : 1))..].TrimStart();
-            }
+    //        string segment;
+    //        if (sepIndex < 0)
+    //        {
+    //            segment = path;
+    //            path = string.Empty;
+    //        }
+    //        else
+    //        {
+    //            segment = path[..sepIndex];
+    //            path = path[(sepIndex + (isDouble ? 2 : 1))..].TrimStart();
+    //        }
 
-            segment = segment.Trim();
-            if (segment.Length is 0)
-                continue;
+    //        segment = segment.Trim();
+    //        if (segment.Length is 0)
+    //            continue;
 
-            // Determine type based on previous segment
-            SegmentType type = lastType switch
-            {
-                SegmentType.FolderCollection => isDouble ? SegmentType.FolderCollection : SegmentType.Folder,
-                SegmentType.Folder => SegmentType.Folder,
-                _ => SegmentType.FolderCollection
-            };
+    //        // Determine type based on previous segment
+    //        SegmentType type = lastType switch
+    //        {
+    //            SegmentType.FolderCollection => isDouble ? SegmentType.FolderCollection : SegmentType.Folder,
+    //            SegmentType.Folder => SegmentType.Folder,
+    //            _ => SegmentType.FolderCollection
+    //        };
 
-            segments.Add((segment, type));
-            lastType = type;
+    //        segments.Add((segment, type));
+    //        lastType = type;
 
-            if (isDouble && segments.Count >= 1)
-                segments[^1] = (segments[^1].Name, SegmentType.FolderCollection);
-        }
+    //        if (isDouble && segments.Count >= 1)
+    //            segments[^1] = (segments[^1].Name, SegmentType.FolderCollection);
+    //    }
 
-        // Mark last as Leaf if parent is Folder
-        if (segments.Count >= 2)
-        {
-            var parent = segments[^2];
-            var last = segments[^1];
-            if (parent.Type == SegmentType.Folder && last.Type != SegmentType.FolderCollection)
-                segments[^1] = (last.Name, SegmentType.Leaf);
-        }
+    //    // Mark last as Leaf if parent is Folder
+    //    if (segments.Count >= 2)
+    //    {
+    //        var parent = segments[^2];
+    //        var last = segments[^1];
+    //        if (parent.Type == SegmentType.Folder && last.Type != SegmentType.FolderCollection)
+    //            segments[^1] = (last.Name, SegmentType.Leaf);
+    //    }
 
-        return segments;
-    }
+    //    return segments;
+    //}
 }

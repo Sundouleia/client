@@ -1,6 +1,4 @@
 using CkCommons.HybridSaver;
-using Dalamud.Bindings.ImGui;
-using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;

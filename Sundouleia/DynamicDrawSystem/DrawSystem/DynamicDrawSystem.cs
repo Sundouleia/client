@@ -9,6 +9,7 @@ public enum DDSChange
     CollectionMoved,   // [Listener for FileSaving & FilterCache Reload] A Collection moved from one FolderGroup to another.
     CollectionMerged,  // [Listener for FileSaving & FilterCache Reload] A Collection was merged into a FolderGroup.
     CollectionRenamed, // [Listener for FileSaving & FilterCache Reload] Collection was renamed.
+    BulkMove,          // [Listener for FileSaving & FilterCache Reload] Multiple collections were moved at once. Usually requires full refresh.
     FullReloadStarting,// [Listener for Selections ] A full reload is starting. Good idea to store any names of selected nodes before they are cleared.
     FullReloadFinished,// [Listener for Selections ] Full reload finished, and is ready for selections to be updated.
 }
@@ -43,19 +44,11 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     private readonly Dictionary<string, IDynamicCollection<T>> _folderMap = new(StringComparer.OrdinalIgnoreCase);
     // could do a leaf map as well but do not see any need to.
 
-    /// <summary> For comparing Entities by name only. </summary>
-    private readonly NameComparer _nameComparer;
-
     /// <summary> The private, incrementing ID counter for this dynamic folder system. </summary>
-    protected uint idCounter { get; private set; } = 1;
+    protected uint idCounter { get; private set; } = 0;
 
-    /// <summary> The root folder collection of this dynamic folder system. </summary>
+    /// <summary> The root folder collection of this dynamic folder system </summary>
     protected DynamicFolderGroup<T> root = DynamicFolderGroup<T>.CreateRoot([DynamicSorterEx.ByFolderName<T>()]);
-
-    public DynamicDrawSystem(IComparer<ReadOnlySpan<char>>? comparer = null)
-    {
-        _nameComparer = new NameComparer(comparer ?? new OrdinalSpanComparer());
-    }
 
     /// <summary>
     ///     Read-only Accessor for root via classes desiring inspection while preventing edits.
@@ -99,13 +92,14 @@ public abstract partial class DynamicDrawSystem<T> where T : class
             return false;
 
         var parent = requestedParent != null ? GetFolderGroupByName(requestedParent.Name) : root;
-        var folderGroup = new DynamicFolderGroup<T>(parent, FAI.FolderTree, name, idCounter + 1u, flags: flags);
+        var folderGroup = new DynamicFolderGroup<T>(parent, idCounter + 1u, name, flags: flags);
 
         // Folder is valid, attempt to assign it. If it fails, throw an exception.
-        if (!folderGroup.Parent.AddChild(folderGroup))
+        if (folderGroup.Parent.Children.Contains(folderGroup))
             throw new Exception($"Could not add folder group [{folderGroup.Name}] to group [{folderGroup.Parent.Name}]: Folder with the same name exists.");
 
         // Successful, so increment the ID counter and update the map and contents.
+        folderGroup.Parent.AddChild(folderGroup);
         ++idCounter;
         _folderMap[folderGroup.Name] = folderGroup;
         DDSChanged?.Invoke(DDSChange.CollectionAdded, folderGroup, null, folderGroup.Parent);
@@ -127,12 +121,13 @@ public abstract partial class DynamicDrawSystem<T> where T : class
             return false;
 
         // Folder is valid, so attempt to assign it. If it fails, throw an exception.
-        if (!folder.Parent.AddChild(folder))
+        if (folder.Parent.Children.Contains(folder))
             throw new Exception($"Could not add folder [{folder.Name}] to group [{folder.Parent.Name}]: Folder with the same name exists.");
 
         // Successful, so increment the ID counter and update the map and contents.
+        folder.Parent.AddChild(folder);
         ++idCounter;
-        folder.Update(_nameComparer, out _);
+        folder.Update(out _);
         _folderMap[folder.Name] = folder;
         DDSChanged?.Invoke(DDSChange.CollectionAdded, folder, null, folder.Parent);
         return true;
@@ -144,7 +139,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         IEnumerable<DynamicLeaf<T>> removed = [];
 
         foreach (var folder in _folderMap.Values.OfType<DynamicFolder<T>>())
-            if (folder.Update(_nameComparer, out var rem))
+            if (folder.Update(out var rem))
                 removed = removed.Concat(rem);
         // Notify of removed leaves.
         CollectionUpdated?.Invoke(CollectionUpdate.FolderUpdated, root, removed);
@@ -152,7 +147,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
 
     public void UpdateFolder(DynamicFolder<T> folder)
     {
-        folder.Update(_nameComparer, out var removed);
+        folder.Update(out var removed);
         CollectionUpdated?.Invoke(CollectionUpdate.FolderUpdated, folder, removed);
     }
 
@@ -212,7 +207,8 @@ public abstract partial class DynamicDrawSystem<T> where T : class
             anyOpened = true;
         }
         // Invoke if any opened. Just do root for simplicity, but if we wanted to we could change every single opened folder individually lol.
-        CollectionUpdated?.Invoke(CollectionUpdate.OpenStateChange, root, null);
+        if (anyOpened)
+            CollectionUpdated?.Invoke(CollectionUpdate.OpenStateChange, root, null);
     }
 
 
@@ -289,9 +285,34 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         }
     }
 
+    // Temporary test for moving folders only.
+    // Moves all collections into the newParent. If desired, merges all items of similar type of destChild at destChild's idx.
+    public void BulkMove(IEnumerable<IDynamicCollection<T>> toMove, DynamicFolderGroup<T> newParent, IDynamicCollection<T>? destChild = null)
+    {
+        switch (BulkMoveCollections(toMove, newParent, destChild))
+        {
+            case Result.Success:
+                DDSChanged?.Invoke(DDSChange.BulkMove, newParent, null, null);
+                // If the folder is closed, open it.
+                if (!newParent.IsOpen)
+                {
+                    newParent.SetIsOpen(true);
+                    CollectionUpdated?.Invoke(CollectionUpdate.OpenStateChange, newParent, null);
+                }
+                break;
+            case Result.SuccessNothingDone:
+                return;
+            case Result.InvalidOperation:
+                throw new Exception("Can not move root directory.");
+            case Result.ItemExists:
+                throw new Exception($"Can't move one or more folders into {newParent.FullPath}, another folder inside it already exists.");
+        }
+    }
+
     public void Move(IDynamicCollection<T> folder, DynamicFolderGroup<T> newParent)
     {
-        switch (MoveFolder(folder, newParent, out var oldParent))
+        var oldParent = folder.Parent;
+        switch (MoveCollection(folder, newParent))
         {
             case Result.Success:
                 DDSChanged?.Invoke(DDSChange.CollectionMoved, folder, oldParent, newParent);
@@ -320,30 +341,6 @@ public abstract partial class DynamicDrawSystem<T> where T : class
                 //}
 
                 throw new Exception($"Can't move {folder.Name} into {newParent.FullPath}, another folder inside it already exists.");
-        }
-    }
-
-    // This would technically be something called in an abstract method or whatever so it can be handled externally.
-    public void Merge(DynamicFolder<T> from, DynamicFolder<T> to)
-    {
-        switch (MergeFolders(from, to))
-        {
-            case Result.SuccessNothingDone:
-                return;
-
-            case Result.InvalidOperation:
-                throw new Exception($"Can not merge root directory into {to.FullPath}.");
-
-            case Result.Success:
-                DDSChanged?.Invoke(DDSChange.CollectionMerged, from, from, to);
-                return;
-
-            case Result.PartialSuccess:
-                DDSChanged?.Invoke(DDSChange.CollectionMerged, from, from, to);
-                return;
-
-            case Result.NoSuccess:
-                throw new Exception($"Could not merge {from.FullPath} into {to.FullPath}. All children already existed in the target.");
         }
     }
 

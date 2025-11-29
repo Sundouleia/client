@@ -36,6 +36,7 @@
 	   <ProjectReference Include="..\Submodules\GlamourerAPI\Glamourer.Api.csproj" />
         <ProjectReference Include="..\Submodules\OtterGui\OtterGui.csproj" />
         <ProjectReference Include="..\Submodules\PenumbraAPI\Penumbra.Api.csproj" />
+	   <ProjectReference Include="..\Submodules\GameDataStrings\Penumbra.String.csproj" />
         <!-- GlobalPropertiesToRemove is because of intentional platform mismatch, does not matter because it is only models, needed for vscode language server to be happy -->
 	   <ProjectReference Include="..\Submodules\SundouleiaAPI\SundouleiaAPI.csproj" GlobalPropertiesToRemove="platform" />
 

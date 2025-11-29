@@ -1,6 +1,4 @@
 using Sundouleia.Gui.Components;
-using Sundouleia.Gui.MainWindow;
-using Sundouleia.Pairs;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 

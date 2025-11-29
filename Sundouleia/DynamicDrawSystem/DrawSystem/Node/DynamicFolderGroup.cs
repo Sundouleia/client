@@ -1,7 +1,5 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Sundouleia.DrawSystem.Selector;
-using Sundouleia.Services;
 
 namespace Sundouleia.DrawSystem;
 
@@ -12,6 +10,7 @@ namespace Sundouleia.DrawSystem;
 public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
 {
     public DynamicFolderGroup<T> Parent { get; internal set; }
+    public int          Priority => 0;
     public uint         ID       { get; }
     public string       Name     { get; internal set; }
     public string       FullPath { get; internal set; } = string.Empty;
@@ -19,7 +18,8 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
 
     // Stylizations.
     public uint NameColor     { get; internal set; } = uint.MaxValue;
-    public FAI  Icon          { get; internal set; }
+    public FAI  Icon          { get; internal set; } // Cant see any reason why this would be anything besides Folder
+    public FAI  IconOpen      { get; internal set; } // Cant see any reason why this would be anything besides FolderOpen
     public uint IconColor     { get; internal set; } = uint.MaxValue;
     public uint BgColor       { get; internal set; } = uint.MinValue;
     public uint BorderColor   { get; internal set; } = uint.MaxValue;
@@ -28,23 +28,32 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
     internal DynamicSorter<IDynamicCollection<T>> Sorter;
     internal List<IDynamicCollection<T>> Children = [];
 
-    internal DynamicFolderGroup(DynamicFolderGroup<T> parent, FAI icon, string name, uint id,
+    internal DynamicFolderGroup(DynamicFolderGroup<T> parent, uint id, string name, 
+        FAI icon = FAI.Folder, FAI iconOpen = FAI.FolderOpen, 
         DynamicSorter<IDynamicCollection<T>>? sorter = null, FolderFlags flags = FolderFlags.None)
     {
         Parent = parent;
         Icon = icon;
+        IconOpen = iconOpen;
         Name = name.FixName();
         ID = id;
         Flags = flags;
         Sorter = sorter ?? new();
         UpdateFullPath();
+
+        //Svc.Logger.Information($"Created FolderGroup:\n" +
+        //    $" Parent: {(Parent is null ? "null" : Parent.Name)}\n" +
+        //    $" Name: {Name}\n" +
+        //    $" ID: {ID}\n" +
+        //    $" FullPath: {FullPath}\n" +
+        //    $" Flags: {Flags}");
     }
 
     IReadOnlyDynamicSorter<IDynamicCollection<T>> IDynamicFolderGroup<T>.Sorter => Sorter;
     IReadOnlyList<IDynamicCollection<T>> IDynamicFolderGroup<T>.Children => Children;
 
     public int TotalChildren => Children.Count;
-    public bool IsRoot => ID == 0;
+    public bool IsRoot => string.Equals(Name, DDSHelpers.RootName, StringComparison.Ordinal);
     public bool IsOpen => Flags.HasAny(FolderFlags.Expanded);
     public bool ShowIfEmpty => Flags.HasAny(FolderFlags.ShowIfEmpty);
 
@@ -97,17 +106,12 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
         => Name;
 
     /// <summary>
-    ///     Appends a child to the folder's children, forcing a sort if desired. <para />
-    ///     Parent and FullPath updates are handled for you.
+    ///     Adds a child to the FolderGroup. (Validation not checked) <para />
+    ///     The added child decouples itself from it's previous parent. <para />
     /// </summary>
-    /// <param name="child"> the child to add. </param>
-    /// <param name="forceSort"> if the children should be sorted after assignment. </param>
-    /// <returns> True if the child was added, false otherwise. </returns>
-    internal bool AddChild(IDynamicCollection<T> child, bool forceSort = false)
+    internal void AddChild(IDynamicCollection<T> child)
     {
-        if (Children.Contains(child))
-            return false;
-
+        child.Parent.Children.Remove(child);
         Children.Add(child);
         if (child is DynamicFolderGroup<T> fc)
         {
@@ -119,36 +123,73 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
             f.Parent = this;
             f.UpdateFullPath();
         }
-        // If we have auto-sort enabled, sort the children.
-        if (forceSort || Flags.HasAny(FolderFlags.AutoSort))
-            SortChildren();
+        SortChildren();
+    }
 
-        return true;
+    /// <summary>
+    ///     Adds all children to the FolderGroup, does not sort after and must be called.
+    /// </summary>
+    internal void AddChildren(IEnumerable<IDynamicCollection<T>> children)
+    {
+        Children.AddRange(children);
+        foreach (var child in children)
+        {
+            if (child is DynamicFolderGroup<T> fc)
+            {
+                fc.Parent.Children.Remove(fc);
+                fc.Parent = this;
+                fc.UpdateFullPath();
+            }
+            else if (child is DynamicFolder<T> f)
+            {
+                f.Parent.Children.Remove(f);
+                f.Parent = this;
+                f.UpdateFullPath();
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Inserts all children at a selected IDX then sorts by node type.
+    /// </summary>
+    internal void InsertChildren(IEnumerable<IDynamicCollection<T>> children, int idx)
+    {
+        // Add them and update their parent / full path.
+        Children.InsertRange(idx, children);
+        foreach (var child in children)
+        {
+            if (child is DynamicFolderGroup<T> fc)
+            {
+                fc.Parent.Children.Remove(fc);
+                fc.Parent = this;
+                fc.UpdateFullPath();
+            }
+            else if (child is DynamicFolder<T> f)
+            {
+                f.Parent.Children.Remove(f);
+                f.Parent = this;
+                f.UpdateFullPath();
+            }
+        }
     }
 
     internal void SetName(string name, bool fix, bool forceSort = false)
     {
         Name = fix ? name.FixName() : name;
         UpdateFullPath();
-        // Sort the parents children if desired.
-        if (forceSort || Parent.Flags.HasAny(FolderFlags.AutoSort))
-            Parent.SortChildren();
     }
 
     /// <summary>
-    ///     Sorts all children by name. Be Careful to only call when nessisary.
+    ///     Sort by priority, FolderGroups, Folders, then Leaves, then whatever else.
     /// </summary>
     internal void SortChildren()
-        => Children.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.Ordinal));
+        => Children.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
     internal void SetIsOpen(bool value)
         => Flags = value ? Flags | FolderFlags.Expanded : Flags & ~FolderFlags.Expanded;
 
     internal void SetShowEmpty(bool value)
         => Flags = value ? Flags | FolderFlags.ShowIfEmpty : Flags & ~FolderFlags.ShowIfEmpty;
-
-    internal void SetAutoSort(bool value)
-        => Flags = value ? Flags | FolderFlags.AutoSort : Flags & ~FolderFlags.AutoSort;
 
     internal void UpdateFullPath()
     {
@@ -163,5 +204,5 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
 
     // Creates the root folder collection of the dynamic folder system.
     internal static DynamicFolderGroup<T> CreateRoot(IEnumerable<ISortMethod<IDynamicCollection<T>>>? sorter = null)
-        => new(null!, FAI.Folder, string.Empty, 0, new(sorter ?? []), FolderFlags.Expanded | FolderFlags.ShowIfEmpty);
+        => new(null!, 0, DDSHelpers.RootName, FAI.Folder, sorter: new(sorter ?? []), flags: FolderFlags.All);
 }

@@ -1,19 +1,6 @@
-using CkCommons;
-using CkCommons.Gui;
-using CkCommons.Raii;
-using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
-using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
-using OtterGui.Text;
 using Sundouleia.DrawSystem;
-using Sundouleia.Gui.Components;
-using Sundouleia.Localization;
-using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Gui.MainWindow;
 

@@ -3,10 +3,8 @@ using CkCommons.Raii;
 using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem.Selector;
 
@@ -148,8 +146,9 @@ public partial class DynamicDrawer<T>
     protected virtual void DrawFolderGroupBanner(IDynamicFolderGroup<T> fg, Vector2 region, DynamicFlags flags)
     {
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"{Label}_node_{fg.ID}", region);
-        HandleInteraction(fg, flags);
+        if (ImGui.InvisibleButton($"{Label}_node_{fg.ID}", region))
+            HandleClick(fg, flags);
+        HandleDetections(fg, flags);
 
         // Back to the start of the line, then draw the folder display contents.
         ImGui.SameLine(pos.X);
@@ -167,7 +166,7 @@ public partial class DynamicDrawer<T>
     /// <param name="flags"> The dynamic draw flags. </param>
     protected virtual void DrawFolderGroupChildren(DynamicFolderGroupCache<T> cfg, DynamicFlags flags)
     {
-        // Simple foreach loop, if things ever really become a problem we can cliprect this, but not much of an issue for now.
+        // Simple for-each loop, if things ever really become a problem we can ClipRect this, but not much of an issue for now.
         foreach (var child in cfg.Children)
             DrawClippedCacheNode(child, flags);
     }
@@ -177,7 +176,7 @@ public partial class DynamicDrawer<T>
     protected virtual void DrawFolderGroupChildren<TFolder>(DynamicFolderGroupCache<T> cfg, DynamicFlags flags) 
         where TFolder : DynamicFolder<T>
     {
-        // Simple foreach loop, if things ever really become a problem we can cliprect this, but not much of an issue for now.
+        // Simple for-each loop, if things ever really become a problem we can ClipRect this, but not much of an issue for now.
         foreach (var child in cfg.Children)
             DrawClippedCacheNode<TFolder>(child, flags);
     }
@@ -197,8 +196,10 @@ public partial class DynamicDrawer<T>
     protected virtual void DrawFolderBannerInner(IDynamicFolder<T> f, Vector2 region, DynamicFlags flags)
     {
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"{Label}_node_{f.ID}", region);
-        HandleInteraction(f, flags);
+        if (ImGui.InvisibleButton($"{Label}_node_{f.ID}", region))
+            HandleClick(f, flags);
+        HandleDetections(f, flags);
+
         // Back to the start of the line, then draw the folder display contents.
         ImGui.SameLine(pos.X);
         CkGui.FramedIconText(f.IsOpen ? FAI.CaretDown : FAI.CaretRight);
@@ -243,8 +244,9 @@ public partial class DynamicDrawer<T>
     protected virtual void DrawLeafInner(IDynamicLeaf<T> leaf, Vector2 region, DynamicFlags flags)
     {
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"{Label}_node_{leaf.Name}", region);
-        HandleInteraction(leaf, flags);
+        if (ImGui.InvisibleButton($"{Label}_node_{leaf.Name}", region))
+            HandleClick(leaf, flags);
+        HandleDetections(leaf, flags);
 
         ImGui.SameLine(pos.X);
         CkGui.TextFrameAligned(leaf.Name);
@@ -268,24 +270,27 @@ public partial class DynamicDrawer<T>
     }
 
     /// <summary>
-    ///     Interaction Handling for nodes. Directing the flow of most updates
-    ///     in the DrawSystem. <para />
-    ///     <b> Override with Caution, and only if you know what you're doing. </b>
+    ///     Defines the logic to execute when a node is clicked. <para />
+    ///     
+    ///     Because certain interactions have various definitions for what a 'click' is, 
+    ///     operations are divided between OnClick, and HandleState. <para />
+    ///     
+    ///     <b> Overriding these implies you know what you are doing. </b>
     /// </summary>
-    protected virtual void HandleInteraction(IDynamicCollection<T> node, DynamicFlags flags)
+    protected virtual void HandleClick(IDynamicCollection<T> node, DynamicFlags flags)
+    {
+        // Handle Folder Toggle.
+        DrawSystem.SetOpenState(node, !node.IsOpen);
+
+        // Handle Selection.
+        if (flags.HasAny(DynamicFlags.SelectableFolders))
+            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+    }
+
+    protected virtual void HandleDetections(IDynamicCollection<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
             _newHoveredNode = node;
-        var clicked = ImGui.IsItemClicked();
-        // Handle Folder Toggle.
-        if (clicked)
-        {
-            DrawSystem.SetOpenState(node, !node.IsOpen);
-            // Might want to append / remove the descendants here after changing the state.
-        }
-        // Handle Selection.
-        if (flags.HasAny(DynamicFlags.SelectableFolders) && clicked)
-            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
 
         // Handle Drag and Drop.
         if (flags.HasAny(DynamicFlags.DragDropFolders))
@@ -295,18 +300,18 @@ public partial class DynamicDrawer<T>
         }
     }
 
-    /// <summary>
-    ///     Interaction Handling for nodes. Directing the flow of most updates
-    ///     in the DrawSystem. <para />
-    ///     <b> Override with Caution, and only if you know what you're doing. </b>
-    /// </summary>
-    protected virtual void HandleInteraction(IDynamicLeaf<T> node, DynamicFlags flags)
+    protected virtual void HandleClick(IDynamicLeaf<T> node, DynamicFlags flags)
+    {
+        // Handle Selection.
+        if (flags.HasAny(DynamicFlags.SelectableLeaves))
+            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+    }
+
+    protected virtual void HandleDetections(IDynamicLeaf<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
             _newHoveredNode = node;
-        // Handle Selection.
-        if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
-            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+
         // Handle Drag and Drop.
         if (flags.HasAny(DynamicFlags.DragDropLeaves))
         {

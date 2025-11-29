@@ -1,7 +1,6 @@
 using CkCommons;
 using CkCommons.Chat;
 using CkCommons.Gui;
-using CkCommons.Helpers;
 using CkCommons.Raii;
 using CkCommons.RichText;
 using Dalamud.Bindings.ImGui;

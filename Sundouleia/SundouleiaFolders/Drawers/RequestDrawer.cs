@@ -167,26 +167,17 @@ public class RequestsDrawer : DynamicDrawer<RequestEntry>
             DrawOutgoingInner(leaf, _.InnerRegion, flags);
     }
 
-    protected override void HandleInteraction(IDynamicLeaf<RequestEntry> node, DynamicFlags flags)
+    protected override void HandleClick(IDynamicLeaf<RequestEntry> node, DynamicFlags flags)
     {
-        if (ImGui.IsItemHovered())
-            _newHoveredNode = node;
         // Handle Selection.
-        if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
+        if (flags.HasAny(DynamicFlags.SelectableLeaves))
         {
             // If there are no other items selected at the time of selection, mark it as the node in the responder.
             _inResponder = (_inResponder == node || BulkSelecting) ? null : node;
             // Then perform the selection.
             Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
         }
-        // Handle Drag and Drop.
-        if (flags.HasAny(DynamicFlags.DragDropLeaves))
-        {
-            AsDragDropSource(node);
-            AsDragDropTarget(node);
-        }
     }
-
     #endregion Leaf Control
 
     #region Incoming Leaf
@@ -202,8 +193,9 @@ public class RequestsDrawer : DynamicDrawer<RequestEntry>
         var rightX = DrawIncomingRightInfo(leaf, flags);
 
         ImGui.SameLine(posX);
-        ImGui.InvisibleButton($"request_{leaf.FullPath}", new Vector2(rightX - posX, ImUtf8.FrameHeight));
-        HandleInteraction(leaf, flags);
+        if (ImGui.InvisibleButton($"request_{leaf.FullPath}", new Vector2(rightX - posX, ImUtf8.FrameHeight)))
+            HandleClick(leaf, flags);
+        HandleDetections(leaf, flags);
         CkGui.AttachToolTip(ToolTip, ImGuiColors.DalamudOrange);
 
         // Below the top row, draw responder if responding.
@@ -281,8 +273,9 @@ public class RequestsDrawer : DynamicDrawer<RequestEntry>
         // Calculate the right area.
         ImGui.SameLine(posX);
         var rightW = ImUtf8.FrameHeight * 2 + ImGui.CalcTextSize(timeLeftText).X;
-        ImGui.InvisibleButton($"req_{leaf.FullPath}", new Vector2(region.X - rightW, ImUtf8.FrameHeight));
-        HandleInteraction(leaf, flags);
+        if (ImGui.InvisibleButton($"req_{leaf.FullPath}", new Vector2(region.X - rightW, ImUtf8.FrameHeight)))
+            HandleClick(leaf, flags);
+        HandleDetections(leaf, flags);
         
         CkGui.ColorTextFrameAlignedInline(timeLeftText, ImGuiColors.ParsedGold);
         CkGui.AttachToolTip("Time left until this request expires.");

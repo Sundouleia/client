@@ -2,21 +2,16 @@ using CkCommons;
 using CkCommons.Classes;
 using CkCommons.Gui;
 using CkCommons.Raii;
-using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem.Selector;
-using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Services.Textures;
 
 namespace Sundouleia.DrawSystem;
 
@@ -90,6 +85,28 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
         ImGui.GetWindowDrawList().AddRectFilled(pos, pos + new Vector2(width, ImUtf8.FrameHeight), frameBg, 6f);
         var stopAdd = string.IsNullOrWhiteSpace(_newGroupName) || _drawSystem.FolderMap.ContainsKey(_newGroupName);
         if (CkGui.IconButton(FAI.FolderPlus, disabled: stopAdd, inPopup: true))
+            TryAddFolder();
+
+        ImGui.SameLine(0, 0);
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+        ImGui.InputTextWithHint("##NewCollectionName", hint, ref _newGroupName, 40);
+        CkGui.AttachToolTip("Add this node with the plus button." +
+            "--SEP----COL--[R-CLICK]:--COL-- Cancels the creation process.", ImGuiColors.DalamudOrange);
+        if (ImGui.IsItemFocused() && ImGui.IsKeyPressed(ImGuiKey.Enter))
+        {
+            TryAddFolder();
+            ImGui.SetKeyboardFocusHere(-1);
+        }
+        
+        // If right clicked, cancel creation process.
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+        {
+            _addingFolderGroup = false;
+            _creating = null;
+            _newGroupName = string.Empty;
+        }
+
+        void TryAddFolder()
         {
             if (_addingFolderGroup)
             {
@@ -112,18 +129,6 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
                     _newGroupName = string.Empty;
                 }
             }
-        }
-        ImGui.SameLine(0, 0);
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-        ImGui.InputTextWithHint("##NewCollectionName", hint, ref _newGroupName, 40);
-        CkGui.AttachToolTip("Add this node with the plus button." +
-            "--SEP----COL--[R-CLICK]:--COL-- Cancels the creation process.", ImGuiColors.DalamudOrange);
-        // If right clicked, cancel creation process.
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-        {
-            _addingFolderGroup = false;
-            _creating = null;
-            _newGroupName = string.Empty;
         }
     }
 
@@ -148,31 +153,45 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
             _creating = null;
             _newGroupName = string.Empty;
         }
-        CkGui.AttachToolTip("Add a nestable Folder to organize your pair Groups.");
+        CkGui.AttachToolTip("Add a FolderGroup to organize your pair Groups.");
 
         ImUtf8.SameLineInner();
         if (CkGui.FancyButton(FAI.TrashAlt, "Delete", bWidth, noDelete))
         {
             Log.LogInformation("Deleting selected groups.");
-            // Perform the delete operation.
+            foreach (var folder in Selector.Collections)
+                // Maybe do something else with this, recursive dissolve ext.
+                DrawSystem.Delete(folder.Name);
         }
         CkGui.AttachToolTip("Delete ALL selected groups.--NL--" +
             "--COL--Must be holding shift to delete.--COL--", ImGuiColors.DalamudOrange);
     }
     #endregion OrganizerHelpers
 
-    protected override void HandleInteraction(IDynamicCollection<Sundesmo> folder, DynamicFlags flags)
+    // Could make this pass in if the button was clicked.
+    // Alternatively we could just override the whole thing with additional methods for the folderGroup and folder.
+    protected override void HandleClick(IDynamicCollection<Sundesmo> folder, DynamicFlags flags)
+    {
+        bool isGroup = folder is DynamicFolderGroup<Sundesmo>;
+        bool canSelect = flags.HasAny(DynamicFlags.SelectableFolders);
+        bool ctrlPressed = ImGui.GetIO().KeyCtrl;
+
+        if (isGroup && !ctrlPressed)
+            DrawSystem.SetOpenState(folder, !folder.IsOpen);
+
+        if (canSelect && (!isGroup || ctrlPressed))
+            Selector.SelectItem(folder, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
+    }
+
+    protected override void HandleDetections(IDynamicCollection<Sundesmo> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
-            _newHoveredNode = folder;
+            _newHoveredNode = node;
 
-        // Handle Selection. (Maybe change it so it requires a ctrl click or shift idfk. Adding a flag for clickSelect could work.)
-        if (flags.HasAny(DynamicFlags.SelectableFolders) && ImGui.IsItemClicked())
-            Selector.SelectItem(folder, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
-
-        // Handle Drag. Drop handled externally.
+        // Handle Drag, return early if dragging.
+        // Drop handled externally.
         if (flags.HasAny(DynamicFlags.DragDropFolders))
-            AsDragDropSource(folder);
+            AsDragDropSource(node);
     }
 
     protected override void PostDragSourceText(IDynamicNode<Sundesmo> entity)
@@ -182,33 +201,83 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
 
         CkGui.Separator(uint.MaxValue);
         var shiftHeld = ImGui.GetIO().KeyShift;
-        string message = DragDropCache switch
+        string message = DragDrop switch
         {
-            // CASE 1: Only collections
-            { OnlyCollections: true, OnlyFolders: false, OnlyGroups: false } => 
-                $"Dropping collection into [{entity.Name}]",
+            // CASE 1: Both FolderGroups and Folders
+            { OnlyCollections: true, OnlyFolders: false, OnlyFolderGroups: false } => 
+                $"Dropping collections into [{entity.Name}]",
 
-            // CASE 2: Target is FolderGroup
+            // CASE 2: Target is FolderGroup, Moves items were only Folders
             { OnlyFolders: true } when entity is IDynamicFolderGroup<Sundesmo> fg =>
-                $"Dropping folders into: {fg.Name}",
+                $"Dropping groups into: {fg.Name}",
 
-            { OnlyCollections: true } when entity is IDynamicFolderGroup<Sundesmo> fg =>
+            // CASE 3: Target is FolderGroup, we are moving only FolderGroups
+            { OnlyFolderGroups: true } when entity is IDynamicFolderGroup<Sundesmo> fg =>
                 shiftHeld
                     ? $"Merging folders into: {fg.Name}"
                     : $"Dropping folders into: {fg.Parent.Name}",
 
-            // CASE 3: Target is Folder
+            // CASE 3: Target is Folder, and moving only Folders.
             { OnlyFolders: true } when entity is IDynamicFolder<Sundesmo> f =>
                 shiftHeld
                     ? $"Merging all pairs from selected into: {f.Name}"
-                    : $"Dropping all Groups into: {f.Parent.Name}",
+                    : $"Dropping groups into: {f.Parent.Name}",
 
-            { OnlyCollections: true } when entity is IDynamicFolder<Sundesmo> f =>
-                $"Dropping groups into: {f.Name}",
+            // CASE 4: Target is Folder, and moving only FolderGroups.
+            { OnlyFolders: false } when entity is IDynamicFolder<Sundesmo> f =>
+                $"Dropping groups into: {f.Parent.Name}",
 
             _ => string.Empty
         };
         CkGui.ColorTextFrameAligned(message, ImGuiColors.DalamudYellow);
+    }
+
+    protected override void PerformDrop(IDynamicNode<Sundesmo> target)
+    {
+        // Get if shifting
+        bool shifting = ImGui.GetIO().KeyShift;
+        var groups = DragDrop.Nodes.OfType<DynamicFolderGroup<Sundesmo>>();
+        var folders = DragDrop.Nodes.OfType<DynamicFolder<Sundesmo>>();
+
+        // If the target is a folder
+        if (target is DynamicFolder<Sundesmo> folderTarget)
+        {
+            // Merge in folders if only moving folders and shifting.
+            if (DragDrop.OnlyFolders && shifting)
+            {
+                foreach (var f in folders)
+                {
+                    if (_groups.TryMergeFolder(f.Name, folderTarget.Name))
+                        DrawSystem.Delete(f);
+                }
+                DrawSystem.UpdateFolder(folderTarget);
+            }
+            // Mark the new target as the parent of the target folder, and migrate everything into there.
+            else
+            {
+                // Move all of these into the target folder's parent.
+                var toMove = DragDrop.Nodes.OfType<IDynamicCollection<Sundesmo>>();
+                DrawSystem.BulkMove(toMove, folderTarget.Parent, folderTarget);
+            }
+        }
+        // For FolderGroups, handle things slightly differently.
+        else if (target is DynamicFolderGroup<Sundesmo> folderGroupTarget)
+        {
+            // If we were holding shift and only had FolderGroups, merge them.
+            if (DragDrop.OnlyFolderGroups && shifting)
+            {
+                foreach (var g in groups)
+                    DrawSystem.Merge(g, folderGroupTarget);
+            }
+            else
+            {
+                var toMove = shifting ? groups.SelectMany(g => g.Children) : groups;
+                // Concat this with all of our folders.
+                toMove = toMove.Concat(folders);
+                // Perform a bulk move to the new location.
+                DrawSystem.BulkMove(toMove, folderGroupTarget);
+            }
+        }
     }
 
 
@@ -246,8 +315,10 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
         using var _ = CkRaii.FramedChildPaddedW(Label + folder.ID, width, ImUtf8.FrameHeight, bgCol, folder.BorderColor, 5f, 1f);
 
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton(Label + folder.ID, new(width - rWidth, ImUtf8.FrameHeight));
-        HandleInteraction(folder, flags);
+        if (ImGui.InvisibleButton(Label + folder.ID, new(width - rWidth, ImUtf8.FrameHeight)))
+            HandleClick(folder, flags);
+        HandleDetections(folder, flags);
+
         CkGui.AttachToolTip(Tooltip, IsDragging || !flags.HasAny(DynamicFlags.DragDropFolders), ImGuiColors.DalamudOrange);
 
         // Draw the grip lines, folder icon, and name.

@@ -8,7 +8,6 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using Dalamud.Plugin.Services;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem.Selector;
@@ -172,8 +171,9 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         using var _ = CkRaii.FramedChildPaddedW($"df_header_{folder.ID}", width, ImUtf8.FrameHeight, bgCol, folder.BorderColor, 5f, 1f);
 
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"{Label}_node_{folder.ID}", new(width - rWidth, ImUtf8.FrameHeight));
-        HandleInteraction(folder, flags);
+        if (ImGui.InvisibleButton($"{Label}_node_{folder.ID}", new(width - rWidth, ImUtf8.FrameHeight)))
+            HandleClick(folder, flags);
+        HandleDetections(folder, flags);
 
         // Back to the start, then draw.
         ImGui.SameLine(pos.X);
@@ -231,8 +231,9 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
 
         // Fill in remaining area with interactable space.
         ImGui.SameLine(posX);
-        ImGui.InvisibleButton($"{Label}_node_{folder.ID}", new(rightX - posX, ImUtf8.FrameHeight));
-        HandleInteraction(folder, flags);
+        if (ImGui.InvisibleButton($"{Label}_node_{folder.ID}", new(rightX - posX, ImUtf8.FrameHeight)))
+            HandleClick(folder, flags);
+        HandleDetections(folder, flags);
     }
 
     private void DrawFolderEditor(GroupFolder f, float width, DynamicFlags flags, bool editing)
@@ -452,8 +453,9 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         // For handling Interactions.
         var isDragDrop = flags.HasAny(DynamicFlags.DragDropLeaves);
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"{leaf.FullPath}-name-area", region);
-        HandleInteraction(leaf, flags);
+        if (ImGui.InvisibleButton($"{leaf.FullPath}-name-area", region))
+            HandleClick(leaf, flags);
+        HandleDetections(leaf, flags);
 
         // Then return to the start position and draw out the text.
         ImGui.SameLine(pos.X);
@@ -477,11 +479,11 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         }
     }
 
-    // Override to handle the unique interactions that can be performed on leaves.
-    protected override void HandleInteraction(IDynamicLeaf<Sundesmo> node, DynamicFlags flags)
+    protected override void HandleDetections(IDynamicLeaf<Sundesmo> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
             _newHoveredNode = node;
+
         // Handle Drag and Drop.
         if (flags.HasAny(DynamicFlags.DragDropLeaves))
         {
@@ -490,24 +492,22 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         }
         else
         {
-            // Additional, SundesmoLeaf-Spesific interaction handles.
+            // Additional, SundesmoLeaf-Specific interaction handles.
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
                 if (!_showingUID.Remove(node))
                     _showingUID.Add(node);
             }
             if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
+            {
                 _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
+            }
             if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
                 _renaming = node;
                 _nameEditStr = node.Data.GetNickname() ?? string.Empty;
             }
         }
-
-        // Handle Selection.
-        if (flags.HasAny(DynamicFlags.SelectableLeaves) && ImGui.IsItemClicked())
-            Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
     }
     #endregion Leaves
 

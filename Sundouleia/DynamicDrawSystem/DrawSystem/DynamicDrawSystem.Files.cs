@@ -28,8 +28,10 @@ public partial class DynamicDrawSystem<T>
         j.WriteStartObject();
         foreach(var group in rootFolders.OfType<IDynamicFolderGroup<T>>())
         {
+            // Only add the path if the parent is not root.
             j.WritePropertyName(group.Name);
             j.WriteValue(group.FullPath);
+
             if (group.IsOpen)
                 opened.Add(group);
         }
@@ -91,7 +93,7 @@ public partial class DynamicDrawSystem<T>
         // Invoke the reload is beginning
         DDSChanged?.Invoke(DDSChange.FullReloadStarting, root, null, null);
         // Reset all data, completely.
-        idCounter = 1;
+        idCounter = 0;
         _folderMap.Clear();
         root.Children.Clear();
         // We cleared everything, which is technically a change.

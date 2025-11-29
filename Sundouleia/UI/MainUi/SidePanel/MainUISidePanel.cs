@@ -13,6 +13,7 @@ using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
@@ -42,7 +43,7 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
         _folderDrawer = drawer;
         _service = service;
 
-        Flags = WFlags.NoCollapse | WFlags.NoTitleBar | WFlags.NoResize | WFlags.NoScrollbar;
+        Flags = WFlags.NoCollapse | WFlags.NoTitleBar | WFlags.NoScrollbar;
     }
 
     /// <summary>
@@ -50,8 +51,13 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
     ///     Lets us Open/Close the window based on logic in the service using minimal computation.
     /// </summary>
     public override void PreOpenCheck()
-        => IsOpen = _service.DisplayMode is not SidePanelMode.None;
-
+    {
+        IsOpen = _service.DisplayMode is not SidePanelMode.None;
+        if (_service.DisplayMode is SidePanelMode.GroupEditor)
+            Flags &= ~WFlags.NoResize;
+        else
+            Flags |= WFlags.NoResize;
+    }
     protected override void PreDrawInternal()
     {
         // Magic that makes the sticky pair window move with the main UI.
@@ -61,8 +67,13 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
         ImGui.SetNextWindowPos(position);
         Flags |= WFlags.NoMove;
 
-        var width = _service.DisplayWidth;
-        ImGui.SetNextWindowSize(new Vector2(width, MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2));
+        float fixedWidth = _service.DisplayWidth;
+        float fixedHeight = MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2;
+
+        if (_service.DisplayMode is SidePanelMode.GroupEditor)
+            this.SetBoundaries(new(fixedWidth, fixedHeight), new(1000, fixedHeight));
+        else
+            this.SetBoundaries(new(fixedWidth, fixedHeight), new(fixedWidth, fixedHeight));
     }
 
     protected override void PostDrawInternal()

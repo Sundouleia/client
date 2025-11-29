@@ -5,7 +5,7 @@ namespace Sundouleia.DrawSystem.Selector;
 ///     Note that IsVisible can be overwritten by parent classes, allowing you to 
 ///     set your own filter overrides.
 /// </summary>
-/// <remarks> Considering allowing custom funcs in other constructors later maybe. </remarks>
+/// <remarks> Considering allowing custom func in other constructors later maybe. </remarks>
 public class DynamicFilterCache<T> : IDisposable where T : class
 {
     private readonly DynamicDrawSystem<T> _parent;
@@ -127,7 +127,7 @@ public class DynamicFilterCache<T> : IDisposable where T : class
         {
             // This will go through each folder and grab the filtered children again.
             // Also sorts the filtered result, and recursively calls BuildCachedFolder
-            // on all subchildren.
+            // on all sub-children.
             foreach (var cachedNode in _toReload)
                 BuildDynamicCache(cachedNode);
             // Clear the nodes to reload.
@@ -274,10 +274,11 @@ public class DynamicFilterCache<T> : IDisposable where T : class
             case DDSChange.CollectionAdded:
             case DDSChange.CollectionRemoved:
             case DDSChange.CollectionMoved:
+            case DDSChange.BulkMove:
             case DDSChange.CollectionMerged:
             case DDSChange.CollectionRenamed:
                 // Mark the entire cache as dirty, because nested children
-                // could be added and we dont have a way to update spesific nodes yet.
+                // could be added and we dont have a way to update specific nodes yet.
                 _isDirty = true;
                 break;
         }

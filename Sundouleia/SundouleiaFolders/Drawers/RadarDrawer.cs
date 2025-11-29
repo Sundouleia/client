@@ -95,8 +95,9 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     private void DrawFolderInner(RadarFolder folder, Vector2 region, DynamicFlags flags)
     {
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"folder_{folder.ID}", region);
-        HandleInteraction(folder, flags);
+        if (ImGui.InvisibleButton($"folder_{folder.ID}", region))
+            HandleClick(folder, flags);
+        HandleDetections(folder, flags);
 
         // Back to the start, then draw.
         ImGui.SameLine(pos.X);
@@ -140,9 +141,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
 
         var pos = ImGui.GetCursorPos();
         ImGui.InvisibleButton($"node_{leaf.FullPath}", new(width - pos.X, ImUtf8.FrameHeight));
-        HandleInteraction(leaf, flags);
-        if (!blockDraft)
-            HandleDraftInteraction(leaf);
+        HandleDetections(leaf, flags);
         CkGui.AttachToolTip(TooltipText, blockDraft, ImGuiColors.DalamudOrange);
 
         // Go back and draw the name.
@@ -182,11 +181,13 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         }
     }
 
-    protected override void HandleInteraction(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
+    protected override void HandleClick(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
+    { }
+
+    protected override void HandleDetections(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
             _newHoveredNode = node;
-        // Do not handle base interaction. (Yes, I know what im doing)
     }
 
     private void DrawDrafter(IDynamicLeaf<RadarUser> leaf, float width, DynamicFlags flags)

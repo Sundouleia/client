@@ -8,6 +8,8 @@ namespace Sundouleia.DrawSystem;
 /// </summary>
 public class DynamicLeaf<T> : IDynamicLeaf<T> where T : class
 {
+    public int Priority => 2;
+
     public DynamicFolder<T> Parent { get; internal set; }
     public T      Data      { get; internal set; }
     public string Name      { get; private set; }

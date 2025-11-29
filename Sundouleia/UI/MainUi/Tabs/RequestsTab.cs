@@ -1,12 +1,5 @@
-using CkCommons;
-using CkCommons.Gui;
-using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
-using Dalamud.Interface.Utility.Raii;
-using OtterGui.Text;
 using Sundouleia.DrawSystem;
-using Sundouleia.Gui.Components;
 
 namespace Sundouleia.Gui.MainWindow;
 

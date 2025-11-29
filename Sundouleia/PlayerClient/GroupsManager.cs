@@ -1,6 +1,4 @@
-using Sundouleia.DrawSystem;
 using Sundouleia.Services.Mediator;
-using System.Collections.Generic;
 
 namespace Sundouleia.PlayerClient;
 
@@ -157,6 +155,30 @@ public class GroupsManager
     }
 
     #endregion Style Edits
+    public bool TryMergeFolder(string fromFolder, string toFolder)
+    {
+        if (!_lookupMap.TryGetValue(fromFolder, out var fromGroup))
+            return false;
+        if (!_lookupMap.TryGetValue(toFolder, out var toGroup))
+            return false;
+        // Perform the merge.
+        MergeGroups(fromGroup, toGroup);
+        return true;
+    }
+
+    /// <summary>
+    ///     Merges all users from one group into another, 
+    ///     removing the group it was moved from.
+    /// </summary>
+    /// <param name="from"> The group to move users from. </param>
+    /// <param name="to"> The group to move users to. </param>
+    /// <remarks> Might add some kind of history system to have a failsafe. </remarks>
+    public void MergeGroups(SundesmoGroup from, SundesmoGroup to)
+    {
+        to.LinkedUids = from.LinkedUids.Union(to.LinkedUids).ToHashSet();
+        Config.Groups.Remove(from);
+        _config.Save();
+    }
 
     // Attempts to add a new sundesmoGroup to the config.
     // Fails if the name already exists. 

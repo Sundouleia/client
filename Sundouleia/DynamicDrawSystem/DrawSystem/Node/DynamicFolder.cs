@@ -1,5 +1,3 @@
-using Dalamud.Interface;
-
 namespace Sundouleia.DrawSystem;
 
 /// <summary>
@@ -11,13 +9,14 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
     private Dictionary<T, DynamicLeaf<T>> _map = new();
 
     public DynamicFolderGroup<T> Parent { get; internal set; }
+    public int         Priority => 1;
     public uint        ID       { get; internal set; }
     public string      Name     { get; internal set; }
     public string      FullPath { get; internal set; } = string.Empty;
     public FolderFlags Flags    { get; private set; } = FolderFlags.None;
 
     // Stylizations.
-    // (Can be protected as the cached folder uses the base refernece)
+    // (Can be protected as the cached folder uses the base ref)
     public uint NameColor     { get; protected set; } = uint.MaxValue;
     public FAI  Icon          { get; protected set; } = FAI.Folder;
     public uint IconColor     { get; protected set; } = uint.MaxValue;
@@ -38,6 +37,13 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
         Flags = flags;
         Sorter = sorter ?? new();
         UpdateFullPath();
+        
+        //Svc.Logger.Information($"Created Folder:\n" +
+        //    $" Parent: {(Parent.Name)}\n" +
+        //    $" Name: {Name}\n" +
+        //    $" ID: {ID}\n" +
+        //    $" FullPath: {FullPath}\n" +
+        //    $" Flags: {Flags}");
     }
 
     IReadOnlyDynamicSorter<DynamicLeaf<T>> IDynamicFolder<T>.Sorter => Sorter;
@@ -68,7 +74,7 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
     }
 
     // Internal Helpers.
-    internal bool Update(NameComparer comparer, out List<DynamicLeaf<T>> removed)
+    internal bool Update(out List<DynamicLeaf<T>> removed)
     {
         removed = [];
         var latest = GetAllItems();
@@ -91,7 +97,7 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
         }
 
         // Update the items.
-        Children = _map.Values.OrderBy(x => x, comparer).ToList();
+        Children = _map.Values.OrderBy(x => x.Name).ToList();
         return removed.Any();
     }
 
@@ -99,9 +105,6 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
     {
         Name = fix ? name.FixName() : name;
         UpdateFullPath();
-        // Sort the parents children if desired.
-        if (forceSort || Parent.Flags.HasAny(FolderFlags.AutoSort))
-            Parent.SortChildren();
     }
 
     internal void SetIsOpen(bool value)
@@ -109,9 +112,6 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
 
     internal void SetShowEmpty(bool value)
         => Flags = value ? Flags | FolderFlags.ShowIfEmpty : Flags & ~FolderFlags.ShowIfEmpty;
-
-    internal void SetAutoSort(bool value)
-        => Flags = value ? Flags | FolderFlags.AutoSort : Flags & ~FolderFlags.AutoSort;
 
     internal void UpdateFullPath()
     {

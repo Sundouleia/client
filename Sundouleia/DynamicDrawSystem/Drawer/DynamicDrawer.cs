@@ -1,9 +1,6 @@
-using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using OtterGui.Text;
-using static Sundouleia.DrawSystem.DynamicSorterEx;
 
 namespace Sundouleia.DrawSystem.Selector;
 
@@ -14,12 +11,11 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     protected readonly DynamicDrawSystem<T>  DrawSystem;
     protected readonly DynamicFilterCache<T> Cache;
     protected readonly DynamicSelections<T>  Selector;
+    protected readonly DynamicDragDrop<T>    DragDrop;
 
     // Queue of all actions to perform after completely drawing the list,
     // to avoid processing operations that would modify the filter mid-draw. (Can be reworked later if we need to)
     private readonly Queue<Action> _postDrawActions = new();
-
-    protected string Label = string.Empty;
 
     public DynamicDrawer(string label, ILogger log, DynamicDrawSystem<T> drawSystem, 
         DynamicFilterCache<T>? cache = null)
@@ -30,7 +26,10 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         DrawSystem = drawSystem;
         Cache      = cache ?? new(drawSystem);
         Selector   = new(drawSystem, Cache);
+        DragDrop   = new(this, Selector);
     }
+
+    public string Label { get; protected set; } = string.Empty;
 
     public virtual void Dispose()
     {
@@ -38,7 +37,7 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         Cache.Dispose();
     }
 
-    // Manages all nodes hover state over a 2 setters per drawframe outside updates.
+    // Manages all nodes hover state over a 2 setters per draw-frame outside updates.
     protected IDynamicNode? _hoveredNode = null; // From last frame.
     protected IDynamicNode? _newHoveredNode = null; // Tracked each frame.
 
@@ -162,6 +161,8 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         ImGui.Text($"CacheMapSize: {Cache.CacheMap.Count}");
         ImGui.Text($"FlatCacheSize: {Cache.FlatList.Count}");
         ImGui.Text($"Total Cache Children: {Cache.RootCache.GetAllDescendants().Count()}");
+        ImGui.Text($"Total DragDrop Nodes: {DragDrop.Total}");
+        ImGui.Text($"DragDrop Names: {string.Join(',', DragDrop.Nodes.Select(n => n.Name))}");
         // Process post-draw actions.
         while (_postDrawActions.TryDequeue(out Action? action))
         {

@@ -3,7 +3,6 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Gui.MainWindow;

@@ -75,6 +75,11 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
 
     protected override bool EnsureAllFolders(Dictionary<string, string> map)
     {
+        _logger.LogInformation($"FolderMap at time of check: \n" +
+            $"{string.Join("\n", FolderMap.Select(kv => $" Folder: [{kv.Key}] => ID: [{kv.Value.ID}]"))}");
+
+        _logger.LogInformation($"Group Mapping to ensure folders: \n" +
+            $"{string.Join("\n", map.Select(kv => $" Group: [{kv.Key}] => Parent: [{kv.Value}]"))}");
         // Grab all groups from the group manager.
         var toCreate = _groups.Groups;
         var anyCreated = false;
@@ -85,11 +90,30 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
         {
             // If the folder exists, continue to prevent unnecessary work.
             if (FolderExists(groupToAdd.Label))
+            {
+                _logger.LogDebug($"Folder for Group [{groupToAdd.Label}] already exists, skipping creation.");
                 continue;
+            }
 
             // It does not exist, so try and obtain it via mapping, with root as fallback.
-            var parent = map.TryGetValue(groupToAdd.Label, out var pn) && TryGetFolderGroup(pn, out var match)
-                ? match : root;
+            DynamicFolderGroup<Sundesmo> parent = root;
+            if (!map.TryGetValue(groupToAdd.Label, out var parentName))
+            {
+                _logger.LogDebug($"No parent mapping found for Group [{groupToAdd.Label}], defaulting to root.");
+            }
+            else
+            {
+                if (TryGetFolderGroup(parentName, out var mappedParent))
+                {
+                    _logger.LogDebug($"Mapped parent folder [{parentName}] for Group [{groupToAdd.Label}] found.");
+                    parent = mappedParent;
+                }
+                else
+                {
+                    _logger.LogWarning($"Mapped parent folder [{parentName}] for Group [{groupToAdd.Label}] not found, defaulting to root.");
+                }
+            }
+
             // Now that we have defined the parent, ensure we are creating with the next peeked id.
             anyCreated |= TryAddFolder(parent, groupToAdd);
         }

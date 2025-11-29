@@ -1,8 +1,14 @@
 using Dalamud.Bindings.ImGui;
 using OtterGui.Extensions;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem.Selector;
+
+public enum SelectionChange
+{
+    Added,
+    Removed,
+    Cleared,
+}
 
 /// <summary>
 ///     A Manager for all selections in a <see cref="DynamicDrawer{T}"/>. <para />
@@ -10,6 +16,9 @@ namespace Sundouleia.DrawSystem.Selector;
 /// </summary>
 public class DynamicSelections<T> : IDisposable where T : class
 {
+    public delegate void SelectionChangeDelegate(SelectionChange kind, IEnumerable<IDynamicNode<T>> affected);
+    public event SelectionChangeDelegate? SelectionChanged;
+
     private readonly DynamicDrawSystem<T> _parent;
     private readonly DynamicFilterCache<T> _cache;
 
@@ -46,7 +55,8 @@ public class DynamicSelections<T> : IDisposable where T : class
     public IReadOnlyList<IDynamicCollection<T>> Collections => _selectedFoldersAll;
     public IReadOnlyList<DynamicLeaf<T>> Leaves => _selectedLeaves;
     public IReadOnlySet<IDynamicNode<T>> Selected => _selected;
-    
+    public IDynamicNode<T>? LastSelected => _lastSelected;
+
     public DynamicLeaf<T>? SelectedLeaf
         => _selectedLeaves.Count is 1 ? _selectedLeaves[0] : null;
 
@@ -59,6 +69,7 @@ public class DynamicSelections<T> : IDisposable where T : class
     /// </summary>
     public void ClearSelected()
     {
+        var cleared = _selected.ToList();
         _selected.Clear();
         _selectedFolderGroups.Clear();
         _selectedFolders.Clear();
@@ -66,6 +77,8 @@ public class DynamicSelections<T> : IDisposable where T : class
         _selectedLeaves.Clear();
         _lastSelected = null;
         _lastAnchor = null;
+        // Notify listeners.
+        SelectionChanged?.Invoke(SelectionChange.Cleared, cleared);
     }
 
     // Deselect the entity, and remove it from all tracked selection lists.
@@ -83,8 +96,6 @@ public class DynamicSelections<T> : IDisposable where T : class
     /// <param name="canRangeSelect"> If we allow SHIFT based range selection. </param>
     public void SelectItem(IDynamicNode<T> entity, bool canAnchorSelect, bool canRangeSelect)
     {
-        Svc.Logger.Information($"Flat List: [{string.Join(", ", _cache.FlatList.Select(n => n.Name))}]");
-        Svc.Logger.Information($"Selecting item: {entity.Name} (Anchor:{_lastAnchor?.Name ?? "null"}, Selected:{entity.Name ?? "null"})");
         bool ctrl = ImGui.GetIO().KeyCtrl;
         bool shift = ImGui.GetIO().KeyShift;
 
@@ -105,7 +116,7 @@ public class DynamicSelections<T> : IDisposable where T : class
             for (int i = start; i <= end; i++)
             {
                 if (selecting)
-                    SelectSingle(_cache.FlatList[i]);
+                    AddToSelected(_cache.FlatList[i]);
                 else
                     DeselectInternal(_cache.FlatList[i]);
             }
@@ -120,7 +131,7 @@ public class DynamicSelections<T> : IDisposable where T : class
             if (wasSelected)
                 DeselectInternal(entity);
             else
-                SelectSingle(entity);
+                AddToSelected(entity);
             // Update interactions.
             _lastAnchor = entity;
             _lastSelected = wasSelected ? null : entity;
@@ -138,16 +149,28 @@ public class DynamicSelections<T> : IDisposable where T : class
             else
             {
                 ClearSelected();
-                SelectSingle(entity);
+                AddToSelected(entity);
                 _lastAnchor = entity;
                 _lastSelected = entity;
             }
         }
     }
 
-    public void SelectSingle(IDynamicNode<T> entity)
+    public void SelectSingle(IDynamicNode<T> entity, bool addToSelection)
     {
-        _selected.Add(entity);
+        if (!addToSelection)
+            ClearSelected();
+
+        AddToSelected(entity);
+        _lastAnchor = entity;
+        _lastSelected = entity;
+    }
+
+    private void AddToSelected(IDynamicNode<T> entity)
+    {
+        if (!_selected.Add(entity))
+            return;
+
         if (entity is DynamicFolderGroup<T> fc)
         {
             _selectedFolderGroups.Add(fc);
@@ -162,17 +185,22 @@ public class DynamicSelections<T> : IDisposable where T : class
         {
             _selectedLeaves.Add(l);
         }
+
+        SelectionChanged?.Invoke(SelectionChange.Added, [entity]);
     }
 
+    // If we end up ever needing this, we should change the selection event to not rapid fire.
     public void SelectMultiple(IEnumerable<IDynamicNode<T>> entities)
     {
         foreach (var entity in entities)
-            SelectSingle(entity);
+            AddToSelected(entity);
     }
 
     private void DeselectInternal(IDynamicNode<T> entity)
     {
-        _selected.Remove(entity);
+        if (!_selected.Remove(entity))
+            return;
+
         if (entity is DynamicFolderGroup<T> fc)
         {
             _selectedFolderGroups.Remove(fc);
@@ -187,15 +215,19 @@ public class DynamicSelections<T> : IDisposable where T : class
         {
             _selectedLeaves.Remove(l);
         }
+
+        SelectionChanged?.Invoke(SelectionChange.Removed, [entity]);
     }
 
     private void DeselectInternal(IEnumerable<IDynamicNode<T>> entities)
     {
-        _selected.RemoveWhere(e => entities.Contains(e));
-        _selectedFolderGroups.RemoveAll(fc => entities.Contains(fc));
-        _selectedFolders.RemoveAll(f => entities.Contains(f));
-        _selectedFoldersAll.RemoveAll(f => entities.Contains(f));
-        _selectedLeaves.RemoveAll(l => entities.Contains(l));
+        _selected.RemoveWhere(entities.Contains);
+        _selectedFolderGroups = _selectedFolderGroups.Except(entities.OfType<DynamicFolderGroup<T>>()).ToList();
+        _selectedFolders = _selectedFolders.Except(entities.OfType<DynamicFolder<T>>()).ToList();
+        _selectedFoldersAll = _selectedFoldersAll.Except(entities.OfType<IDynamicCollection<T>>()).ToList();
+        _selectedLeaves = _selectedLeaves.Except(entities.OfType<DynamicLeaf<T>>()).ToList();
+        // Inform listeners.
+        SelectionChanged?.Invoke(SelectionChange.Removed, entities);
     }
 
     /// <summary>
