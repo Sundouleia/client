@@ -4,6 +4,7 @@ using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
+using Dalamud.Plugin.Services;
 using OtterGui.Text;
 
 namespace Sundouleia.DrawSystem.Selector;
@@ -48,9 +49,9 @@ public partial class DynamicDrawer<T>
     /// </summary>
     protected virtual void DrawSearchBar(float width, int length)
     {
-        var tmp = Cache.Filter;
+        var tmp = FilterCache.Filter;
         if (FancySearchBar.Draw("Filter", width, ref tmp, string.Empty, length))
-            Cache.Filter = tmp;
+            FilterCache.Filter = tmp;
     }
 
     protected virtual void PostSearchBar()
@@ -141,7 +142,7 @@ public partial class DynamicDrawer<T>
         using var _ = CkRaii.FramedChildPaddedW($"dfg_{Label}_{fg.ID}", width, ImUtf8.FrameHeight, bgCol, fg.BorderColor, 5f, 1f);
             DrawFolderGroupBanner(fg, _.InnerRegion, flags);
     }
-
+    
     // Where we draw the interactions area and the responses to said items, can be customized.
     protected virtual void DrawFolderGroupBanner(IDynamicFolderGroup<T> fg, Vector2 region, DynamicFlags flags)
     {
@@ -152,10 +153,7 @@ public partial class DynamicDrawer<T>
 
         // Back to the start of the line, then draw the folder display contents.
         ImGui.SameLine(pos.X);
-        CkGui.FramedIconText(fg.IsOpen ? FAI.CaretDown : FAI.CaretRight);
-        ImGui.SameLine();
-        ImGui.AlignTextToFramePadding();
-        CkGui.IconText(fg.Icon, fg.IconColor);
+        CkGui.FramedIconText(fg.IsOpen ? fg.IconOpen : fg.Icon);
         CkGui.ColorTextFrameAlignedInline(fg.Name, fg.NameColor);
     }
 
@@ -273,7 +271,7 @@ public partial class DynamicDrawer<T>
     ///     Defines the logic to execute when a node is clicked. <para />
     ///     
     ///     Because certain interactions have various definitions for what a 'click' is, 
-    ///     operations are divided between OnClick, and HandleState. <para />
+    ///     operations are divided between HandleClick, and HandleDetections. <para />
     ///     
     ///     <b> Overriding these implies you know what you are doing. </b>
     /// </summary>
@@ -287,6 +285,12 @@ public partial class DynamicDrawer<T>
             Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
     }
 
+    /// <summary>
+    ///     Defines hover, drag-drop, and other detection logic for a node. <para />
+    ///     
+    ///     Because certain interactions have various definitions for what a 'click' is, 
+    ///     operations are divided between HandleClick, and HandleDetections. <para />
+    /// </summary>
     protected virtual void HandleDetections(IDynamicCollection<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
@@ -300,6 +304,7 @@ public partial class DynamicDrawer<T>
         }
     }
 
+    /// <inheritdoc cref="HandleClick(IDynamicCollection{T},DynamicFlags)"/>
     protected virtual void HandleClick(IDynamicLeaf<T> node, DynamicFlags flags)
     {
         // Handle Selection.
@@ -307,6 +312,7 @@ public partial class DynamicDrawer<T>
             Selector.SelectItem(node, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
     }
 
+    /// <inheritdoc cref="HandleDetections(IDynamicCollection{T},DynamicFlags)"/>
     protected virtual void HandleDetections(IDynamicLeaf<T> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
@@ -321,7 +327,7 @@ public partial class DynamicDrawer<T>
     }
 
     // Special clipped draw just for the DynamicDrawer.
-    private void ClippedDraw<I>(IReadOnlyList<I> data, Action<I, DynamicFlags> draw, float lineHeight, DynamicFlags flags)
+    protected void ClippedDraw<I>(IReadOnlyList<I> data, Action<I, DynamicFlags> draw, float lineHeight, DynamicFlags flags)
     {
         using var clipper = ImUtf8.ListClipper(data.Count, lineHeight);
         while (clipper.Step())
@@ -340,7 +346,7 @@ public partial class DynamicDrawer<T>
     }
 
     // For drawing recursive FolderGroups
-    public void DynamicClippedDraw<I>(IReadOnlyList<I> data, Action<I, DynamicFlags> draw, DynamicFlags flags)
+    protected void DynamicClippedDraw<I>(IReadOnlyList<I> data, Action<I, DynamicFlags> draw, DynamicFlags flags)
     {
         using IEnumerator<I> enumerator = data.GetEnumerator();
 

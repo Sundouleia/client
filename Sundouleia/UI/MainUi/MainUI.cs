@@ -119,7 +119,7 @@ public class MainUI : WindowMediatorSubscriberBase
     public override void OnClose()
     {
         base.OnClose();
-        _stickyService.ClearAllData();
+        _stickyService.ClearDisplay();
     }
 
     protected override void DrawInternal()

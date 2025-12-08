@@ -122,7 +122,7 @@ public static class DynamicSorterEx
         public string Name => "Name";
         public FAI Icon => FAI.SortAlphaDown; // Maybe change.
         public string Tooltip => "Sort by name.";
-        public Func<DynamicLeaf<RadarUser>, IComparable?> KeySelector => l => l.Data.PlayerName;
+        public Func<DynamicLeaf<RadarUser>, IComparable?> KeySelector => l => l.Data.DisplayName;
     }
 
     public struct ByRequestTime : ISortMethod<DynamicLeaf<RequestEntry>>

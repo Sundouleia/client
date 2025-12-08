@@ -1,11 +1,11 @@
 namespace Sundouleia.DrawSystem.Selector;
 
 /// <summary>
-///     A Filterable Cache for a <see cref="DynamicDrawSystem{T}"/>. <para />
-///     Note that IsVisible can be overwritten by parent classes, allowing you to 
-///     set your own filter overrides.
+///     The Cache used by a <see cref="DynamicDrawer{T, TCache}"/>, which
+///     holds information about the nodes visible for a searchable filter. <para />
+///     Includes a lookup cachedNode map of all DrawSystem collections.
 /// </summary>
-/// <remarks> Considering allowing custom func in other constructors later maybe. </remarks>
+/// <remarks> If you want to store additional data in the cache, inherit and add more data. </remarks>
 public class DynamicFilterCache<T> : IDisposable where T : class
 {
     private readonly DynamicDrawSystem<T> _parent;

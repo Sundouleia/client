@@ -1,4 +1,5 @@
 using Sundouleia.Gui.Components;
+using Sundouleia.PlayerClient;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 
@@ -46,3 +47,6 @@ public record ClearProfileCache : MessageBase;
 
 /// <summary> This is fired whenever the discord bot wishes to send out an account verification to our client. </summary>
 public record VerificationPopupMessage(VerificationCode VerificationCode) : MessageBase;
+
+// Temporary placeholder for data analysis until refactoring.
+public record ActorAnalyzedMessage : MessageBase;

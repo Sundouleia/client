@@ -85,11 +85,11 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     #region Search
     protected override void DrawSearchBar(float width, int length)
     {
-        var tmp = Cache.Filter;
+        var tmp = FilterCache.Filter;
         var buttonsWidth = CkGui.IconButtonSize(FAI.Wrench).X + CkGui.IconTextButtonSize(FAI.PeopleGroup, "Groups");
         // Update the search bar if things change, like normal.
         if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
-            Cache.Filter = tmp;
+            FilterCache.Filter = tmp;
     }
 
     private void DrawButtons()
@@ -220,7 +220,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             {
                 DrawSystem.Rename(folder, _nameEditTmp);
                 // Mark the parent for a reload, since its new name may not be filtered anymore.
-                Cache.MarkForReload(folder.Parent);
+                FilterCache.MarkForReload(folder.Parent);
             }
         }
         CkGui.AttachToolTip("The name of this group.");
@@ -297,7 +297,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             {
                 // Update the folder within the file system and mark things for a reload.
                 DrawSystem.UpdateFolder(f);
-                Cache.MarkForReload(f);
+                FilterCache.MarkForReload(f);
             }
         }
         CkGui.AttachToolTip("Show offline pairs in this folder.");
@@ -307,7 +307,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         {
             f.SetShowEmpty(showIfEmpty);
             if (_groups.TrySetState(f.Name, f.ShowOffline, f.ShowIfEmpty))
-                Cache.MarkForReload(f);
+                FilterCache.MarkForReload(f);
         }
         CkGui.AttachToolTip("Folder is shown even with 0 items are filtered");
     }
@@ -338,7 +338,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         {
             _groups.ClearFilters(folder.Name);
             folder.ApplyLatestSorter();
-            Cache.MarkForSortUpdate(folder);
+            FilterCache.MarkForSortUpdate(folder);
         }
 
         // Early exit if the popup is not open.
@@ -349,7 +349,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         if (_filterEditor.DrawPopup($"{folder.ID}_filterEdit", folder, 150f * ImGuiHelpers.GlobalScale))
         {
             folder.ApplyLatestSorter();
-            Cache.MarkForSortUpdate(folder);
+            FilterCache.MarkForSortUpdate(folder);
         }
 
         return currentRightSide;

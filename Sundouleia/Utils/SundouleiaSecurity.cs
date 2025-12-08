@@ -1,4 +1,5 @@
 using Blake3;
+using CkCommons;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using System.Security.Cryptography;
@@ -34,7 +35,7 @@ public static class SundouleiaSecurity
     ///     Only call this when you are visible.
     /// </summary>
     public static async Task<string> GetClientIdentHash()
-        => await Svc.Framework.RunOnFrameworkThread(() => Svc.ClientState.LocalContentId.ToString().GetHash256());
+        => await Svc.Framework.RunOnFrameworkThread(() => PlayerData.ContentId.ToString().GetHash256());
 
     /// <summary>
     ///     for right now i wont be encrypting in and out the secret keys but later on i can keep this here and just add it back in. 

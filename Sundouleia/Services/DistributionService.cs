@@ -23,6 +23,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     // likely file sending somewhere in here.
     private readonly MainHub _hub;
     private readonly MainConfig _config;
+    private readonly ActorAnalyzer _analyzer;
     private readonly IpcManager _ipc;
     private readonly SundesmoManager _sundesmos;
     private readonly FileCacheManager _cacheManager;
@@ -51,7 +52,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         SundouleiaMediator mediator,
         MainHub hub,
         MainConfig config,
-        PlzNoCrashFrens noCrashPlz,
+        ActorAnalyzer analyzer,
         IpcManager ipc,
         SundesmoManager pairs,
         FileCacheManager cacheManager,
@@ -61,6 +62,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     {
         _hub = hub;
         _config = config;
+        _analyzer = analyzer;
         _ipc = ipc;
         _sundesmos = pairs;
         _cacheManager = cacheManager;
@@ -137,6 +139,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _distributeDataTask = Task.Run(async () =>
         {
             await ResendAll().ConfigureAwait(false);
+            // Update our analyzer? (change later probably)
+            _analyzer.UpdatedOwnedActorsMods();
             _hubConnectionSent = true;
 
         }, _distributeDataCTS.Token);

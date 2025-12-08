@@ -5,11 +5,12 @@ using Dalamud.Interface.Utility.Raii;
 namespace Sundouleia.DrawSystem.Selector;
 
 // Initialization and base calls for the selector.
-public partial class DynamicDrawer<T> : IDisposable where T : class
+public partial class DynamicDrawer<T> : IDisposable 
+    where T : class
 {
     protected readonly ILogger Log;
     protected readonly DynamicDrawSystem<T>  DrawSystem;
-    protected readonly DynamicFilterCache<T> Cache;
+    protected readonly DynamicFilterCache<T> FilterCache;
     protected readonly DynamicSelections<T>  Selector;
     protected readonly DynamicDragDrop<T>    DragDrop;
 
@@ -22,19 +23,19 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     {
         Label = label;
 
-        Log        = log;
-        DrawSystem = drawSystem;
-        Cache      = cache ?? new(drawSystem);
-        Selector   = new(drawSystem, Cache);
-        DragDrop   = new(this, Selector);
+        Log         = log;
+        DrawSystem  = drawSystem;
+        FilterCache = cache ?? new DynamicFilterCache<T>(drawSystem);
+        Selector    = new(drawSystem, FilterCache);
+        DragDrop    = new(this, Selector);
     }
 
-    public string Label { get; protected set; } = string.Empty;
+    public string Label { get; init; }
 
     public virtual void Dispose()
     {
         Selector.Dispose();
-        Cache.Dispose();
+        FilterCache.Dispose();
     }
 
     // Manages all nodes hover state over a 2 setters per draw-frame outside updates.
@@ -45,73 +46,41 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
     ///     Draws the full hierarchy of a DynamicDrawSystem's Root folder. <para />
     ///     Can define the width of this display, and the flags.
     /// </summary>
-    public void DrawFullCache(float width, DynamicFlags flags = DynamicFlags.None)
+    public void DrawContents(float width, DynamicFlags flags = DynamicFlags.None)
     {
         using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
         if (!_)
             return;
 
         HandleMainContextActions();
-        Cache.UpdateCache();
+        FilterCache.UpdateCache();
 
         // Set the style for the draw logic.
         ImGui.SetScrollX(0);
         using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
              .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
 
-        DrawFolderGroupChildren(Cache.RootCache, flags);
+        DrawFolderGroupChildren(FilterCache.RootCache, flags);
         PostDraw();
     }
 
-    /// <inheritdoc cref="DrawFullCache(float, DynamicFlags)"/>
+    /// <inheritdoc cref="DrawContents(float, DynamicFlags)"/>
     /// <remarks> Only <see cref="DynamicFolder{T}"/>'s of type <typeparamref name="TFolder"/> are drawn. </remarks>
-    public void DrawFullCache<TFolder>(float width, DynamicFlags flags = DynamicFlags.None) where TFolder : DynamicFolder<T>
+    public void DrawContents<TFolder>(float width, DynamicFlags flags = DynamicFlags.None) where TFolder : DynamicFolder<T>
     {
         using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
         if (!_)
             return;
 
         HandleMainContextActions();
-        Cache.UpdateCache();
+        FilterCache.UpdateCache();
 
         // Set the style for the draw logic.
         ImGui.SetScrollX(0);
         using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
              .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
 
-        DrawFolderGroupChildren<TFolder>(Cache.RootCache, flags);
-        PostDraw();
-    }
-
-    /// <summary>
-    ///     Attempts to draw a IDynamicCache Folder or FolderGroup by its name. <para />
-    ///     Can provide width and flags for the draw. <para />
-    ///     <b> Cannot be whitelisted to a single folder type. No reason to. </b>
-    /// </summary>
-    /// <param name="folderName"> The name of the folder to draw. </param>
-    /// <param name="width"> The width of the draw area. </param>
-    /// <param name="flags"> The flags to use for drawing. </param>
-    /// <remarks> If the folder is not found, nothing is drawn. </remarks>
-    public void DrawFolder(string folderName, float width, DynamicFlags flags = DynamicFlags.None)
-    {
-        using var _ = ImRaii.Child(Label, new Vector2(width, -1), false, WFlags.NoScrollbar);
-        if (!_)
-            return;
-
-        HandleMainContextActions();
-        Cache.UpdateCache();
-
-        if (!DrawSystem.TryGetFolder(folderName, out var node))
-            return;
-        if (!Cache.CacheMap.TryGetValue(node, out var cachedNode))
-            return;
-
-        // Set the style for the draw logic.
-        ImGui.SetScrollX(0);
-        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
-             .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
-
-        DrawClippedCacheNode(cachedNode, flags);
+        DrawFolderGroupChildren<TFolder>(FilterCache.RootCache, flags);
         PostDraw();
     }
 
@@ -133,9 +102,9 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         // Handle any main context interactions such as right-click menus and the like.
         HandleMainContextActions();
         // Update the cache to its latest state.
-        Cache.UpdateCache();
+        FilterCache.UpdateCache();
 
-        if (!Cache.CacheMap.TryGetValue(folder, out var cachedNode))
+        if (!FilterCache.CacheMap.TryGetValue(folder, out var cachedNode))
             return;
 
         // Set the style for the draw logic.
@@ -158,9 +127,9 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         ImGui.Text($"Selected: {Selector.Collections.Count} Collections");
         ImGui.Text($"Selected: {Selector.Leaves.Count} Leaves");
         ImGui.Text($"Selected: {Selector.Selected.Count} Nodes");
-        ImGui.Text($"CacheMapSize: {Cache.CacheMap.Count}");
-        ImGui.Text($"FlatCacheSize: {Cache.FlatList.Count}");
-        ImGui.Text($"Total Cache Children: {Cache.RootCache.GetAllDescendants().Count()}");
+        ImGui.Text($"CacheMapSize: {FilterCache.CacheMap.Count}");
+        ImGui.Text($"FlatCacheSize: {FilterCache.FlatList.Count}");
+        ImGui.Text($"Total Cache Children: {FilterCache.RootCache.GetAllDescendants().Count()}");
         ImGui.Text($"Total DragDrop Nodes: {DragDrop.Total}");
         ImGui.Text($"DragDrop Names: {string.Join(',', DragDrop.Nodes.Select(n => n.Name))}");
         // Process post-draw actions.
@@ -182,8 +151,6 @@ public partial class DynamicDrawer<T> : IDisposable where T : class
         _hoveredNode    = _newHoveredNode;
         _newHoveredNode = null;
     }
-
-
 
     // Helper for parent classes.
     protected void AddPostDrawLogic(Action act)

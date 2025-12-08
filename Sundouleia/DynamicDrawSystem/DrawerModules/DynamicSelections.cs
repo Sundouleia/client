@@ -35,6 +35,10 @@ public class DynamicSelections<T> : IDisposable where T : class
     protected IDynamicNode<T>? _lastSelected;
     protected IDynamicNode<T>? _lastAnchor;
 
+    // Manages all nodes hover state over a 2 setters per draw-frame outside updates.
+    protected IDynamicNode? _hoveredNode = null; // From last frame.
+    protected IDynamicNode? _newHoveredNode = null; // Tracked each frame.
+
     public DynamicSelections(DynamicDrawSystem<T> parent, DynamicFilterCache<T> cache)
     {
         _parent = parent;

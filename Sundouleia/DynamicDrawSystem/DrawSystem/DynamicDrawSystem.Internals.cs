@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Sundouleia.DrawSystem;
 
 // the internal, private operations for the dynamic file system.
@@ -198,22 +200,32 @@ public partial class DynamicDrawSystem<T>
         return res;
     }
 
+    // Removes a folder from the DrawSystem.
+    // FolderGroups will merge it's children into the parent before removal.
+    // Folders will simply be removed.
     private Result RemoveFolder(IDynamicCollection<T> folder)
     {
         // If the folder is not found, it was technically removed lol.
         if (!_folderMap.TryGetValue(folder.Name, out var match))
             return Result.SuccessNothingDone;
 
+        // Prevent root from being removed.
+        if (folder.Name == DDSHelpers.RootName)
+            return Result.InvalidOperation;
+
         // Otherwise, it does exist, and we should remove it.
         if (folder is DynamicFolderGroup<T> fg)
         {
-            fg.Parent.Children.Remove(match);
-            _folderMap.Remove(folder.Name);
+            // Merge the folder into the parent, then remove it.
+            MergeFolders(fg, fg.Parent);
+            Svc.Logger.Debug($"Merged FolderGroup '{fg.Name}' into Parent '{fg.Parent.Name}'");
             return Result.Success;
         }
         else if (folder is DynamicFolder<T> f)
         {
+            // Remove the folder from the child.
             f.Parent.Children.Remove(match);
+            // Remove it from the mapping.
             _folderMap.Remove(folder.Name);
             return Result.Success;
         }
@@ -231,21 +243,25 @@ public partial class DynamicDrawSystem<T>
         if (from == to)
             return Result.SuccessNothingDone;
         // If we are moving from root, fail.
-        if (from.Name.Length is 0)
+        if (from.Name == DDSHelpers.RootName)
             return Result.InvalidOperation;
         // If a circular reference exists, fail.
         if (!HasValidHeritage(to, from))
             return Result.CircularReference;
 
+        Svc.Logger.Debug($"Merging FolderGroup '{from.Name}' into '{to.Name}'");
         // Otherwise we can proceed to merge.
         var result = from.TotalChildren is 0 ? Result.Success : Result.NoSuccess;
         // iterate through the children and move them.
         for (var i = 0; i < from.TotalChildren;)
         {
+            var childName = from.Children[i].Name;
+            Svc.Logger.Debug($" Attempting to move child '{childName}'");
             var moveRet = MoveCollection(from.Children[i], to);
             // If the move was successful,
             if (moveRet is Result.Success)
             {
+                Svc.Logger.Debug($"  Moved child '{childName}' successfully.");
                 // If previous result was NoSuccess, check if this is the first item
                 if (result == Result.NoSuccess)
                     result = (i == 0) ? Result.Success : Result.PartialSuccess;
@@ -256,6 +272,7 @@ public partial class DynamicDrawSystem<T>
             }
             else
             {
+                Svc.Logger.Debug($"  Failed to move child '{childName}'.");
                 // Move failed, increment index
                 i++;
                 // Bump success down to partial success, if we were currently set to success.
@@ -264,9 +281,13 @@ public partial class DynamicDrawSystem<T>
             }
         }
 
-        // return the final result. If it was successful, remove the old folder.
+        // return the final result.
+        // If it was successful, remove the old folder from its parent, and the map.
         if (result is Result.Success)
-            RemoveFolder(from);
+        {
+            from.Parent.Children.Remove(from);
+            _folderMap.Remove(from.Name);
+        }
 
         return result;
     }

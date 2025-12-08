@@ -7,6 +7,10 @@ public class NoCrashFriendsStorage
 {
     // <DataHashOfAnimationFile, Dictionary<SkeletonName, List<BoneIndices>>>
     public ConcurrentDictionary<string, Dictionary<string, List<ushort>>> BonesDictionary { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    // <FileHash, TriangleCount>, May not even need this if we allocate runtime caches per plugin instance,
+    // assuming they do not take that long to process. If they do, then keep this.
+    public ConcurrentDictionary<string, long> ModelTris { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 public class NoCrashFriendsConfig : IHybridSavable
@@ -60,6 +64,4 @@ public class NoCrashFriendsConfig : IHybridSavable
     }
 
     public NoCrashFriendsStorage Current { get; private set; } = new();
-
-    public ConcurrentDictionary<string, Dictionary<string, List<ushort>>> BoneDict => Current.BonesDictionary;
 }

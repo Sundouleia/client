@@ -161,8 +161,8 @@ public class HomeTab
                 _mediator.Publish(new UiToggleMessage(typeof(GroupsUI)));
             CkGui.AttachToolTip("Create, arrange, delete, and manage Groups.");
 
-            if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", buttonWidth, true))
-                _mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
+            if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", buttonWidth, false))
+                _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
             CkGui.AttachToolTip("Inspect data of owned actors!");
 
             if (CkGui.FancyButton(FAI.FileExport, "MCDF Controller", buttonWidth, true))

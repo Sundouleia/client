@@ -9,6 +9,7 @@ namespace Sundouleia.DrawSystem;
 /// </summary>
 public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
 {
+    public string StringSplitter => "//";
     public DynamicFolderGroup<T> Parent { get; internal set; }
     public int          Priority => 0;
     public uint         ID       { get; }
@@ -197,9 +198,18 @@ public class DynamicFolderGroup<T> : IDynamicFolderGroup<T> where T : class
         // construct the string builder and begin concatenation.
         var sb = new StringBuilder();
         // call recursive concatenation across ancestors.
-        IDynamicCollection<T>.Concat(this, sb, "//");
+        IDynamicCollection<T>.Concat(this, sb);
         // build the string and update it.
         FullPath = sb.ToString();
+
+        // Update all children's full paths (maybe revise this later or something)
+        foreach (var child in Children)
+        {
+            if (child is DynamicFolderGroup<T> fc)
+                fc.UpdateFullPath();
+            else if (child is DynamicFolder<T> f)
+                f.UpdateFullPath();
+        }
     }
 
     // Creates the root folder collection of the dynamic folder system.

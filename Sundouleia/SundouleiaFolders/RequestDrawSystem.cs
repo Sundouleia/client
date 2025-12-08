@@ -54,7 +54,7 @@ public sealed class RequestsDrawSystem : DynamicDrawSystem<RequestEntry>, IMedia
 
     private void LoadData()
     {
-        // If any changes occured, re-save the file.
+        // If any changes occurred, re-save the file.
         if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Requests)))
         {
             _logger.LogInformation("RequestsDrawSystem folder structure changed on load, saving updated structure.");

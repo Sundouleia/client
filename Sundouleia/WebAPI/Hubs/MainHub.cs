@@ -270,8 +270,8 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         var dummyRequests = new List<SundesmoRequest>();
         for (int i = 0; i < 5; i++)
         {
-            dummyRequests.Add(new SundesmoRequest(new($"Dummy Sender {i}"), MainHub.OwnUserData, new(false, "Blah Blah", (ushort)i, (ushort)(i * 10)), DateTime.Now));
-            dummyRequests.Add(new SundesmoRequest(MainHub.OwnUserData, new($"Dummy Recipient {i}"), new(false, "Blah Blah", (ushort)(i * 5), (ushort)(i * 15)), DateTime.Now));
+            dummyRequests.Add(new SundesmoRequest(new($"Dummy Sender {i}"), OwnUserData, new(false, "Wawa", "Blah Blah", (ushort)i, (ushort)(i * 10)), DateTime.Now));
+            dummyRequests.Add(new SundesmoRequest(OwnUserData, new($"Dummy Recipient {i}"), new(false, "Wawa", "Blah Blah", (ushort)(i * 5), (ushort)(i * 15)), DateTime.Now));
         }
         requests.AddRange(dummyRequests);
 #endif

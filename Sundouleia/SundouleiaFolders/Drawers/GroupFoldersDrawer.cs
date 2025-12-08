@@ -61,7 +61,7 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
 
         _iconSelector = new FAIconCombo(logger);
 
-        Cache.MarkCacheDirty();
+        FilterCache.MarkCacheDirty();
     }
 
     #region OrganizerHelpers
@@ -159,9 +159,13 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
         if (CkGui.FancyButton(FAI.TrashAlt, "Delete", bWidth, noDelete))
         {
             Log.LogInformation("Deleting selected groups.");
-            foreach (var folder in Selector.Collections)
-                // Maybe do something else with this, recursive dissolve ext.
-                DrawSystem.Delete(folder.Name);
+            AddPostDrawLogic(() =>
+            {
+                Log.LogDebug($"Deleting {Selector.Collections.Count} selected groups.");
+                foreach (var folder in Selector.Collections)
+                    DrawSystem.Delete(folder.Name);
+                Log.LogInformation("Deleted selected groups.");
+            });
         }
         CkGui.AttachToolTip("Delete ALL selected groups.--NL--" +
             "--COL--Must be holding shift to delete.--COL--", ImGuiColors.DalamudOrange);
@@ -359,7 +363,7 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
         if (ImGui.IsItemDeactivatedAfterEdit() && _groups.TryRename(folder.Name, _nameEditTmp))
         {
             DrawSystem.Rename(folder, _nameEditTmp);
-            Cache.MarkForReload(folder.Parent);
+            FilterCache.MarkForReload(folder.Parent);
         }
         CkGui.AttachToolTip("The name of this group.");
 
@@ -428,7 +432,7 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
             {
                 // Update the folder within the file system and mark things for a reload.
                 DrawSystem.UpdateFolder(f);
-                Cache.MarkForReload(f);
+                FilterCache.MarkForReload(f);
             }
         }
         CkGui.AttachToolTip("Show offline pairs in this folder.");
@@ -438,7 +442,7 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
         {
             f.SetShowEmpty(showIfEmpty);
             if (_groups.TrySetState(f.Name, f.ShowOffline, f.ShowIfEmpty))
-                Cache.MarkForReload(f);
+                FilterCache.MarkForReload(f);
         }
         CkGui.AttachToolTip("Folder is shown even with 0 items are filtered");
     }

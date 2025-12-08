@@ -11,6 +11,7 @@ using Sundouleia.DrawSystem;
 using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
@@ -22,22 +23,25 @@ using System.Collections.Immutable;
 
 namespace Sundouleia.Gui.MainWindow;
 
-// We could idealy have this continuously running but never drawing much
+// We could ideally have this continuously running but never drawing much
 // if anything at all while not expected.
-// It would allow us to process the logic in the drawloop like we want.
+// It would allow us to process the logic in the draw-loop like we want.
 public class MainUISidePanel : WindowMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly MainMenuTabs _mainUiTabs;
+    private readonly FolderConfig _config;
     private readonly GroupsFolderDrawer _folderDrawer;
     private readonly SundesmoManager _sundesmos;
     private readonly StickyUIService _service;
 
-    public MainUISidePanel(ILogger<MainUISidePanel> logger, SundouleiaMediator mediator, MainHub hub, 
-        MainMenuTabs tabs, GroupsFolderDrawer drawer, SundesmoManager sundesmos, StickyUIService service)
+    public MainUISidePanel(ILogger<MainUISidePanel> logger, SundouleiaMediator mediator,
+        MainHub hub, MainMenuTabs tabs, FolderConfig config, GroupsFolderDrawer drawer,
+        SundesmoManager sundesmos, StickyUIService service)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
         _mainUiTabs = tabs;
+        _config = config;
         _hub = hub;
         _sundesmos = sundesmos;
         _folderDrawer = drawer;
@@ -52,11 +56,11 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
     /// </summary>
     public override void PreOpenCheck()
     {
-        IsOpen = _service.DisplayMode is not SidePanelMode.None;
-        if (_service.DisplayMode is SidePanelMode.GroupEditor)
-            Flags &= ~WFlags.NoResize;
-        else
+        IsOpen = _service.CanDraw;
+        if (_service.DisplayMode is not SidePanelMode.GroupEditor)
             Flags |= WFlags.NoResize;
+        else
+            Flags &= ~WFlags.NoResize;
     }
     protected override void PreDrawInternal()
     {
@@ -79,28 +83,32 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
     protected override void PostDrawInternal()
     { }
 
+    // If this runs, it is assumed that for this frame the data is valid for drawing.
     protected override void DrawInternal()
     {
         // If there is no mode to draw, do not draw.
         if (_service.DisplayMode is SidePanelMode.None)
             return;
 
-        if (!_service.IsModeValid())
-            return;
-
         // Display the correct mode.
-        switch (_service.DisplayMode)
+        switch (_service.DisplayCache)
         {
-            case SidePanelMode.GroupEditor:
-                DrawGroupOrganizer();
+            case GroupOrganizerCache goc:
+                DrawGroupOrganizer(goc);
                 return;
-            case SidePanelMode.Interactions:
-                DrawSundesmoInteractions();
+            case InteractionsCache ic:
+                DrawInteractions(ic);
+                return;
+            case ResponseCache irc when irc.Mode is SidePanelMode.IncomingRequests:
+                DrawIncomingRequests(irc);
+                return;
+            case ResponseCache prc when prc.Mode is SidePanelMode.PendingRequests:
+                DrawPendingRequests(prc);
                 return;
         }
     }
 
-    private void DrawGroupOrganizer()
+    private void DrawGroupOrganizer(GroupOrganizerCache cache)
     {
         // Should be relatively simple to display this outside of some headers and stylizations.
         using var _ = CkRaii.Child("GroupOrganizer", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
@@ -111,32 +119,31 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
         ImGui.Separator();
 
 
-        _folderDrawer.DrawFullCache<GroupFolder>(width, DynamicFlags.Organizer);
+        _folderDrawer.DrawContents<GroupFolder>(width, DynamicFlags.Organizer);
     }
 
     #region Interactions
-    private void DrawSundesmoInteractions()
+    private void DrawInteractions(InteractionsCache cache)
     { 
-        if (_service.Interactions.Sundesmo is not { } s)
-            return;
-
         using var _ = CkRaii.Child("InteractionsDisplay", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
-        var dispName = _service.Interactions.DisplayName;
-        DrawHeader(s, dispName);
+        var dispName = cache.DisplayName;
+        var sundesmo = cache.Sundesmo!;
 
-        DrawCommon(s, dispName, width);
+        DrawHeader(sundesmo, dispName);
+
+        DrawCommon(sundesmo, dispName, width);
         ImGui.Separator();
 
         ImGui.Text("Permissions");
-        DrawDistinctPermRow(s, dispName, width, nameof(PairPerms.AllowAnimations), s.OwnPerms.AllowAnimations);
-        DrawDistinctPermRow(s, dispName, width, nameof(PairPerms.AllowSounds), s.OwnPerms.AllowSounds);
-        DrawDistinctPermRow(s, dispName, width, nameof(PairPerms.AllowVfx), s.OwnPerms.AllowVfx);
+        DrawDistinctPermRow(sundesmo, dispName, width, nameof(PairPerms.AllowAnimations), sundesmo.OwnPerms.AllowAnimations);
+        DrawDistinctPermRow(sundesmo, dispName, width, nameof(PairPerms.AllowSounds), sundesmo.OwnPerms.AllowSounds);
+        DrawDistinctPermRow(sundesmo, dispName, width, nameof(PairPerms.AllowVfx), sundesmo.OwnPerms.AllowVfx);
 
         ImGui.Separator();
 
         ImGui.Text("Pair Options");
-        DrawPairOptions(s, dispName, _.InnerRegion.X);
+        DrawPairOptions(sundesmo, dispName, _.InnerRegion.X);
     }
 
     private void DrawHeader(Sundesmo s, string dispName)
@@ -322,4 +329,31 @@ public class MainUISidePanel : WindowMediatorSubscriberBase
         return true;
     }
     #endregion Interactions
+
+    #region RequestResponder
+    private void DrawIncomingRequests(ResponseCache irc)
+    {
+        using var _ = CkRaii.Child("RequestResponder", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+
+        CkGui.FontTextCentered("Request Responder", UiFontService.Default150Percent);
+
+        CkGui.FramedIconText(FAI.ObjectGroup);
+        CkGui.TextFrameAlignedInline("Bulk Selector Area");
+        CkGui.TextFrameAligned($"There are currently: {irc.Selected.Count} selected requests.");
+    }
+
+    private void DrawPendingRequests(ResponseCache prc)
+    {
+        using var _ = CkRaii.Child("PendingRequests", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+
+        CkGui.FontTextCentered("Pending Requests", UiFontService.Default150Percent);
+
+        CkGui.FramedIconText(FAI.ObjectGroup);
+        CkGui.TextFrameAlignedInline("Bulk Selector Area");
+        CkGui.TextFrameAligned($"There are currently: {prc.Selected.Count} selected requests.");
+    }
+    #endregion RequestResponder
+
 }

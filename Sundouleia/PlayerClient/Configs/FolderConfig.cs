@@ -13,8 +13,10 @@ public class FolderStorage
     // Cached sort order filters. Maybe revise later idk.
     public List<FolderSortPreset> SortPresets { get; set; } = new();
 
-    // RequestFolder Swapper
+    // RequestFolder Config
     public bool ViewingIncoming { get; set; } = true;
+    public List<string> DefaultAcceptGroups { get; set; } = [];
+    public bool ApplyRequestedNick { get; set; } = true;
 
     // WhitelistFolder Swapper
     public bool ViewingGroups { get; set; } = false;

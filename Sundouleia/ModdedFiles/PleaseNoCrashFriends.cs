@@ -5,6 +5,7 @@ using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.Havok.Animation;
 using FFXIVClientStructs.Havok.Common.Base.Types;
 using FFXIVClientStructs.Havok.Common.Serialize.Util;
+using Sundouleia.GameData;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using System.Runtime.InteropServices;
@@ -18,7 +19,8 @@ public class PlzNoCrashFrens
     private readonly SundouleiaMediator _mediator;
     private readonly NoCrashFriendsConfig _config;
     private readonly FileCacheManager _manager;
-    private readonly List<string> _failedCalculatedTris = [];
+
+    private readonly List<string> _failedMeshCalculations = [];
 
     public PlzNoCrashFrens(ILogger<PlzNoCrashFrens> logger, SundouleiaMediator mediator,
         NoCrashFriendsConfig config, FileCacheManager manager)
@@ -166,12 +168,12 @@ public class PlzNoCrashFrens
     }
 
     /// <summary>
-    ///     <c>{SkeletonName, List{ushort} BoneIndices}</c>, fetched by pap's file datahash name. 
+    ///     <c>{SkeletonName, List{ushort} BoneIndices}</c>, fetched by pap's file data-hash name. 
     /// </summary>
     public unsafe Dictionary<string, List<ushort>>? GetBoneIndicesFromPap(string hash)
     {
         // If we have already cached the bones from this file, then we can simply return the bones for the custom animation to avoid calculating this file.
-        if (_config.BoneDict.TryGetValue(hash, out var bones))
+        if (_config.Current.BonesDictionary.TryGetValue(hash, out var bones))
             return bones;
 
         // Attempt to retrieve the file from our cached file entries. If not found return and log.
@@ -265,8 +267,73 @@ public class PlzNoCrashFrens
         }
 
         // Store the parsed output information into the config storage.
-        _config.BoneDict[hash] = output;
+        _config.Current.BonesDictionary[hash] = output;
         _config.Save();
         return output;
+    }
+
+    // Maybe shift back to a Task<long> if we need to configure await to run off the UI thread.
+    public long GetTrianglesByHash(string hash)
+    {
+        if (_config.Current.ModelTris.TryGetValue(hash, out var cachedTris) && cachedTris > 0)
+            return cachedTris;
+
+        if (_failedMeshCalculations.Contains(hash, StringComparer.Ordinal))
+            return 0;
+
+        var path = _manager.GetFileCacheByHash(hash);
+        if (path is null || !path.ResolvedFilepath.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase))
+            return 0;
+
+        var filePath = path.ResolvedFilepath;
+
+        try
+        {
+            _logger.LogDebug($"Detected Model File {filePath}. Calculating Tris");
+            var file = new MdlFile(filePath);
+            // Models without a LOD failed to construct.
+            if (file.LodCount <= 0)
+            {
+                _failedMeshCalculations.Add(hash);
+                _config.Current.ModelTris[hash] = 0;
+                _config.Save();
+                return 0;
+            }
+            // Scan over LODs until we find a valid triangle count.
+            long tris = 0;
+            for (int i = 0; i < file.LodCount; i++)
+            {
+                try
+                {
+                    var meshIdx = file.Lods[i].MeshIndex;
+                    var meshCnt = file.Lods[i].MeshCount;
+                    tris = file.Meshes.Skip(meshIdx).Take(meshCnt).Sum(p => p.IndexCount) / 3;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug($"LOD Mesh {i} from [{filePath}] failed to load: ({ex})");
+                    continue;
+                }
+
+                // Once we found a valid tri count store it and break.
+                if (tris > 0)
+                {
+                    _logger.LogDebug("TriAnalysis: {filePath} => {tris} triangles", filePath, tris);
+                    _config.Current.ModelTris[hash] = tris;
+                    _config.Save();
+                    break;
+                }
+            }
+            // Ret the correctly calculated tri's for this mdl file.
+            return tris;
+        }
+        catch (Exception ex)
+        {
+            _failedMeshCalculations.Add(hash);
+            _config.Current.ModelTris[hash] = 0;
+            _config.Save();
+            _logger.LogWarning($"Failed to parse: {filePath} ({ex})");
+            return 0;
+        }
     }
 }

@@ -30,7 +30,7 @@ public class AccountManager
     public bool TryGetAuthForPlayer([NotNullWhen(true)] out CharaAuthentication auth)
     {
         // fetch the cid of our current player.
-        var cid = Svc.Framework.RunOnFrameworkThread(() => PlayerData.ContentId).Result;
+        var cid = Svc.Framework.RunOnFrameworkThread(() => PlayerData.ContentIdInstanced).Result;
         // if we cannot find any authentications with this data, it means that none exist.
         if (Config.LoginAuths.Find(la => la.ContentId == cid) is not { } match)
         {
@@ -102,7 +102,7 @@ public class AccountManager
     //{
     //    var name = PlayerData.NameInstanced;
     //    var world = PlayerData.HomeWorldIdInstanced;
-    //    var cid = PlayerData.ContendIdInstanced;
+    //    var cid = PlayerData.ContentIdInstanced;
 
     //    // If we already have an auth for this character, do nothing.
     //    if (AccountStorage.LoginAuths.Any(a => a.ContentId == cid))
@@ -114,7 +114,7 @@ public class AccountManager
     //    {
     //        PlayerName = PlayerData.NameInstanced,
     //        WorldId = PlayerData.HomeWorldIdInstanced,
-    //        ContentId = PlayerData.ContendIdInstanced,
+    //        ContentId = PlayerData.ContentIdInstanced,
     //        ProfileIdx = autoSelectedKey
     //    });
     //    Save();

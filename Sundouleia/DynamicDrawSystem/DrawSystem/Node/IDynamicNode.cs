@@ -67,6 +67,11 @@ public interface IDynamicFolder<T> : IDynamicCollection<T> where T : class
 public interface IDynamicCollection<T> : IDynamicNode<T> where T : class
 {
     /// <summary>
+    ///     The separator used for calculating full paths.
+    /// </summary>
+    public string StringSplitter { get; }
+
+    /// <summary>
     ///     The parent folder of this folder.
     /// </summary>
     public DynamicFolderGroup<T> Parent { get; }
@@ -132,13 +137,13 @@ public interface IDynamicCollection<T> : IDynamicNode<T> where T : class
     /// </summary>
     public bool ShowIfEmpty { get; }
 
-    internal static bool Concat(IDynamicCollection<T> path, StringBuilder sb, string separator)
+    internal static bool Concat(IDynamicCollection<T> path, StringBuilder sb)
     {
         if (path.IsRoot)
             return false;
 
-        if (Concat(path.Parent, sb, separator))
-            sb.Append(separator);
+        if (Concat(path.Parent, sb))
+            sb.Append(path.StringSplitter);
         sb.Append(path.Name);
         return true;
     }

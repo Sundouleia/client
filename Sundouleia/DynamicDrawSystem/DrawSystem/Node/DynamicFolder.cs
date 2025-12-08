@@ -1,3 +1,5 @@
+using Dalamud.Bindings.ImGui;
+
 namespace Sundouleia.DrawSystem;
 
 /// <summary>
@@ -8,6 +10,7 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
 {
     private Dictionary<T, DynamicLeaf<T>> _map = new();
 
+    public string StringSplitter => "/";
     public DynamicFolderGroup<T> Parent { get; internal set; }
     public int         Priority => 1;
     public uint        ID       { get; internal set; }
@@ -21,8 +24,8 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
     public FAI  Icon          { get; protected set; } = FAI.Folder;
     public uint IconColor     { get; protected set; } = uint.MaxValue;
     public uint BgColor       { get; protected set; } = uint.MinValue;
-    public uint BorderColor   { get; protected set; } = uint.MaxValue;
-    public uint GradientColor { get; protected set; } = uint.MaxValue;
+    public uint BorderColor   { get; protected set; } = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+    public uint GradientColor { get; protected set; } = ImGui.GetColorU32(ImGuiCol.TextDisabled);
 
     internal DynamicSorter<DynamicLeaf<T>> Sorter;
     internal List<DynamicLeaf<T>> Children = [];
@@ -37,7 +40,6 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
         Flags = flags;
         Sorter = sorter ?? new();
         UpdateFullPath();
-        
         //Svc.Logger.Information($"Created Folder:\n" +
         //    $" Parent: {(Parent.Name)}\n" +
         //    $" Name: {Name}\n" +
@@ -118,9 +120,14 @@ public abstract class DynamicFolder<T> : IDynamicFolder<T> where T : class
         // construct the string builder and begin concatenation.
         var sb = new StringBuilder();
         // call recursive concatenation across ancestors.
-        IDynamicCollection<T>.Concat(this, sb, "/");
+        IDynamicCollection<T>.Concat(this, sb);
         // build the string and update it.
         FullPath = sb.ToString();
+
+        // Update all leaves for their new full path.
+        // (Extremely lightweight)
+        foreach (var leaf in Children)
+            leaf.UpdateFullPath();
     }
 
     /// <summary>

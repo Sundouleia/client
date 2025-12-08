@@ -44,7 +44,8 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     private AddTemporaryMod             AddTempMod;
     private RemoveTemporaryMod          RemoveTempMod;
 
-    private RedrawObject                RedrawObject;               // Can force the client to Redraw.
+    private ConvertTextureFile          ConvertTexFile;         // Converts provided texture files to BC7 format.
+    private RedrawObject                RedrawObject;           // Can force the client to Redraw.
     private ResolvePlayerPathsAsync     ResolveOnScreenActorPaths;
 
     // Would like to hopefully have a penumbra update that would allow us to get the effective changes
@@ -89,6 +90,7 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
         AddTempMod = new AddTemporaryMod(Svc.PluginInterface);
         RemoveTempMod = new RemoveTemporaryMod(Svc.PluginInterface);
 
+        ConvertTexFile = new ConvertTextureFile(Svc.PluginInterface);
         RedrawObject = new RedrawObject(Svc.PluginInterface);
         ResolveOnScreenActorPaths = new ResolvePlayerPathsAsync(Svc.PluginInterface);
 
@@ -140,6 +142,54 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
             ModDirectory = value;
             Mediator.Publish(new PenumbraDirectoryChanged(ModDirectory));
         }
+    }
+
+    public async Task ConvertTextureFiles(Dictionary<string, string[]> textures, IProgress<(string, int)> progress, CancellationToken token)
+    {
+        if (!APIAvailable)
+            return;
+
+        // Track conversion progress.
+        int currentTexture = 0;
+        foreach (var texture in textures)
+        {
+            if (token.IsCancellationRequested)
+                break;
+            // establish progress tracking for the texture conversion.
+            progress.Report((texture.Key, currentTexture));
+
+            Logger.LogInformation($"Converting Texture {texture.Key} to BC7 format.", LoggerType.IpcPenumbra);
+            // At the current moment, this modifies the current, existing data of the tex file.
+            // It would be preferred to have a location where these files could temporarily reside during conversion,
+            // then be updated after conversion completes.
+            // This would prevent any file scanning errors for file-hash data, and also ensure the updates are atomic.
+            var convertTask = ConvertTexFile.Invoke(texture.Key, texture.Key, TextureType.Bc7Tex, mipMaps: true);
+
+            // Another thing to note is that due to history in 3d modeling, this conversion process can be done for
+            // BC1, BC3, and BC7 for users familiar with what they are doing.
+            // NormalMaps should go to BC7, Multi, Specular, and ID can be BC3, Diffuse can be BC7, Emissive can be BC1.
+            await convertTask.ConfigureAwait(false);
+
+            // Validate the task completion.
+            if (convertTask.IsCompletedSuccessfully && texture.Value.Any())
+            {
+                foreach (var duplicatedTexture in texture.Value)
+                {
+                    Logger.LogInformation($"Migrating duplicate ({duplicatedTexture})");
+                    try
+                    {
+                        File.Copy(texture.Key, duplicatedTexture, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Failed to copy {duplicatedTexture}: {ex}");
+                    }
+                }
+            }
+        }
+
+        // Redraw self after the conversion to reflect the updates.
+        RedrawObject.Invoke(0, RedrawType.Redraw);
     }
 
     /// <summary> 

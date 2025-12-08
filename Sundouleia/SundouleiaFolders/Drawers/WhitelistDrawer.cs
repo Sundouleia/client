@@ -74,11 +74,11 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     #region Search
     protected override void DrawSearchBar(float width, int length)
     {
-        var tmp = Cache.Filter;
+        var tmp = FilterCache.Filter;
         var buttonsWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconTextButtonSize(FAI.Globe, "Basic");
         // Update the search bar if things change, like normal.
         if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
-            Cache.Filter = tmp;
+            FilterCache.Filter = tmp;
 
         // If the config is expanded, draw that.
         if (_configExpanded)

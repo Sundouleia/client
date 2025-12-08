@@ -19,6 +19,7 @@ namespace Sundouleia.Radar;
 public sealed class RadarManager : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
+    private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly CharaObjectWatcher _watcher;
 
@@ -27,10 +28,12 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     private Lazy<List<RadarUser>> _usersInternal;
 
     public RadarManager(ILogger<RadarManager> logger, SundouleiaMediator mediator,
-        MainConfig config, SundesmoManager sundesmos, CharaObjectWatcher watcher)
+        MainConfig config, RequestsManager requests, SundesmoManager sundesmos, 
+        CharaObjectWatcher watcher)
         : base(logger, mediator)
     {
         _config = config;
+        _requests = requests;
         _sundesmos = sundesmos;
         _watcher = watcher;
 
@@ -47,7 +50,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         {
             for (int i = 0; i < 5; i++)
             {
-                var toAdd = new RadarUser(_sundesmos, new(new($"Dummy Sender {i}"), $"RandomIdent{i}"), IntPtr.Zero);
+                var toAdd = new UnpairedRadarUser(_requests, new(new($"Dummy Sender {i}"), $"RandomIdent{i}"), IntPtr.Zero);
                 _allRadarUsers.TryAdd(new($"Dummy Sender {i}"), toAdd);
             }
             RecreateLazy();
@@ -82,7 +85,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
             if (target.TargetObjectId != radarUser.PlayerObjectId) continue;
             
             // Otherwise, we found a match, so log it.
-            Logger.LogDebug($"Context menu target matched radar user {radarUser.AnonymousName}.", LoggerType.RadarManagement);
+            Logger.LogDebug($"Context menu target matched radar user {radarUser.DisplayName}.", LoggerType.RadarManagement);
             args.AddMenuItem(new MenuItem()
             {
                 Name = new SeStringBuilder().AddText("Send Temporary Request").Build(),
@@ -119,8 +122,12 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
             // Attempt to fetch their visibility if the address was zero in the call.
             if (address == IntPtr.Zero && !string.IsNullOrEmpty(user.Ident))
                 _watcher.TryGetExisting(user.Ident, out address);
-            // Not create the user.
-            _allRadarUsers.TryAdd(user.User, new RadarUser(_sundesmos, user, address));
+
+            // Add the user based on if they are a pair or not a pair.
+            if (_sundesmos.GetUserOrDefault(user.User) is { } match)
+                _allRadarUsers.TryAdd(user.User, new PairedRadarUser(match, user, address));
+            else
+                _allRadarUsers.TryAdd(user.User, new UnpairedRadarUser(_requests, user, address));
         }
         // Could have removed hashedIdent from the User, so we should remove them from the list.
         RecreateLazy();
@@ -131,7 +138,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         if (!_allRadarUsers.TryGetValue(user, out var existing))
             return;
         // Update visibility.
-        Logger.LogDebug($"(Radar) {existing.AnonymousName} is now {(address != IntPtr.Zero ? "rendered" : "unrendered")}.", LoggerType.RadarManagement);
+        Logger.LogDebug($"(Radar) {existing.DisplayName} is now {(address != IntPtr.Zero ? "rendered" : "unrendered")}.", LoggerType.RadarManagement);
         existing.UpdateVisibility(address);
         RecreateLazy(true);
     }

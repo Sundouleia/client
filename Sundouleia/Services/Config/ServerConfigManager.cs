@@ -98,7 +98,7 @@ public class ServerConfigManager
     {
         var name = PlayerData.NameInstanced;
         var world = PlayerData.HomeWorldIdInstanced;
-        var cid = PlayerData.ContendIdInstanced;
+        var cid = PlayerData.ContentIdInstanced;
 
         // If we already have an auth for this character, do nothing.
         if (AccountStorage.LoginAuths.Any(a => a.ContentId == cid))
@@ -110,7 +110,7 @@ public class ServerConfigManager
         {
             PlayerName = PlayerData.NameInstanced,
             WorldId = PlayerData.HomeWorldIdInstanced,
-            ContentId = PlayerData.ContendIdInstanced,
+            ContentId = PlayerData.ContentIdInstanced,
             ProfileIdx = autoSelectedKey
         });
         Save();

@@ -1,20 +1,35 @@
 using Dalamud.Bindings.ImGui;
 using Sundouleia.DrawSystem;
+using Sundouleia.DrawSystem.Selector;
+using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Gui.MainWindow;
 
 // Idk if we even need the tabs anymore lol.
 public class RequestsTab
 {
-    private readonly RequestsDrawer _drawer;
-    public RequestsTab(RequestsDrawer drawer)
+    private readonly FolderConfig _config;
+    private readonly RequestsInDrawer _incoming;
+    private readonly RequestsOutDrawer _outgoing;
+    public RequestsTab(FolderConfig config, RequestsInDrawer incoming, RequestsOutDrawer outgoing)
     {
-        _drawer = drawer;
+        _config = config;
+        _incoming = incoming;
+        _outgoing = outgoing;
     }
+
     public void DrawSection()
     {
         var width = ImGui.GetContentRegionAvail().X;
-        _drawer.DrawFilterRow(width, 100);
-        _drawer.DrawFullCache(width); // Need to update cache to draw single folders if possible.=
+        if (_config.Current.ViewingIncoming)
+        {
+            _incoming.DrawFilterRow(width, 100);
+            _incoming.DrawIncomingRequests(width, DynamicFlags.RequestsList);
+        }
+        else
+        {
+            _outgoing.DrawFilterRow(width, 100);
+            _outgoing.DrawPendingRequests(width, DynamicFlags.RequestsList);
+        }
     }
 }

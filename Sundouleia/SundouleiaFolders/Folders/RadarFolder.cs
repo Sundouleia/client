@@ -22,6 +22,7 @@ public sealed class RadarFolder : DynamicFolder<RadarUser>
     {
         // Can set stylizations here.
         BorderColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+        GradientColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
         _generator = generator;
     }
 

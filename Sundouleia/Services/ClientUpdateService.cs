@@ -6,6 +6,7 @@ using Glamourer.Api.IpcSubscribers;
 using Penumbra.Api.Enums;
 using Penumbra.Api.IpcSubscribers;
 using Sundouleia.Interop;
+using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
@@ -23,6 +24,7 @@ namespace Sundouleia.Services;
 public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
 {
     private readonly MainHub _hub;
+    private readonly ActorAnalyzer _analyzer;
     private readonly IpcManager _ipc;
     private readonly SundesmoManager _sundesmos;
     private readonly CharaObjectWatcher _watcher;
@@ -36,10 +38,12 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
     private IpcKind _allPendingUpdates = IpcKind.None;
 
     public ClientUpdateService(ILogger<ClientUpdateService> logger, SundouleiaMediator mediator,
-        MainHub hub, IpcManager ipc, SundesmoManager pairs, CharaObjectWatcher watcher,
-        DistributionService distributor) : base(logger, mediator)
+        MainHub hub, ActorAnalyzer analyzer, IpcManager ipc, SundesmoManager pairs, 
+        CharaObjectWatcher watcher, DistributionService distributor) 
+        : base(logger, mediator)
     {
         _hub = hub;
+        _analyzer = analyzer;
         _ipc = ipc;
         _sundesmos = pairs;
         _watcher = watcher;
@@ -134,11 +138,18 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
             {
                 Logger.LogDebug($"Processing single update ({allPendingSnapshot}) for {pendingSnapshot.Keys.First()}.", LoggerType.ClientUpdates);
                 await _distributor.UpdateAndSendSingle(pendingSnapshot.Keys.First(), allPendingSnapshot).ConfigureAwait(false);
+                // Update the analyzer if the change included mods.
+                if (modUpdate)
+                    _analyzer.UpdatedOwnedActorsMods();
                 return;
             }
             // Otherwise, we should process it with the assumption that the modded state could have at any point changed.
             Logger.LogDebug($"Processing CheckStateAndUpdate for {pendingSnapshot.Count} owned objects.", LoggerType.ClientUpdates);
             await _distributor.CheckStateAndUpdate(pendingSnapshot, allPendingSnapshot).ConfigureAwait(false);
+            
+            if (modUpdate)
+                _analyzer.UpdatedOwnedActorsMods();
+        
         }, _debounceCTS.Token);
     }
 

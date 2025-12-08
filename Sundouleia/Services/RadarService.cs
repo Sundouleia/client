@@ -67,7 +67,7 @@ public class RadarService : DisposableMediatorSubscriberBase
     {
         await SundouleiaEx.WaitForPlayerLoading();
         CurrWorld = PlayerData.CurrentWorldIdInstanced;
-        CurrWorldName = PlayerData.CurrentWorldNameInstanced;
+        CurrWorldName = PlayerData.CurrentWorldInstanced;
         CurrZone = PlayerContent.TerritoryIdInstanced;
         Mediator.Publish(new RadarTerritoryChanged(0, CurrZone));
     }
@@ -151,7 +151,7 @@ public class RadarService : DisposableMediatorSubscriberBase
     private unsafe void OnObjectCreated(IntPtr address)
     {
         // Obtain the list of all users except the valid ones to get the invalid ones.
-        var invalidUsers = _manager.RadarUsers.Where(u => (!u.IsValid && u.CanSendRequest)).ToList();
+        var invalidUsers = _manager.RadarUsers.Where(u => (!u.IsValid && u.CanSendRequests)).ToList();
         // If there are no invalid users, we can skip processing.
         if (invalidUsers.Count == 0)
             return;
@@ -160,7 +160,7 @@ public class RadarService : DisposableMediatorSubscriberBase
         foreach (var invalid in invalidUsers)
             if (_watcher.TryGetExisting(invalid.HashedIdent, out IntPtr match) && match == address)
             {
-                Logger.LogDebug($"(Radar) Unresolved user [{invalid.AnonymousName}] now visible.", LoggerType.RadarData);
+                Logger.LogDebug($"(Radar) Unresolved user [{invalid.DisplayName}] now visible.", LoggerType.RadarData);
                 _manager.UpdateVisibility(new(invalid.UID), address);
                 break;
             }
@@ -175,7 +175,7 @@ public class RadarService : DisposableMediatorSubscriberBase
         if (_manager.RadarUsers.FirstOrDefault(u => u.Address == address) is not { } match)
             return;
         // Update their visibility.
-        Logger.LogDebug($"(Radar) Resolved user [{match.AnonymousName}] no longer visible.", LoggerType.RadarData);
+        Logger.LogDebug($"(Radar) Resolved user [{match.DisplayName}] no longer visible.", LoggerType.RadarData);
         _manager.UpdateVisibility(new(match.UID), IntPtr.Zero);
     }
 

@@ -1,4 +1,6 @@
 using Sundouleia.Services.Mediator;
+using SundouleiaAPI.Data;
+using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.PlayerClient;
@@ -9,6 +11,8 @@ namespace Sundouleia.PlayerClient;
 /// </summary>
 public sealed class RequestsManager : DisposableMediatorSubscriberBase
 {
+    // Maybe revise this as time goes on, as we store a seperate list of UserData's, if the requestEntry should be revised at any point.
+    // It is currently functional, but a bit messy and could be improved upon.
     private HashSet<RequestEntry> _allRequests = new();
 
     // Lazily created lists from the full request list.
@@ -18,8 +22,8 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
     public RequestsManager(ILogger<RequestsManager> logger, SundouleiaMediator mediator)
         : base(logger, mediator)
     {
-        _incomingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => !r.FromClient).OrderByDescending(r => r.TimeToRespond).ToList());
-        _outgoingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => r.FromClient).OrderByDescending(r => r.TimeToRespond).ToList());
+        _incomingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => !r.FromClient).ToList());
+        _outgoingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => r.FromClient).ToList());
 
         Mediator.Subscribe<DisconnectedMessage>(this, _ =>
         {
@@ -35,6 +39,8 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
     // Expose the Request Entries.
     public List<RequestEntry> Incoming => _incomingInternal.Value;
     public List<RequestEntry> Outgoing => _outgoingInternal.Value;
+
+
 
     public void AddNewRequest(SundesmoRequest newRequest)
     {

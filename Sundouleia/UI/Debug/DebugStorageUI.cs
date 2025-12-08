@@ -200,25 +200,22 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
         ImGui.Text("Total Radar Users:");
         CkGui.ColorTextInline(_radar.RadarUsers.Count.ToString(), ImGuiColors.DalamudViolet);
 
-        using (var _ = ImRaii.Table("All-RadarUsers-table", 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        using (var _ = ImRaii.Table("All-RadarUsers-table", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
             ImGui.TableSetupColumn("Anon. Name");
             ImGui.TableSetupColumn("UnmaskedName");
             ImGui.TableSetupColumn("ValidHash");
             ImGui.TableSetupColumn("Rendered");
-            ImGui.TableSetupColumn("PcName");
             ImGui.TableSetupColumn("ObjIdx");
             ImGui.TableHeadersRow();
             foreach (var user in _radar.RadarUsers)
             {
                 ImGui.TableNextColumn();
-                CkGui.ColorTextFrameAligned(user.AnonymousName, ImGuiColors.ParsedBlue);
+                CkGui.ColorTextFrameAligned(user.DisplayName, ImGuiColors.ParsedBlue);
                 ImGui.TableNextColumn();
                 CkGui.TextFrameAligned(user.UID);
                 DrawIconBoolColumn(!string.IsNullOrEmpty(user.HashedIdent));
                 DrawIconBoolColumn(user.IsValid);
-                ImGui.TableNextColumn();
-                CkGui.TextFrameAligned(user.IsValid ? user.PlayerName : "N/A");
                 ImGui.TableNextColumn();
                 CkGui.TextFrameAligned(user.IsValid ? user.ObjIndex.ToString() : "N/A");
             }

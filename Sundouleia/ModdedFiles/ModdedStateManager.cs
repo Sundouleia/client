@@ -16,41 +16,20 @@ using SundouleiaAPI.Data;
 
 namespace Sundouleia.ModFiles;
 
-// Hi.
-// ---
-// I absolutely hate most of the overhead in this class, and wish that it could be more optimized.
-// However as things currently are, it is difficult to know the mods that are presently applied
-// to your on-screen actor until fully redrawn via penumbra API's.
+// This manager will be heavily reduced if some requested penumbra API could be merged in that allows us to track
+// the current active collection's fileCache for effective changes.
+// This internal list gives us the final resulting modded paths with all priority conflicts taken into account.
 // 
-// While Glamourer has the [Auto-Reload Gear] option, that automatically reapplies your character upon
-// changing a mod or reloading your gear, to update your visual state before redrawing, we must also
-// consider that not everyone has this option enabled.
-// 
-// Additionally, there is no API in glamourer yet to check the state of this option, know when it gets toggled,
-// or to call upon reapplication. There is currently a PR pending that requests the addition of these features.
-// As if they could be requested then we could remove a lot of unessisary code here and also prevent the 
-// need to redraw other sundesmo player actors almost entirely. We could even reapply their states mid-animation
-// and update them to keep being in said animation.
+// With this list tracked for the collections on our active actors, we will be able to remove a lot of overhead
+// that runs multiple API calls to know if a mod is enabled or not on every change.
 //
-// Even with this API added in Glamourer, it would still not be enough to cover the on-screen actors effective
-// changes list, which is idealy what we need at the time of pulling the data, so we have to use resource-load still.
-// ------
-// The ideal solution would be the following:
-// - Penumbra gets API to grab the 'on-screen actor effective changes' for their collection.
-//    => out <string[] GamePaths, string[] ReplacementPaths>)
-// - Glamourer adds the ReapplyState api, an event to know when the Auto-Reload gear option is toggled,
-//   and one to get the state, much like the version.
+// Instead of this, we will simply need to compare the current on-screen actor's files, and then reflect it across the animation files and other data that cannot be obtained
+// such as .pap's, .scd's, and other extension types, as whenever the plugin loads or unloads, or a collection switches,
+// we can simply check it against the fileCache, and remove paths no longer in the collectionCache, and add ones used while it is active.
+// This way we only update the cache when a change occurs, and we only need to grab the on-screen actor paths that can be quickly retrieved.
 //
-// With these two changes, we would only need to grab the effective changes of an actor whenever
-// mod settings changed or glamourerState changed, and send off to others those changes. Following that we would call
-// a reapply self if glamourer's auto-reload gear was disabled.
-// 
-// Then everything would be synced as simple as that.
-//
-// But right now, we have a lot of people fighting over what they think is a competition, which makes it difficult to request any
-// changes for things related to helping with update synchronization. This is understandable, but unfortunate, and will need patience
-// until the dust settles and these changes can see reason for implementation.
-
+// Until then we need to deal with this confusing nightmare mess of code that somehow manages to work by a lot of things managing to
+// somehow line up in a way that can work together, unstable as it is.
 
 /// <summary>
 ///     Processes changes to transient data, and tracks persistent data, along with on-screen data, 
@@ -425,6 +404,9 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         pathsToResolve.RemoveWhere(string.IsNullOrEmpty);
         return pathsToResolve;
     }
+
+    public void ReloadPersistentTransients()
+        => _persistentTransients = null;
 
     private bool AddTransient(OwnedObject obj, string item)
     {

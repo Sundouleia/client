@@ -50,7 +50,7 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
 
     /// <summary>
     ///     Update only the folder styles. <b> Leave Name and SortOrder as is.</b> <para />
-    ///     Nothing internally is updated so no refresh or save is nessisary.
+    ///     Nothing internally is updated so no refresh or save is necessary.
     /// </summary>
     public void ApplyLatestStyle()
     {

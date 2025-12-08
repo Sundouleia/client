@@ -63,3 +63,10 @@ public class RequestEntry(SundesmoRequest request) : IEquatable<RequestEntry>, I
     public static bool operator !=(RequestEntry? left, RequestEntry? right)
         => !Equals(left, right);
 }
+
+public class Foo
+{
+    private int _x;
+    public Foo(int x) => _x = x;
+    public bool Equals(Foo? other) => other is not null && _x == other._x; // valid
+}

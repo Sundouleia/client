@@ -131,7 +131,8 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<GroupsFolderDrawer>()
         .AddSingleton<GroupsDrawer>()
         .AddSingleton<RadarDrawer>()
-        .AddSingleton<RequestsDrawer>()
+        .AddSingleton<RequestsInDrawer>()
+        .AddSingleton<RequestsOutDrawer>()
         .AddSingleton<WhitelistDrawer>()
         .AddSingleton<GroupsDrawSystem>()
         .AddSingleton<RadarDrawSystem>()
@@ -139,6 +140,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<WhitelistDrawSystem>()
 
         // Mod Files (revise)
+        .AddSingleton<ActorAnalyzer>()
         .AddSingleton<PenumbraWatcher>()
         .AddSingleton<SundouleiaWatcher>()
         .AddSingleton<FileCacheManager>()
@@ -256,6 +258,7 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Modules
         .AddScoped<GroupsUI>()
+        .AddScoped<WindowMediatorSubscriberBase, ActorOptimizerUI>()
         .AddScoped<WindowMediatorSubscriberBase, GroupsUI>()
         .AddScoped<WindowMediatorSubscriberBase, TransferBarUI>()
         .AddScoped<WindowMediatorSubscriberBase, RadarChatPopoutUI>()
@@ -273,7 +276,7 @@ public static class SundouleiaServiceExtensions
         .AddScoped<ProfilesTab>()
         .AddScoped<DebugTab>()
 
-        // Scoped Misc
+        // Scoped Standalones
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
         .AddScoped<WindowMediatorSubscriberBase, ChangelogUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugStorageUI>()

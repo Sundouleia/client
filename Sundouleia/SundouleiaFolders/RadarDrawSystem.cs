@@ -57,7 +57,7 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
 
     private void LoadData()
     {
-        // If any changes occured, re-save the file.
+        // If any changes occurred, re-save the file.
         if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Radar)))
         {
             _logger.LogInformation("Changes detected during load, saving updated config.");
@@ -67,7 +67,7 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
 
     protected override bool EnsureAllFolders(Dictionary<string, string> _)
     {
-        // Add both folders accordingly if nessisary.
+        // Add both folders accordingly if necessary.
         bool anyAdded = false;
         anyAdded |= TryAddFolder(FAI.Link, Constants.FolderTagRadarPaired, () => [.. _radar.RadarUsers.Where(u => _sundesmos.ContainsSundesmo(u.UID))]);
         anyAdded |= TryAddFolder(FAI.SatelliteDish, Constants.FolderTagRadarUnpaired, () => [.. _radar.RadarUsers.Where(u => !_sundesmos.ContainsSundesmo(u.UID))]);

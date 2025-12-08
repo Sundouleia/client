@@ -8,6 +8,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using Microsoft.VisualBasic.ApplicationServices;
 using OtterGui.Text;
 using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Pairs;
@@ -16,6 +17,7 @@ using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem;
 
@@ -63,11 +65,11 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     #region Search
     protected override void DrawSearchBar(float width, int length)
     {
-        var tmp = Cache.Filter;
+        var tmp = FilterCache.Filter;
         var buttonsWidth = CkGui.IconButtonSize(FAI.Cog).X;
         // Update the search bar if things change, like normal.
         if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
-            Cache.Filter = tmp; // Auto-Marks as dirty.
+            FilterCache.Filter = tmp; // Auto-Marks as dirty.
 
         // If the config is expanded, draw that.
         if (_configExpanded)
@@ -87,7 +89,35 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             _configExpanded = !_configExpanded;
         CkGui.AttachToolTip("Configure radar defaults.");
     }
-    #endregion Search    
+
+    private void DrawRadarConfig(float width)
+    {
+        var bgCol = _configExpanded ? ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f) : 0;
+        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
+        using var child = CkRaii.ChildPaddedW("RadarConfig", width, CkStyle.GetFrameRowsHeight(2), bgCol, 5f);
+
+        // Maybe move the variables into a config so we can store them between plugin states.
+        CkGui.FramedIconText(FAI.PeopleGroup);
+        // Combo inline here holding the groups.
+        CkGui.ColorTextFrameAlignedInline("[Dummy Combo Placeholder]", ImGuiColors.ParsedGrey);
+        // Note that when the combo is dropped down, there are buttons to clear, search filter, and also to add a new one.
+        // Selections also will not close the combo.
+        ImUtf8.SameLineInner();
+        CkGui.FramedHoverIconText(FAI.InfoCircle, ImGuiColors.TankBlue.ToUint());
+        if (ImGui.IsItemHovered())
+        {
+            // Show the popup, at the location of the framed icon text to the right, displaying the groups that the request, when accepted, are added to.
+        }
+
+        // next row, checkbox.
+        CkGui.FramedIconText(FAI.Stopwatch);
+        ImUtf8.SameLineInner();
+        if (ImGui.Checkbox("Requests Are Temporary", ref _defaultIsTemporary))
+        {
+            Log.LogInformation($"Default Temporary Request setting changed to [{_defaultIsTemporary}]");
+        }
+    }
+    #endregion Search
 
     protected override void DrawFolderBannerInner(IDynamicFolder<RadarUser> folder, Vector2 region, DynamicFlags flags)
         => DrawFolderInner((RadarFolder)folder, region, flags);
@@ -111,69 +141,95 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         CkGui.AttachToolTip($"{folder.TotalChildren} total. --COL--({folder.Lurkers} lurkers)--COL--", ImGuiColors.DalamudGrey2);
     }
 
-    #region Leaf
-    // This override intentionally prevents the inner method from being called so that we can call our own inner method.
     protected override void DrawLeaf(IDynamicLeaf<RadarUser> leaf, DynamicFlags flags, bool selected)
     {
-        var drafting = _inDrafter == leaf;
-        var height = drafting ? CkStyle.GetFrameRowsHeight(3) : ImUtf8.FrameHeight;
-        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), height);
-        var bgCol = (!drafting && selected) ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
-        var frameCol = drafting ? ImGui.GetColorU32(ImGuiCol.Button) : 0;
-        using (var _ = CkRaii.FramedChild(Label + leaf.Name, size, bgCol, frameCol, 5f, 1f))
-            DrawLeafInner(leaf, _.InnerRegion, flags, drafting);
+        // Draw out the leaf, based on it's data type.
+        if (leaf.Data is PairedRadarUser pru)
+            DrawPairedUser(leaf, pru, flags, selected);
+        else if (leaf.Data is UnpairedRadarUser uru)
+            DrawUnpairedUser(leaf, uru, flags, selected);
+        else
+        {
+            using (var _ = CkRaii.Child(Label + leaf.Name, new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImUtf8.FrameHeight)))
+                ImGui.TextUnformatted($"Unknown Radar User Type: {leaf.Data.GetType().FullName}");
+        }
     }
 
-    // Inner leaf called by the above drawfunction, serving as a replacement for the default DrawLeafInner.
-    private void DrawLeafInner(IDynamicLeaf<RadarUser> leaf, Vector2 region, DynamicFlags flags, bool drafting)
+    private void DrawPairedUser(IDynamicLeaf<RadarUser> leaf, PairedRadarUser pru, DynamicFlags flags, bool selected)
     {
-        DrawTopRow(leaf, region.X, flags);
-        if (drafting)
-            DrawDrafter(leaf, region.X, flags);
-    }
-
-    private void DrawTopRow(IDynamicLeaf<RadarUser> leaf, float width, DynamicFlags flags)
-    {
-        bool blockDraft = leaf.Data.IsPair || _requests.Outgoing.Any(r => r.RecipientUID == leaf.Data.UID);
+        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImUtf8.FrameHeight);
+        var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
+        using var _ = CkRaii.FramedChild(Label + leaf.Name, size, bgCol, 0, 5f, 1f);
+        
+        // Draw the paired user row.
         ImUtf8.SameLineInner();
-        bool examining = DrawLeftSide(leaf.Data);
+        DrawLeafIcon(leaf.Data);        
         ImGui.SameLine();
 
         var pos = ImGui.GetCursorPos();
-        ImGui.InvisibleButton($"node_{leaf.FullPath}", new(width - pos.X, ImUtf8.FrameHeight));
+        ImGui.InvisibleButton($"node_{leaf.FullPath}", new(_.InnerRegion.X - pos.X, ImUtf8.FrameHeight));
         HandleDetections(leaf, flags);
-        CkGui.AttachToolTip(TooltipText, blockDraft, ImGuiColors.DalamudOrange);
 
         // Go back and draw the name.
         ImGui.SameLine(pos.X);
-        if (_sundesmos.GetUserOrDefault(new(leaf.Data.UID)) is { } match)
-        {
-            CkGui.TextFrameAligned(match.GetNickAliasOrUid());
-            CkGui.ColorTextFrameAlignedInline($"({match.UserData.AnonTag})", ImGuiColors.DalamudGrey2);
-        }
-        else
-            ImGui.Text(leaf.Data.AnonymousName);
+        CkGui.TextFrameAligned(pru.DisplayName);
+        CkGui.ColorTextFrameAlignedInline($"({pru.AnonTag})", ImGuiColors.DalamudGrey2);
     }
 
-    private void HandleDraftInteraction(IDynamicLeaf<RadarUser> user)
+    private void DrawUnpairedUser(IDynamicLeaf<RadarUser> leaf, UnpairedRadarUser uru, DynamicFlags flags, bool selected)
     {
-        // Only other thing we care about is what to do on selection, or shift selection.
-        bool clicked = ImGui.IsItemClicked(ImGuiMouseButton.Left);
-        if (ImGui.GetIO().KeyShift && clicked)
+        bool drafting = _inDrafter == leaf;
+        var height = drafting ? CkStyle.GetFrameRowsHeight(3) : ImUtf8.FrameHeight;
+        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), height);  
+        var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
+        var frameCol = drafting ? ImGui.GetColorU32(ImGuiCol.Button) : 0;
+
+        using var _ = CkRaii.FramedChild(Label + leaf.Name, size, 0, frameCol, 5f, 1f);
+
+        using (var selectable = CkRaii.Child(leaf.Name, new(_.InnerRegion.X, ImUtf8.FrameHeight), bgCol, 5f))
         {
-            // Perform a quick-send request.
-            SendRequest(user, _defaultGroups.Select(g => g.Label).ToList());
+            // Get the size of the right based on interaction.  
+            ImUtf8.SameLineInner();
+            DrawLeafIcon(leaf.Data);
+            ImGui.SameLine();
+
+            var pos = ImGui.GetCursorPos();
+            if (ImGui.InvisibleButton($"node_{leaf.FullPath}", selectable.InnerRegion))
+                HandleClick(leaf, flags);
+            HandleDetections(leaf, flags);
+            CkGui.AttachToolTip(TooltipText, ImGuiColors.DalamudOrange);
+
+            // Go back and draw the name.
+            ImGui.SameLine(pos.X);
+            CkGui.TextFrameAligned(uru.DisplayName);
         }
+
+        // Draw the drafter afterwards.
+        if (!drafting)
+            return;
+
+        var sendRequestSize = CkGui.IconTextButtonSize(FAI.CloudUploadAlt, "Send");
+        ImGui.SetNextItemWidth(_.InnerRegion.X - sendRequestSize - ImUtf8.ItemInnerSpacing.X);
+        ImGui.InputTextWithHint("##sendRequestMsg", "Attach Message (Optional)", ref _requestMsg, 100);
+        ImUtf8.SameLineInner();
+        if (CkGui.IconTextButton(FAI.CloudUploadAlt, "Send", disabled: UiService.DisableUI))
+            SendRequest(leaf, _groupsToJoinOnAccept);
+    }
+
+    // We only ever do this for the unpaired leaves so it's ok to handle that logic here.
+    protected override void HandleClick(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
+    {
+        // Send quick-request if shift is held.
+        if (ImGui.GetIO().KeyShift && _inDrafter != node)
+            SendRequest(node, _defaultGroups.Select(g => g.Label).ToList());
         // Otherwise just set the drafter to this node and clear all drafter variables.
-        else if (clicked)
+        else
         {
-            if (_inDrafter == user)
-            {
+            if (_inDrafter == node)
                 _inDrafter = null;
-            }
             else
             {
-                _inDrafter = user;
+                _inDrafter = node;
                 _groupsToJoinOnAccept = _defaultGroups.Select(g => g.Label).ToList();
                 _asTemporary = _defaultIsTemporary;
                 _requestMsg = string.Empty;
@@ -181,27 +237,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         }
     }
 
-    protected override void HandleClick(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
-    { }
-
-    protected override void HandleDetections(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
-    {
-        if (ImGui.IsItemHovered())
-            _newHoveredNode = node;
-    }
-
-    private void DrawDrafter(IDynamicLeaf<RadarUser> leaf, float width, DynamicFlags flags)
-    {
-        var sendRequestSize = CkGui.IconTextButtonSize(FAI.CloudUploadAlt, "Send");
-
-        ImGui.SetNextItemWidth(width - sendRequestSize - ImUtf8.ItemInnerSpacing.X);
-        ImGui.InputTextWithHint("##sendRequestMsg", "Attach Message (Optional)", ref _requestMsg, 100);
-        ImUtf8.SameLineInner();
-        if (CkGui.IconTextButton(FAI.CloudUploadAlt, "Send", disabled: UiService.DisableUI))
-            SendRequest(leaf, _groupsToJoinOnAccept);
-    }
-
-    private unsafe bool DrawLeftSide(RadarUser user)
+    private unsafe bool DrawLeafIcon(RadarUser user)
     {
         using (ImRaii.Group())
         {
@@ -238,50 +274,17 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             var res = await _hub.UserSendRequest(new(new(node.Data.UID), _asTemporary, _requestMsg));
             if (res.ErrorCode is SundouleiaApiEc.Success && res.Value is { } sentRequest)
             {
-                Svc.Logger.Information($"Successfully sent sundesmo request to {node.Data.AnonymousName}");
+                Svc.Logger.Information($"Successfully sent sundesmo request to {node.Data.DisplayName}");
                 _requests.AddNewRequest(sentRequest);
                 _groupsToJoinOnAccept = _defaultGroups.Select(g => g.Label).ToList();
                 _asTemporary = _defaultIsTemporary;
                 _requestMsg = string.Empty;
-                // premptively add this user to all of these groups as users, or place them in some hidden pending list.
+                // primitively add this user to all of these groups as users, or place them in some hidden pending list.
                 return;
             }
             // Notify failure.
-            Svc.Logger.Warning($"Request to {node.Data.AnonymousName} failed with error code {res.ErrorCode}");
+            Svc.Logger.Warning($"Request to {node.Data.DisplayName} failed with error code {res.ErrorCode}");
         });
     }
-    #endregion Leaf
-
-    #region Config
-    private void DrawRadarConfig(float width)
-    {
-        var bgCol = _configExpanded ? ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f) : 0;
-        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
-        using var child = CkRaii.ChildPaddedW("RadarConfig", width, CkStyle.GetFrameRowsHeight(2), bgCol, 5f);
-
-        // Maybe move the vars into a config so we can store them between plugin states.
-        CkGui.FramedIconText(FAI.PeopleGroup);
-        // Combo inline here holding the groups.
-        CkGui.ColorTextFrameAlignedInline("[Dummy Combo Placeholder]", ImGuiColors.ParsedGrey);
-        // Note that when the combo is dropped down, there are buttons to clear, search filter, and also to add a new one.
-        // Selections also will not close the combo.
-        // We could even make a smallbutton that shows "view current' or something, idk.
-        ImUtf8.SameLineInner();
-        CkGui.FramedHoverIconText(FAI.InfoCircle, ImGuiColors.TankBlue.ToUint());
-        if (ImGui.IsItemHovered())
-        {
-            // Show the popup, at the location of the framed icon text to the right, displaying the groups that the request, when accepted, are added to.
-        }
-
-        // next row, checkbox.
-        CkGui.FramedIconText(FAI.Stopwatch);
-        ImUtf8.SameLineInner();
-        if (ImGui.Checkbox("Requests Are Temporary", ref _defaultIsTemporary))
-        {
-            Log.LogInformation($"Default Temporary Request setting changed to [{_defaultIsTemporary}]");
-        }
-    }
-
-    #endregion Config
 }
 
