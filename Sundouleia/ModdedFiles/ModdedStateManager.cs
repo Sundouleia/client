@@ -441,12 +441,12 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     ///     TODO: Separate this to process all owned objects concurrently, with special logic for pets.
     /// </summary>
     /// <exception cref="InvalidOperationException"></exception>
-    public async Task<HashSet<ModdedFile>> CollectModdedState(CancellationToken ct)
+    public async Task<ModdedState> CollectModdedState(CancellationToken ct)
     {
         if (!_config.HasValidCacheFolderSetup())
         {
             Logger.LogWarning("Cache Folder not setup! Cannot process mod files!");
-            return new HashSet<ModdedFile>(ModdedFileComparer.Instance);
+            return new ModdedState();
         }
 
         // Grab all of our owned object paths.
@@ -454,9 +454,8 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         if (await _ipc.Penumbra.GetClientOnScreenResourcePaths().ConfigureAwait(false) is not { } clientOnScreenPaths)
             throw new InvalidOperationException("Penumbra returned null data");
 
-        // var tasks = new List<Task<HashSet<ModdedFile>>>();
-        var moddedFiles = new HashSet<ModdedFile>(ModdedFileComparer.Instance);
-        // Iterate through each of the client-actor-onscreen-paths and process them.
+        // Generate a new modded state to store the collected data into.
+        var moddedState = new ModdedState();
 
         var sw = Stopwatch.StartNew();
         Logger.LogDebug($"Processing {clientOnScreenPaths.Keys.Count} owned object modded states in parallel.", LoggerType.ResourceMonitor);
@@ -467,28 +466,32 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
             if (!_watcher.TryFindOwnedObjectByIdx(ownedObjectIdx, out var ownedObject))
                 continue;
 
-            if (ownedObject is OwnedObject.Player)
-                moddedFiles.UnionWith(await CollectPlayerModdedState(onScreenPaths, ct));
-            else
-                moddedFiles.UnionWith(await CollectOtherModdedState(ownedObject, onScreenPaths, ct));
+            var objectFiles = (ownedObject is OwnedObject.Player)
+                ? await CollectPlayerModdedFiles(onScreenPaths, ct)
+                : await CollectOtherModdedFiles(ownedObject, onScreenPaths, ct);
+            // Store the result into the modded state.
+            moddedState.SetOwnedFiles(ownedObject, objectFiles);
         }
 
         sw.Stop();
         Logger.LogDebug($"Processed owned object modded states in {sw.ElapsedMilliseconds}ms.", LoggerType.ResourceMonitor);
 
         Logger.LogTrace($"== Final Replacements ==", LoggerType.ResourceMonitor);
-        foreach (var replacement in moddedFiles.OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
+        foreach (var replacement in moddedState.AllFiles.OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
         {
             Logger.LogTrace($" => {replacement}", LoggerType.ResourceMonitor);
             ct.ThrowIfCancellationRequested();
         }
 
+        // WARNING: May want to move where this is published, as this can be called fairly frequently.
+        // Inform the mediator that we calculated our modded state.
+        Mediator.Publish(new ModdedStateCollected(moddedState));
 
-        // return all paths.
-        return moddedFiles;
+        // return the modded state.
+        return moddedState;
     }
 
-    private async Task<HashSet<ModdedFile>> CollectPlayerModdedState(Dictionary<string, HashSet<string>> onScreenPaths, CancellationToken ct)
+    private async Task<HashSet<ModdedFile>> CollectPlayerModdedFiles(Dictionary<string, HashSet<string>> onScreenPaths, CancellationToken ct)
     {
         // await until we are present and visible.
         await _watcher.WaitForFullyLoadedGameObject(_watcher.WatchedPlayerAddr, ct).ConfigureAwait(false);
@@ -517,7 +520,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         return moddedPaths;
     }
 
-    private async Task<HashSet<ModdedFile>> CollectOtherModdedState(OwnedObject obj, Dictionary<string, HashSet<string>> onScreenPaths, CancellationToken ct)
+    private async Task<HashSet<ModdedFile>> CollectOtherModdedFiles(OwnedObject obj, Dictionary<string, HashSet<string>> onScreenPaths, CancellationToken ct)
     {
         await _watcher.WaitForFullyLoadedGameObject(_watcher.FromOwned(obj), ct).ConfigureAwait(false);
 

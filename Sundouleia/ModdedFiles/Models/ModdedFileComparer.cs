@@ -1,6 +1,4 @@
-using Sundouleia.PlayerClient;
-
-namespace SundouleiaAPI.Data;
+namespace Sundouleia.ModFiles;
 
 public class ModdedFileComparer : IEqualityComparer<ModdedFile>
 {

@@ -12,6 +12,8 @@ using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 
+// Doing the hecking brainstorm voodoo
+
 namespace Sundouleia.Gui;
 
 // Redesign a lot of this after it runs. Primarily copied over for an initial look at what it used to look like.
@@ -34,13 +36,12 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
     private readonly Dictionary<string, string[]> _texturesToConvert = new(StringComparer.Ordinal);
 
     // The last cached analysis on our client actor(s).
-    private Dictionary<string, ActorAnalyzer.FileDataEntry>? _cachedAnalysis;
+    private Dictionary<OwnedObject, Dictionary<string, FileDataEntry>>? _cachedAnalysis;
 
     private Task? _conversionTask;
     private CancellationTokenSource _conversionCTS = new();
 
-    private CancellationTokenSource _recorderCTS = new();
-
+    private OwnedObject _currentTab = OwnedObject.Player;
     private string _conversionCurrentFileName = string.Empty;
     private int _conversionCurrentFileProgress = 0;
     private bool _enableBc7ConversionMode = false;
@@ -111,6 +112,9 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
         {
             _cachedAnalysis = _analyzer.LastAnalysis.DeepClone();
             _hasUpdate = false;
+            // If the new analysis no longer has the selected tab, revert it to player.
+            if (!_cachedAnalysis.ContainsKey(_currentTab))
+                _currentTab = OwnedObject.Player;
         }
 
         using var tabBar = ImRaii.TabBar("analysisRecordingTabBar");
@@ -135,8 +139,6 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
     protected override void PostDrawInternal()
     { }
 
-    private bool _showAlreadyAddedTransients = false;
-    private bool _acknowledgeReview = false;
     private string _selectedStoredCharacter = string.Empty;
     private string _selectedJobEntry = string.Empty;
     private readonly List<string> _storedPathsToRemove = [];
@@ -156,16 +158,13 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
             availableContentRegion = ImGui.GetContentRegionAvail();
             using (ImRaii.ListBox("##characters", new Vector2(200, availableContentRegion.Y)))
             {
-                _logger.LogDebug($"Drawing {config.Count} stored characters.");
                 foreach (var (nameWorld, caches) in config)
                 {
-                    _logger.LogDebug($"Nameworld: {nameWorld} | Jobs: {caches.JobBasedCache.Count} | Persistent: {caches.PersistentCache.Count}");
                     var name = nameWorld.Split("_");
-                    _logger.LogDebug($"Split nameworld into: {string.Join(", ", name)}");
                     if (!GameDataSvc.WorldData.TryGetValue(ushort.Parse(name[1]), out var worldname))
                         continue;
 
-                    if (ImGui.Selectable(name[0] + " (" + worldname + ")", string.Equals(_selectedStoredCharacter, nameWorld, StringComparison.Ordinal)))
+                    if (ImGui.Selectable($"{name[0]} ({worldname})", string.Equals(_selectedStoredCharacter, nameWorld, StringComparison.Ordinal)))
                     {
                         _selectedStoredCharacter = nameWorld;
                         _selectedJobEntry = string.Empty;
@@ -356,7 +355,7 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
         }
         else
         {
-            if (_cachedAnalysis!.Any(f => !f.Value.IsComputed))
+            if (_cachedAnalysis!.Any(c => c.Value.Any(f => !f.Value.IsComputed)))
             {
                 CkGui.ColorTextWrapped("Some entries have their file size not determined yet, press the button below to analyze current data.", ImGuiColors.DalamudYellow);
                 if (CkGui.IconTextButton(FontAwesomeIcon.PlayCircle, "Start analysis (missing entries)"))
@@ -372,128 +371,159 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
         ImGui.Separator();
 
         ImGui.Text("Total files:");
-        CkGui.TextInline(_cachedAnalysis!.Count.ToString());
+        CkGui.TextInline(_cachedAnalysis!.Values.Sum(c => c.Values.Count).ToString());
         ImGui.SameLine();
         CkGui.HoverIconText(FAI.InfoCircle, CkColor.VibrantPink.Uint());
         if (ImGui.IsItemHovered())
         {
             string text = "";
-            var filesOfType = _cachedAnalysis.Values.GroupBy(f => f.FileType, StringComparer.Ordinal);
+            var filesOfType = _cachedAnalysis.Values.SelectMany(a => a.Values).GroupBy(f => f.FileType, StringComparer.Ordinal);
             text = string.Join(Environment.NewLine, filesOfType.OrderBy(f => f.Key, StringComparer.Ordinal)
                 .Select(f => $"{f.Key}: {f.Count()} files | Size: {SundouleiaEx.ByteToString(f.Sum(v => v.OriginalSize))} " +
                 $"| Compressed: {SundouleiaEx.ByteToString(f.Sum(v => v.CompressedSize))}"));
             CkGui.ToolTipInternal(text);
         }
 
-        ImGui.Text($"Total size (actual): {SundouleiaEx.ByteToString(_cachedAnalysis!.Sum(c => c.Value.OriginalSize))}");
-        ImGui.Text($"Total size (compressed for up/download only): {SundouleiaEx.ByteToString(_cachedAnalysis!.Sum(c => c.Value.CompressedSize))}");
-        ImGui.Text($"Total modded model triangles: {_cachedAnalysis.Sum(f => f.Value.Triangles)}");
+        ImGui.Text($"Total size (actual): {SundouleiaEx.ByteToString(_cachedAnalysis!.Sum(c => c.Value.Sum(c => c.Value.OriginalSize)))}");
+        ImGui.Text($"Total size (compressed for up/download only): {SundouleiaEx.ByteToString(_cachedAnalysis!.Sum(c => c.Value.Sum(c => c.Value.CompressedSize)))}");
+        ImGui.Text($"Total modded model triangles: {_cachedAnalysis.Sum(c => c.Value.Sum(f => f.Value.Triangles))}");
 
         ImGui.Separator();
-
-        // No object selection is necessary here, as all modded files end up being sent together anyways.
-        // The only benefit would be for some kind of visual sorting, but that would damage efficiency in
-        // cached mod transfer.
-        // If there is a way to divide it without costing that we could but at the moment i dont care.
+        // Make use of ModdedStates's seperation of files by object to split the current files between each owned actor.
+        using var tabbar = ImRaii.TabBar("objectSelection");
         
-        using var id = ImRaii.PushId("DataInspection");
-
-        var headerText = "Actor Inspection";
-        if (_cachedAnalysis.Any(f => !f.Value.IsComputed)) headerText += " (!)";
-
-        CkGui.FontText(headerText, UiFontService.Default150Percent);
-        var filesByType = _cachedAnalysis.Values.GroupBy(f => f.FileType, StringComparer.Ordinal).OrderBy(k => k.Key, StringComparer.Ordinal).ToList();
-        
-        ImGui.Text($"Total Files: {_cachedAnalysis.Count}");
-        ImGui.Text($"Total Size (actual): {SundouleiaEx.ByteToString(_cachedAnalysis.Sum(c => c.Value.OriginalSize))}");
-        ImGui.Text($"Total Size (compressed for up/download only): {SundouleiaEx.ByteToString(_cachedAnalysis.Sum(c => c.Value.CompressedSize))}");
-        
-        var vRamUsage = filesByType.SingleOrDefault(v => string.Equals(v.Key, "tex", StringComparison.Ordinal));
-        if (vRamUsage is not null)
+        foreach (var (ownedObject, dataAnalysis) in _cachedAnalysis)
         {
-            var actualVramUsage = vRamUsage.Sum(f => f.OriginalSize);
-            ImGui.Text($"Total VRAM usage: {SundouleiaEx.ByteToString(actualVramUsage)}");
-            // Could maybe have some kind of threshold thing here but i'd rather not deal with that right now.
-        }
+            using var id = ImRaii.PushId(ownedObject.ToString());
+            var tabText = ownedObject.ToString();   
+            if (dataAnalysis.Any(f => !f.Value.IsComputed))
+                tabText += " (!)";
 
-        var actualTriCount = _cachedAnalysis.Values.Sum(f => f.Triangles);
-        ImGui.Text("Client Actor(s) modded model tris");
-        CkGui.ColorTextInline($"{actualTriCount}", ImGuiColors.DalamudYellow);
-        // Again, could have some kind of threshold warning here but not necessary right now.
+            using var tab = ImRaii.TabItem(tabText + "###" + ownedObject.ToString());
+            if (!tab)
+                continue;
 
-        ImGui.Separator();
-        
-        using var fileTabBar = ImRaii.TabBar("fileTabs");
-        foreach (IGrouping<string, ActorAnalyzer.FileDataEntry>? fileGroup in filesByType)
-        {
-            var fileGroupText = $"{fileGroup.Key} [{fileGroup.Count()}]";
-            var requiresCompute = fileGroup.Any(k => !k.IsComputed);
-            
-            // This is cursed UI design holy moly.
-            using var col = ImRaii.PushColor(ImGuiCol.Tab, ImGuiColors.DalamudYellow, requiresCompute);
-            if (requiresCompute)
-                fileGroupText += " (!)";
+            var filesByType = dataAnalysis.Values.GroupBy(f => f.FileType, StringComparer.Ordinal).OrderBy(k => k.Key, StringComparer.Ordinal).ToList();
 
-            col.Push(ImGuiCol.Text, 0xFF000000, requiresCompute && !string.Equals(_selectedFileTypeTab, fileGroup.Key, StringComparison.Ordinal));
-            using var fileTab = ImRaii.TabItem(fileGroupText + "###" + fileGroup.Key);
-            col.Pop();
-
-            if (!fileTab)
-                continue; 
-
-            if (!string.Equals(fileGroup.Key, _selectedFileTypeTab, StringComparison.Ordinal))
+            ImGui.Text($"Files for {ownedObject}");
+            ImGui.SameLine();
+            CkGui.HoverIconText(FAI.InfoCircle, CkColor.VibrantPink.Uint());
+            if (ImGui.IsItemHovered())
             {
-                _selectedFileTypeTab = fileGroup.Key;
+                var text = string.Join('\n', filesByType.Select(f => $"{f.Key}: {f.Count()} files | " +
+                    $"Size: {SundouleiaEx.ByteToString(f.Sum(v => v.OriginalSize))} " +
+                    $"| Compressed: {SundouleiaEx.ByteToString(f.Sum(v => v.CompressedSize))}"));
+                CkGui.ToolTipInternal(text);
+            }
+
+            ImGui.Text($"Total Size (actual):");
+            CkGui.ColorTextInline(SundouleiaEx.ByteToString(dataAnalysis.Sum(c => c.Value.OriginalSize)), ImGuiColors.DalamudYellow);
+
+            ImGui.Text($"Total Size (compressed for up/download only):");
+            CkGui.ColorTextInline(SundouleiaEx.ByteToString(dataAnalysis.Sum(c => c.Value.CompressedSize)), ImGuiColors.DalamudYellow);
+
+            // VRAM calculations are done through original, uncompressed sizes. Please note this means that the individual cannot 'optimize their mods'
+            // outside of direct texture compression on the original textures.
+            // The server does its own compression when files are in transit, but it ultimate is on the mod creators to make models with more optimized tricounts,
+            // as they contribute to the final VRAM calculations that the end user cannot change from the plugin.
+            var vRamUsage = filesByType.SingleOrDefault(v => string.Equals(v.Key, "tex", StringComparison.Ordinal));
+            if (vRamUsage is not null)
+            {
+                var actualVramUsage = vRamUsage.Sum(f => f.OriginalSize);
+                ImGui.Text($"Total VRAM usage:");
+                CkGui.ColorTextInline(SundouleiaEx.ByteToString(actualVramUsage), ImGuiColors.DalamudYellow);
+                // Could maybe have some kind of threshold thing here but i'd rather not deal with that right now.
+            }
+
+            // Display the actual tri-count for this owned object.
+            var actualTriCount = dataAnalysis.Values.Sum(f => f.Triangles);
+            ImGui.Text($"{ownedObject} modded model tris");
+            CkGui.ColorTextInline($"{actualTriCount}", ImGuiColors.DalamudYellow);
+            // Again, could have some kind of threshold warning here but not necessary right now.
+            
+            ImGui.Separator();
+            // Handle tab switching.
+            if (_currentTab != ownedObject)
+            {
                 _selectedHash = string.Empty;
+                _currentTab = ownedObject;
+                _selectedFileTypeTab = string.Empty;
                 _enableBc7ConversionMode = false;
                 _texturesToConvert.Clear();
             }
 
-            ImGui.Text($"{fileGroup.Key} files:");
-            CkGui.ColorTextInline($"{fileGroup.Count()}", ImGuiColors.DalamudYellow);
-
-            ImGui.Text($"{fileGroup.Key} files size (actual):");
-            CkGui.ColorTextInline($"{SundouleiaEx.ByteToString(fileGroup.Sum(c => c.OriginalSize))}", ImGuiColors.DalamudYellow);
-
-            ImGui.Text($"{fileGroup.Key} files size (compressed for up/download only):");
-            CkGui.ColorTextInline($"{SundouleiaEx.ByteToString(fileGroup.Sum(c => c.CompressedSize))}", ImGuiColors.DalamudYellow);
-
-            // For textures specifically, allow conversions.
-            if (string.Equals(_selectedFileTypeTab, "tex", StringComparison.Ordinal))
+            // Secondary tab bar for seperation by fileTypes.
+            using var fileByTypeTabBar = ImRaii.TabBar("fileByTypeTabs");
+            foreach (IGrouping<string, FileDataEntry>? fileGroup in filesByType)
             {
-                ImGui.Checkbox("Enable BC7 Conversion Mode", ref _enableBc7ConversionMode);
-                if (_enableBc7ConversionMode)
+                var fileGroupText = $"{fileGroup.Key} [{fileGroup.Count()}]";
+                var requiresCompute = fileGroup.Any(k => !k.IsComputed);
+
+                // This is cursed UI design holy moly.
+                using var col = ImRaii.PushColor(ImGuiCol.Tab, ImGuiColors.DalamudYellow, requiresCompute);
+                if (requiresCompute)
+                    fileGroupText += " (!)";
+
+                col.Push(ImGuiCol.Text, 0xFF000000, requiresCompute && !string.Equals(_selectedFileTypeTab, fileGroup.Key, StringComparison.Ordinal));
+                using var fileTab = ImRaii.TabItem(fileGroupText + "###" + fileGroup.Key);
+                col.Pop();
+
+                if (!fileTab)
+                    continue;
+
+                if (!string.Equals(fileGroup.Key, _selectedFileTypeTab, StringComparison.Ordinal))
                 {
-                    CkGui.ColorText("WARNING BC7 CONVERSION:", ImGuiColors.DalamudYellow);
-                    CkGui.ColorTextInline("Converting textures to BC7 is irreversible!", ImGuiColors.DalamudRed);
-                    // BC7 conversion info
-                    CkGui.ColorTextWrapped("" +
-                        "- Converting textures to BC7 will reduce their size (compressed and uncompressed) drastically. It is recommended to be used for large (4k+) textures.\n" +
-                        "- Some textures, especially ones utilizing colorsets, might not be suited for BC7 conversion and might produce visual artifacts.\n" +
-                        "- Before converting textures, make sure to have the original files of the mod you are converting so you can reimport it in case of issues.\n" +
-                        "- Conversion will convert all found texture duplicates (entries with more than 1 file path) automatically.\n" +
-                        "- Converting textures to BC7 is a very expensive operation and, depending on the amount of textures to convert, will take a while to complete."
-                    , ImGuiColors.DalamudYellow);
-                    // If we have any textures selected to convert, allow us to convert them.
-                    if (_texturesToConvert.Count is not 0 && CkGui.IconTextButton(FontAwesomeIcon.PlayCircle, $"Convert {_texturesToConvert.Count} texture(s)"))
+                    _selectedFileTypeTab = fileGroup.Key;
+                    _selectedHash = string.Empty;
+                    _enableBc7ConversionMode = false;
+                    _texturesToConvert.Clear();
+                }
+
+                ImGui.Text($"{fileGroup.Key} files:");
+                CkGui.ColorTextInline($"{fileGroup.Count()}", ImGuiColors.DalamudYellow);
+
+                ImGui.Text($"{fileGroup.Key} files size (actual):");
+                CkGui.ColorTextInline($"{SundouleiaEx.ByteToString(fileGroup.Sum(c => c.OriginalSize))}", ImGuiColors.DalamudYellow);
+
+                ImGui.Text($"{fileGroup.Key} files size (compressed for up/download only):");
+                CkGui.ColorTextInline($"{SundouleiaEx.ByteToString(fileGroup.Sum(c => c.CompressedSize))}", ImGuiColors.DalamudYellow);
+
+                // For textures specifically, allow conversions.
+                if (string.Equals(_selectedFileTypeTab, "tex", StringComparison.Ordinal))
+                {
+                    ImGui.Checkbox("Enable BC7 Conversion Mode", ref _enableBc7ConversionMode);
+                    if (_enableBc7ConversionMode)
                     {
-                        _conversionCTS = _conversionCTS.SafeCancelRecreate();
-                        _conversionTask = _ipc.Penumbra.ConvertTextureFiles(_texturesToConvert, _conversionProgress, _conversionCTS.Token);
+                        CkGui.ColorText("WARNING BC7 CONVERSION:", ImGuiColors.DalamudYellow);
+                        CkGui.ColorTextInline("Converting textures to BC7 is irreversible!", ImGuiColors.DalamudRed);
+                        // BC7 conversion info
+                        CkGui.ColorTextWrapped("" +
+                            "- Converting textures to BC7 will reduce their size (compressed and uncompressed) drastically. It is recommended to be used for large (4k+) textures.\n" +
+                            "- Some textures, especially ones utilizing colorsets, might not be suited for BC7 conversion and might produce visual artifacts.\n" +
+                            "- Before converting textures, make sure to have the original files of the mod you are converting so you can reimport it in case of issues.\n" +
+                            "- Conversion will convert all found texture duplicates (entries with more than 1 file path) automatically.\n" +
+                            "- Converting textures to BC7 is a very expensive operation and, depending on the amount of textures to convert, will take a while to complete."
+                        , ImGuiColors.DalamudYellow);
+                        // If we have any textures selected to convert, allow us to convert them.
+                        if (_texturesToConvert.Count is not 0 && CkGui.IconTextButton(FontAwesomeIcon.PlayCircle, $"Convert {_texturesToConvert.Count} texture(s)"))
+                        {
+                            _conversionCTS = _conversionCTS.SafeCancelRecreate();
+                            _conversionTask = _ipc.Penumbra.ConvertTextureFiles(_texturesToConvert, _conversionProgress, _conversionCTS.Token);
+                        }
                     }
                 }
-            }
 
-            ImGui.Separator();
-            // Draw out the table for this file type.
-            DrawTable(fileGroup);
+                ImGui.Separator();
+                // Draw out the table for this file type.
+                DrawTable(fileGroup);
+            }
         }
 
         // Individual file details.
         ImGui.Separator();
         ImGui.Text("Selected file:");
         CkGui.ColorTextInline(_selectedHash, ImGuiColors.DalamudYellow);
-
-        if (_cachedAnalysis.TryGetValue(_selectedHash, out ActorAnalyzer.FileDataEntry? item))
+        if (_cachedAnalysis[_currentTab].TryGetValue(_selectedHash, out FileDataEntry? item))
         {
             var filePaths = item.FilePaths;
             ImGui.Text("Local file path:");
@@ -538,7 +568,7 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
         _conversionCurrentFileProgress = e.Item2;
     }
 
-    private void DrawTable(IGrouping<string, ActorAnalyzer.FileDataEntry> fileGroup)
+    private void DrawTable(IGrouping<string, FileDataEntry > fileGroup)
     {
         // Colum logic
         var tableColumns = string.Equals(fileGroup.Key, "tex", StringComparison.Ordinal)
@@ -572,42 +602,43 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
         {
             var idx = sortSpecs.Specs.ColumnIndex;
             var asc = sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending;
+            var analyzedData = _cachedAnalysis![_currentTab];
 
             // Hash
             if (idx is 0)
-                _cachedAnalysis = asc
-                    ? _cachedAnalysis.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
-                    : _cachedAnalysis.OrderByDescending(k => k.Key, StringComparer.Ordinal).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
+                analyzedData = asc
+                    ? analyzedData.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
+                    : analyzedData.OrderByDescending(k => k.Key, StringComparer.Ordinal).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
             // FilePaths count
             else if (idx is 1)
-                _cachedAnalysis = asc
-                    ? _cachedAnalysis.OrderBy(k => k.Value.FilePaths.Count).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
-                    : _cachedAnalysis.OrderByDescending(k => k.Value.FilePaths.Count).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
+                analyzedData = asc
+                    ? analyzedData.OrderBy(k => k.Value.FilePaths.Count).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
+                    : analyzedData.OrderByDescending(k => k.Value.FilePaths.Count).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
             // GamePaths count
             else if (idx is 2)
-                _cachedAnalysis = asc
-                    ? _cachedAnalysis.OrderBy(k => k.Value.GamePaths.Count).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
-                    : _cachedAnalysis.OrderByDescending(k => k.Value.GamePaths.Count).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
+                analyzedData = asc
+                    ? analyzedData.OrderBy(k => k.Value.GamePaths.Count).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
+                    : analyzedData.OrderByDescending(k => k.Value.GamePaths.Count).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
             // OriginalSize
             else if (idx is 3)
-                _cachedAnalysis = asc
-                    ? _cachedAnalysis.OrderBy(k => k.Value.OriginalSize).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
-                    : _cachedAnalysis.OrderByDescending(k => k.Value.OriginalSize).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
+                analyzedData = asc
+                    ? analyzedData.OrderBy(k => k.Value.OriginalSize).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
+                    : analyzedData.OrderByDescending(k => k.Value.OriginalSize).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
             // CompressedSize
             else if (idx is 4)
-                _cachedAnalysis = asc
-                    ? _cachedAnalysis.OrderBy(k => k.Value.CompressedSize).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
-                    : _cachedAnalysis.OrderByDescending(k => k.Value.CompressedSize).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
+                analyzedData = asc
+                    ? analyzedData.OrderBy(k => k.Value.CompressedSize).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
+                    : analyzedData.OrderByDescending(k => k.Value.CompressedSize).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
             // Triangles (mdl)
             else if (string.Equals(fileGroup.Key, "mdl", StringComparison.Ordinal) && idx == 5)
-                _cachedAnalysis = asc
-                    ? _cachedAnalysis.OrderBy(k => k.Value.Triangles).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
-                    : _cachedAnalysis.OrderByDescending(k => k.Value.Triangles).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
+                analyzedData = asc
+                    ? analyzedData.OrderBy(k => k.Value.Triangles).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
+                    : analyzedData.OrderByDescending(k => k.Value.Triangles).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
             // Format (tex)
             else if (string.Equals(fileGroup.Key, "tex", StringComparison.Ordinal) && idx == 5)
-                _cachedAnalysis = asc
-                    ? _cachedAnalysis.OrderBy(k => k.Value.Format.Value, StringComparer.Ordinal).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
-                    : _cachedAnalysis.OrderByDescending(k => k.Value.Format.Value, StringComparer.Ordinal).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
+                analyzedData = asc
+                    ? analyzedData.OrderBy(k => k.Value.Format.Value, StringComparer.Ordinal).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal)
+                    : analyzedData.OrderByDescending(k => k.Value.Format.Value, StringComparer.Ordinal).ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
 
             sortSpecs.SpecsDirty = false;
         }
@@ -628,19 +659,29 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
                 ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ImGuiColors.DalamudYellow.ToUint());
             }
             ImGui.TextUnformatted(item.Hash);
-            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            if (ImGui.IsItemClicked())
+                _selectedHash = item.Hash;
+
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(item.FilePaths.Count.ToString());
-            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            if (ImGui.IsItemClicked())
+                _selectedHash = item.Hash;
+
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(item.GamePaths.Count.ToString());
-            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            if (ImGui.IsItemClicked())
+                _selectedHash = item.Hash;
+
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(SundouleiaEx.ByteToString(item.OriginalSize));
-            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            if (ImGui.IsItemClicked())
+                _selectedHash = item.Hash;
+
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(SundouleiaEx.ByteToString(item.CompressedSize));
-            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            if (ImGui.IsItemClicked())
+                _selectedHash = item.Hash;
+
             if (string.Equals(fileGroup.Key, "tex", StringComparison.Ordinal))
             {
                 ImGui.TableNextColumn();
@@ -659,13 +700,9 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
                     if (ImGui.Checkbox("###convert" + item.Hash, ref toConvert))
                     {
                         if (toConvert && !_texturesToConvert.ContainsKey(filePath))
-                        {
                             _texturesToConvert[filePath] = item.FilePaths.Skip(1).ToArray();
-                        }
                         else if (!toConvert && _texturesToConvert.ContainsKey(filePath))
-                        {
                             _texturesToConvert.Remove(filePath);
-                        }
                     }
                 }
             }
@@ -673,7 +710,8 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
             {
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(item.Triangles.ToString());
-                if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+                if (ImGui.IsItemClicked())
+                    _selectedHash = item.Hash;
             }
         }
     }

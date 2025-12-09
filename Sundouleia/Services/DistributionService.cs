@@ -120,8 +120,8 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             LastCreatedData.CPlusState[OwnedObject.Companion] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             // Cache mods.
             var moddedState = await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false);
-            Logger.LogDebug($"(OnHubConnected) Collected modded state. [{moddedState.Count} Mod Files]", LoggerType.DataDistributor);
-            LastCreatedData.ApplyNewModState(await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false));
+            Logger.LogDebug($"(OnHubConnected) Collected modded state. [{moddedState.AllFiles.Count} Mod Files]", LoggerType.DataDistributor);
+            LastCreatedData.ApplyNewModState(moddedState);
 
         }
         catch (Exception ex)
@@ -139,8 +139,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _distributeDataTask = Task.Run(async () =>
         {
             await ResendAll().ConfigureAwait(false);
-            // Update our analyzer? (change later probably)
-            _analyzer.UpdatedOwnedActorsMods();
             _hubConnectionSent = true;
 
         }, _distributeDataCTS.Token);

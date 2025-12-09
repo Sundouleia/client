@@ -1,3 +1,4 @@
+using Sundouleia.ModFiles;
 using SundouleiaAPI.Data;
 
 namespace Sundouleia.PlayerClient;
@@ -8,7 +9,8 @@ namespace Sundouleia.PlayerClient;
 /// </summary>
 public class ClientDataCache
 {
-    // Key'd by mod hash.
+    // Key'd by mod hash. This is the collective modded state sent for mod updates.
+    // It contains modded files used by all owned actors at the time of the latest update.
     public Dictionary<string, ModdedFile> AppliedMods { get; set; } = new();
 
     // Can be accessed by multiple tasks concurrently.
@@ -86,18 +88,19 @@ public class ClientDataCache
         };
     }
 
-    public ModUpdates ApplyNewModState(HashSet<ModdedFile> moddedState)
+    public ModUpdates ApplyNewModState(ModdedState latestState)
     {
+        // We only want to process what has changed, and update that.
         var toAdd = new List<ModFile>();
         var toRemove = new List<string>();
 
         // First determine which files are removed based on the most currentState.
-        toRemove.AddRange(AppliedMods.Keys.Except(moddedState.Select(m => m.Hash)).ToList());
+        toRemove.AddRange(AppliedMods.Keys.Except(latestState.AllFiles.Select(m => m.Hash)).ToList());
         foreach (var hash in toRemove)
             AppliedMods.Remove(hash, out _);
 
         // Now iterate through the new hashes. Any that need to be added should be placed in the ToAdd.
-        foreach (var mod in moddedState)
+        foreach (var mod in latestState.AllFiles)
         {
             // Skip unchanged mods. A mod is considered changed, if the set of replaced game paths is different.
             if (AppliedMods.TryGetValue(mod.Hash, out var file) && file.GamePaths.SetEquals(mod.GamePaths))

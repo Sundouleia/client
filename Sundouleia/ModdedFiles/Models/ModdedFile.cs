@@ -1,7 +1,7 @@
 using SundouleiaAPI.Data;
 using System.Text.RegularExpressions;
 
-namespace Sundouleia.PlayerClient;
+namespace Sundouleia.ModFiles;
 
 /// <summary>
 ///     Primarily intended to help with efficient modded state calculations, 
@@ -17,6 +17,7 @@ public partial class ModdedFile
         GamePaths = gamePaths.Select(g => g.Replace('\\', '/').ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
         ResolvedPath = filePath.Replace('\\', '/');
     }
+
     public ModdedFile(ModdedFile other)
     {
         GamePaths = new HashSet<string>(other.GamePaths, StringComparer.Ordinal);

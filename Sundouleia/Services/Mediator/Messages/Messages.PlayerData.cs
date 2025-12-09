@@ -1,3 +1,4 @@
+using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
 using Sundouleia.WebAPI.Files.Models;
 using SundouleiaAPI.Data;
@@ -17,6 +18,14 @@ public record FilesUploading(PlayerHandler Player) : MessageBase;
 public record FilesUploaded(PlayerHandler Player) : MessageBase;
 public record FileDownloadStarted(PlayerHandler Player, FileTransferProgress Status) : MessageBase;
 public record FileDownloadComplete(PlayerHandler Player) : MessageBase;
+
+/// <summary>
+///     Whenever the ModdedStateManager finished calculating the state 
+///     of our current client-owned actors. <para />
+///     Note that this currently does not take into account 
+///     100 percent accurate transients but can after new penumbra API.
+/// </summary>
+public record ModdedStateCollected(ModdedState ModdedState) : MessageBase;
 
 /// <summary>
 ///     Whenever a CLIENT OWNED OBJECT is created.
