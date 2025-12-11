@@ -35,8 +35,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     private Lazy<List<Sundesmo>> _directPairsInternal;  // the internal direct pairs lazy list for optimization
     public List<Sundesmo> DirectPairs => _directPairsInternal.Value; // the direct pairs the client has with other users.
 
-    public SundesmoManager(ILogger<SundesmoManager> logger, SundouleiaMediator mediator, 
-        MainConfig config, FolderConfig folderConfig, ServerConfigManager serverConfigs, 
+    public SundesmoManager(ILogger<SundesmoManager> logger, SundouleiaMediator mediator,
+        MainConfig config, FolderConfig folderConfig, ServerConfigManager serverConfigs,
         SundesmoFactory factory, StickyUIService stickyService)
         : base(logger, mediator)
     {
@@ -45,7 +45,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         _folderConfig = folderConfig;
         _serverConfigs = serverConfigs;
         _pairFactory = factory;
-        _stickyService = stickyService; 
+        _stickyService = stickyService;
 
         Mediator.Subscribe<ConnectedMessage>(this, _ => OnClientConnected());
         Mediator.Subscribe<ReconnectedMessage>(this, _ => OnClientConnected());
@@ -179,10 +179,11 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             if ((int)intent > 1)
                 s.Value.MarkForUnload();
 
-            s.Value.MarkOffline();
             // If it was a hard disconnect, we should dispose of the data.
             if (intent is DisconnectIntent.LogoutShutdown)
                 DisposeSundesmo(s.Value);
+            else
+                s.Value.MarkOffline();
         });
         // Recreate the lazy list.
         RecreateLazy();
