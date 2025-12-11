@@ -21,7 +21,7 @@ namespace Sundouleia.Pairs;
 ///     Stores information about a pairing (Sundesmo) between 2 users. <para />
 ///     Created via the SundesmoFactory
 /// </summary>
-public class Sundesmo : IComparable<Sundesmo>
+public sealed class Sundesmo : IComparable<Sundesmo>, IDisposable
 {
     private readonly ILogger<Sundesmo> _logger;
     private readonly SundouleiaMediator _mediator;
@@ -61,6 +61,8 @@ public class Sundesmo : IComparable<Sundesmo>
         _mountMinion = factory.Create(OwnedObject.MinionOrMount, this);
         _pet = factory.Create(OwnedObject.Pet, this);
         _companion = factory.Create(OwnedObject.Companion, this);
+
+        _logger.LogDebug($"Creating Sundesmo for ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
     }
 
     public bool IsReloading { get; private set; } = false;
@@ -227,9 +229,9 @@ public class Sundesmo : IComparable<Sundesmo>
     ///     Removes all applied appearance data for the sundesmo if rendered, 
     ///     and disposes all internal data.
     /// </summary>
-    public void DisposeData()
+    public void Dispose()
     {
-        _logger.LogDebug($"Disposing data for [{PlayerName}] ({GetNickAliasOrUid()})", UserData.AliasOrUID);
+        _logger.LogDebug($"Disposing data for [{PlayerName}] ({GetNickAliasOrUid()})", LoggerType.PairManagement);
         // Cancel any existing timeout task, and then dispose of all data.
         _timeoutCTS.SafeCancel();
         _player.Dispose();
