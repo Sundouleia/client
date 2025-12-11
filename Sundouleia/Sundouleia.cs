@@ -13,6 +13,7 @@ using Sundouleia.Gui.Profiles;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.ModFiles.Cache;
+using Sundouleia.ModularActorData;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
@@ -139,6 +140,9 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<RequestsDrawSystem>()
         .AddSingleton<WhitelistDrawSystem>()
 
+        // Modular Actor Data
+        .AddSingleton<ModularActorManager>()
+
         // Mod Files (revise)
         .AddSingleton<ActorAnalyzer>()
         .AddSingleton<PenumbraWatcher>()
@@ -204,6 +208,7 @@ public static class SundouleiaServiceExtensions
 
     public static IServiceCollection AddSundouleiaIPC(this IServiceCollection services)
     => services
+        .AddSingleton<IpcCallerBrio>()
         .AddSingleton<IpcCallerCustomize>()
         .AddSingleton<IpcCallerGlamourer>()
         .AddSingleton<IpcCallerHeels>()

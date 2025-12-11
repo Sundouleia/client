@@ -61,7 +61,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
     private void LoadData()
     {
         // Before we load anything, inverse the sort direction of root.
-        //SetSortDirection(root, true);
+        SetSortDirection(root, true);
         // If any changes occured, re-save the file.
         if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Whitelist)))
         {

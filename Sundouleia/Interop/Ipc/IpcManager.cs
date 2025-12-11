@@ -8,6 +8,7 @@ namespace Sundouleia.Interop;
 /// </summary>
 public sealed partial class IpcManager : DisposableMediatorSubscriberBase
 {
+    public IpcCallerBrio        Brio { get; }
     public IpcCallerCustomize   CustomizePlus { get; }
     public IpcCallerGlamourer   Glamourer { get; }
     public IpcCallerHeels       Heels { get; }
@@ -17,6 +18,7 @@ public sealed partial class IpcManager : DisposableMediatorSubscriberBase
     public IpcCallerPetNames    PetNames { get; }
 
     public IpcManager(ILogger<IpcManager> logger, SundouleiaMediator mediator,
+        IpcCallerBrio brio,
         IpcCallerCustomize customizePlus,
         IpcCallerGlamourer glamourer,
         IpcCallerHeels heels,
@@ -26,6 +28,7 @@ public sealed partial class IpcManager : DisposableMediatorSubscriberBase
         IpcCallerPetNames petNames
         ) : base(logger, mediator)
     {
+        Brio = brio;
         CustomizePlus = customizePlus;
         Glamourer = glamourer;
         Heels = heels;
@@ -55,5 +58,6 @@ public sealed partial class IpcManager : DisposableMediatorSubscriberBase
         Heels.CheckAPI();
         PetNames.CheckAPI();
         Honorific.CheckAPI();
+        Brio.CheckAPI();
     }
 }

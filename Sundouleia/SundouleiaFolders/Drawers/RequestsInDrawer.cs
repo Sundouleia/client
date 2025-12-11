@@ -165,19 +165,22 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
         var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), CkStyle.ThreeRowHeight());
         var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
 
-        using var _ = CkRaii.FramedChild(Label + leaf.Name, size, bgCol, ImGui.GetColorU32(ImGuiCol.Button), 5f, 1f);
-        // Inner content, first row.
-        ImUtf8.SameLineInner();
-        var posX = ImGui.GetCursorPosX();
-        using (ImRaii.PushFont(UiBuilder.MonoFont))
-            CkGui.TextFrameAlignedInline(leaf.Data.SenderAnonName);
-        // store the cursorX
-        var rightX = DrawIncomingRightInfo(leaf, flags);
-        ImGui.SameLine(posX);
-        if (ImGui.InvisibleButton($"request_{leaf.FullPath}", new Vector2(rightX - posX, ImUtf8.FrameHeight)))
-            HandleClick(leaf, flags);
-        HandleDetections(leaf, flags);
-        CkGui.AttachToolTip(ToolTip, ImGuiColors.DalamudOrange);
+        using var _ = CkRaii.FramedChild(Label + leaf.Name, size, 0, ImGui.GetColorU32(ImGuiCol.Button), 5f, 1f);
+
+        using (var __ = CkRaii.Child(Label + leaf.Name + "inner", new(_.InnerRegion.X, ImUtf8.FrameHeight), ImGui.GetColorU32(ImGuiCol.FrameBgHovered), 5f))
+        {
+            ImUtf8.SameLineInner();
+            var posX = ImGui.GetCursorPosX();
+            using (ImRaii.PushFont(UiBuilder.MonoFont))
+                CkGui.TextFrameAlignedInline(leaf.Data.SenderAnonName);
+            // store the cursorX
+            var rightX = DrawIncomingRightInfo(leaf, flags);
+            ImGui.SameLine(posX);
+            if (ImGui.InvisibleButton($"request_{leaf.FullPath}", new Vector2(rightX - posX, ImUtf8.FrameHeight)))
+                HandleClick(leaf, flags);
+            HandleDetections(leaf, flags);
+            CkGui.AttachToolTip(ToolTip, ImGuiColors.DalamudOrange);
+        }
 
         // Lower area for responder options.
         CkGui.ColorText("Include selector for groups, and an accept/reject button.", ImGuiColors.ParsedGold);

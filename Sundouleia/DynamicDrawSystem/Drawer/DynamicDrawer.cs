@@ -124,6 +124,7 @@ public partial class DynamicDrawer<T> : IDisposable
     protected void PostDraw()
     {
         UpdateHoverNode();
+#if DEBUG
         ImGui.Text($"Selected: {Selector.Collections.Count} Collections");
         ImGui.Text($"Selected: {Selector.Leaves.Count} Leaves");
         ImGui.Text($"Selected: {Selector.Selected.Count} Nodes");
@@ -132,6 +133,7 @@ public partial class DynamicDrawer<T> : IDisposable
         ImGui.Text($"Total Cache Children: {FilterCache.RootCache.GetAllDescendants().Count()}");
         ImGui.Text($"Total DragDrop Nodes: {DragDrop.Total}");
         ImGui.Text($"DragDrop Names: {string.Join(',', DragDrop.Nodes.Select(n => n.Name))}");
+#endif
         // Process post-draw actions.
         while (_postDrawActions.TryDequeue(out Action? action))
         {
