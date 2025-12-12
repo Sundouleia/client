@@ -31,7 +31,7 @@ public sealed class PenumbraWatcher : IDisposable
 
     public void StopMonitoring()
     {
-        _logger.LogInformation("Stopping monitoring of Penumbra and Sundeouleia storage folders");
+        _logger.LogInformation("Stopping monitoring of the Penumbra storage folder");
         Watcher?.Dispose();
         Watcher = null;
     }

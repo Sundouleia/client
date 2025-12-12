@@ -115,11 +115,11 @@ public class ModularActorDataSecurity
         var headerToSign = Combine(fileId.ToByteArray(), salt, keyHash, ownerPubSpki);
         var ownerHeaderSig = SmadCryptography.Sign(owner, headerToSign);
 
-        var header = new SmadHeader(1, fileId, salt, keyHash, ownerPubSpki, initialAllowed, new SignedHeaderSignature(ownerHeaderSig));
+        var header = new SmabHeader(1, fileId, salt, keyHash, ownerPubSpki, initialAllowed, new OwnerSignature(ownerHeaderSig));
 
         // --- Use AllowedHashes as AAD ---
         var fileSecret = SmadCryptography.DeriveFileSecret(testPassword);
-        var aad = Encoding.UTF8.GetBytes(string.Join(",", header.AllowedHashes));
+        var aad = Encoding.UTF8.GetBytes(string.Join(",", header.Hashes));
         var (cipher, nonce, tag) = SmadCryptography.AesGcmEncrypt(payload, fileSecret, aad);
         Array.Clear(fileSecret); // clear sensitive data
 
@@ -133,7 +133,7 @@ public class ModularActorDataSecurity
         var tokenPayload = new UpdateTokenPayload(fileId, [ allowedHash ], Array.Empty<string>(), DateTimeOffset.UtcNow.AddMinutes(5).UtcTicks, Guid.NewGuid().ToString("N"));
         var tokenBytes = CanonicalizeTokenPayload(tokenPayload);
         var tokenSig = SmadCryptography.Sign(owner, tokenBytes);
-        var token = new UpdateToken(tokenPayload, tokenSig);
+        var token = new UpdateToken(tokenPayload, new(tokenSig));
         File.WriteAllBytes("valid_owned_sample_token.json", SerializeToken(token));
 
         _logger.LogInformation($"Applying valid token to add allowed hash: {allowedHash}");
@@ -157,10 +157,10 @@ public class ModularActorDataSecurity
         // --- Attempt forgery 2: attacker creates own keypair & signs token ---
         _logger.LogWarning("=== Forgery 2: attacker generates own keypair & signs malicious token ===");
         using var evil = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var malPayload = new UpdateTokenPayload(fileId, new[] { "evil-hash-666" }, Array.Empty<string>(), DateTimeOffset.UtcNow.AddMinutes(60).UtcTicks, Guid.NewGuid().ToString("N"));
+        var malPayload = new UpdateTokenPayload(fileId, [ "evil-hash-666" ], Array.Empty<string>(), DateTimeOffset.UtcNow.AddMinutes(60).UtcTicks, Guid.NewGuid().ToString("N"));
         var malBytes = CanonicalizeTokenPayload(malPayload);
         var malSig = SmadCryptography.Sign(evil, malBytes);
-        var malToken = new UpdateToken(malPayload, malSig);
+        var malToken = new UpdateToken(malPayload, new(malSig));
         File.WriteAllBytes("forged_update_token.json", SerializeToken(malToken));
 
         _logger.LogInformation("Applying attacker forged token...");
@@ -173,7 +173,7 @@ public class ModularActorDataSecurity
 
         var originalToken = DeserializeToken(File.ReadAllBytes("valid_owned_sample_token.json"));
         var tamperedPayload = new UpdateTokenPayload(fileId, [ "tampered-hash" ], Array.Empty<string>(), originalToken.Payload.ExpiresUtcTicks, originalToken.Payload.Nonce);
-        var tamperedToken = new UpdateToken(tamperedPayload, originalToken.OwnerSignature);
+        var tamperedToken = new UpdateToken(tamperedPayload, originalToken.Signature);
         File.WriteAllBytes("token_attacker_tampered.json", SerializeToken(tamperedToken));
         
         _logger.LogInformation("Applying tampered token...");
@@ -181,28 +181,28 @@ public class ModularActorDataSecurity
         _logger.LogInformation("Result: " + (tamperResult ? "ACCEPTED (BAD)" : "REJECTED (GOOD)") + "\n");
 
         // --- Attempt forgery 4: Successfully modify the file, however it becomes an invalid file ---
-        if (testOverrideExample)
-        {
-            _logger.LogWarning("=== Forgery 4: Attacker directly tampers with AllowedHashes in header ===");
-            var (origHeader, origCipher, origNonce, origTag) = ReadMcdfFile(basePath);
+        //if (testOverrideExample)
+        //{
+        //    _logger.LogWarning("=== Forgery 4: Attacker directly tampers with AllowedHashes in header ===");
+        //    var (origHeader, origCipher, origNonce, origTag) = ReadMcdfFile(basePath);
 
-            _logger.LogInformation("Original AllowedHashes: " + string.Join(",", origHeader.AllowedHashes));
-            // Attacker tampers with the header
-            var hacked = origHeader.AllowedHashes.ToList();
-            hacked.Add("evil-hash-direct-edit");
-            var tamperedHeader = new SmadHeader(origHeader.Version, origHeader.FileId, origHeader.Salt, origHeader.KeyHash, origHeader.OwnerPubKey, hacked.ToArray(), origHeader.OwnerHeaderSignature);
-            _logger.LogInformation("Writing tempered AllowedHashes into base.smab...");
+        //    _logger.LogInformation("Original AllowedHashes: " + string.Join(",", origHeader.Hashes));
+        //    // Attacker tampers with the header
+        //    var hacked = origHeader.Hashes.ToList();
+        //    hacked.Add("evil-hash-direct-edit");
+        //    var tamperedHeader = new SmabHeader(origHeader.Version, origHeader.Id, origHeader.Salt, origHeader.Key, origHeader.OwnerPubKey, hacked.ToArray(), origHeader.Signature);
+        //    _logger.LogInformation("Writing tempered AllowedHashes into base.smab...");
             
-            // Write modified header + original ciphertext
-            WriteSmadFile(basePath, tamperedHeader, origCipher, origNonce, origTag);
+        //    // Write modified header + original ciphertext
+        //    WriteSmadFile(basePath, tamperedHeader, origCipher, origNonce, origTag);
             
-            // Loader tries to decrypt
-            _logger.LogInformation("Attempting to load file after tampering...");
-            if (TryLoadAndValidate(basePath, testPassword, out var dec4, out var allowed4))
-                _logger.LogError($"Result: ACCEPTED (BAD - should never happen), Decrypted: {Encoding.UTF8.GetString(dec4)}, AllowedHashes: {string.Join(",", allowed4)}");
-            else
-                _logger.LogInformation($"Result: REJECTED (GOOD - AAD detected tampering)");
-        }
+        //    // Loader tries to decrypt
+        //    _logger.LogInformation("Attempting to load file after tampering...");
+        //    if (TryLoadAndValidate(basePath, testPassword, out var dec4, out var allowed4))
+        //        _logger.LogError($"Result: ACCEPTED (BAD - should never happen), Decrypted: {Encoding.UTF8.GetString(dec4)}, AllowedHashes: {string.Join(",", allowed4)}");
+        //    else
+        //        _logger.LogInformation($"Result: REJECTED (GOOD - AAD detected tampering)");
+        //}
 
 
         // --- Final loader check ---
@@ -219,23 +219,23 @@ public class ModularActorDataSecurity
     }
 
     // --- Serialization helpers ---
-    private byte[] SerializeHeader(SmadHeader h)
+    private byte[] SerializeHeader(SmabHeader h)
     {
         var opts = new JsonSerializerOptions { WriteIndented = false };
         var wrapper = new
         {
             Version = h.Version,
-            FileId = h.FileId,
+            FileId = h.Id,
             Salt = Convert.ToBase64String(h.Salt),
-            KeyHash = Convert.ToBase64String(h.KeyHash),
+            KeyHash = Convert.ToBase64String(h.Key),
             OwnerPubKey = Convert.ToBase64String(h.OwnerPubKey),
-            AllowedHashes = h.AllowedHashes,
-            OwnerHeaderSignature = h.OwnerHeaderSignature == null ? null : Convert.ToBase64String(h.OwnerHeaderSignature.Signature)
+            AllowedHashes = h.Hashes,
+            OwnerHeaderSignature = h.Signature == null ? null : h.Signature,
         };
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(wrapper, opts);
     }
 
-    private SmadHeader DeserializeHeader(byte[] json)
+    private SmabHeader DeserializeHeader(byte[] json)
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
@@ -244,14 +244,14 @@ public class ModularActorDataSecurity
         var salt = Convert.FromBase64String(root.GetProperty("Salt").GetString()!);
         var keyHash = Convert.FromBase64String(root.GetProperty("KeyHash").GetString()!);
         var ownerPub = Convert.FromBase64String(root.GetProperty("OwnerPubKey").GetString()!);
-        var initialAllowed = root.GetProperty("AllowedHashes").EnumerateArray().Select(e => e.GetString()).ToArray()!;
-        SignedHeaderSignature? sig = null;
+        var allowedHashes = root.GetProperty("AllowedHashes").EnumerateArray().Select(e => e.GetString()).ToArray()!;
+        OwnerSignature? sig = null;
         if (root.TryGetProperty("OwnerHeaderSignature", out var sElem) && sElem.ValueKind != JsonValueKind.Null)
         {
             var sbytes = Convert.FromBase64String(sElem.GetString()!);
-            sig = new SignedHeaderSignature(sbytes);
+            sig = new OwnerSignature(sbytes);
         }
-        return new SmadHeader(version, fileId, salt, keyHash, ownerPub, initialAllowed, sig);
+        return new SmabHeader(version, fileId, salt, keyHash, ownerPub, allowedHashes, sig);
     }
 
     private byte[] SerializeToken(UpdateToken t)
@@ -267,7 +267,7 @@ public class ModularActorDataSecurity
                 ExpiresUtcTicks = t.Payload.ExpiresUtcTicks,
                 Nonce = t.Payload.Nonce
             },
-            OwnerSignature = Convert.ToBase64String(t.OwnerSignature)
+            OwnerSignature = t.Signature
         };
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(wrapper, opts);
     }
@@ -281,8 +281,8 @@ public class ModularActorDataSecurity
         var adds = p.GetProperty("AddHashes").EnumerateArray().Select(x => x.GetString()!).ToArray();
         var removes = p.GetProperty("RemoveHashes").EnumerateArray().Select(x => x.GetString()!).ToArray();
         var expires = p.GetProperty("ExpiresUtcTicks").GetInt64();
-        var nonce = p.GetProperty("Nonce").GetString();
-        var sig = Convert.FromBase64String(root.GetProperty("OwnerSignature").GetString()!);
+        var nonce = p.GetProperty("Nonce").GetString() ?? string.Empty;
+        var sig = new OwnerSignature(Convert.FromBase64String(root.GetProperty("OwnerSignature").GetString()!));
         return new UpdateToken(new UpdateTokenPayload(fileId, adds, removes, expires, nonce), sig);
     }
 
@@ -308,7 +308,7 @@ public class ModularActorDataSecurity
     }
 
     // --- File format IO ---
-    private void WriteSmadFile(string path, SmadHeader header, byte[] cipher, byte[] nonce, byte[] tag)
+    private void WriteSmadFile(string path, SmabHeader header, byte[] cipher, byte[] nonce, byte[] tag)
     {
         var tmp = path + ".tmp";
         var headerJson = SerializeHeader(header);
@@ -328,7 +328,7 @@ public class ModularActorDataSecurity
         File.Move(tmp, path, true);
     }
 
-    private (SmadHeader header, byte[] cipher, byte[] nonce, byte[] tag) ReadMcdfFile(string path)
+    private (SmabHeader header, byte[] cipher, byte[] nonce, byte[] tag) ReadMcdfFile(string path)
     {
         using var fs = File.OpenRead(path);
         using var br = new BinaryReader(fs);
@@ -354,14 +354,14 @@ public class ModularActorDataSecurity
             var (header, cipher, nonce, tag) = ReadMcdfFile(mcdfPath);
 
             var candidate = SmadCryptography.DeriveKeyHash(providedPassword, header.Salt);
-            if (!candidate.SequenceEqual(header.KeyHash))
+            if (!candidate.SequenceEqual(header.Key))
             {
                 Console.WriteLine("[Load] Provided password fails KDF check.");
                 return false;
             }
 
             var fileSecret = SmadCryptography.DeriveFileSecret(providedPassword);
-            var aad = Encoding.UTF8.GetBytes(string.Join(",", header.AllowedHashes));
+            var aad = Encoding.UTF8.GetBytes(string.Join(",", header.Hashes));
             var plain = SmadCryptography.AesGcmDecrypt(cipher, nonce, tag, fileSecret, aad);
             Array.Clear(fileSecret);
             if (plain == null)
@@ -371,7 +371,7 @@ public class ModularActorDataSecurity
             }
 
             decryptedPayload = plain;
-            effectiveAllowed = header.AllowedHashes ?? Array.Empty<string>();
+            effectiveAllowed = header.Hashes ?? Array.Empty<string>();
             return true;
         }
         catch (Exception ex)
@@ -389,23 +389,23 @@ public class ModularActorDataSecurity
             var token = DeserializeToken(tokenBytes);
             var (header, cipher, nonce, tag) = ReadMcdfFile(mcdfPath);
 
-            if (token.Payload.FileId != header.FileId) return false;
+            if (token.Payload.FileId != header.Id) return false;
             if (token.Payload.ExpiresUtcTicks < DateTimeOffset.UtcNow.UtcTicks) return false;
 
             using var ownerPub = SmadCryptography.ImportPublic(header.OwnerPubKey);
             var data = CanonicalizeTokenPayload(token.Payload);
-            if (!SmadCryptography.Verify(ownerPub, data, token.OwnerSignature)) return false;
+            if (!SmadCryptography.Verify(ownerPub, data, token.Signature.Signature)) return false;
 
-            var allAllowed = header.AllowedHashes.ToList();
+            var allAllowed = header.Hashes.ToList();
             foreach (var a in token.Payload.AddHashes) if (!allAllowed.Contains(a)) allAllowed.Add(a);
             foreach (var r in token.Payload.RemoveHashes) if (allAllowed.Contains(r)) allAllowed.Remove(r);
 
-            var newHeader = new SmadHeader(header.Version, header.FileId, header.Salt, header.KeyHash, header.OwnerPubKey, allAllowed.ToArray(), header.OwnerHeaderSignature);
+            var newHeader = new SmabHeader(header.Version, header.Id, header.Salt, header.Key, header.OwnerPubKey, allAllowed.ToArray(), header.Signature);
 
             // --- re-encrypt using new AAD ---
             var fileSecret = SmadCryptography.DeriveFileSecret("base-password-123"); // for demo, we hardcode; in prod, pass correct password
-            var newAad = Encoding.UTF8.GetBytes(string.Join(",", newHeader.AllowedHashes));
-            var newCipherPlain = SmadCryptography.AesGcmDecrypt(cipher, nonce, tag, fileSecret, Encoding.UTF8.GetBytes(string.Join(",", header.AllowedHashes)))!;
+            var newAad = Encoding.UTF8.GetBytes(string.Join(",", newHeader.Hashes));
+            var newCipherPlain = SmadCryptography.AesGcmDecrypt(cipher, nonce, tag, fileSecret, Encoding.UTF8.GetBytes(string.Join(",", header.Hashes)))!;
             var (newCipher, newNonce, newTag) = SmadCryptography.AesGcmEncrypt(newCipherPlain, fileSecret, newAad);
             Array.Clear(fileSecret);
 

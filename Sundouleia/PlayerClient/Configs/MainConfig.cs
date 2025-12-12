@@ -20,6 +20,7 @@ public class ConfigStorage
     public bool CompactCache { get; set; } = true;
     public double MaxCacheInGiB { get; set; } = 20;
     public string CacheScanComplete { get; set; } = string.Empty;
+    [JsonIgnore] public string SMACacheFolder => Path.Combine(CacheFolder, Constants.SMAFolderName);
 
     // General
     public MainMenuTabs.SelectedTab MainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
@@ -37,8 +38,8 @@ public class ConfigStorage
     public bool RadarChatUnreadDtr { get; set; } = false;
     public bool RadarShowUnreadBubble { get; set; } = true;
 
-    // General - Exports
-    public string ExportFolderCDF { get; set; } = string.Empty;
+    // General - Sundouleia Modular Actor Files (Holds close relation with stored fileData...)
+    public string SMAExportFolder { get; set; } = string.Empty;
 
     // Preferences - Downloads
     public int DownloadLimitBytes { get; set; } = 0;

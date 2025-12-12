@@ -437,6 +437,51 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     }
 
     /// <summary>
+    ///     Collects up all transients, on-screen data, persistant transients, calculating the ownedObject's current modded state. <para />
+    ///     Used primarily for single SMAD related file operations.
+    /// </summary>
+    /// <returns> The modded files applied to this owned object at the time of calculation. </returns>
+    public async Task<ModdedState> CollectActorModdedState(OwnedObject kind, CancellationToken ct)
+    {
+        var moddedState = new ModdedState();
+
+        // Fail if no valid config.
+        if (!_config.HasValidCacheFolderSetup())
+        {
+            Logger.LogWarning("Cache Folder not setup! Cannot process mod files!");
+            return moddedState;
+        }
+
+        // Fail if owned object is not present.
+        var ownedAddr = _watcher.FromOwned(kind);
+        if (ownedAddr == IntPtr.Zero)
+        {
+            Logger.LogWarning($"Owned Object of kind {{{kind}}} not present! Cannot process mod files!");
+            return moddedState;
+        }
+
+        // A bit messy but can maybe clean up later idk.
+        ushort ownedIdx = ushort.MaxValue;
+        unsafe { ownedIdx = ((GameObject*)ownedAddr)->ObjectIndex; }
+        if (ownedIdx == ushort.MaxValue)
+        {
+            Logger.LogWarning($"Owned Object of kind {{{kind}}} has invalid index! Cannot process mod files!");
+            return moddedState;
+        }
+
+        // Collect the on-screen paths for this owned object.
+        if (await _ipc.Penumbra.GetCharacterResourcePathData(ownedIdx).ConfigureAwait(false) is not { } onScreenPaths)
+            throw new InvalidOperationException("Penumbra returned null data");
+
+        var objectFiles = (kind is OwnedObject.Player)
+            ? await CollectPlayerModdedFiles(onScreenPaths, ct)
+            : await CollectOtherModdedFiles(kind, onScreenPaths, ct);
+        // Store the result into the modded state.
+        moddedState.SetOwnedFiles(kind, objectFiles);
+        return moddedState;
+    }
+
+    /// <summary>
     ///     Collects up all transients, on-screen data, and persistent transients, calculating the Client's current modded state. <para />
     ///     TODO: Separate this to process all owned objects concurrently, with special logic for pets.
     /// </summary>
@@ -483,7 +528,6 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
             ct.ThrowIfCancellationRequested();
         }
 
-        // WARNING: May want to move where this is published, as this can be called fairly frequently.
         // Inform the mediator that we calculated our modded state.
         Mediator.Publish(new ModdedStateCollected(moddedState));
 

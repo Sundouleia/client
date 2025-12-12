@@ -17,7 +17,7 @@ public class FileCacheEntity
     public long? CompressedSize { get; set; }
     public string CsvEntry => $"{Hash}{Constants.CsvSplit}{PrefixedFilePath}{Constants.CsvSplit}{LastModifiedDateTicks}|{Size ?? -1}|{CompressedSize ?? -1}";
     public string Hash { get; set; }
-    public bool IsCacheEntry => PrefixedFilePath.StartsWith(Constants.PrefixCache, StringComparison.OrdinalIgnoreCase);
+    public bool IsCacheEntry => PrefixedFilePath.StartsWith(Constants.PrefixCache, StringComparison.OrdinalIgnoreCase); // Should do something here for SMACache Entries.
     public string LastModifiedDateTicks { get; set; }
     public string PrefixedFilePath { get; init; }
     public string ResolvedFilepath { get; private set; } = string.Empty;

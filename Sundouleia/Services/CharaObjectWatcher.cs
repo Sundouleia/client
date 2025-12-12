@@ -1,6 +1,7 @@
 using CkCommons;
 using Dalamud.Hooking;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Sundouleia.Pairs;
@@ -172,6 +173,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     private unsafe void CollectInitialData()
     {
         var objManager = GameObjectManager.Instance();
+        // Standard Actor Handling.
         for (var i = 0; i < 200; i++)
         {
             GameObject* obj = objManager->Objects.IndexSorted[i];

@@ -103,7 +103,7 @@ public class FolderConfig : IHybridSavable
     {
         if (data is not JObject serverNicknames)
             return;
-        Current = serverNicknames.ToObject<FolderStorage>() ?? throw new Exception("Failed to load GroupsStorage.");
+        Current = serverNicknames.ToObject<FolderStorage>() ?? throw new Exception("Failed to load FolderStorage.");
         // Clean up any invalid group entries. Invalid entries have empty names or an FAI value of 0.
         Current.Groups.RemoveAll(g => g.Icon == 0 || g.Label.IsNullOrWhitespace());
     }

@@ -2,24 +2,23 @@
 
 namespace Sundouleia.ModFiles.Cache;
 
-// Might be possible to split this up into different files but we will see.
-// I personally would prefer it since this looks a bit messy.
-public sealed class SundouleiaWatcher : IDisposable
+// Monitors the cached files of loaded Sundouleia Modular Actors while inside GPose.
+public sealed class ModularActorWatcher : IDisposable
 {
-    private readonly ILogger<SundouleiaWatcher> _logger;
+    private readonly ILogger<ModularActorWatcher> _logger;
     private readonly MainConfig _config;
-    private readonly FileCacheManager _fileDbManager;
+    private readonly SMAFileCacheManager _smaCacheManager;
 
     private readonly ConcurrentQueue<KeyValuePair<string, WatcherChange>> _changeQueue = new();
     private readonly CancellationTokenSource _processingCts = new();
     private Task? _processingTask;
     record WatcherChange(WatcherChangeTypes ChangeType, string? OldPath = null);
 
-    public SundouleiaWatcher(ILogger<SundouleiaWatcher> logger, MainConfig config, FileCacheManager fileDbManager)
+    public ModularActorWatcher(ILogger<ModularActorWatcher> logger, MainConfig config, SMAFileCacheManager smaCacheManager)
     {
         _logger = logger;
         _config = config;
-        _fileDbManager = fileDbManager;
+        _smaCacheManager = smaCacheManager;
         // Start the background processing task.
         _processingTask = Task.Run(ProcessChangesAsync, _processingCts.Token);
     }
@@ -37,21 +36,28 @@ public sealed class SundouleiaWatcher : IDisposable
 
     public void StopMonitoring()
     {
-        _logger.LogInformation("Stopping monitoring of the Sundeouleia storage folder");
+        _logger.LogInformation("Stopping monitoring of the SMA storage folders");
         Watcher?.Dispose();
         Watcher = null;
     }
 
-    public void StartWatcher(string? sundeouleiaPath)
+    public void StartWatcher(string? smaCachePath)
     {
         // Stop the current file system watcher regardless of if valid or not.
         Watcher?.Dispose();
         // If it is an invalid directory, null the watcher and return.
-        if (string.IsNullOrEmpty(sundeouleiaPath) || !Directory.Exists(sundeouleiaPath))
+        if (string.IsNullOrEmpty(smaCachePath))
         {
             Watcher = null;
-            _logger.LogWarning("Sundeouleia file path is not set, cannot start the FSW for Sundeouleia.");
+            _logger.LogWarning("Invalid SMA path provided. Cannot start watcher.");
             return;
+        }
+
+        // If the directory does not yet exist, create it.
+        if (!Directory.Exists(smaCachePath))
+        {
+            Directory.CreateDirectory(smaCachePath);
+            _logger.LogInformation($"Created missing SMA cache directory at: {smaCachePath}");
         }
 
         // Otherwise get the drive information on the defined cache folder. (not the one we passed in)
@@ -62,10 +68,10 @@ public sealed class SundouleiaWatcher : IDisposable
         _logger.LogInformation($"Storage is on NTFS drive: {StorageisNTFS}");
 
         // Begin the FileSystemWatcher for the defined path we have passed in.
-        _logger.LogDebug($"Initializing Sundeouleia FileSystemWatcher for: {sundeouleiaPath}");
+        _logger.LogDebug($"Initializing SMA FileSystemWatcher for: {smaCachePath}");
         Watcher = new()
         {
-            Path = sundeouleiaPath,
+            Path = smaCachePath,
             InternalBufferSize = 8388608,
             NotifyFilter = NotifyFilters.CreationTime
                 | NotifyFilters.LastWrite
@@ -73,7 +79,7 @@ public sealed class SundouleiaWatcher : IDisposable
                 | NotifyFilters.DirectoryName
                 | NotifyFilters.Size,
             Filter = "*.*",
-            IncludeSubdirectories = false, // should only ever be one large folder.
+            IncludeSubdirectories = false,
         };
         // Only want created and deleted here, should not track date modified things.
         Watcher.Deleted += File_Changed;
@@ -82,16 +88,16 @@ public sealed class SundouleiaWatcher : IDisposable
     }
 
     /// <summary>
-    ///     If a file was deleted, created, or changed within the penumbra directory.
+    ///     If a file was deleted or created in the SMA directory.
     /// </summary>
     private void File_Changed(object sender, FileSystemEventArgs e)
     {
-        // Only need to filter by valid extensions, as we know nothing else is in this folder.
-        if (!Constants.ValidExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
+        // Workaround to allow filtering for multiple extension types.
+        if (!Constants.SMAExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
             return;
         // Enqueue the change for processing. (Avoid fire-and-forget)
         _changeQueue.Enqueue(new(e.FullPath, new WatcherChange(e.ChangeType)));
-        _logger.LogTrace($"FS-Watcher Event: {e.ChangeType} on {e.FullPath}");
+        _logger.LogDebug($"FS-Watcher Event: {e.ChangeType} on {e.FullPath}");
     }
 
     /// <summary>
@@ -107,10 +113,6 @@ public sealed class SundouleiaWatcher : IDisposable
         {
             // Allow delay before processing changes. (Slightly faster than penumbras folder)
             await Task.Delay(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
-
-            // If we are currently running an invoked scan, await for it to complete.
-            // TODO: Add logic for this here.
-            // (we COULD try to see if we blow up when processing a change during a scan but idk if it just screenshots or not)
 
             // Dequeue all changes (this also ensures they are distinct)
             while (_changeQueue.TryDequeue(out var change))
@@ -129,7 +131,7 @@ public sealed class SundouleiaWatcher : IDisposable
     /// </summary>
     private void HandleChanges(Dictionary<string, WatcherChange> changes)
     {
-        lock (_fileDbManager)
+        lock (_smaCacheManager)
         {
             var deletedEntries = changes.Where(c => c.Value.ChangeType == WatcherChangeTypes.Deleted).Select(c => c.Key);
             var renamedEntries = changes.Where(c => c.Value.ChangeType == WatcherChangeTypes.Renamed);
@@ -150,8 +152,8 @@ public sealed class SundouleiaWatcher : IDisposable
                 .Concat(remainingEntries)
                 .ToArray();
 
-            _ = _fileDbManager.GetFileCachesByPaths(allChanges);
-            _fileDbManager.WriteOutFullCsv();
+            _ = _smaCacheManager.GetFileCachesByPaths(allChanges);
+            // Do not write out the csv, we have no use for it as this is relatively temporary.
         }
     }
 }

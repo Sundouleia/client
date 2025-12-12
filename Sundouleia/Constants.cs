@@ -30,11 +30,13 @@ public static class Constants
     ];
 
     // CachePrefixes
+    public const string SMAFolderName = "ModularActorCache";
     public const string PrefixCache = "{cache}";
     public const string PrefixPenumbra = "{penumbra}";
     public const string CsvSplit = "|";
     // File Filtering.
+    public static readonly IImmutableList<string> SMAExtensions     = [".smad", ".smab", ".smao", ".smai", ".smaip"];
     public static readonly IImmutableList<string> ValidExtensions   = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".pbd", ".scd", ".skp", ".shpk"];
-    public static readonly IEnumerable<string> HandledExtensions   = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
+    public static readonly IEnumerable<string> HandledExtensions    = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
     public static readonly IEnumerable<string> MdlMtrlTexExtensions = ["tex", "mdl", "mtrl"];
 }

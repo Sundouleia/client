@@ -163,6 +163,23 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         GetAccessInfo.RegisterFunc((address) => _handledSundesmos.TryGetValue(address, out var access) ? access : (MoodleAccess.None, 0, MoodleAccess.None, 0));
         // register loaders
         LoadSmadFile.RegisterFunc(LoadSMAD);
+        LoadSmabFile.RegisterFunc(LoadSMAB);
+        LoadSmaoFile.RegisterFunc(LoadSMAO);
+        LoadSmaoFiles.RegisterFunc(LoadSMAO);
+        LoadSmaiFile.RegisterFunc(LoadSMAI);
+        LoadSmaiFiles.RegisterFunc(LoadSMAI);
+        LoadSmaipFile.RegisterFunc(LoadSMAIP);
+        // register async loaders
+        LoadSmadFileAsync.RegisterFunc(LoadSMADAsync);
+        LoadSmabFileAsync.RegisterFunc(LoadSMABAsync);
+        LoadSmaoFileAsync.RegisterFunc(LoadSMAOAsync);
+        LoadSmaoFilesAsync.RegisterFunc(LoadSMAOAsync);
+        LoadSmaiFileAsync.RegisterFunc(LoadSMAIAsync);
+        LoadSmaiFilesAsync.RegisterFunc(LoadSMAIAsync);
+        LoadSmaipFileAsync.RegisterFunc(LoadSMAIPAsync);
+        // register validators
+        IsFileValid.RegisterFunc(ValidateFile);
+        IsUpdateFileValid.RegisterFunc(ValidateUpdateFile);
 
         Logger.LogInformation("Started IpcProviderService");
         NotifyReady();

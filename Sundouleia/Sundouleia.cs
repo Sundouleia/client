@@ -142,11 +142,15 @@ public static class SundouleiaServiceExtensions
 
         // Modular Actor Data
         .AddSingleton<ModularActorManager>()
-
-        // Mod Files (revise)
+        .AddSingleton<ModularActorFileHandler>()
+        .AddSingleton<ModularActorHandler>()
         .AddSingleton<ActorAnalyzer>()
+
+        // Mod Files
         .AddSingleton<PenumbraWatcher>()
         .AddSingleton<SundouleiaWatcher>()
+        .AddSingleton<ModularActorWatcher>()
+        .AddSingleton<SMAFileCacheManager>()
         .AddSingleton<FileCacheManager>()
         .AddSingleton<FileDownloader>()
         .AddSingleton<FileUploader>()
@@ -223,6 +227,7 @@ public static class SundouleiaServiceExtensions
     => services
         .AddSingleton<MainConfig>()
         .AddSingleton<FolderConfig>()
+        .AddSingleton<ModularActorsConfig>()
         .AddSingleton<NickConfig>()
         .AddSingleton<FavoritesConfig>()
         .AddSingleton<AccountConfig>()
@@ -262,9 +267,10 @@ public static class SundouleiaServiceExtensions
         .AddScoped<RadarChatTab>()
 
         // Scoped Modules
-        .AddScoped<GroupsUI>()
         .AddScoped<WindowMediatorSubscriberBase, ActorOptimizerUI>()
-        .AddScoped<WindowMediatorSubscriberBase, GroupsUI>()
+        .AddScoped<WindowMediatorSubscriberBase, SMACreatorUI>()
+        .AddScoped<WindowMediatorSubscriberBase, SMAManagerUI>()
+        .AddScoped<WindowMediatorSubscriberBase, SMAControllerUI>()
         .AddScoped<WindowMediatorSubscriberBase, TransferBarUI>()
         .AddScoped<WindowMediatorSubscriberBase, RadarChatPopoutUI>()
 

@@ -46,6 +46,7 @@ public sealed class UiFileDialogService : IDisposable
         _manager.OpenFileDialog(title, filters, CreateCallback(title, callback), selectionCountMax, GetStartPath(title, startPath, forceStartPath));
     }
 
+    // Add one with a startpath.
     public void OpenSingleFilePicker(string title, string filters, Action<bool, string> callback)
     {
         _isOpen = true;
@@ -56,6 +57,12 @@ public sealed class UiFileDialogService : IDisposable
     {
         _isOpen = true;
         _manager.OpenFolderDialog(title, CreateCallback(title, callback), GetStartPath(title, startPath, forceStartPath));
+    }
+
+    public void SaveFile(string title, string filters, string defaultFileName, string defaultExtension, Action<bool, string> callback, string? startPath, bool forceStartPath)
+    {
+        _isOpen = true;
+        _manager.SaveFileDialog(title, filters, defaultFileName, defaultExtension, CreateCallback(title, callback), GetStartPath(title, startPath, forceStartPath));
     }
 
     public void Reset()

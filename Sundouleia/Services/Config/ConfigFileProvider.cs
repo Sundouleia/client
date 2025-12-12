@@ -1,4 +1,5 @@
 using CkCommons.HybridSaver;
+using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Services.Configs;
 
@@ -20,16 +21,22 @@ public class ConfigFileProvider : IConfigFileProvider
     
     // Shared Configs
     public readonly string MainConfig;
-    public readonly string TransientCache;
-    public readonly string PlzNoCrashFriends;
+    public readonly string ModularActorsConfig;
     public readonly string RecentChatLog;
     public readonly string Favorites;
-    public readonly string LoadedResources;
-    public readonly string FileCacheCsv;
     public readonly string NicknameConfig;
     public readonly string AccountConfig;
+    // Shared Sync-related Configs
+    public readonly string TransientCache;
+    public readonly string PlzNoCrashFriends;
+    public readonly string LoadedResources;
+    public readonly string FileCacheCsv;
+
+    // Shared FileSystem Configs.
     public string DDS_Requests => Path.Combine(FileSysDirectory, "dds-requests.json");
     public string DDS_Whitelist => Path.Combine(FileSysDirectory, "dds-whitelist.json");
+
+    // Maybe Maybe not? Unsure how I want to display this yet.
     public string DDS_MCDFData => Path.Combine(FileSysDirectory, "dds-mcdfdata.json");
     public string DDS_Radar => Path.Combine(FileSysDirectory, "dds-radar.json");
 
@@ -58,6 +65,7 @@ public class ConfigFileProvider : IConfigFileProvider
 
         // Configs.
         MainConfig = Path.Combine(SundouleiaDirectory, "config.json");
+        ModularActorsConfig = Path.Combine(SundouleiaDirectory, "modularactors.json");
         TransientCache = Path.Combine(SundouleiaDirectory, "transientcache.json");
         PlzNoCrashFriends = Path.Combine(SundouleiaDirectory, "plznocrashfriends.json");
         RecentChatLog = Path.Combine(SundouleiaDirectory, "chat-recent.json");

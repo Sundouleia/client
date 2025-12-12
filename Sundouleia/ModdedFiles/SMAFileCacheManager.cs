@@ -12,50 +12,49 @@ using System.Globalization;
 namespace Sundouleia.ModFiles;
 
 /// <summary>
-///     Manages the contents of the FileCache.csv file
+///     Helps manage cached file entries reflecting the files in the SMA Cache Directory.
 /// </summary>
-public sealed class FileCacheManager : IHostedService
+public sealed class SMAFileCacheManager : IHostedService
 {
-    private readonly ILogger<FileCacheManager> _logger;
+    private readonly ILogger<SMAFileCacheManager> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
-    private readonly IpcManager _ipc;
     private readonly ConfigFileProvider _fileNames;
 
-    // File cache entities of current files stored in the cache.
     private readonly ConcurrentDictionary<string, List<FileCacheEntity>> _fileCaches = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _getCachesByPathsSemaphore = new(1, 1);
     private readonly object _fileWriteLock = new();
 
-    public FileCacheManager(ILogger<FileCacheManager> logger, SundouleiaMediator mediator,
-        MainConfig config, IpcManager ipc, ConfigFileProvider fileNames)
+    public SMAFileCacheManager(ILogger<SMAFileCacheManager> logger, SundouleiaMediator mediator,
+        MainConfig config, ConfigFileProvider fileNames)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
-        _ipc = ipc;
         _fileNames = fileNames;
     }
 
     public int TotalCacheEntities => _fileCaches.Sum(k => k.Value.Count);
-    private string CsvBakPath => _fileNames.FileCacheCsv + ".bak";
+    public bool IsCacheValid => _config.HasValidSMACache(); 
 
-    public bool CacheFolderIsValid() => _config.HasValidCacheFolderSetup();
-
+    // RETURN TO THIS
     /// <summary>
-    ///     Creates a new entity to reflect the provided sundouleia file path, if it exists. <para />
-    ///     The created entity is then returned, or null if invalid.
+    ///     Create s a new entity that reflects the provided file path, if the path exists. (Unsure if we use this)
     /// </summary>
     public FileCacheEntity? CreateCacheEntry(string path)
     {
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
-        _logger.LogTrace($"Creating cache entry for {path}", LoggerType.FileCache);
+
+        _logger.LogTrace($"Creating cache entry for {path}");
         var fullName = fi.FullName.ToLowerInvariant();
-        if (!fullName.Contains(_config.Current.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
-        string prefixedPath = fullName.Replace(_config.Current.CacheFolder.ToLowerInvariant(), Constants.PrefixCache + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+        // Fail if it is not in our valid cache path.
+        if (!fullName.Contains(_config.Current.SMACacheFolder.ToLowerInvariant(), StringComparison.Ordinal))  return null;
+        // Get the prefixed path.
+        string prefixedPath = fullName.Replace(_config.Current.SMACacheFolder.ToLowerInvariant(), Constants.PrefixCache + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath);
     }
+
 
     /// <summary>
     ///     Creates a new entity to reflect the provided penumbra file path, if the file exists. <para />
@@ -162,11 +161,11 @@ public sealed class FileCacheManager : IHostedService
     }
 
 
-    // Used mainly for download management.
+    // Used mainly for download management and MCDF handling.
     public string GetCacheFilePath(string hash, string extension)
         => Path.Combine(_config.Current.CacheFolder, hash + "." + extension);
 
-    // Used mainly for download management.
+    // Used mainly for download management and MCDF handling.
     public async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
     {
         var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
@@ -327,33 +326,6 @@ public sealed class FileCacheManager : IHostedService
         return (FileState.Valid, fileCache);
     }
 
-    public void WriteOutFullCsv()
-    {
-        lock (_fileWriteLock)
-        {
-            StringBuilder sb = new();
-            // hellfire, but optimal i guess.
-            foreach (var entry in _fileCaches.SelectMany(k => k.Value).OrderBy(f => f.PrefixedFilePath, StringComparer.OrdinalIgnoreCase))
-                sb.AppendLine(entry.CsvEntry);
-
-            // Make a backup!
-            if (File.Exists(_fileNames.FileCacheCsv))
-                File.Copy(_fileNames.FileCacheCsv, CsvBakPath, overwrite: true);
-
-            // Write all text to the main one, and then delete the backup if successful.
-            try
-            {
-                File.WriteAllText(_fileNames.FileCacheCsv, sb.ToString());
-                File.Delete(CsvBakPath);
-            }
-            catch
-            {
-                // Otherwise, write all text to the backup path so we dont lose everything.
-                File.WriteAllText(CsvBakPath, sb.ToString());
-            }
-        }
-    }
-
     // something something pair handler voodoo magic wowie crazy world.
     internal FileCacheEntity MigrateFileHashToExtension(FileCacheEntity fileCache, string ext)
     {
@@ -461,130 +433,12 @@ public sealed class FileCacheManager : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting FileCacheManager");
-
-        lock (_fileWriteLock)
-        {
-            try
-            {
-                _logger.LogInformation($"Checking for {CsvBakPath}", LoggerType.FileCsv);
-
-                if (File.Exists(CsvBakPath))
-                {
-                    _logger.LogInformation($"{CsvBakPath} found, moving to {_fileNames.FileCacheCsv}", LoggerType.FileCsv);
-                    File.Move(CsvBakPath, _fileNames.FileCacheCsv, overwrite: true);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to move BAK to ORG, deleting BAK");
-                try
-                {
-                    if (File.Exists(CsvBakPath))
-                        File.Delete(CsvBakPath);
-                }
-                catch (Exception ex1)
-                {
-                    _logger.LogWarning(ex1, "Could not delete bak file");
-                }
-            }
-        }
-
-        if (File.Exists(_fileNames.FileCacheCsv))
-        {
-            if (IpcCallerPenumbra.APIAvailable && string.IsNullOrEmpty(IpcCallerPenumbra.ModDirectory))
-                _ipc.Penumbra.CheckModDirectory();
-
-            if (!IpcCallerPenumbra.APIAvailable || string.IsNullOrEmpty(IpcCallerPenumbra.ModDirectory))
-            {
-                _mediator.Publish(new NotificationMessage("Penumbra not connected", "Could not load local file cache data. " +
-                    "Penumbra is not connected or not properly set up. Please enable and/or configure Penumbra properly to use Sundeouleia." +
-                    "After, reload Sundeouleia in the Plugin installer.", NotificationType.Error));
-            }
-
-            _logger.LogInformation($"{_fileNames.FileCacheCsv} found, parsing");
-
-            bool success = false;
-            string[] entries = [];
-            int attempts = 0;
-            while (!success && attempts < 10)
-            {
-                try
-                {
-                    _logger.LogInformation($"Attempting to read {_fileNames.FileCacheCsv}", LoggerType.FileCsv);
-                    entries = File.ReadAllLines(_fileNames.FileCacheCsv);
-                    success = true;
-                }
-                catch (Exception ex)
-                {
-                    attempts++;
-                    _logger.LogWarning($"Could not open {_fileNames.FileCacheCsv}, trying again: {ex}");
-                    Thread.Sleep(100);
-                }
-            }
-
-            if (!entries.Any())
-            {
-                _logger.LogWarning($"Could not load entries from {_fileNames.FileCacheCsv}, continuing with empty file cache");
-            }
-
-            _logger.LogInformation($"Found {entries.Length} files in {_fileNames.FileCacheCsv}", LoggerType.FileCsv);
-
-            Dictionary<string, bool> processedFiles = new(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in entries)
-            {
-                var splittedEntry = entry.Split(Constants.CsvSplit, StringSplitOptions.None);
-                try
-                {
-                    var hash = splittedEntry[0];
-                    if (hash.Length != Constants.Blake3HashLength) 
-                        throw new InvalidOperationException($"Expected Hash length of {Constants.Blake3HashLength}, received {hash.Length}");
-                    
-                    var path = splittedEntry[1];
-                    var time = splittedEntry[2];
-
-                    if (processedFiles.ContainsKey(path))
-                    {
-                        _logger.LogWarning($"Already processed {path}, ignoring");
-                        continue;
-                    }
-
-                    processedFiles.Add(path, value: true);
-
-                    long size = -1;
-                    long compressed = -1;
-                    if (splittedEntry.Length > 3)
-                    {
-                        if (long.TryParse(splittedEntry[3], CultureInfo.InvariantCulture, out long result))
-                        {
-                            size = result;
-                        }
-                        if (long.TryParse(splittedEntry[4], CultureInfo.InvariantCulture, out long resultCompressed))
-                        {
-                            compressed = resultCompressed;
-                        }
-                    }
-                    AddHashedFile(ReplacePathPrefixes(new FileCacheEntity(hash, path, time, size, compressed)));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning($"Failed to initialize entry {entry}, ignoring: {ex}");
-                }
-            }
-
-            if (processedFiles.Count != entries.Length)
-            {
-                WriteOutFullCsv();
-            }
-        }
-
-        _logger.LogInformation("Started FileCacheManager");
         return Task.CompletedTask;
     }
 
     // Upon the plugin stopping, write out the full CSV for the current state.
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        WriteOutFullCsv();
         return Task.CompletedTask;
     }
 }

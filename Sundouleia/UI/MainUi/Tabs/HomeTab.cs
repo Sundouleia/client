@@ -2,6 +2,7 @@ using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
@@ -157,19 +158,18 @@ public class HomeTab
         var buttonWidth = (region.X - ImUtf8.ItemInnerSpacing.X) / 2;
         using (ImRaii.Group())
         {
-            if (CkGui.FancyButton(FAI.PeopleGroup, "Manage Groups", buttonWidth, false))
-                _mediator.Publish(new UiToggleMessage(typeof(GroupsUI)));
-            CkGui.AttachToolTip("Create, arrange, delete, and manage Groups.");
-
             if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
             CkGui.AttachToolTip("Inspect data of owned actors!");
 
-            if (CkGui.FancyButton(FAI.FileExport, "MCDF Controller", buttonWidth, true))
-            {
-                // Something.
-            }
-            CkGui.AttachToolTip("Export and Organize MCDF's.");
+            if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", buttonWidth, false))
+                _mediator.Publish(new UiToggleMessage(typeof(SMAManagerUI)));
+            CkGui.AttachToolTip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
+
+            if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", buttonWidth, false))
+                _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
+            CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
+                "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
 
             if (CkGui.FancyButton(FAI.Trophy, "Achievements", buttonWidth, true))
             {
@@ -207,19 +207,18 @@ public class HomeTab
 
     private void DrawButtonList(Vector2 region)
     {
-        if (CkGui.FancyButton(FAI.PeopleGroup, "Manage Groups", region.X, false))
-            _mediator.Publish(new UiToggleMessage(typeof(GroupsUI)));
-        CkGui.AttachToolTip("Create, arrange, delete, and manage Groups.");
-
-        if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", region.X, true))
+        if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", region.X, false))
             _mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
         CkGui.AttachToolTip("Inspect data of owned actors!");
 
-        if (CkGui.FancyButton(FAI.FileExport, "MCDF Controller", region.X, true))
-        {
-            // Something.
-        }
-        CkGui.AttachToolTip("Export and Organize MCDF's.");
+        if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", region.X, false))
+            _mediator.Publish(new UiToggleMessage(typeof(SMAManagerUI)));
+        CkGui.AttachToolTip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
+
+        if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", region.X, false))
+            _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
+        CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
+            "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
 
         if (CkGui.FancyButton(FAI.Trophy, "Achievements", region.X, true))
         {

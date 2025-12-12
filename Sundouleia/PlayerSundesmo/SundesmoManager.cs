@@ -205,6 +205,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     {
         Logger.LogDebug("Disposing all Pairs", LoggerType.PairManagement);
         var pairCount = _allSundesmos.Count;
+        // Replace with Parallel.ForEach after testing.
         foreach (var sundesmo in _allSundesmos.Values)
         {
             DisposeSundesmo(sundesmo);

@@ -16,8 +16,8 @@ public unsafe class OnTickService : IHostedService
 
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     // Conditions we want to track.
-    private bool _isInGPose = false;
-    private bool _isInCutscene = false;
+    public static bool InGPose { get; private set; } = false;
+    public static bool InCutscene { get; private set; } = false;
 
     public OnTickService(ILogger<OnTickService> logger, SundouleiaMediator mediator)
     {
@@ -50,30 +50,30 @@ public unsafe class OnTickService : IHostedService
         var isNormal = DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(1);
 
         // Check for cutscene changes, but there is probably an event for this somewhere.
-        if (PlayerData.InCutscene && !_isInCutscene)
+        if (PlayerData.InCutscene && !InCutscene)
         {
             _logger.LogDebug("Cutscene start");
-            _isInCutscene = true;
+            InCutscene = true;
             _mediator.Publish(new CutsceneBeginMessage());
         }
-        else if (!PlayerData.InCutscene && _isInCutscene)
+        else if (!PlayerData.InCutscene && InCutscene)
         {
             _logger.LogDebug("Cutscene end");
-            _isInCutscene = false;
+            InCutscene = false;
             _mediator.Publish(new CutsceneEndMessage());
         }
 
         // Check for GPose changes (this also is likely worthless.
-        if (PlayerData.IsInGPose && !_isInGPose)
+        if (PlayerData.IsInGPose && !InGPose)
         {
             _logger.LogDebug("Gpose start");
-            _isInGPose = true;
+            InGPose = true;
             _mediator.Publish(new GPoseStartMessage());
         }
-        else if (!PlayerData.IsInGPose && _isInGPose)
+        else if (!PlayerData.IsInGPose && InGPose)
         {
             _logger.LogDebug("Gpose end");
-            _isInGPose = false;
+            InGPose = false;
             _mediator.Publish(new GPoseEndMessage());
         }
 
