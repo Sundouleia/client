@@ -29,6 +29,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         LoadData();
 
         Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => UpdateFolders());
+        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ => UpdateFolder(Constants.FolderTagVisible));
 
         // Subscribe to the changes (which is to change very, very soon, with overrides.
         DDSChanged += OnChange;
@@ -112,7 +113,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         {
             anyChanges |= Delete(Constants.FolderTagOnline);
             anyChanges |= Delete(Constants.FolderTagOffline);
-            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll, 
+            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll,
                                         uint.MaxValue, () => _sundesmos.DirectPairs, DynamicSorterEx.AllFolderSorter));
         }
         // Return if anything was modified.
@@ -129,9 +130,9 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
     public string GetFileName(ConfigFileProvider files, out bool isAccountUnique)
         => (isAccountUnique = false, files.DDS_Whitelist).Item2;
 
-    public string JsonSerialize() 
+    public string JsonSerialize()
         => throw new NotImplementedException();
 
-    public void WriteToStream(StreamWriter writer) 
+    public void WriteToStream(StreamWriter writer)
         => SaveToFile(writer);
 }

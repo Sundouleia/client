@@ -58,7 +58,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         => root;
 
     // Temporary for debugger assistance.
-    public IReadOnlyDictionary<string, IDynamicCollection<T>> FolderMap 
+    public IReadOnlyDictionary<string, IDynamicCollection<T>> FolderMap
         => _folderMap;
 
     // Attempts to get a DynamicFolderGroup by its name, returning true if found.
@@ -116,7 +116,7 @@ public abstract partial class DynamicDrawSystem<T> where T : class
         // Ensure Validity. If parent is null or the id counter is off, fail creation.
         if (folder.Parent is null)
             return false;
-        
+
         if (folder.ID != idCounter + 1u)
             return false;
 
@@ -149,6 +149,14 @@ public abstract partial class DynamicDrawSystem<T> where T : class
     {
         folder.Update(out var removed);
         CollectionUpdated?.Invoke(CollectionUpdate.FolderUpdated, folder, removed);
+    }
+
+    public void UpdateFolder(string folderName)
+    {
+        if (_folderMap.TryGetValue(folderName, out var folder) && folder is DynamicFolder<T> f)
+        {
+            UpdateFolder(f);
+        }
     }
 
     public void SetSortDirection(IDynamicCollection<T> folder, bool isDescending)
@@ -326,12 +334,12 @@ public abstract partial class DynamicDrawSystem<T> where T : class
 
             case Result.CircularReference:
                 throw new Exception($"Can not move {folder.FullPath} into {newParent.FullPath} since folders can not contain themselves.");
-            
+
             case Result.ItemExists:
                 // if and only if both folders are FolderCollections, should we allow a merge to occur.
-                
+
                 // Fix this as we tackle the merging territory.
-                
+
                 //var matchingIdx = Search(newParent, folder.Name);
                 //// If we meet criteria to merge, do so.
                 //if (folder is DynamicFolderGroup<T> fc && newParent.Children[matchingIdx] is DynamicFolderGroup<T> destFolder)
@@ -346,18 +354,18 @@ public abstract partial class DynamicDrawSystem<T> where T : class
 
     public void Merge(DynamicFolderGroup<T> from, DynamicFolderGroup<T> to)
     {
-        switch(MergeFolders(from, to))
+        switch (MergeFolders(from, to))
         {
             case Result.SuccessNothingDone:
                 return;
 
             case Result.InvalidOperation:
                 throw new Exception($"Can not merge root directory into {to.FullPath}.");
-            
+
             case Result.Success:
                 DDSChanged?.Invoke(DDSChange.CollectionMerged, from, from, to);
                 return;
-            
+
             case Result.PartialSuccess:
                 DDSChanged?.Invoke(DDSChange.CollectionMerged, from, from, to);
                 return;
