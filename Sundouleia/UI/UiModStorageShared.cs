@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Helpers;
@@ -14,7 +15,6 @@ using Sundouleia.ModFiles.Cache;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.WebAPI.Files;
-using System.Text.RegularExpressions;
 
 namespace Sundouleia.Gui;
 
@@ -37,8 +37,8 @@ public partial class UiFileCacheShared
     private bool _isMonitoring => _mainWatcher.Watcher is not null;
 
 
-    public UiFileCacheShared(ILogger<UiFileCacheShared> logger, MainConfig config, FileUploader uploader, 
-        FileCompactor compactor, CacheMonitor monitor, SundouleiaWatcher mainWatcher, PenumbraWatcher penumbraWatcher, 
+    public UiFileCacheShared(ILogger<UiFileCacheShared> logger, MainConfig config, FileUploader uploader,
+        FileCompactor compactor, CacheMonitor monitor, SundouleiaWatcher mainWatcher, PenumbraWatcher penumbraWatcher,
         UiFileDialogService dialogService)
     {
         _logger = logger;
@@ -210,7 +210,7 @@ public partial class UiFileCacheShared
     private void DrawPenumbraWatcherControls(float offsetX, bool allWatchersValid)
     {
         ImGui.SameLine(ImGui.GetContentRegionAvail().X - offsetX);
-        if (CkGui.IconTextButton(FAI.Play, "Restart", disabled: _penumbraWatcher.Watcher is not null, id: "penMonitor"))
+        if (CkGui.IconTextButton(FAI.Play, "Restart", disabled: _penumbraWatcher.Watcher is not null, id: "penMonitorRestart"))
         {
             _penumbraWatcher.StartWatcher(IpcCallerPenumbra.ModDirectory);
             if (allWatchersValid)
@@ -220,7 +220,7 @@ public partial class UiFileCacheShared
             "--NL--If the button remains present after clicking it, consult /xllog for errors");
 
         ImUtf8.SameLineInner();
-        if (CkGui.IconTextButton(FAI.StopCircle, "Stop", disabled: _penumbraWatcher.Watcher is null || !KeyMonitor.CtrlPressed()))
+        if (CkGui.IconTextButton(FAI.StopCircle, "Stop", disabled: _penumbraWatcher.Watcher is null || !KeyMonitor.CtrlPressed(), id: "penMonitorStop"))
             _penumbraWatcher.StopMonitoring();
         CkGui.AttachToolTip("Halts monitoring Penumbra Storage. While disabled, files will not sync.--NL--Hold CTRL to enable this button" +
             "--SEP----COL--Unless you are changing cache folders, do not stop monitoring!--COL--", ImGuiColors.DalamudRed);
@@ -229,7 +229,7 @@ public partial class UiFileCacheShared
     private void DrawSundouleiaWatcherControls(float offsetX, bool allWatchersValid)
     {
         ImGui.SameLine(ImGui.GetContentRegionAvail().X - offsetX);
-        if (CkGui.IconTextButton(FAI.Play, "Restart", disabled: _penumbraWatcher.Watcher is not null, id: "penMonitor"))
+        if (CkGui.IconTextButton(FAI.Play, "Restart", disabled: _mainWatcher.Watcher is not null, id: "mainMonitorRestart"))
         {
             _mainWatcher.StartWatcher(_config.Current.CacheFolder);
             if (allWatchersValid)
@@ -238,7 +238,7 @@ public partial class UiFileCacheShared
         CkGui.AttachToolTip("Restarts the Sundouleia watcher and invokes a full scan over both directories if both are valid." +
             "--NL--If the button remains present after clicking it, consult /xllog for errors");
         ImUtf8.SameLineInner();
-        if (CkGui.IconTextButton(FAI.StopCircle, "Stop", disabled: _penumbraWatcher.Watcher is null || !KeyMonitor.CtrlPressed()))
+        if (CkGui.IconTextButton(FAI.StopCircle, "Stop", disabled: _mainWatcher.Watcher is null || !KeyMonitor.CtrlPressed(), id: "mainMonitorStop"))
             _mainWatcher.StopMonitoring();
         CkGui.AttachToolTip("Halts monitoring Sundouleia Storage. While disabled, files will not sync.--NL--Hold CTRL to enable this button" +
             "--SEP----COL--Unless you are changing cache folders, do not stop monitoring!--COL--", ImGuiColors.DalamudRed);
@@ -453,7 +453,7 @@ public partial class UiFileCacheShared
 
     private bool CachePresetPenumbraParentDirExists()
     {
-        if (string.IsNullOrEmpty(IpcCallerPenumbra.ModDirectory)) 
+        if (string.IsNullOrEmpty(IpcCallerPenumbra.ModDirectory))
             return false;
         // grab the root path.
         if (Path.GetPathRoot(IpcCallerPenumbra.ModDirectory!) is not { } driveRoot)
