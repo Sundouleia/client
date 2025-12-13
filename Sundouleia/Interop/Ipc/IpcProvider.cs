@@ -28,7 +28,7 @@ using Sundouleia.Pairs;
 using Sundouleia.Watchers;
 using TerraFX.Interop.Windows;
 using Sundouleia.Services.Mediator;
-using Sundouleia.ModularActorData;
+using Sundouleia.ModularActor;
 
 namespace Sundouleia.Interop;
 
@@ -56,7 +56,7 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
 {
     private const int SundouleiaApiVersion = 1;
 
-    private readonly ModularActorManager _actorFileManager;
+    private readonly SMAManager _actorFileManager;
     private readonly SundesmoManager _sundesmos;
     private readonly CharaObjectWatcher _watcher;
 
@@ -101,7 +101,7 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
     private static ICallGateProvider<List<MoodlesStatusInfo>, object?>?         ApplyStatusInfoList;    // Apply moodle tuples to the client actor.
 
     public IpcProvider(ILogger<IpcProvider> logger, SundouleiaMediator mediator,
-        ModularActorManager actorFileManager, SundesmoManager pairs, CharaObjectWatcher watcher)
+        SMAManager actorFileManager, SundesmoManager pairs, CharaObjectWatcher watcher)
         : base(logger, mediator)
     {
         _actorFileManager = actorFileManager;

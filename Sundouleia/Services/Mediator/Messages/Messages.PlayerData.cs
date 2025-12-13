@@ -1,3 +1,4 @@
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
 using Sundouleia.WebAPI.Files.Models;
@@ -46,6 +47,16 @@ public record WatchedObjectCreated(IntPtr Address) : SameThreadMessage;
 ///     Whenever a NON-CLIENT OWNED OBJECT is destroyed. Intended for Sundesmos.
 /// </summary>
 public record WatchedObjectDestroyed(IntPtr Address) : SameThreadMessage;
+
+/// <summary>
+///     Whenever a GPose Actor is created.
+/// </summary>
+public record GPoseObjectCreated(IntPtr Address) : SameThreadMessage;
+
+/// <summary>
+///     Whenever a GPose Actor is destroyed.
+/// </summary>
+public record GPoseObjectDestroyed(IntPtr Address, GameObject DataSnapshot) : SameThreadMessage;
 
 
 

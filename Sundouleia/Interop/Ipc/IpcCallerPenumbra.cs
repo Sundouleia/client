@@ -2,6 +2,7 @@ using Dalamud.Interface.ImGuiNotification;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
 using Penumbra.Api.IpcSubscribers;
+using Sundouleia.ModularActor;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Interop;
@@ -270,6 +271,43 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
             return Guid.Empty;
         }).ConfigureAwait(false);
     }
+
+    /// <summary>
+    ///     Assign a SundouleiaModularActorData entry with a new temporary collection.
+    /// </summary>
+    public async Task<Guid> NewSMACollection(HandledActorDataEntry entry)
+    {
+        if (!APIAvailable)
+            return Guid.Empty;
+        
+        return await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            if (CreateTempCollection.Invoke(SUNDOULEIA_ID, entry.CollectionName, out Guid id) is { } ret && ret is PenumbraApiEc.Success)
+            {
+                Logger.LogDebug($"New Temp {{{entry.CollectionName}}} -> ID: {id}", LoggerType.IpcPenumbra);
+                return id;
+            }
+            return Guid.Empty;
+        }).ConfigureAwait(false);
+    }
+
+    // We could do this all at once, or we could handle it with the base mod on 0, outfit on 1, accessories on 2.
+    // This would allow us to apply distinct meta-manips, but at the moment I dont think it is that easy to overlap them?
+    public async Task ReloadSMABase(HandledActorDataEntry entry)
+    {
+        if (!APIAvailable) return;
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            // remove the existing temporary mod
+            var retRemove = RemoveTempMod.Invoke(entry.GetTempModBaseName(), entry.CollectionId, 0);
+            Logger.LogTrace($"SMA-Base TempMod removed for Collection: {entry.CollectionId}, Success: [{retRemove}]", LoggerType.IpcPenumbra);
+
+            // add the new temporary mod with the new paths.
+            var retAdded = AddTempMod.Invoke(entry.GetTempModBaseName(), entry.CollectionId, entry.Data.FinalModdedDict, entry.Data.CompositeManips, 0);
+            Logger.LogTrace($"Re-Adding SMA-Base TempMod for Collection: {entry.CollectionId}, Success: [{retAdded}]", LoggerType.IpcPenumbra);
+        }).ConfigureAwait(false);
+    }
+
 
     /// <summary>
     ///     Assigns a Temporary Collection to a visible Sundesmo that we identify

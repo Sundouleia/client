@@ -1,5 +1,6 @@
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Ipc;
+using Sundouleia.ModularActor;
 using Sundouleia.Pairs;
 
 namespace Sundouleia.Interop;
@@ -88,6 +89,26 @@ public sealed class IpcCallerCustomize : IIpcCaller
         // return the valid profile string.
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(profileStr));
     }
+
+    public async Task<Guid> ApplyTempProfile(HandledActorDataEntry gPoseActor)
+    {
+        if (!APIAvailable || !gPoseActor.IsValid) return Guid.Empty;
+
+        return await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(gPoseActor.Data.CPlusData));
+            if (string.IsNullOrEmpty(gPoseActor.Data.CPlusData))
+            {
+                RevertUser.InvokeFunc(gPoseActor.ObjectIndex);
+                return Guid.Empty;
+            }
+            else
+            {
+                return SetTempProfile.InvokeFunc(gPoseActor.ObjectIndex, decodedScale).Item2 ?? Guid.Empty;
+            }
+        }).ConfigureAwait(false);
+    }
+
 
     public async Task<Guid> ApplyTempProfile(PlayerHandler handler, string profileData)
     {

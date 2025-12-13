@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 
-namespace Sundouleia.ModularActorData;
+namespace Sundouleia.ModularActor;
 
 public static class SmadCryptography
 {

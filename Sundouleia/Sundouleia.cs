@@ -13,7 +13,7 @@ using Sundouleia.Gui.Profiles;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.ModFiles.Cache;
-using Sundouleia.ModularActorData;
+using Sundouleia.ModularActor;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
@@ -141,9 +141,9 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<WhitelistDrawSystem>()
 
         // Modular Actor Data
-        .AddSingleton<ModularActorManager>()
-        .AddSingleton<ModularActorFileHandler>()
-        .AddSingleton<ModularActorHandler>()
+        .AddSingleton<SMAManager>()
+        .AddSingleton<SMAFileHandler>()
+        .AddSingleton<GPoseActorHandler>()
         .AddSingleton<ActorAnalyzer>()
 
         // Mod Files

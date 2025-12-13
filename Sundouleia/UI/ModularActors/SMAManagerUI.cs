@@ -6,7 +6,7 @@ using OtterGui.Text;
 using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem;
 using Sundouleia.ModFiles;
-using Sundouleia.ModularActorData;
+using Sundouleia.ModularActor;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
@@ -17,14 +17,14 @@ namespace Sundouleia.Gui;
 public class SMAManagerUI : WindowMediatorSubscriberBase
 {
     // Some config, probably.
-    private readonly ModularActorFileHandler _smaHandler;
+    private readonly SMAFileHandler _smaHandler;
     private readonly FileCacheManager _fileCache;
-    private readonly ModularActorManager _smaManager;
+    private readonly SMAManager _smaManager;
     private readonly TutorialService _guides;
 
     public SMAManagerUI(ILogger<SMACreatorUI> logger, SundouleiaMediator mediator,
-        ModularActorFileHandler smaHandler, FileCacheManager fileCache,
-        ModularActorManager smaManager, TutorialService guides) 
+        SMAFileHandler smaHandler, FileCacheManager fileCache,
+        SMAManager smaManager, TutorialService guides) 
         : base(logger, mediator, "Modular Actor Manager###SundouleiaSMAManager")
     {
         _smaHandler = smaHandler;

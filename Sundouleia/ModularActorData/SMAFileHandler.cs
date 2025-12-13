@@ -12,29 +12,30 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using TerraFX.Interop.Windows;
 
-namespace Sundouleia.ModularActorData;
+namespace Sundouleia.ModularActor;
 
 // TODO, Organize
 /// <summary>
 ///     Handles how SMAD, SMAB, SMAO, SMAI & SMAIP files are handled by Sundouleia. <para />
 ///     Ensures any files in use are monitored and know when to be removed afterwards.
 /// </summary> 
-public class ModularActorFileHandler
+public class SMAFileHandler
 {
-    private readonly ILogger<ModularActorFileHandler> _logger;
+    private readonly ILogger<SMAFileHandler> _logger;
     private readonly MainConfig _mainConfig;
     private readonly ModularActorsConfig _smaConfig;
-    private readonly ModularActorHandler _handler;
+    private readonly GPoseActorHandler _handler;
     private readonly FileCacheManager _fileCache;
     private readonly SMAFileCacheManager _smaFileCache;
+    private readonly SMAManager _smaManager;
     private readonly ModdedStateManager _modStateManager;
     private readonly CharaObjectWatcher _watcher;
 
-    public ModularActorFileHandler(ILogger<ModularActorFileHandler> logger, 
+    public SMAFileHandler(ILogger<SMAFileHandler> logger, 
         MainConfig mainConfig, ModularActorsConfig smaConfig,
-        ModularActorHandler handler, FileCacheManager cacheManager, 
-        SMAFileCacheManager smaFileCache, ModdedStateManager modStateManager, 
-        CharaObjectWatcher watcher)
+        GPoseActorHandler handler, FileCacheManager cacheManager, 
+        SMAFileCacheManager smaFileCache, SMAManager smaManager,
+        ModdedStateManager modStateManager, CharaObjectWatcher watcher)
     {
         _logger = logger;
         _mainConfig = mainConfig;
@@ -42,12 +43,13 @@ public class ModularActorFileHandler
         _handler = handler;
         _fileCache = cacheManager;
         _smaFileCache = smaFileCache;
+        _smaManager = smaManager;
         _modStateManager = modStateManager;
         _watcher = watcher;
     }
 
     /// <summary>
-    ///     Using the defined actor, a description, filepath, and password, 
+    ///     Using the defined actor, a description, file path, and password, 
     ///     construct the base file of an actor and save it to disk.
     /// </summary>
     /// <param name="actor"> Which of the ownedActors to save a base file of. </param>
@@ -128,7 +130,7 @@ public class ModularActorFileHandler
         // Decompress the decrypted byte array using LZ4.
         var actorBaseData = ExtractActorBaseData(fileHeader!, decryptedByteArray);
         _logger.LogInformation("SMAB Payload Processed Successfully, storing into handler.");
-        _handler.AddProcessedActorData(new ModularActorData(actorBaseData));
+        _smaManager.AddProcessedActorData(new ModularActorData(actorBaseData));
         return true;
     }
 

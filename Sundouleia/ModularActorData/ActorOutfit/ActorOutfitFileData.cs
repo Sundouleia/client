@@ -13,32 +13,72 @@ using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModularActor;
 
-// This data is only used to reflect what goes into SundouleiaModularActor files!
-// As such as can know when it is valid to throw an exception and when not to.
-public record ActorBaseFileData
+[Flags]
+public enum SMAOSlotFilter : short
 {
-    public OwnedObject ActorKind { get; init; }
-    public string FileName { get; set; } = string.Empty;
+    MainHand = 0 << 0,
+    OffHand  = 1 << 0,
+    Head     = 1 << 1,
+    Body     = 1 << 2,
+    Hands    = 1 << 3,
+    Legs     = 1 << 4,
+    Feet     = 1 << 5,
+    Ears     = 1 << 6,
+    Neck     = 1 << 7,
+    Wrists   = 1 << 8,
+    RFinger  = 1 << 9,
+    LFinger  = 1 << 10,
+    Bonus    = 1 << 11,
+}
+
+[Flags]
+public enum SMAOMetaFilter : byte
+{
+    None      = 0 << 0,
+    Hat       = 1 << 0,
+    VieraEars = 1 << 1,
+    Visor     = 1 << 2,
+    Weapon    = 1 << 3,
+}
+
+// Maybe add the filters in here, maybe not.
+public record SMAOMeta(string Name, string Description, string? ThumbnailBase64);
+
+
+// An ActorOutfit file depends on being applied to an associated ActorBase.
+// This data can limit what parts of it are applied, helping with layering.
+//
+// By Default, simply layering moddedDict's in the main ModularActorData will be fine, but glamourer needs stacking.
+//
+// Additionally we may need to handle merging metadata strings, but for now ignore this.
+// 
+// Parsing the modded files for selected slots will be a lot easier with our requested penumbraAPI calls, but we need to wait for those.
+public record ActorOutfitFileData
+{
+    public string OutfitName { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public string ThumbnailBase64 { get; set; } = string.Empty; // Maybe?
+    public string Base64Thumbnail { get; set; } = string.Empty; // Optional, obviously.
 
-    // For now use glamourer data, later we can make glamourer data store a different version of the base64 string
-    // to compose the modular approach.
-    public string GlamourerData { get; set; } = string.Empty;
+    // Filters to limit what is stored.
+    public SMAOSlotFilter SlotFilter { get; set; } = SMAOSlotFilter.MainHand;
+    public SMAOMetaFilter MetaFilter { get; set; } = SMAOMetaFilter.None;
+    public bool Customizations       { get; set; } = false;
+    public bool AdvCustomizations    { get; set; } = false;
 
-    // The CustomizePlus data applied.
-    public string CPlusData { get; set; } = string.Empty;
+    public string GlamourerData { get; set; } = string.Empty; // Base64 Glamourer Data.
 
-    // Note that when allowing layering with this multiple mods must be added to the list.
-    public string ModManipulationData { get; set; } = string.Empty;
 
+
+    public string ManipString { get; set; } = string.Empty;
+
+    // The files & FileSwaps to apply for the outfit.
     public List<FileModData> Files { get; set; } = []; // Contains modded resources.
     public List<FileSwap> FileSwaps { get; set; } = []; // Don't contain modded resources, vanilla swap.
 
-    public ActorBaseFileData()
+    public ActorOutfitFileData()
     { }
 
-    public ActorBaseFileData(FileCacheManager manager, OwnedObject actorKind, ModdedState state, string desc, bool noBodyLegs = true)
+    public ActorOutfitFileData(FileCacheManager manager, OwnedObject actorKind, ModdedState state, string desc, bool noBodyLegs = true)
     {
         Description = desc;
         // As of right now we pull from the DistributionService's last cached client data to retrieve this information.
@@ -48,11 +88,8 @@ public record ActorBaseFileData
         if (DistributionService.LastCreatedData.GlamourerState.TryGetValue(actorKind, out var glamourerData))
             GlamourerData = glamourerData;
 
-        if (DistributionService.LastCreatedData.CPlusState.TryGetValue(actorKind, out var cplusData))
-            CPlusData = cplusData;
-
         // Mark the manipulation data string.
-        ModManipulationData = DistributionService.LastCreatedData.ModManips;
+        ManipString = DistributionService.LastCreatedData.ModManips;
 
         // Iterate over the modded state, if any files are present for the object.
         if (!state.FilesByObject.TryGetValue(actorKind, out var moddedFiles))
@@ -90,6 +127,7 @@ public record ActorBaseFileData
         }
     }
 
+    // File filtering will be a lot better when we can get direct filtering from a resourceTree.
     private bool IsBodyLegModel(string gp)
         => gp.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) && 
         (gp.Contains("/body/", StringComparison.OrdinalIgnoreCase) || gp.Contains("/legs/", StringComparison.OrdinalIgnoreCase));

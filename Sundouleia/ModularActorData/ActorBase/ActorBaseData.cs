@@ -1,4 +1,4 @@
-namespace Sundouleia.ModularActorData;
+namespace Sundouleia.ModularActor;
 
 /// <summary>
 ///     Post-Processed <see cref="ActorBaseFileData"/> record for caching.
@@ -16,9 +16,10 @@ public record ActorBaseData
         ModdedDict = moddedDict;
     }
 
+    public Guid   BaseId      => _header.Id;
     public string Description { get; private set; } = string.Empty;
     public string GlamourData { get; private set; } = string.Empty;
-    public string CPlusData   { get; private set; } = string.Empty;
+    public string CPlusData   { get; private set; } = Convert.ToBase64String(Encoding.UTF8.GetBytes("{}")); // Default empty JSON.
     public string ModManips   { get; private set; } = string.Empty;
     
     /// <summary>

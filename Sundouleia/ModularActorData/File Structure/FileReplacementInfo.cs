@@ -11,7 +11,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using TerraFX.Interop.Windows;
 
-namespace Sundouleia.ModularActorData;
+namespace Sundouleia.ModularActor;
 
 // Represents a modded file entry.
 public record FileModData(IEnumerable<string> GamePaths, int Length, string FileHash);

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 
-namespace Sundouleia.ModularActorData;
+namespace Sundouleia.ModularActor;
 
 // Corby is creating a new filetype and it is consuming
 // a lot of brain power so sry if slow on responses for a bit.

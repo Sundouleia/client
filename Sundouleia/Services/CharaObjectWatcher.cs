@@ -1,5 +1,6 @@
 using CkCommons;
 using Dalamud.Hooking;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
@@ -49,6 +50,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     // A persistent static cache holding all rendered Character pointers.
     public static HashSet<nint> RenderedCharas { get; private set; } = new();
     public static HashSet<nint> RenderedCompanions { get; private set; } = new();
+    public static HashSet<nint> GPoseActors { get; private set; } = new();
 
     // Public, Accessible, Managed pointer address to Owned Object addresses
     public ConcurrentDictionary<nint, OwnedObject> WatchedTypes { get; private set; } = new();
@@ -182,6 +184,19 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
             if (obj->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
                 NewCharacterRendered(obj);
         }
+
+        // If in GPose, collect all GPose actors.
+        if (GameMain.IsInGPose())
+        {
+            for (var i = 201; i < objManager->Objects.IndexSorted.Length; i++)
+            {
+                GameObject* obj = objManager->Objects.IndexSorted[i];
+                if (obj is null) continue;
+                // Look into further maybe, idk.
+                if (obj->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
+                    NewCharacterRendered(obj);
+            }
+        }
     }
 
     /// <summary>
@@ -191,8 +206,19 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     /// </summary>
     private unsafe void  NewCharacterRendered(GameObject* chara)
     {
-        Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}");
         var address = (nint)chara;
+
+        // For GPose actors.
+        if (chara->ObjectIndex > 200)
+        {
+            Logger.LogDebug($"New GPose Character Rendered: {(nint)chara:X} - {chara->NameString}");
+            GPoseActors.Add(address);
+            Mediator.Publish(new GPoseObjectCreated(address));
+            return;
+        }
+
+        // Other Actors.
+        Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}");
         if (address == OwnedObjects.PlayerAddress)
         {
             AddOwnedObject(OwnedObject.Player, address);
@@ -213,11 +239,9 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
             AddOwnedObject(OwnedObject.Companion, address);
             WatchedCompanionAddr = address;
         }
-        // Should PROBABLY ignore event NPC's lol. Idk though!
+        // Otherwise, it is a non-client owned object.
         else
         {
-            // it is possible we may have difficulty assessing order priority of mediator calls here, if this is the case, 
-            // we can always call these directly.
             RenderedCharas.Add(address);
             Mediator.Publish(new WatchedObjectCreated(address));
         }
@@ -225,8 +249,18 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
 
     private unsafe void CharacterRemoved(GameObject* chara)
     {
-        Logger.LogDebug($"Character Removed: {(nint)chara:X} - {chara->GetName()}");
         var address = (nint)chara;
+
+        // For GPose actors.
+        if (GPoseActors.Remove(address))
+        {
+            Logger.LogDebug($"GPose Character Removed: {(nint)chara:X} - {chara->NameString}");
+            Mediator.Publish(new GPoseObjectDestroyed(address, *chara));
+            return;
+        }
+
+        // Other Actors.
+        Logger.LogDebug($"Character Removed: {(nint)chara:X} - {chara->GetName()}");
         if (address == WatchedPlayerAddr)
         {
             RemoveOwnedObject(OwnedObject.Player, address);
@@ -247,6 +281,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
             RemoveOwnedObject(OwnedObject.Companion, address);
             WatchedCompanionAddr = IntPtr.Zero;
         }
+        // For other actors.
         else
         {
             RenderedCharas.Remove(address);

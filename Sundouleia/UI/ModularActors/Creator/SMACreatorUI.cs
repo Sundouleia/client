@@ -9,7 +9,7 @@ using OtterGui.Text;
 using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem;
 using Sundouleia.ModFiles;
-using Sundouleia.ModularActorData;
+using Sundouleia.ModularActor;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -24,9 +24,9 @@ namespace Sundouleia.Gui;
 public class SMACreatorUI : WindowMediatorSubscriberBase
 {
     // Some config, probably.
-    private readonly ModularActorFileHandler _smaHandler;
+    private readonly SMAFileHandler _smaHandler;
     private readonly FileCacheManager _fileCache;
-    private readonly ModularActorManager _smaManager;
+    private readonly SMAManager _smaManager;
     private readonly CharaObjectWatcher _objWatcher;
     private readonly UiFileDialogService _dialogService;
     private readonly TutorialService _guides;
@@ -34,7 +34,7 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
     private CancellationTokenSource _exportCTS = new();
     private Task? _exportTask = null;
 
-    private string _filePassword = "Dummy-Password-123";
+    private string _filePassword = "password";
     private string _exportDescription = string.Empty;
     private OwnedObject _objToExport = OwnedObject.Player;
     // Should always be kept secret at all times!!!!!
@@ -43,8 +43,8 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
     private byte[] _lastExportedKey = Array.Empty<byte>();
 
     public SMACreatorUI(ILogger<SMACreatorUI> logger, SundouleiaMediator mediator,
-        ModularActorFileHandler smaHandler, FileCacheManager fileCache,
-        ModularActorManager smaManager, CharaObjectWatcher objWatcher,
+        SMAFileHandler smaHandler, FileCacheManager fileCache,
+        SMAManager smaManager, CharaObjectWatcher objWatcher,
         UiFileDialogService dialogService, TutorialService guides) 
         : base(logger, mediator, "Modular Actor Creator###SundouleiaSMACreator")
     {
@@ -121,7 +121,7 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
         _exportTask = Task.Run(async () =>
         {
             _logger.LogInformation($"Starting export of ActorBase to {savedPath}.");
-            var privateKey = await _smaHandler.SaveActorBaseFile(_objToExport, _exportDescription, savedPath, _filePassword).ConfigureAwait(false);
+            var privateKey = await _smaHandler.SaveActorBaseFile(_objToExport, _exportDescription, savedPath, _filePassword);
             _lastExportedFilePassword = _filePassword;
             _lastExportedKey = privateKey;
             _logger.LogInformation($"Completed export of ActorBase to {savedPath}.");

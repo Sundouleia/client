@@ -2,6 +2,7 @@ using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.ModFiles;
@@ -413,6 +414,28 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                     ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
                     ImGui.TableNextColumn();
                     ImGui.Text(obj->CompanionOwnerId.ToString());
+                }
+
+                if (GameMain.IsInGPose())
+                {
+                    foreach (var addr in CharaObjectWatcher.GPoseActors.ToList())
+                    {
+                        GameObject* obj = (GameObject*)addr;
+                        ImGui.TableNextColumn();
+                        ImGui.Text(obj->NameString.ToString());
+                        ImGui.TableNextColumn();
+                        ImGui.Text(obj->ObjectIndex.ToString());
+                        ImGui.TableNextColumn();
+                        ImGui.Text(obj->ObjectKind.ToString());
+                        ImGui.TableNextColumn();
+                        CkGui.ColorText($"{addr:X}", ImGuiColors.TankBlue);
+                        ImGui.TableNextColumn();
+                        ImGui.TableNextColumn();
+                        ImGui.Text(obj->EntityId.ToString());
+                        ImGui.TableNextColumn();
+                        ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
+                        ImGui.TableNextColumn();
+                    }
                 }
             }
             ImGui.Separator();
