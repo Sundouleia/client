@@ -29,13 +29,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         LoadData();
 
         Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => UpdateFolders());
-        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ =>
-        {
-            if (FolderMap.TryGetValue(Constants.FolderTagVisible, out var visibleFolder) && visibleFolder is DynamicFolder<Sundesmo> dynamicVisibleFolder)
-            {
-                UpdateFolder(dynamicVisibleFolder);
-            }
-        });
+        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ => UpdateFolder(Constants.FolderTagVisible));
 
         // Subscribe to the changes (which is to change very, very soon, with overrides.
         DDSChanged += OnChange;
