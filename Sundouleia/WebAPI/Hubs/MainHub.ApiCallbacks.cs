@@ -169,6 +169,82 @@ public partial class MainHub
     }
     #endregion Moderation Callbacks
 
+    #region Moodles Callbacks
+    public Task Callback_PairMoodleDataUpdated(MoodlesDataUpdate dto)
+    {
+        Logger.LogDebug($"Callback_PairMoodleDataUpdated: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveMoodleData(dto.User, dto.Data));
+        return Task.CompletedTask;
+    }
+
+    public Task Callback_PairMoodleStatusesUpdate(MoodlesStatusesUpdate dto)
+    {
+        Logger.LogDebug($"Callback_PairMoodleStatusesUpdate: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveMoodleStatuses(dto.User, dto.Statuses));
+        return Task.CompletedTask;
+    }
+
+    public Task Callback_PairMoodlePresetsUpdate(MoodlesPresetsUpdate dto)
+    {
+        Logger.LogDebug($"Callback_PairMoodlePresetsUpdate: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveMoodlePresets(dto.User, dto.Presets));
+        return Task.CompletedTask;
+    }
+
+    public Task Callback_PairMoodleStatusModified(MoodlesStatusModified dto)
+    {
+        Logger.LogDebug($"Callback_PairMoodleStatusModified: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveMoodleStatusUpdate(dto.User, dto.Status, dto.Deleted));
+        return Task.CompletedTask;
+    }
+
+    public Task Callback_PairMoodlePresetModified(MoodlesPresetModified dto)
+    {
+        Logger.LogDebug($"Callback_PairMoodlePresetModified: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveMoodlePresetUpdate(dto.User, dto.Preset, dto.Deleted));
+        return Task.CompletedTask;
+    }
+    public async Task Callback_ApplyMoodleId(ApplyMoodleId dto)
+    {
+        Logger.LogDebug($"Callback_ApplyMoodlesById: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        // Fail if not a valid pair or not rendered.
+        if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
+            Logger.LogWarning($"Received ApplyMoodlesById for an unpaired user: {dto.User.AliasOrUID}");
+        else if (!pair.IsRendered)
+            Logger.LogWarning($"Received ApplyMoodlesById for a sundesmo not rendered: {dto.User.AliasOrUID}");
+        else
+            await _moodles.ApplyStatuses(dto.Ids).ConfigureAwait(false);
+    }
+
+    public Task Callback_ApplyMoodleStatus(ApplyMoodleStatus dto)
+    {
+        Logger.LogDebug($"Callback_ApplyMoodlesByStatus: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        // Fail if not a valid pair.
+        if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
+            Logger.LogWarning($"Received ApplyStatusesToSelf for an unpaired user: {dto.User.AliasOrUID}");
+        else if (!pair.IsRendered)
+            Logger.LogWarning($"Received ApplyStatusesToSelf for a sundesmo not rendered: {dto.User.AliasOrUID}" );
+        else
+        {
+            Mediator.Publish(new EventMessage(new(pair.GetNickAliasOrUid(), pair.UserData.UID, DataEventType.MoodleApplied, "Applied by Pair.")));
+            _ipcProvider.ApplyStatusTuples(dto.Statuses);
+        }
+        return Task.CompletedTask;
+    }
+
+    public async Task Callback_RemoveMoodleId(RemoveMoodleId dto)
+    {
+        Logger.LogDebug($"Callback_RemoveMoodlesById: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        // Fail if not a valid pair or not rendered.
+        if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
+            Logger.LogWarning($"Received RemoveMoodlesById for an unpaired user: {dto.User.AliasOrUID}");
+        else if (!pair.IsRendered)
+            Logger.LogWarning($"Received RemoveMoodlesById for a sundesmo not rendered: {dto.User.AliasOrUID}");
+        else
+            await _moodles.RemoveStatuses(dto.Ids).ConfigureAwait(false);
+    }
+    #endregion Moodles Callbacks
+
     #region Data Update Callbacks
     /// <summary>
     ///     Updates both mods and other visual data. Should only be used on 
@@ -412,6 +488,54 @@ public partial class MainHub
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_Unblocked), act);
+    }
+
+    public void OnPairMoodleDataUpdated(Action<MoodlesDataUpdate> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_PairMoodleDataUpdated), act);
+    }
+
+    public void OnPairMoodleStatusesUpdate(Action<MoodlesStatusesUpdate> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_PairMoodleStatusesUpdate), act);
+    }
+
+    public void OnPairMoodlePresetsUpdate(Action<MoodlesPresetsUpdate> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_PairMoodlePresetsUpdate), act);
+    }
+
+    public void OnPairMoodleStatusModified(Action<MoodlesStatusModified> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_PairMoodleStatusModified), act);
+    }
+
+    public void OnPairMoodlePresetModified(Action<MoodlesPresetModified> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_PairMoodlePresetModified), act);
+    }
+
+    public void OnApplyMoodleId(Action<ApplyMoodleId> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_ApplyMoodleId), act);
+    }
+
+    public void OnApplyMoodleStatus(Action<ApplyMoodleStatus> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_ApplyMoodleStatus), act);
+    }
+
+    public void OnRemoveMoodleId(Action<RemoveMoodleId> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_RemoveMoodleId), act);
     }
 
     public void OnIpcUpdateFull(Action<IpcUpdateFull> act)

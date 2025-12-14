@@ -8,6 +8,7 @@ using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
+using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.Services;
@@ -70,6 +71,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         _moddedState = moddedState;
         _watcher = watcher;
 
+        // Process applyToPair change.
+        Mediator.Subscribe<MoodlesApplyStatusToPair>(this, _ => ApplyMoodleTuplesToSundesmo(_.ApplyStatusTupleDto).ConfigureAwait(false));
+
         // Process sundesmo state changes.
         Mediator.Subscribe<SundesmoOnline>(this, msg => { if (msg.RemoveFromLimbo) InLimbo.Remove(msg.Sundesmo.UserData); });
         Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => NewVisibleUsers.Add(msg.Handler.Sundesmo.UserData));
@@ -93,6 +97,41 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     public HashSet<UserData> InLimbo { get; private set; } = new();
 
     public List<UserData> SundesmosForUpdatePush => _sundesmos.GetVisibleConnected().Except([.. InLimbo, .. NewVisibleUsers]).ToList();
+
+    #region Moodles
+    private async Task ApplyMoodleTuplesToSundesmo(ApplyMoodleStatus dto)
+    {
+        Logger.LogDebug($"Pushing ApplyMoodlesByStatus to: {dto.User.AliasOrUID}", LoggerType.DataDistributor);
+        if (await _hub.UserApplyMoodleTuples(dto).ConfigureAwait(false) is { } res && res.ErrorCode is not SundouleiaApiEc.Success)
+            Logger.LogError($"Failed to push ApplyMoodlesByStatus to server. [{res.ErrorCode}]");
+        else
+            Logger.LogDebug($"Successfully pushed ApplyMoodlesByStatus to the server", LoggerType.DataDistributor);
+    }
+
+    public async Task PushMoodlesData(List<UserData> trustedUsers)
+    {
+        if (!MainHub.IsConnectionDataSynced) 
+            return;
+        Logger.LogDebug($"Pushing MoodlesData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+        await _hub.UserPushMoodlesData(new(trustedUsers, MoodlesDataCache.MoodleCache));
+    }
+
+    public async Task PushMoodleStatusUpdate(List<UserData> trustedUsers, MoodlesStatusInfo status, bool wasDeleted)
+    {
+        if (!MainHub.IsConnectionDataSynced)
+            return;
+        Logger.LogTrace($"Pushing StatusUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+        await _hub.UserPushStatusModified(new(trustedUsers, status, wasDeleted));
+    }
+
+    public async Task PushMoodlePresetUpdate(List<UserData> trustedUsers, MoodlePresetInfo preset, bool wasDeleted)
+    {
+        if (!MainHub.IsConnectionDataSynced)
+            return;
+        Logger.LogTrace($"Pushing PresetUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+        await _hub.UserPushPresetModified(new(trustedUsers, preset, wasDeleted));
+    }
+    #endregion Moodles
 
     // Only entry point where we ignore timeout states.
     // If this gets abused through we can very easily add timeout functionality here too.

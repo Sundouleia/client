@@ -1,6 +1,7 @@
 using CkCommons;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Hosting;
+using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
@@ -26,6 +27,8 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private readonly ServerConfigManager _serverConfigs;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
+    private readonly IpcCallerMoodles _moodles;
+    private readonly IpcProvider _ipcProvider;
 
     // Static private accessors (persistent across singleton instantiations for other static accessors.)
     private static ServerState _serverStatus = ServerState.Offline;
@@ -50,7 +53,9 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         TokenProvider tokenProvider,
         ServerConfigManager serverConfigs,
         RequestsManager requests,
-        SundesmoManager sundesmos)
+        SundesmoManager sundesmos,
+        IpcCallerMoodles moodles,
+        IpcProvider ipcProvider)
         : base(logger, mediator)
     {
         _hubFactory = hubFactory;
@@ -58,6 +63,8 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         _serverConfigs = serverConfigs;
         _requests = requests;
         _sundesmos = sundesmos;
+        _moodles = moodles;
+        _ipcProvider = ipcProvider;
 
         // Subscribe to the things.
         Mediator.Subscribe<ClosedMessage>(this, _ => HubInstanceOnClosed(_.Exception));
@@ -190,6 +197,16 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
 
         OnBlocked(dto => _ = Callback_Blocked(dto));
         OnUnblocked(dto => _ = Callback_Unblocked(dto));
+
+        OnPairMoodleDataUpdated(dto => _ = Callback_PairMoodleDataUpdated(dto));
+        OnPairMoodleStatusesUpdate(dto => _ = Callback_PairMoodleStatusesUpdate(dto));
+        OnPairMoodlePresetsUpdate(dto => _ = Callback_PairMoodlePresetsUpdate(dto));
+        OnPairMoodleStatusModified(dto => _ = Callback_PairMoodleStatusModified(dto));
+        OnPairMoodlePresetModified(dto => _ = Callback_PairMoodlePresetModified(dto));
+
+        OnApplyMoodleId(dto => _ = Callback_ApplyMoodleId(dto));
+        OnApplyMoodleStatus(dto => _ = Callback_ApplyMoodleStatus(dto));
+        OnRemoveMoodleId(dto => _ = Callback_RemoveMoodleId(dto));
 
         OnIpcUpdateFull(dto => _ = Callback_IpcUpdateFull(dto));
         OnIpcUpdateMods(dto => _ = Callback_IpcUpdateMods(dto));

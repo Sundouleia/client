@@ -150,6 +150,18 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.EndTabItem();
             }
 
+            if (ImGui.BeginTabItem(CkLoc.Settings.TabOwnedFiles))
+            {
+                _fileCacheShared.DrawFileCacheStorageBox();
+                ImGui.Separator();
+                _fileCacheShared.DrawCacheMonitoring(true, true, true);
+                ImGui.Separator();
+                _fileCacheShared.DrawFileCompactor(true);
+                ImGui.Separator();
+                _fileCacheShared.DrawTransfers();
+                ImGui.EndTabItem();
+            }
+
             if (ImGui.BeginTabItem("Debug"))
             {
                 _debugTab.DrawDebugMain();
@@ -220,7 +232,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var animationsGlobal = MainHub.GlobalPerms.DefaultAllowAnimations;
         var soundsGlobal = MainHub.GlobalPerms.DefaultAllowSounds;
         var vfxGlobal = MainHub.GlobalPerms.DefaultAllowVfx;
-
+        var curShare = MainHub.GlobalPerms.DefaultShareOwnMoodles;
+        var curAccess = MainHub.GlobalPerms.DefaultMoodleAccess;
 
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowAnimationsLabel, ref animationsGlobal, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowAnimations), animationsGlobal));
@@ -233,6 +246,52 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowVfxLabel, ref vfxGlobal, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowVfx), vfxGlobal));
         CkGui.HelpText(CkLoc.Settings.MainOptions.AllowVfxTT);
+
+        using var _ = ImRaii.Disabled(!IpcCallerMoodles.APIAvailable);
+
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.ShareMoodles, ref curShare))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultShareOwnMoodles), curShare));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.ShareMoodlesTT);
+
+        var refAllowOwn = curAccess.HasAny(MoodleAccess.AllowOwn);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowOwnMoodles, ref refAllowOwn))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.AllowOwn));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowOwnMoodlesTT);
+
+        var refAllowOthers = curAccess.HasAny(MoodleAccess.AllowOther);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowOtherMoodles, ref refAllowOthers))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.AllowOther));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowOtherMoodlesTT);
+
+        var refPosMoodles = curAccess.HasAny(MoodleAccess.Positive);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowPosMoodles, ref refPosMoodles))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.Positive));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowPosMoodlesTT);
+
+        var refNegMoodles = curAccess.HasAny(MoodleAccess.Negative);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowNegMoodles, ref refNegMoodles))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.Negative));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowNegMoodlesTT);
+
+        var refSpecialAccess = curAccess.HasAny(MoodleAccess.Special);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowSpecialMoodles, ref refSpecialAccess))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.Special));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowSpecialMoodlesTT);
+
+        var refPermAccess = curAccess.HasAny(MoodleAccess.Permanent);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowPermanentMoodles, ref refPermAccess))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.Permanent));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.AllowPermanentMoodlesTT);
+
+        var refAppliedCanRemove = curAccess.HasAny(MoodleAccess.RemoveApplied);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RemoveAppliedMoodles, ref refAppliedCanRemove))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.RemoveApplied));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.RemoveAppliedMoodlesTT);
+
+        var refAnyCanRemove = curAccess.HasAny(MoodleAccess.RemoveAny);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RemoveAnyMoodles, ref refAnyCanRemove))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.RemoveAny));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.RemoveAnyMoodlesTT);
     }
 
     private void DrawMainRadar()
@@ -479,7 +538,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     /// <summary>
     ///     Updates the global permissions on the server. Should be executed as a UIService task to prevent edits while processing.
     /// </summary>
-    public async Task<bool> ChangeGlobalPerm(string propertyName, bool newValue)
+    public async Task<bool> ChangeGlobalPerm(string propertyName, object newValue)
     {
         if (MainHub.ConnectionResponse?.GlobalPerms is not { } globals)
             return false;
@@ -502,7 +561,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 throw new InvalidOperationException($"Property {propertyName} in GlobalPerms, has a finalValue of null.");
 
             // Now that it is updated client-side, attempt to make the change on the server, and get the hub response.
-            HubResponse response = await _hub.ChangeGlobalPerm(propertyName, (bool)newValue);
+            HubResponse response = await _hub.ChangeGlobalPerm(propertyName, newValue);
 
             if (response.ErrorCode is not SundouleiaApiEc.Success)
                 throw new InvalidOperationException($"Failed to change {propertyName} to {finalVal}. Reason: {response.ErrorCode}");

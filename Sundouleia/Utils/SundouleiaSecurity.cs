@@ -43,6 +43,19 @@ public static class SundouleiaSecurity
     public static string GetHash256(this string stringToHash)
         => GetOrComputeHashSHA256(stringToHash);
 
+    public static string GetFileHashSHA256(this string filePath)
+    {
+        if (!File.Exists(filePath))
+            return string.Empty;
+
+        var dataToHash = File.ReadAllBytes(filePath);
+        if (_hashListSHA256.TryGetValue(filePath, out var hash))
+            return hash;
+
+        return _hashListSHA256[filePath] =
+            BitConverter.ToString(_sha256CryptoProvider.ComputeHash(dataToHash)).Replace("-", "", StringComparison.Ordinal);
+    }
+
     private static string GetOrComputeHashSHA256(string stringToCompute)
     {
         if (_hashListSHA256.TryGetValue(stringToCompute, out var hash))

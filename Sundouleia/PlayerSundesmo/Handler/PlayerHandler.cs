@@ -92,6 +92,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public unsafe bool HasModelFilesInSlotLoaded => ((CharacterBase*)_player->DrawObject)->HasModelFilesInSlotLoaded != 0;
 
     public string NameString { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
+    public string NameWithWorld { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
     public unsafe bool IsRendered => _player != null;
     public bool HasAlterations => _appearanceData != null || _replacements.Count is not 0;
 
@@ -118,7 +119,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (IsRendered)
         {
             Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) is already rendered, reapplying alterations.", LoggerType.PairHandler);
-            Mediator.Publish(new SundesmoPlayerRendered(this));
+            Mediator.Publish(new SundesmoPlayerRendered(this, Sundesmo));
             Mediator.Publish(new FolderUpdateSundesmos());
             await ReInitializeInternal().ConfigureAwait(false);
         }
@@ -136,9 +137,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Set the game data.
         _player = (Character*)address;
         NameString = _player->NameString;
+        NameWithWorld = PlayerData.GetNameWorldUnsafe(_player);
         // Notify other services.
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] rendered!", LoggerType.PairHandler);
-        Mediator.Publish(new SundesmoPlayerRendered(this));
+        Mediator.Publish(new SundesmoPlayerRendered(this, Sundesmo));
         ReInitializeInternal().ConfigureAwait(false);
     }
 
@@ -183,6 +185,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Sundesmo.TriggerTimeoutTask();
         // Refresh the list to reflect visible state.
         Logger.LogDebug($"Marking {Sundesmo.GetNickAliasOrUid()} as unrendered @ [{address:X}]", LoggerType.PairHandler);
+        Mediator.Publish(new SundesmoPlayerUnrendered(address));
         Mediator.Publish(new FolderUpdateSundesmos());
     }
 
@@ -783,6 +786,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _tempProfile = Guid.Empty;
             _appearanceData = null;
             NameString = string.Empty;
+            NameWithWorld = string.Empty;
             unsafe { _player = null; }
         }
     }

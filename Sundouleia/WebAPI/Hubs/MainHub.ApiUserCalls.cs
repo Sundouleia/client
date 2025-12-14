@@ -35,6 +35,37 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushIpcSingle), dto).ConfigureAwait(false);
     }
 
+    // --- Moodle Updates ---
+    public async Task<HubResponse> UserPushMoodlesData(PushMoodlesData dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushMoodlesData), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserPushMoodlesStatuses(PushMoodlesStatuses dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushMoodlesStatuses), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserPushMoodlesPresets(PushMoodlesPresets dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushMoodlesPresets), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserPushStatusModified(PushStatusModified dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushStatusModified), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserPushPresetModified(PushPresetModified dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushPresetModified), dto).ConfigureAwait(false);
+    }
+
     public async Task<HubResponse> UserUpdateProfileContent(ProfileContent dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
@@ -109,9 +140,32 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserUnblock), dto).ConfigureAwait(false);
     }
 
+    public async Task<HubResponse> UserApplyMoodles(ApplyMoodleId dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserApplyMoodles), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserApplyMoodleTuples(ApplyMoodleStatus dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserApplyMoodleTuples), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserRemoveMoodles(RemoveMoodleId dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRemoveMoodles), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserClearMoodles(UserDto dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserClearMoodles), dto).ConfigureAwait(false);
+    }
 
     // -- Permission Changes ---
-    public async Task<HubResponse> ChangeGlobalPerm(string propName, bool newValue)
+    public async Task<HubResponse> ChangeGlobalPerm(string propName, object newValue)
         => await UserChangeGlobalsSingle(new(OwnUserData, propName, newValue));
 
     public async Task<HubResponse> UserChangeGlobalsSingle(SingleChangeGlobal dto)
@@ -167,6 +221,60 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarChatMessage), dto).ConfigureAwait(false);
     }
 
+    // --- SMA File Sharing ---
+    public async Task<HubResponse<SMABFileInfo>> AccessFile(SMABFileAccess dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<SMABFileInfo>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<SMABFileInfo>>(nameof(AccessFile), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse<List<string>>> GetAllowedHashes(Guid FileId)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<List<string>>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<List<string>>>(nameof(GetAllowedHashes), FileId).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> CreateProtectedSMAB(NewSMABFile dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(CreateProtectedSMAB), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UpdateFileDataHash(SMABDataUpdate dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UpdateFileDataHash), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UpdateFilePassword(SMABDataUpdate dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UpdateFilePassword), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UpdateAllowedHashes(SMABAccessUpdate dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UpdateAllowedHashes), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UpdateAllowedUids(SMABAccessUpdate dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UpdateAllowedUids), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UpdateExpireTime(SMABExpireTime dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UpdateExpireTime), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> RemoveProtectedFile(Guid FileId)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RemoveProtectedFile), FileId).ConfigureAwait(false);
+    }
 
     // --- Reporting ---
     public async Task<HubResponse> UserReportProfile(ProfileReport dto)

@@ -1,3 +1,6 @@
+using Sundouleia.Pairs;
+using SundouleiaAPI.Network;
+
 namespace Sundouleia.Services.Mediator;
 
 // Useful for IPC-Updates, but may also become irrelevant once we get proper watchers / services / listeners hooked up for changes.
@@ -23,6 +26,10 @@ public record PetNamesDataChanged(string NicknamesData) : MessageBase;
 
 public record MoodlesReady : MessageBase;
 public record MoodlesChanged(IntPtr Address) : MessageBase;
+// For Moodle PairAccess changes in permissions
+public record MoodleAccessPermsChanged(Sundesmo Sundesmo) : MessageBase;
+public record MoodlesApplyStatusToPair(ApplyMoodleStatus ApplyStatusTupleDto) : MessageBase;
+
 
 public record ModelRelatedResourceLoaded(OwnedObject Object) : MessageBase;
 public record TransientResourceLoaded(OwnedObject Object) : MessageBase;

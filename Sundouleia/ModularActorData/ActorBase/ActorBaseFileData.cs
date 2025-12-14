@@ -13,6 +13,16 @@ using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModularActor;
 
+public record ActorBaseFileDataContainer
+{
+    public string GlamourerData { get; init; } = "";
+    public string CPlusData { get; init; } = "";
+    public string ModManipulationData { get; init; } = "";
+    public IReadOnlyList<FileModData> Files { get; init; } = [];
+    public IReadOnlyList<FileSwap> FileSwaps { get; init; } = [];
+}
+
+
 // This data is only used to reflect what goes into SundouleiaModularActor files!
 // As such as can know when it is valid to throw an exception and when not to.
 public record ActorBaseFileData

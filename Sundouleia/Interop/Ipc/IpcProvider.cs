@@ -1,53 +1,15 @@
-global using IPCMoodleAccessTuple = (// Maybe include ptr/objectIdx or not idk
-    Sundouleia.Interop.MoodleAccess OtherAccess, long OtherMaxTime, 
-    Sundouleia.Interop.MoodleAccess CallerAccess, long CallerMaxTime
-);
-
-global using MoodlesStatusInfo = (
-    System.Guid GUID,
-    int IconID,
-    string Title,
-    string Description,
-    byte StatusType,        // Moodles StatusType enum, as a byte.
-    string CustomVFXPath,   // What VFX to show on application.
-    int Stacks,             // Usually 1 when no stacks are used.
-    long ExpireTicksUTC,    // Permanent if -1, referred to as 'NoExpire' in MoodleStatus
-    string Applier,         // Who applied the moodle. (Only relevent when updating active moodles)
-    string Dispeller,       // When set, only this person can dispel your moodle.
-    bool Permanent,         // Referred to as 'Sticky' in the Moodles UI
-    System.Guid StatusOnDispell, // What status is applied upon the moodle being right-clicked off.
-    bool ReapplyIncStacks,  // If stacks increase on reapplication.
-    int StackIncCount       // How many stacks get added on each reapplication.
-);
-
-global using MoodlePresetInfo = (System.Guid GUID, System.Collections.Generic.List<System.Guid> Statuses, byte ApplyType, string Title);
-
 using Dalamud.Plugin.Ipc;
 using Microsoft.Extensions.Hosting;
-using Sundouleia.Pairs;
-using Sundouleia.Watchers;
-using TerraFX.Interop.Windows;
-using Sundouleia.Services.Mediator;
 using Sundouleia.ModularActor;
+using Sundouleia.Pairs;
+using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
+using SundouleiaAPI.Data.Permissions;
+using SundouleiaAPI.Network;
+using System.Diagnostics.CodeAnalysis;
+using static CkCommons.Textures.MoodleDisplay;
 
 namespace Sundouleia.Interop;
-
-[Flags] // Defines access permissions for moodle application and removal on others.
-public enum MoodleAccess : short
-{
-    None            = 0 << 0, // No Access
-    AllowOwn        = 1 << 0, // The Access Owners own moodles can be applied.
-    AllowOther      = 1 << 1, // The Access Owners 'other' / 'pair' can apply their moodles.
-    Positive        = 1 << 2, // Positive Statuses can be applied.
-    Negative        = 1 << 3, // Negative Statuses can be applied.
-    Special         = 1 << 4, // Special Statuses can be applied.
-    Permanent       = 1 << 5, // Moodles without a duration can be applied.
-    RemoveApplied   = 1 << 6, // 'Other' can remove only moodles they have applied.
-    RemoveAny       = 1 << 7, // 'Other' can remove any moodles.
-    Clearing        = 1 << 8, // 'Other' can clear all moodles.
-}
-
-
 
 /// <summary>
 /// The IPC Provider for Sundouleia to interact with other plugins by sharing information about visible players.
@@ -60,6 +22,7 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
     private readonly SundesmoManager _sundesmos;
     private readonly CharaObjectWatcher _watcher;
 
+    // Could update to be playerHandler or Sundesmo, but it does make address lookup a bit more annoying.
     private readonly Dictionary<nint, IPCMoodleAccessTuple> _handledSundesmos = [];
 
     // Sundouleia's Personal IPC Events.
@@ -76,29 +39,27 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
     private ICallGateProvider<Dictionary<nint, IPCMoodleAccessTuple>>? GetAllRenderedInfo; // Get rendered sundesmos & their access info) (could make list)
     private ICallGateProvider<nint, IPCMoodleAccessTuple>?             GetAccessInfo;      // Get a sundesmo's access info.
     // Modular Actor Data, Base, Outfit, Item, and ItemPack loaders.
-    private ICallGateProvider<string, int, bool>?       LoadSmadFile;   // Load a ModularActorData File to the gameObjectIdx.
-    private ICallGateProvider<string, int, bool>?       LoadSmabFile;   // Load a ModularActorBase File to the gameObjectIdx.
-    private ICallGateProvider<string, int, bool>?       LoadSmaoFile;   // Load a ModularActorOutfit File to the gameObjectIdx.
-    private ICallGateProvider<List<string>, int, bool>? LoadSmaoFiles;  // Load many ModularActorOutfit Files to the gameObjectIdx.
-    private ICallGateProvider<string, int, bool>?       LoadSmaiFile;   // Load a ModularActorItem File to the gameObjectIdx.
-    private ICallGateProvider<List<string>, int, bool>? LoadSmaiFiles;  // Load many ModularActorItem Files to the gameObjectIdx.
-    private ICallGateProvider<string, int, bool>?       LoadSmaipFile;  // Load an ItemPack holding multiple items to the gameObjectIdx.
-    // The above methods, but Async variants.
-    private ICallGateProvider<string, int, Task<bool>>?       LoadSmadFileAsync;
-    private ICallGateProvider<string, int, Task<bool>>?       LoadSmabFileAsync;
-    private ICallGateProvider<string, int, Task<bool>>?       LoadSmaoFileAsync;
-    private ICallGateProvider<List<string>, int, Task<bool>>? LoadSmaoFilesAsync;
-    private ICallGateProvider<string, int, Task<bool>>?       LoadSmaiFileAsync;
-    private ICallGateProvider<List<string>, int, Task<bool>>? LoadSmaiFilesAsync;
-    private ICallGateProvider<string, int, Task<bool>>?       LoadSmaipFileAsync;
+    private ICallGateProvider<string, int, Task<bool>>?       LoadSmadFile;
+    private ICallGateProvider<string, int, Task<bool>>?       LoadSmabFile;
+    private ICallGateProvider<string, int, Task<bool>>?       LoadSmaoFile;
+    private ICallGateProvider<List<string>, int, Task<bool>>? LoadSmaoFiles;
+    private ICallGateProvider<string, int, Task<bool>>?       LoadSmaiFile;
+    private ICallGateProvider<List<string>, int, Task<bool>>? LoadSmaiFiles;
+    private ICallGateProvider<string, int, Task<bool>>?       LoadSmaipFile;
 
     // SMAD related validators.
-    private ICallGateProvider<string, bool>? IsFileValid;       // Validates if a SMAD, SMAB, SMAO, SMAI, or SMAIP file is valid.
-    private ICallGateProvider<string, bool>? IsUpdateFileValid; // Validates if an update token is valid for a given SMAD file.
+    private ICallGateProvider<string, Task<bool>>? IsFileValid;       // Validates if a SMAD, SMAB, SMAO, SMAI, or SMAIP file is valid.
+    private ICallGateProvider<string, Task<bool>>? IsUpdateFileValid; // Validates if an update token is valid for a given SMAD file.
 
     // IPC Event Actions (for Moodles)
-    private static ICallGateProvider<MoodlesStatusInfo, object?>?               ApplyStatusInfo;        // Apply a moodle tuple to the client actor.
-    private static ICallGateProvider<List<MoodlesStatusInfo>, object?>?         ApplyStatusInfoList;    // Apply moodle tuples to the client actor.
+    private static ICallGateProvider<MoodlesStatusInfo, object?>?       ApplyStatusInfo;    // Apply a moodle tuple to the client actor.
+    private static ICallGateProvider<List<MoodlesStatusInfo>, object?>? ApplyStatusInfoList;// Apply moodle tuples to the client actor.
+    
+    /// <summary>
+    ///     Obtains the request to apply Moodles onto another Pair. <para />
+    ///     If valid permissions, invokes a server call to request the action on the other pair.
+    /// </summary>
+    private ICallGateProvider<nint, List<MoodlesStatusInfo>, bool, object?>? ApplyToPairRequest;
 
     public IpcProvider(ILogger<IpcProvider> logger, SundouleiaMediator mediator,
         SMAManager actorFileManager, SundesmoManager pairs, CharaObjectWatcher watcher)
@@ -109,8 +70,29 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         _watcher = watcher;
 
         // Should subscribe to characterActorCreated or rendered / unrendered events.
-        
-        // these events would then trigger the respective plugin IPC.
+        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ =>
+        {
+            // Add to handled sundesmos.
+            _handledSundesmos.TryAdd(_.Handler.Address, _.Sundesmo.ToAccessTuple());
+            NotifyPairRendered(_.Handler.Address);
+        });
+
+        Mediator.Subscribe<SundesmoPlayerUnrendered>(this, _ =>
+        {
+            // Remove from handled sundesmos.
+            _handledSundesmos.Remove(_.Address, out var removed);
+            NotifyPairUnrendered(_.Address);
+        });
+
+        Mediator.Subscribe<MoodleAccessPermsChanged>(this, _ =>
+        {
+            // Update the permission if they are rendered.
+            if (!_.Sundesmo.IsRendered)
+                return;
+            // Update the access permissions.
+            _handledSundesmos[_.Sundesmo.PlayerAddress] = _.Sundesmo.ToAccessTuple();
+            NotifyAccessUpdated(_.Sundesmo.PlayerAddress);
+        });
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -130,26 +112,19 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         GetAllRendered = Svc.PluginInterface.GetIpcProvider<List<nint>>("Sundouleia.GetAllRendered");
         GetAllRenderedInfo = Svc.PluginInterface.GetIpcProvider<Dictionary<nint, IPCMoodleAccessTuple>>("Sundouleia.GetAllRenderedInfo");
         GetAccessInfo = Svc.PluginInterface.GetIpcProvider<nint, IPCMoodleAccessTuple>("Sundouleia.GetAccessInfo");
-        IsFileValid = Svc.PluginInterface.GetIpcProvider<string, bool>("Sundouleia.IsFileValid");
-        IsUpdateFileValid = Svc.PluginInterface.GetIpcProvider<string, bool>("Sundouleia.IsUpdateFileValid");
+        IsFileValid = Svc.PluginInterface.GetIpcProvider<string, Task<bool>>("Sundouleia.IsFileValid");
+        IsUpdateFileValid = Svc.PluginInterface.GetIpcProvider<string, Task<bool>>("Sundouleia.IsUpdateFileValid");
 
-        // init loaders
-        LoadSmadFile = Svc.PluginInterface.GetIpcProvider<string, int, bool>("Sundouleia.LoadSmadFile");
-        LoadSmabFile = Svc.PluginInterface.GetIpcProvider<string, int, bool>("Sundouleia.LoadSmabFile");
-        LoadSmaoFile = Svc.PluginInterface.GetIpcProvider<string, int, bool>("Sundouleia.LoadSmaoFile");
-        LoadSmaoFiles = Svc.PluginInterface.GetIpcProvider<List<string>, int, bool>("Sundouleia.LoadSmaoFiles");
-        LoadSmaiFile = Svc.PluginInterface.GetIpcProvider<string, int, bool>("Sundouleia.LoadSmaiFile");
-        LoadSmaiFiles = Svc.PluginInterface.GetIpcProvider<List<string>, int, bool>("Sundouleia.LoadSmaiFiles");
-        LoadSmaipFile = Svc.PluginInterface.GetIpcProvider<string, int, bool>("Sundouleia.LoadSmaipFile");
-        
-        // init async loaders
-        LoadSmadFileAsync = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmadFileAsync");
-        LoadSmabFileAsync = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmabFileAsync");
-        LoadSmaoFileAsync = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmaoFileAsync");
-        LoadSmaoFilesAsync = Svc.PluginInterface.GetIpcProvider<List<string>, int, Task<bool>>("Sundouleia.LoadSmaoFilesAsync");
-        LoadSmaiFileAsync = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmaiFileAsync");
-        LoadSmaiFilesAsync = Svc.PluginInterface.GetIpcProvider<List<string>, int, Task<bool>>("Sundouleia.LoadSmaiFilesAsync");
-        LoadSmaipFileAsync = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmaipFileAsync");
+        // init Callable Actions
+        LoadSmadFile = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmadFile");
+        LoadSmabFile = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmabFile");
+        LoadSmaoFile = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmaoFile");
+        LoadSmaoFiles = Svc.PluginInterface.GetIpcProvider<List<string>, int, Task<bool>>("Sundouleia.LoadSmaoFiles");
+        LoadSmaiFile = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmaiFile");
+        LoadSmaiFiles = Svc.PluginInterface.GetIpcProvider<List<string>, int, Task<bool>>("Sundouleia.LoadSmaiFiles");
+        LoadSmaipFile = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmaipFile");
+        ApplyToPairRequest = Svc.PluginInterface.GetIpcProvider<nint, List<MoodlesStatusInfo>, bool, object?>("Sundouleia.ApplyToPairRequest");
+
 
         // init appliers (Maybe replace with applied / removed / updated later)
         ApplyStatusInfo = Svc.PluginInterface.GetIpcProvider<MoodlesStatusInfo, object?>("Sundouleia.ApplyStatusInfo");
@@ -169,14 +144,7 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         LoadSmaiFile.RegisterFunc(LoadSMAI);
         LoadSmaiFiles.RegisterFunc(LoadSMAI);
         LoadSmaipFile.RegisterFunc(LoadSMAIP);
-        // register async loaders
-        LoadSmadFileAsync.RegisterFunc(LoadSMADAsync);
-        LoadSmabFileAsync.RegisterFunc(LoadSMABAsync);
-        LoadSmaoFileAsync.RegisterFunc(LoadSMAOAsync);
-        LoadSmaoFilesAsync.RegisterFunc(LoadSMAOAsync);
-        LoadSmaiFileAsync.RegisterFunc(LoadSMAIAsync);
-        LoadSmaiFilesAsync.RegisterFunc(LoadSMAIAsync);
-        LoadSmaipFileAsync.RegisterFunc(LoadSMAIPAsync);
+        ApplyToPairRequest.RegisterAction(ProcessApplyToPairRequest);
         // register validators
         IsFileValid.RegisterFunc(ValidateFile);
         IsUpdateFileValid.RegisterFunc(ValidateUpdateFile);
@@ -198,6 +166,8 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         // unregister the event actions.
         PairRendered?.UnregisterAction();
         PairUnrendered?.UnregisterAction();
+        AccessUpdated?.UnregisterAction();
+        ApplyToPairRequest?.UnregisterAction();
         // unregister the functions for getters.
         GetAllRendered?.UnregisterFunc();
         GetAllRenderedInfo?.UnregisterFunc();
@@ -210,14 +180,6 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         LoadSmaiFile?.UnregisterFunc();
         LoadSmaiFiles?.UnregisterFunc();
         LoadSmaipFile?.UnregisterFunc();
-        // unregister async loaders
-        LoadSmadFileAsync?.UnregisterFunc();
-        LoadSmabFileAsync?.UnregisterFunc();
-        LoadSmaoFileAsync?.UnregisterFunc();
-        LoadSmaoFilesAsync?.UnregisterFunc();
-        LoadSmaiFileAsync?.UnregisterFunc();
-        LoadSmaiFilesAsync?.UnregisterFunc();
-        LoadSmaipFileAsync?.UnregisterFunc();
         // unregister validators
         IsFileValid?.UnregisterFunc();
         IsUpdateFileValid?.UnregisterFunc();
@@ -233,53 +195,82 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
     /// <summary> Loads a SundouleiaModularActorData file onto the given object index. </summary>
     /// <returns> True if loaded successfully, false otherwise. </returns>
     /// <remarks> Only works in GPOSE. </remarks>
-    private bool LoadSMAD(string path, int objectIdx)
-        => false; // Not ready.
-    
-    private bool LoadSMAB(string path, int objectIdx)
-        => false; // Not ready.
-
-    private bool LoadSMAO(string path, int objectIdx)
-        => false; // Not ready.
-
-    private bool LoadSMAO(List<string> paths, int objectIdx)
-        => false; // Not ready.
-
-    private bool LoadSMAI(string path, int objectIdx)
-        => false; // Not ready.
-
-    private bool LoadSMAI(List<string> paths, int objectIdx)
-        => false; // Not ready.
-
-    private bool LoadSMAIP(string path, int objectIdx)
-        => false; // Not ready.
-
-    private async Task<bool> LoadSMADAsync(string path, int objectIdx)
+    private async Task<bool> LoadSMAD(string path, int objectIdx)
         => await Task.FromResult(false); // Not ready.
 
-    private async Task<bool> LoadSMABAsync(string path, int objectIdx)
+    private async Task<bool> LoadSMAB(string path, int objectIdx)
         => await Task.FromResult(false); // Not ready.
 
-    private async Task<bool> LoadSMAOAsync(string path, int objectIdx)
+    private async Task<bool> LoadSMAO(string path, int objectIdx)
         => await Task.FromResult(false); // Not ready.
 
-    private async Task<bool> LoadSMAOAsync(List<string> paths, int objectIdx)
+    private async Task<bool> LoadSMAO(List<string> paths, int objectIdx)
         => await Task.FromResult(false); // Not ready.
 
-    private async Task<bool> LoadSMAIAsync(string path, int objectIdx)
+    private async Task<bool> LoadSMAI(string path, int objectIdx)
         => await Task.FromResult(false); // Not ready.
 
-    private async Task<bool> LoadSMAIAsync(List<string> paths, int objectIdx)
+    private async Task<bool> LoadSMAI(List<string> paths, int objectIdx)
         => await Task.FromResult(false); // Not ready.
 
-    private async Task<bool> LoadSMAIPAsync(string path, int objectIdx)
+    private async Task<bool> LoadSMAIP(string path, int objectIdx)
         => await Task.FromResult(false); // Not ready.
+
+    /// <summary>
+    ///     Applies a <see cref="MoodlesStatusInfo"/> tuple to the CLIENT ONLY via Moodles. <para />
+    ///     This helps account for trying on Moodle Presets, or applying the preset's StatusTuples. <para />
+    ///     Method is invoked via GagSpeak's IpcProvider to prevent miss-use of bypassing permissions.
+    /// </summary>
+    public void ApplyStatusTuple(MoodlesStatusInfo status) => ApplyStatusInfo?.SendMessage(status);
+
+    /// <summary>
+    ///     Applies a group of <see cref="MoodlesStatusInfo"/> tuples to the CLIENT ONLY via Moodles. <para />
+    ///     This helps account for trying on Moodle Presets, or applying the preset's StatusTuples. <para />
+    ///     Method is invoked via GagSpeak's IpcProvider to prevent miss-use of bypassing permissions.
+    /// </summary>
+    public void ApplyStatusTuples(IEnumerable<MoodlesStatusInfo> statuses) => ApplyStatusInfoList?.SendMessage(statuses.ToList());
+
+    // Used to ensure integrity before pushing update to the server.
+    private void ProcessApplyToPairRequest(nint recipientAddr, List<MoodlesStatusInfo> toApply, bool isPreset)
+    {
+        // Identify the pair.
+        if (_sundesmos.DirectPairs.FirstOrDefault(p => p.IsRendered && p.PlayerAddress == recipientAddr) is not { } pair)
+            return;
+        // Validate.
+        foreach (var status in toApply)
+            if (!IsStatusValid(status, out var errorMsg))
+            {
+                Logger.LogWarning(errorMsg);
+                return;
+            }
+        // If valid, publish
+        Mediator.Publish(new MoodlesApplyStatusToPair(new(pair.UserData, toApply)));
+
+        bool IsStatusValid(MoodlesStatusInfo status, [NotNullWhen(false)] out string? error)
+        {
+            if (!pair.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOther))
+                return (error = "Attempted to apply to a pair without 'AllowOther' active.") is null;
+            else if (!pair.PairPerms.MoodleAccess.HasAny(MoodleAccess.Positive))
+                return (error = "Pair does not allow application of Moodles with positive status types.") is null;
+            else if (!pair.PairPerms.MoodleAccess.HasAny(MoodleAccess.Negative))
+                return (error = "Pair does not allow application of Moodles with negative status types.") is null;
+            else if (!pair.PairPerms.MoodleAccess.HasAny(MoodleAccess.Special))
+                return (error = "Pair does not allow application of Moodles with special status types.") is null;
+            else if (!pair.PairPerms.MoodleAccess.HasAny(MoodleAccess.Permanent) && status.ExpireTicksUTC == -1)
+                return (error = "Pair does not allow application of permanent Moodles.") is null;
+            else if (pair.PairPerms.MaxMoodleTime < TimeSpan.FromMilliseconds(status.ExpireTicksUTC))
+                return (error = "Moodle duration of requested Moodle was longer than the pair allows!") is null;
+
+            return (error = null) is null;
+        }
+    }
+
 
     // Validation.
-    private bool ValidateFile(string path)
-        => false; // Not ready.
+    private async Task<bool> ValidateFile(string path)
+        => await Task.FromResult(false);
 
-    private bool ValidateUpdateFile(string path)
-        => false; // Not ready.
+    private async Task<bool> ValidateUpdateFile(string path)
+        => await Task.FromResult(false);
 }
 

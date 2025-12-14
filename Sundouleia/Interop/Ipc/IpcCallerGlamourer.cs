@@ -24,6 +24,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     // API EVENTS
     public EventSubscriber<nint, StateChangeType> OnStateChanged;   // Informs us when ANY Glamour Change has occurred.
     // API GETTERS
+    private readonly GetState       GetState;  // Obtain the JObject of the client's current state.
     private readonly GetStateBase64 GetBase64; // Get the Base64string of the client's current state.
     // API ENACTORS
     private readonly ApplyState      ApplyState;       // Applies actor state with the obtained base64 strings.
@@ -44,6 +45,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
 
         ApiVersion = new ApiVersion(Svc.PluginInterface);
 
+        GetState = new GetState(Svc.PluginInterface);
         GetBase64 = new GetStateBase64(Svc.PluginInterface);
 
         ApplyState = new ApplyState(Svc.PluginInterface);

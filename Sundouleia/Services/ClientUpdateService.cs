@@ -55,7 +55,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _ipc.Glamourer.OnStateChanged.Enable();
         _ipc.CustomizePlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
         _ipc.Heels.OnOffsetUpdate.Subscribe(OnHeelsOffsetUpdate);
-        _ipc.Moodles.OnStatusModified.Subscribe(OnMoodlesUpdate);
+        _ipc.Moodles.OnStatusManagerModified.Subscribe(OnMoodlesUpdate);
         _ipc.Honorific.OnTitleChange.Subscribe(OnHonorificUpdate);
         _ipc.PetNames.OnNicknamesChanged.Subscribe(OnPetNamesUpdate);
 
@@ -78,7 +78,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _ipc.Glamourer.OnStateChanged?.Dispose();
         _ipc.CustomizePlus.OnProfileUpdate.Unsubscribe(OnCPlusProfileUpdate);
         _ipc.Heels.OnOffsetUpdate.Unsubscribe(OnHeelsOffsetUpdate);
-        _ipc.Moodles.OnStatusModified.Unsubscribe(OnMoodlesUpdate);
+        _ipc.Moodles.OnStatusManagerModified.Unsubscribe(OnMoodlesUpdate);
         _ipc.Honorific.OnTitleChange.Unsubscribe(OnHonorificUpdate);
         _ipc.PetNames.OnNicknamesChanged.Unsubscribe(OnPetNamesUpdate);
         Svc.Framework.Update -= OnFrameworkTick;

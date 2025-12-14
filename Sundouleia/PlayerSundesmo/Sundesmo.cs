@@ -5,6 +5,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using GagspeakAPI.Data;
 using OtterGui;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
@@ -74,6 +75,9 @@ public sealed class Sundesmo : IComparable<Sundesmo>, IDisposable
     public GlobalPerms PairGlobals => UserPair.Globals;
     public PairPerms PairPerms => UserPair.Perms;
 
+    // Shared MoodleData, if any.
+    public MoodleData SharedData = new();
+
     // Internal Helpers
     public bool IsTemporary => UserPair.IsTemporary;
     public bool IsRendered => _player.IsRendered;
@@ -82,6 +86,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>, IDisposable
     public bool IsPaused => OwnPerms.PauseVisuals;
     public string Ident => _onlineUser?.Ident ?? string.Empty;
     public string PlayerName => _player.NameString;
+    public string PlayerNameWorld => _player.NameWithWorld;
     public IntPtr PlayerAddress => IsRendered ? _player.Address : IntPtr.Zero;
     public PlayerHandler PlayerHandler => _player;
 
@@ -110,6 +115,38 @@ public sealed class Sundesmo : IComparable<Sundesmo>, IDisposable
 
     public string? GetNickname() => _nickConfig.GetNicknameForUid(UserData.UID);
     public string GetNickAliasOrUid() => _nickConfig.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
+
+    public IPCMoodleAccessTuple ToAccessTuple()
+    {
+        return new IPCMoodleAccessTuple(
+            OwnPerms.MoodleAccess,  (long)OwnPerms.MaxMoodleTime.TotalMilliseconds,
+            PairPerms.MoodleAccess, (long)PairPerms.MaxMoodleTime.TotalMilliseconds);
+    }
+
+    public void SetMoodleData(MoodleData newData)
+        => SharedData = newData;
+
+    public void UpdateMoodleStatus(MoodlesStatusInfo status, bool deleted)
+    {
+        if (deleted)
+            SharedData.Statuses.Remove(status.GUID);
+        else
+            SharedData.TryUpdateStatus(status);
+    }
+
+    public void SetMoodleStatuses(List<MoodlesStatusInfo> statuses)
+        => SharedData.SetStatuses(statuses);
+
+    public void UpdateMoodlePreset(MoodlePresetInfo preset, bool deleted)
+    {
+        if (deleted)
+            SharedData.Presets.Remove(preset.GUID);
+        else
+            SharedData.TryUpdatePreset(preset);
+    }
+
+    public void SetMoodlePresets(List<MoodlePresetInfo> presets)
+        => SharedData.SetPresets(presets);
 
     // Reapply all existing data to all rendered objects.
     public void ReapplyAlterations()

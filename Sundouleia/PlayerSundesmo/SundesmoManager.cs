@@ -5,6 +5,7 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.ImGuiNotification;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using GagspeakAPI.Data;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
@@ -366,6 +367,48 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     #endregion Manager Helpers
 
     #region Updates
+    public void ReceiveMoodleData(UserData target, MoodleData newMoodleData)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+        
+        Logger.LogTrace($"Received moodle update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        sundesmo.SetMoodleData(newMoodleData);
+    }
+
+    public void ReceiveMoodleStatuses(UserData target, List<MoodlesStatusInfo> newStatuses)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+        Logger.LogTrace($"Received moodle status update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        sundesmo.SetMoodleStatuses(newStatuses);
+    }
+
+    public void ReceiveMoodlePresets(UserData target, List<MoodlePresetInfo> newPresets)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+        Logger.LogTrace($"Received moodle preset update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        sundesmo.SetMoodlePresets(newPresets);
+    }
+
+    public void ReceiveMoodleStatusUpdate(UserData target, MoodlesStatusInfo status, bool deleted)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+        Logger.LogTrace($"Received moodle status single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        sundesmo.UpdateMoodleStatus(status, deleted);
+    }
+
+    public void ReceiveMoodlePresetUpdate(UserData target, MoodlePresetInfo preset, bool deleted)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+        Logger.LogTrace($"Received moodle preset single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        sundesmo.UpdateMoodlePreset(preset, deleted);
+    }
+
+
     // Should happen only on initial loads.
     public void ReceiveIpcUpdateFull(UserData target, NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
@@ -466,6 +509,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
         if (!PropertyChanger.TrySetProperty(sundesmo.PairPerms, permName, newValue, out var finalVal) || finalVal is null)
             throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
+
+        // Inform of a permission change here for moodles!
 
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s PairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
         RecreateLazy();

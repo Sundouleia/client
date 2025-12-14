@@ -13,34 +13,6 @@ using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModularActor;
 
-[Flags]
-public enum SMAOSlotFilter : short
-{
-    MainHand = 0 << 0,
-    OffHand  = 1 << 0,
-    Head     = 1 << 1,
-    Body     = 1 << 2,
-    Hands    = 1 << 3,
-    Legs     = 1 << 4,
-    Feet     = 1 << 5,
-    Ears     = 1 << 6,
-    Neck     = 1 << 7,
-    Wrists   = 1 << 8,
-    RFinger  = 1 << 9,
-    LFinger  = 1 << 10,
-    Bonus    = 1 << 11,
-}
-
-[Flags]
-public enum SMAOMetaFilter : byte
-{
-    None      = 0 << 0,
-    Hat       = 1 << 0,
-    VieraEars = 1 << 1,
-    Visor     = 1 << 2,
-    Weapon    = 1 << 3,
-}
-
 // Maybe add the filters in here, maybe not.
 public record SMAOMeta(string Name, string Description, string? ThumbnailBase64);
 
@@ -60,8 +32,8 @@ public record ActorOutfitFileData
     public string Base64Thumbnail { get; set; } = string.Empty; // Optional, obviously.
 
     // Filters to limit what is stored.
-    public SMAOSlotFilter SlotFilter { get; set; } = SMAOSlotFilter.MainHand;
-    public SMAOMetaFilter MetaFilter { get; set; } = SMAOMetaFilter.None;
+    public SMAFileSlotFilter SlotFilter { get; set; } = SMAFileSlotFilter.MainHand;
+    public SMAFileMetaFilter MetaFilter { get; set; } = SMAFileMetaFilter.None;
     public bool Customizations       { get; set; } = false;
     public bool AdvCustomizations    { get; set; } = false;
 

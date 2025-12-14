@@ -1,9 +1,12 @@
 using CkCommons.HybridSaver;
+using Penumbra.String.Classes;
 using Sundouleia.Services.Configs;
+using Sundouleia.Utils;
 
 namespace Sundouleia.PlayerClient;
 
-
+// Currently contemplating the use of this file, since it only serves to help identify files, but not actually store them.
+// Perhaps it will become more clear later.
 public class ModularActorsConfig : IHybridSavable
 {
     private readonly ILogger<ModularActorsConfig> _logger;
@@ -68,93 +71,76 @@ public class ModularActorsConfig : IHybridSavable
 
     public bool AddBaseFile(Guid fileId, string fileName, string filePath, string password, byte[] publicKey, byte[] privateKey)
     {
-        // If there is an entry already, ignore it.
-        if (Current.BaseFiles.ContainsKey(fileId))
-            return false;
-
-        // Otherwise, add it.
-        Current.BaseFiles[fileId] = new ModularActorBaseEntry(fileId, fileName, filePath)
+        var res = Current.BaseFileInfo.TryAdd(fileId, new SMABaseFileMeta
         {
-            AccessPassword = password,
-            FilePublicKey = publicKey,
-            FilePrivateKey = privateKey
-        };
-        Save();
-        return true;
+            Id = fileId,
+            FilePath = filePath,
+            Password = password,
+            PrivateKey = Convert.ToBase64String(privateKey),
+            DataHash = SundouleiaSecurity.GetFileHashSHA256(filePath)
+        });
+        if (res) Save();
+        return res;
     }
 
     public bool AddOutfitFile(Guid fileId, string fileName, string filePath)
     {
-        if (Current.OutfitFiles.ContainsKey(fileId))
+        if (File.Exists(filePath))
             return false;
-        Current.OutfitFiles[fileId] = new ModularActorOtherEntry(fileId, fileName, filePath);
-        Save();
-        return true;
+
+        var res = Current.OutfitFileInfo.TryAdd(fileId, new SMAFileMeta
+        {
+            Id = fileId,
+            FilePath = filePath,
+            DataHash = SundouleiaSecurity.GetFileHashSHA256(filePath)
+        });
+        if (res) Save();
+        return res;
     }
 
     public bool AddItemFile(Guid fileId, string fileName, string filePath)
     {
-        if (Current.ItemFiles.ContainsKey(fileId))
+        if (File.Exists(filePath))
             return false;
-        Current.ItemFiles[fileId] = new ModularActorOtherEntry(fileId, fileName, filePath);
-        Save();
-        return true;
+        var res = Current.ItemFileInfo.TryAdd(fileId, new SMAFileMeta
+        {
+            Id = fileId,
+            FilePath = filePath,
+            DataHash = SundouleiaSecurity.GetFileHashSHA256(filePath)
+        });
+        if (res) Save();
+        return res;
     }
 
     public bool AddItemPackFile(Guid fileId, string fileName, string filePath)
     {
-        if (Current.ItemPackFiles.ContainsKey(fileId))
+        if (File.Exists(filePath))
             return false;
-        Current.ItemPackFiles[fileId] = new ModularActorOtherEntry(fileId, fileName, filePath);
-        Save();
-        return true;
+        var res = Current.ItemPackFileInfo.TryAdd(fileId, new SMAFileMeta
+        {
+            Id = fileId,
+            FilePath = filePath,
+            DataHash = SundouleiaSecurity.GetFileHashSHA256(filePath)
+        });
+        if (res) Save();
+        return res;
     }
 
-    // Validate the integrity of all files listed in storage.
-    // If any file is not in its expected location, flag it as invalid.
-    public void CheckBaseIntegrity(out List<Guid> invalidFiles)
+    // Idk why not just update the state in the record itself but whatever.
+    public void ValidateIntegrity(List<SMAFileMeta> files, out List<Guid> invalidFiles)
     {
         invalidFiles = new List<Guid>();
-        foreach (var files in Current.BaseFiles.Values)
-        {
-            if (!File.Exists(files.FilePath))
+        foreach (var file in files)
+            if (!file.IsValid())
             {
-                _logger.LogWarning($"SMABase file missing ({files.FileName}): {files.FilePath}");
-                invalidFiles.Add(files.FileId);
+                _logger.LogWarning($"SMA file invalid ({file.FilePath}): {file.FilePath}");
+                invalidFiles.Add(file.Id);
             }
-        }
-        // Maybe remove invalid files? Or keep to mark as invalid? Idk yet.
-    }
-
-    public void CheckOutfitIntegrity(out List<Guid> invalidIds)
-    {
-        invalidIds = new List<Guid>();
-        foreach (var files in Current.OutfitFiles.Values)
-        {
-            if (!File.Exists(files.FilePath))
-            {
-                _logger.LogWarning($"SMAOutfit file missing ({files.FileName}): {files.FilePath}");
-                invalidIds.Add(files.FileId);
-            }
-        }
-    }
-
-    public void CheckItemIntegrity(out List<Guid> invalidIds)
-    {
-        invalidIds = new List<Guid>();
-        foreach (var files in Current.ItemFiles.Values)
-        {
-            if (!File.Exists(files.FilePath))
-            {
-                _logger.LogWarning($"SMAItem file missing ({files.FileName}): {files.FilePath}");
-                invalidIds.Add(files.FileId);
-            }
-        }
     }
 
     public bool AirstrikeBaseFile(Guid id)
     {
-        if (!Current.BaseFiles.Remove(id, out var removed))
+        if (!Current.BaseFileInfo.Remove(id, out var removed))
             return false;
         // Otherwise log removal and save.
         _logger.LogInformation($"Launched airstrikes on ({removed.FilePath}), removing it from storage.");
@@ -164,7 +150,7 @@ public class ModularActorsConfig : IHybridSavable
 
     public bool AirstrikeOutfitFile(Guid id)
     {
-        if (!Current.OutfitFiles.Remove(id, out var removed))
+        if (!Current.OutfitFileInfo.Remove(id, out var removed))
             return false;
         // Otherwise log removal and save.
         _logger.LogInformation($"Launched airstrikes on ({removed.FilePath}), removing it from storage.");
@@ -174,7 +160,7 @@ public class ModularActorsConfig : IHybridSavable
 
     public bool AirstrikeItemFile(Guid id)
     {
-        if (!Current.ItemFiles.Remove(id, out var removed))
+        if (!Current.ItemFileInfo.Remove(id, out var removed))
             return false;
         // Otherwise log removal and save.
         _logger.LogInformation($"Launched airstrikes on ({removed.FilePath}), removing it from storage.");
@@ -183,43 +169,40 @@ public class ModularActorsConfig : IHybridSavable
     }
 }
 
-/// <summary>
-///     Private data associated with all created Sundouleia Modular Actor 
-///     Data, Base, Outfit, Item, and ItemPack files.
-/// </summary>
-/// <remarks> If lost, you will need to resend these files (if a backup cannot be recovered). </remarks>
+// Helps us obtain correct file information for our own exported data on 
 public class ModularActorStorage
 {
-    /// <summary>
-    ///     A Global password to use when saving a file that no password was provided for.
-    /// </summary>
-    public string FallbackPassword { get; set; } = string.Empty;
-
-    // All created ModularActorBase files details and private access data.
-    public Dictionary<Guid, ModularActorBaseEntry> BaseFiles { get; set; } = new();
-
-    // All created ModularActorOutfit file details. (Could maybe key by hash but idk yet.)
-    public Dictionary<Guid, ModularActorOtherEntry> OutfitFiles { get; set; } = new();
-
-    // All created ModularActorItem file details. (Could maybe key by hash but idk yet.)
-    public Dictionary<Guid, ModularActorOtherEntry> ItemFiles { get; set; } = new();
-
-    // Might not need to store created item packs since they are just a list of allowed items effectively.
-    public Dictionary<Guid, ModularActorOtherEntry> ItemPackFiles { get; set; } = new();
-
+    // Could maybe key this by file-path, or data-hash, idk yet.
+    public Dictionary<Guid, SMABaseFileMeta> BaseFileInfo     { get; set; } = new();
+    public Dictionary<Guid, SMAFileMeta>     OutfitFileInfo   { get; set; } = new();
+    public Dictionary<Guid, SMAFileMeta>     ItemFileInfo     { get; set; } = new();
+    public Dictionary<Guid, SMAFileMeta>     ItemPackFileInfo { get; set; } = new();
 }
 
-/// <summary>
-///     Holds essential info needed to decrypt a ModularActorBase file.
-/// </summary>
-public record ModularActorBaseEntry(Guid FileId, string FileName, string FilePath)
+// A Metadata record for SMA Base Files. If the filePath does not match the file contents, we can assume it is invalid.
+public record SMAFileMeta
 {
-    internal string AccessPassword { get; set; } = string.Empty; // Required to open the base file.
-    internal byte[] FilePublicKey { get; set; } = Array.Empty<byte>(); // Required to access & decrypt. (may not need)
-    internal byte[] FilePrivateKey { get; set; } = Array.Empty<byte>(); // Required to make access updates to files.
+    public string FilePath      { get; set; } = string.Empty; // Expected Location on Disk.
+    public Guid   Id            { get; set; } = Guid.Empty;   // Unique Identifier for the file.
+    public string Name          { get; set; } = string.Empty; // Some info for UI Help.
+    public string Description   { get; set; } = string.Empty; // Some info for UI Help.
+
+    public string DataHash   { get; set; } = string.Empty; // Hash of the file data for integrity checks.
+
+    public bool IsValid() => IsValidPath() && IsValidData();
+    public bool IsValidPath() => File.Exists(FilePath);
+    public bool IsValidData()
+    {
+        var dataHash = SundouleiaSecurity.GetFileHashSHA256(FilePath);
+        if (string.IsNullOrEmpty(dataHash))
+            return false;
+        return string.Equals(DataHash, dataHash, StringComparison.Ordinal);
+    }
 }
 
-/// <summary>
-///     Holds essential info to location and identify other Modular Actor file types.
-/// </summary>
-public record ModularActorOtherEntry(Guid FileId, string FileName, string FilePath);
+public record SMABaseFileMeta : SMAFileMeta
+{
+    public List<string> AllowedDataHashes { get; set; } = new();        // What other files can be used with this base.
+    public string       PrivateKey        { get; set; } = string.Empty; // Private Key to decrypt the file.
+    public string       Password          { get; set; } = string.Empty; // Password to access the file. (Blank assumes none)
+}
