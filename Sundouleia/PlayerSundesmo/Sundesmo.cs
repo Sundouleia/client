@@ -22,7 +22,7 @@ namespace Sundouleia.Pairs;
 ///     Stores information about a pairing (Sundesmo) between 2 users. <para />
 ///     Created via the SundesmoFactory
 /// </summary>
-public sealed class Sundesmo : IComparable<Sundesmo>, IDisposable
+public sealed class Sundesmo : IComparable<Sundesmo>
 {
     private readonly ILogger<Sundesmo> _logger;
     private readonly SundouleiaMediator _mediator;
@@ -266,7 +266,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>, IDisposable
     ///     Removes all applied appearance data for the sundesmo if rendered, 
     ///     and disposes all internal data.
     /// </summary>
-    public void Dispose()
+    public void TemporarilyDisposeData()
     {
         _logger.LogDebug($"Disposing data for [{PlayerName}] ({GetNickAliasOrUid()})", LoggerType.PairManagement);
         // Cancel any existing timeout task, and then dispose of all data.
