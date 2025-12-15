@@ -470,12 +470,15 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         }
 
         // Collect the on-screen paths for this owned object.
+        Logger.LogDebug($"Collecting on-screen resource paths for owned object {{{kind}}} @ Idx [{ownedIdx}]");
         if (await _ipc.Penumbra.GetCharacterResourcePathData(ownedIdx).ConfigureAwait(false) is not { } onScreenPaths)
             throw new InvalidOperationException("Penumbra returned null data");
 
+        Logger.LogDebug($"Processing owned object modded state for {{{kind}}}");
         var objectFiles = (kind is OwnedObject.Player)
             ? await CollectPlayerModdedFiles(onScreenPaths, ct)
             : await CollectOtherModdedFiles(kind, onScreenPaths, ct);
+        Logger.LogDebug($"Processed owned object modded state for {{{kind}}} with {objectFiles.Count} modded files.");
         // Store the result into the modded state.
         moddedState.SetOwnedFiles(kind, objectFiles);
         return moddedState;

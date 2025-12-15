@@ -268,29 +268,4 @@ public class GroupsManager
             group.LinkedUids.Remove(uid);
         _config.Save();
     }
-
-    public bool TryRemoveGroup(string groupLabel)
-    {
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(groupLabel, StringComparison.Ordinal)) is not { } match)
-        {
-            _logger.LogWarning($"No group found with the name {{{groupLabel}}} to remove.");
-            return false;
-        }
-        
-        Config.Groups.Remove(match);
-        _config.Save();
-        return true;
-    }
-
-    public bool TryRemoveGroup(SundesmoGroup group)
-    {
-        if (!Config.Groups.Contains(group))
-        {
-            _logger.LogWarning($"No group found with the name {{{group.Label}}} to remove.");
-            return false;
-        }
-        Config.Groups.Remove(group);
-        _config.Save();
-        return true;
-    }
 }

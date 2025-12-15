@@ -79,6 +79,12 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         }
     }
 
+    public async Task<JObject> GetClientState()
+    {
+        if (!APIAvailable) return new JObject();
+        return await Svc.Framework.RunOnFrameworkThread(() => GetState.Invoke(0).Item2 ?? new JObject()).ConfigureAwait(false);
+    }
+
     public async Task<string> GetClientBase64State()
     {
         if (!APIAvailable) return string.Empty;
@@ -100,16 +106,29 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         }).ConfigureAwait(false);
     }
 
-    public async Task<string> GetBase64StateByObject(IGameObject obj)
-    {
-        if (!APIAvailable) return string.Empty;
-        return await Svc.Framework.RunOnFrameworkThread(() => GetBase64.Invoke(obj.ObjectIndex).Item2 ?? string.Empty).ConfigureAwait(false);
-    }
-
     public async Task<string> GetBase64StateByIdx(ushort objectIdx)
     {
         if (!APIAvailable) return string.Empty;
         return await Svc.Framework.RunOnFrameworkThread(() => GetBase64.Invoke(objectIdx).Item2 ?? string.Empty).ConfigureAwait(false);
+    }
+
+    public async Task ApplyStateByPtr(IntPtr actorAddr, JObject state)
+    {
+        if (!APIAvailable || PlayerData.IsZoning || state is null)
+            return;
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            // Only accept requests to obtain profiles for players.
+            if (Svc.Objects.CreateObjectReference(actorAddr) is { } obj && obj is ICharacter)
+                ApplyState.Invoke(state, obj.ObjectIndex, SUNDOULEIA_LOCK);
+        }).ConfigureAwait(false);
+    }
+
+    public async Task ApplyStateByIdx(ushort objectIdx, JObject state)
+    {
+        // Had IsZoning before, can add back in if needed, but shouldnt be necessary if we know the obj is valid.
+        if (!APIAvailable || state is null) return;
+        await Svc.Framework.RunOnFrameworkThread(() => ApplyState.Invoke(state, objectIdx, SUNDOULEIA_LOCK)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -139,7 +158,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     // Require handler to enforce being called by the SundesmoHandler.
     public async Task ReleaseActor(ushort objIdx)
     {
-        // Had IsZoning before, can add back in if needed, but shouldnt be nessisary if we know the obj is valid.
+        // Had IsZoning before, can add back in if needed, but shouldnt be necessary if we know the obj is valid.
         if (!APIAvailable)
             return;
         

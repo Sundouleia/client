@@ -27,6 +27,7 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
     private readonly SMAFileHandler _smaHandler;
     private readonly FileCacheManager _fileCache;
     private readonly SMAManager _smaManager;
+    private readonly ModdedStateManager _moddedState;
     private readonly CharaObjectWatcher _objWatcher;
     private readonly UiFileDialogService _dialogService;
     private readonly TutorialService _guides;
@@ -42,12 +43,13 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
     private string _lastExportedFilePassword = string.Empty;
     private byte[] _lastExportedKey = Array.Empty<byte>();
 
-    public SMACreatorUI(ILogger<SMACreatorUI> logger, SundouleiaMediator mediator,
+    public SMACreatorUI(ILogger<SMACreatorUI> logger, SundouleiaMediator mediator, ModdedStateManager moddedState,
         SMAFileHandler smaHandler, FileCacheManager fileCache,
         SMAManager smaManager, CharaObjectWatcher objWatcher,
         UiFileDialogService dialogService, TutorialService guides) 
         : base(logger, mediator, "Modular Actor Creator###SundouleiaSMACreator")
     {
+        _moddedState = moddedState;
         _smaHandler = smaHandler;
         _fileCache = fileCache;
         _smaManager = smaManager;
@@ -83,11 +85,20 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
         ImGui.InputTextWithHint("##FileDesc", "(Optional) Provide Description...", ref _exportDescription, 100);
 
         ImGui.Spacing();
-        if (CkGui.IconTextButton(FontAwesomeIcon.FileExport, "Export ActorBase as SMAB"))
+        if (CkGui.IconTextButton(FontAwesomeIcon.FileExport, "Export ActorBase as SMAB", disabled: _exportTask is not null && !_exportTask.IsCompleted))
         {
             var defaultName = "actorbase.smab";
             _dialogService.SaveFile("Export ActorBase to file", ".smab", defaultName, ".smab", OnFileExported, Directory.Exists(_lastSavedLocation) ? _lastSavedLocation : null, true);
         }
+        if (_exportTask is not null && !_exportTask.IsCompleted)
+        {
+            CkGui.TextInline("Export Progress:");
+            CkGui.ColorTextInline(_smaHandler.CurrentFile, ImGuiColors.DalamudViolet);
+            CkGui.TextInline("(");
+            CkGui.ColorTextInline(_smaHandler.CurrentFile, ImGuiColors.DalamudViolet);
+            CkGui.TextInline($") ");
+        }
+
         CkGui.ColorTextWrapped("Note: ActorBase's are for storing the face, makeup, nails, and skin." +
             "\nEnsure your actor is in smallclothes before exporting this file." +
             "\nYour chest and leg models will NOT be included for privacy reasons.", ImGuiColors.DalamudYellow);
@@ -121,9 +132,9 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
         _exportTask = Task.Run(async () =>
         {
             _logger.LogInformation($"Starting export of ActorBase to {savedPath}.");
-            var privateKey = await _smaHandler.SaveActorBaseFile(_objToExport, _exportDescription, savedPath, _filePassword);
+            // var privateKey = await _smaHandler.SaveActorBaseFile(_objToExport, _exportDescription, savedPath, _filePassword);
             _lastExportedFilePassword = _filePassword;
-            _lastExportedKey = privateKey;
+            // _lastExportedKey = privateKey;
             _logger.LogInformation($"Completed export of ActorBase to {savedPath}.");
         }, _exportCTS.Token);
     }

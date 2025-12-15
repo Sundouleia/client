@@ -21,7 +21,7 @@ public class ConfigFileProvider : IConfigFileProvider
     
     // Shared Configs
     public readonly string MainConfig;
-    public readonly string ModularActorsConfig;
+    public readonly string OwnedSMAFilesConfig;
     public readonly string RecentChatLog;
     public readonly string Favorites;
     public readonly string NicknameConfig;
@@ -65,7 +65,7 @@ public class ConfigFileProvider : IConfigFileProvider
 
         // Configs.
         MainConfig = Path.Combine(SundouleiaDirectory, "config.json");
-        ModularActorsConfig = Path.Combine(SundouleiaDirectory, "modularactors.json");
+        OwnedSMAFilesConfig = Path.Combine(SundouleiaDirectory, "ownedsmafiles.json");
         TransientCache = Path.Combine(SundouleiaDirectory, "transientcache.json");
         PlzNoCrashFriends = Path.Combine(SundouleiaDirectory, "plznocrashfriends.json");
         RecentChatLog = Path.Combine(SundouleiaDirectory, "chat-recent.json");

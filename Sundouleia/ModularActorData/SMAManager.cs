@@ -123,7 +123,7 @@ public class SMAManager
         }
         
         _logger.LogDebug($"SMA ({entry.Data.BaseId}) Applying Glamourer Data.");
-        await _ipc.Glamourer.ApplyBase64StateByPtr(entry.ObjectAddress, entry.Data.FinalGlamourData).ConfigureAwait(false);
+        await _ipc.Glamourer.ApplyStateByPtr(entry.ObjectAddress, entry.Data.FinalGlamourData).ConfigureAwait(false);
 
         _logger.LogDebug($"SMA ({entry.Data.BaseId}) Applying CustomizePlus Data.");
         if (!string.IsNullOrEmpty(entry.Data.CPlusData))
