@@ -23,8 +23,8 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     internal Hook<Character.Delegates.OnInitialize> OnCharaInitializeHook;
     internal Hook<Character.Delegates.Dtor> OnCharaDestroyHook;
     internal Hook<Character.Delegates.Terminate> OnCharaTerminateHook;
-    internal Hook<Companion.Delegates.OnInitialize> OnCompanionInitializeHook;
-    internal Hook<Companion.Delegates.Terminate> OnCompanionTerminateHook;
+    //internal Hook<Companion.Delegates.OnInitialize> OnCompanionInitializeHook;
+    //internal Hook<Companion.Delegates.Terminate> OnCompanionTerminateHook;
 
     private readonly CancellationTokenSource _runtimeCTS = new();
 
@@ -40,8 +40,8 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         OnCharaInitializeHook.SafeEnable();
         OnCharaTerminateHook.SafeEnable();
         OnCharaDestroyHook.SafeEnable();
-        OnCompanionInitializeHook.SafeEnable();
-        OnCompanionTerminateHook.SafeEnable();
+        //OnCompanionInitializeHook.SafeEnable();
+        //OnCompanionTerminateHook.SafeEnable();
 
         // Collect data from existing objects
         CollectInitialData();
@@ -69,8 +69,8 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         OnCharaInitializeHook?.Dispose();
         OnCharaTerminateHook?.Dispose();
         OnCharaDestroyHook?.Dispose();
-        OnCompanionInitializeHook?.Dispose();
-        OnCompanionTerminateHook?.Dispose();
+        //OnCompanionInitializeHook?.Dispose();
+        //OnCompanionTerminateHook?.Dispose();
 
         RenderedCharas.Clear();
         RenderedCompanions.Clear();
@@ -204,7 +204,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     ///     wishing to detect created objects. <para />
     ///     Doing so will ensure any final lines are processed prior to the address invalidating.
     /// </summary>
-    private unsafe void  NewCharacterRendered(GameObject* chara)
+    private unsafe void NewCharacterRendered(GameObject* chara)
     {
         var address = (nint)chara;
 
@@ -434,7 +434,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         // DrawObject does not exist yet.
         if ((IntPtr)gameObj->DrawObject == IntPtr.Zero) return false;
         // RenderFlags are marked as 'still loading'.
-        if (gameObj->RenderFlags == 2048) return false;
+        if ((ulong)gameObj->RenderFlags == 2048) return false;
         // There are models loaded into slots, still being applied.
         if(((CharacterBase*)gameObj->DrawObject)->HasModelInSlotLoaded != 0) return false;
         // There are model files loaded into slots, still being applied.

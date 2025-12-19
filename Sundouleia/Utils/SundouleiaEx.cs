@@ -214,4 +214,10 @@ public static class SundouleiaEx
             _ => string.Empty
         };
     }
+
+    public static IPCMoodleAccessTuple ToIpc(this ProviderMoodleAccessTuple t)
+        => ((MoodleAccess)t.OtherAccessFlags, t.OtherMaxTime, (MoodleAccess)t.CallerAccessFlags, t.CallerMaxTime);
+
+    public static ProviderMoodleAccessTuple ToCallGate(this IPCMoodleAccessTuple t)
+        => ((short)t.OtherAccess, t.OtherMaxTime, (short)t.CallerAccess, t.CallerMaxTime);
 }

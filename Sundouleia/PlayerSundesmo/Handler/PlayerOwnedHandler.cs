@@ -56,7 +56,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     public unsafe ulong EntityId => _gameObject->EntityId;
     public unsafe ulong GameObjectId => _gameObject->GetGameObjectId().ObjectId;
     public unsafe IntPtr DrawObjAddress => (nint)_gameObject->DrawObject;
-    public unsafe int RenderFlags => _gameObject->RenderFlags;
+    public unsafe ulong RenderFlags => (ulong)_gameObject->RenderFlags;
     public unsafe bool HasModelInSlotLoaded => ((CharacterBase*)_gameObject->DrawObject)->HasModelInSlotLoaded != 0;
     public unsafe bool HasModelFilesInSlotLoaded => ((CharacterBase*)_gameObject->DrawObject)->HasModelFilesInSlotLoaded != 0;
     public string NameString { get; private set; } = string.Empty; // Manually set so it can be used on timeouts.

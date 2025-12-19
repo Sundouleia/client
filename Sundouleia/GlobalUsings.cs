@@ -49,3 +49,6 @@ global using IPCMoodleAccessTuple = (
     SundouleiaAPI.Enums.MoodleAccess OtherAccess, long OtherMaxTime,
     SundouleiaAPI.Enums.MoodleAccess CallerAccess, long CallerMaxTime
 );
+
+// Dalamud's Newtonsoft-based converter for objects does not play nice with nested [Flag] Enums in tuples, inside dictionaries.
+global using ProviderMoodleAccessTuple = (short OtherAccessFlags, long OtherMaxTime, short CallerAccessFlags, long CallerMaxTime);

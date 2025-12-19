@@ -445,11 +445,18 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         // On Failed Loads
         void AddDefaultWelcomeWithLog(string logMessage)
         {
-            // Maybe replace with territory intended use later or something.
-            _logger.LogWarning(logMessage);
-            AddMessage(new(new("System"), "System",
-                $"[color=grey2]Welcome to {RadarService.CurrZoneName}'s Radar Chat! Your Name displays as " +
-                $"[color=yellow]{MainHub.OwnUserData.AnonName}[/color] to others! Feel free to say hi![/color][line]"));
+            try
+            {
+                // Maybe replace with territory intended use later or something.
+                _logger.LogWarning(logMessage);
+                AddMessage(new(new("System"), "System",
+                    $"[color=grey2]Welcome to {RadarService.CurrZoneName}'s Radar Chat! Your Name displays as " +
+                    $"[color=yellow]{MainHub.OwnUserData.AnonName}[/color] to others! Feel free to say hi![/color][line]"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to add default welcome message: {ex}");
+            }
         }
     }
 }

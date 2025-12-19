@@ -308,13 +308,13 @@ public class ProfilesTab
         _logger.LogInformation($"I would have removed your chara from this profile! {item.Chara.PlayerName ?? "UNK"}");
         return;
 
-        var prevIdx = item.Chara.ProfileIdx;
-        item.Chara.ProfileIdx = -1;
-        _account.SaveConfig();
+        //var prevIdx = item.Chara.ProfileIdx;
+        //item.Chara.ProfileIdx = -1;
+        //_account.SaveConfig();
 
-        // Logout if the previous IDX maps to our current character.
-        if (_account.Config.Profiles.TryGetValue(prevIdx, out var profile) && profile.UserUID == MainHub.UID)
-            _ = _hub.Reconnect(); // Will need to fix this, as reconnects are kind of busted atm.
+        //// Logout if the previous IDX maps to our current character.
+        //if (_account.Config.Profiles.TryGetValue(prevIdx, out var profile) && profile.UserUID == MainHub.UID)
+        //    _ = _hub.Reconnect(); // Will need to fix this, as reconnects are kind of busted atm.
     }
 
     private void RecreateAuthLists()

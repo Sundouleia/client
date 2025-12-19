@@ -23,21 +23,22 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
     private readonly CharaObjectWatcher _watcher;
 
     // Could update to be playerHandler or Sundesmo, but it does make address lookup a bit more annoying.
-    private readonly Dictionary<nint, IPCMoodleAccessTuple> _handledSundesmos = [];
+    private readonly Dictionary<nint, ProviderMoodleAccessTuple> _handledSundesmos = [];
 
     // Sundouleia's Personal IPC Events.
-    private static ICallGateProvider<int>?    ApiVersion;       // FUNC 
-    private static ICallGateProvider<object>? Ready;            // FUNC
-    private static ICallGateProvider<object>? Disposing;        // FUNC
+    private static ICallGateProvider<int>?    ApiVersion;
+    private static ICallGateProvider<object>? Ready;
+    private static ICallGateProvider<object>? Disposing;
+
     // Events to handle knowing when the state of the list changes. (Simplify from sundesmo to pair for common understanding)
     private static ICallGateProvider<nint, object>? PairRendered;   // When a sundesmo becomes rendered.
     private static ICallGateProvider<nint, object>? PairUnrendered; // When a sundesmo is no longer rendered.
     private static ICallGateProvider<nint, object>? AccessUpdated;  // A rendered pair's access permissions changed.
 
     // IPC Getters (Could change to another thing besides pointers but idk)
-    private ICallGateProvider<List<nint>>?                             GetAllRendered;     // Get rendered sundesmos pointers.
-    private ICallGateProvider<Dictionary<nint, IPCMoodleAccessTuple>>? GetAllRenderedInfo; // Get rendered sundesmos & their access info) (could make list)
-    private ICallGateProvider<nint, IPCMoodleAccessTuple>?             GetAccessInfo;      // Get a sundesmo's access info.
+    private ICallGateProvider<List<nint>>?                                  GetAllRendered;     // Get rendered sundesmos pointers.
+    private ICallGateProvider<Dictionary<nint, ProviderMoodleAccessTuple>>? GetAllRenderedInfo; // Get rendered sundesmos & their access info) (could make list)
+    private ICallGateProvider<nint, ProviderMoodleAccessTuple>?             GetAccessInfo;      // Get a sundesmo's access info.
     // Modular Actor Data, Base, Outfit, Item, and ItemPack loaders.
     private ICallGateProvider<string, int, Task<bool>>?       LoadSmadFile;
     private ICallGateProvider<string, int, Task<bool>>?       LoadSmabFile;
@@ -73,7 +74,7 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         Mediator.Subscribe<SundesmoPlayerRendered>(this, _ =>
         {
             // Add to handled sundesmos.
-            _handledSundesmos.TryAdd(_.Handler.Address, _.Sundesmo.ToAccessTuple());
+            _handledSundesmos.TryAdd(_.Handler.Address, _.Sundesmo.ToAccessTuple().ToCallGate());
             NotifyPairRendered(_.Handler.Address);
         });
 
@@ -90,7 +91,7 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
             if (!_.Sundesmo.IsRendered)
                 return;
             // Update the access permissions.
-            _handledSundesmos[_.Sundesmo.PlayerAddress] = _.Sundesmo.ToAccessTuple();
+            _handledSundesmos[_.Sundesmo.PlayerAddress] = _.Sundesmo.ToAccessTuple().ToCallGate();
             NotifyAccessUpdated(_.Sundesmo.PlayerAddress);
         });
     }
@@ -110,8 +111,8 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
 
         // init Getters
         GetAllRendered = Svc.PluginInterface.GetIpcProvider<List<nint>>("Sundouleia.GetAllRendered");
-        GetAllRenderedInfo = Svc.PluginInterface.GetIpcProvider<Dictionary<nint, IPCMoodleAccessTuple>>("Sundouleia.GetAllRenderedInfo");
-        GetAccessInfo = Svc.PluginInterface.GetIpcProvider<nint, IPCMoodleAccessTuple>("Sundouleia.GetAccessInfo");
+        GetAllRenderedInfo = Svc.PluginInterface.GetIpcProvider<Dictionary<nint, ProviderMoodleAccessTuple>>("Sundouleia.GetAllRenderedInfo");
+        GetAccessInfo = Svc.PluginInterface.GetIpcProvider<nint, ProviderMoodleAccessTuple>("Sundouleia.GetAccessInfo");
         IsFileValid = Svc.PluginInterface.GetIpcProvider<string, Task<bool>>("Sundouleia.IsFileValid");
         IsUpdateFileValid = Svc.PluginInterface.GetIpcProvider<string, Task<bool>>("Sundouleia.IsUpdateFileValid");
 
@@ -134,8 +135,8 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         ApiVersion.RegisterFunc(() => SundouleiaApiVersion);
         // register getters
         GetAllRendered.RegisterFunc(() => _handledSundesmos.Keys.ToList());
-        GetAllRenderedInfo.RegisterFunc(() => new Dictionary<nint, IPCMoodleAccessTuple>(_handledSundesmos));
-        GetAccessInfo.RegisterFunc((address) => _handledSundesmos.TryGetValue(address, out var access) ? access : (MoodleAccess.None, 0, MoodleAccess.None, 0));
+        GetAllRenderedInfo.RegisterFunc(() => new Dictionary<nint, ProviderMoodleAccessTuple>(_handledSundesmos));
+        GetAccessInfo.RegisterFunc((address) => _handledSundesmos.TryGetValue(address, out var access) ? access : (0, 0, 0, 0));
         // register loaders
         LoadSmadFile.RegisterFunc(LoadSMAD);
         LoadSmabFile.RegisterFunc(LoadSMAB);

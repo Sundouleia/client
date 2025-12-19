@@ -1,10 +1,10 @@
 {
-    "Author": "Cordelia",
-    "Name": "Sundouleia",
-    "InternalName": "Sundouleia",
-    "Punchline": "Satisfying DalamudPackager",
-    "Description": "Satisfying DalamudPackager",
-    "ApplicableVersion": "any",
-	"IconUrl": "https://raw.githubusercontent.com/Sundouleia/repo/main/Images/icon.png",
-    "RepoUrl": "https://github.com/Sundouleia/repo"
+  "Author": "Cordelia",
+  "Name": "Sundouleia",
+  "InternalName": "Sundouleia",
+  "Punchline": "Satisfying DalamudPackager",
+  "Description": "Satisfying DalamudPackager",
+  "ApplicableVersion": "any",
+  "IconUrl": "https://raw.githubusercontent.com/Sundouleia/repo/main/Images/icon.png",
+  "RepoUrl": "https://github.com/Sundouleia/repo"
 }

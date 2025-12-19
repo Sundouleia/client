@@ -24,7 +24,6 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
     private readonly MainHub _hub;
     private readonly UiFileDialogService _fileDialog;
     private readonly ProfileService _service;
-    private readonly CosmeticService _cosmetics;
 
     public ProfileAvatarEditor(ILogger<ProfileAvatarEditor> logger, SundouleiaMediator mediator,
         MainHub hub, UiFileDialogService fileDialog, ProfileService service) 

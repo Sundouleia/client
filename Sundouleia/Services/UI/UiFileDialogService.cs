@@ -73,7 +73,7 @@ public sealed class UiFileDialogService : IDisposable
 
     public void Draw()
     {
-        // if (_isOpen)
+        if (_isOpen)
             _manager.Draw();
     }
 

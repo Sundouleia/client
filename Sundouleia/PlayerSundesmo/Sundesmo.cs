@@ -119,7 +119,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     public IPCMoodleAccessTuple ToAccessTuple()
     {
         return new IPCMoodleAccessTuple(
-            OwnPerms.MoodleAccess,  (long)OwnPerms.MaxMoodleTime.TotalMilliseconds,
+            OwnPerms.MoodleAccess, (long)OwnPerms.MaxMoodleTime.TotalMilliseconds,
             PairPerms.MoodleAccess, (long)PairPerms.MaxMoodleTime.TotalMilliseconds);
     }
 

@@ -87,7 +87,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public unsafe ulong GameObjectId => _player->GetGameObjectId().ObjectId;
     public unsafe ushort ObjIndex => _player->ObjectIndex;
     public unsafe IntPtr DrawObjAddress => (nint)_player->DrawObject;
-    public unsafe int RenderFlags => _player->RenderFlags;
+    public unsafe ulong RenderFlags => (ulong)_player->RenderFlags;
     public unsafe bool HasModelInSlotLoaded => ((CharacterBase*)_player->DrawObject)->HasModelInSlotLoaded != 0;
     public unsafe bool HasModelFilesInSlotLoaded => ((CharacterBase*)_player->DrawObject)->HasModelFilesInSlotLoaded != 0;
 
