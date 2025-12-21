@@ -1,10 +1,10 @@
+using System.Net.WebSockets;
 using CkCommons;
 using Dalamud.Interface.ImGuiNotification;
-using Sundouleia.Services.Mediator;
-using SundouleiaAPI.Hub;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
-using System.Net.WebSockets;
+using Sundouleia.Services.Mediator;
+using SundouleiaAPI.Hub;
 
 namespace Sundouleia.WebAPI;
 /// <summary>
@@ -212,9 +212,9 @@ public partial class MainHub
     /// </summary>
     public async Task Reconnect(DisconnectIntent intent = DisconnectIntent.Normal)
     {
-        if (intent is DisconnectIntent.LogoutShutdown)
+        if (intent is DisconnectIntent.Logout || intent is DisconnectIntent.Shutdown)
         {
-            Logger.LogWarning("Cannot call reconnect with intent [LogoutShutdown], aborting Reconnect.");
+            Logger.LogWarning("Cannot call reconnect with intent [Logout/Shutdown], aborting Reconnect.");
             return;
         }
 
@@ -521,7 +521,7 @@ public partial class MainHub
             Logger.LogError("Failure to obtain Data after reconnection to SundouleiaHub-Main. Reason: " + ex);
             // disconnect if a non-websocket related issue, otherwise, reconnect.
             if (ex is not WebSocketException || ex is not TimeoutException)
-                {
+            {
                 Logger.LogWarning("Disconnecting from SundouleiaHub-Main after failed reconnection in HubInstanceOnReconnected(). Websocket/Timeout Reason: " + ex);
                 await Disconnect(ServerState.Disconnected, DisconnectIntent.Unexpected).ConfigureAwait(false);
             }
