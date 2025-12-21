@@ -124,8 +124,9 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
         LoadSmaiFile = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmaiFile");
         LoadSmaiFiles = Svc.PluginInterface.GetIpcProvider<List<string>, int, Task<bool>>("Sundouleia.LoadSmaiFiles");
         LoadSmaipFile = Svc.PluginInterface.GetIpcProvider<string, int, Task<bool>>("Sundouleia.LoadSmaipFile");
-        ApplyToPairRequest = Svc.PluginInterface.GetIpcProvider<nint, List<MoodlesStatusInfo>, bool, object?>("Sundouleia.ApplyToPairRequest");
 
+        // For Moodles pair application requests
+        ApplyToPairRequest = Svc.PluginInterface.GetIpcProvider<nint, List<MoodlesStatusInfo>, bool, object?>("Sundouleia.ApplyToPairRequest");
 
         // init appliers (Maybe replace with applied / removed / updated later)
         ApplyStatusInfo = Svc.PluginInterface.GetIpcProvider<MoodlesStatusInfo, object?>("Sundouleia.ApplyStatusInfo");
@@ -257,9 +258,9 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
                 return (error = "Pair does not allow application of Moodles with negative status types.") is null;
             else if (!pair.PairPerms.MoodleAccess.HasAny(MoodleAccess.Special))
                 return (error = "Pair does not allow application of Moodles with special status types.") is null;
-            else if (!pair.PairPerms.MoodleAccess.HasAny(MoodleAccess.Permanent) && status.ExpireTicksUTC == -1)
+            else if (!pair.PairPerms.MoodleAccess.HasAny(MoodleAccess.Permanent) && status.ExpireTicks == -1)
                 return (error = "Pair does not allow application of permanent Moodles.") is null;
-            else if (pair.PairPerms.MaxMoodleTime < TimeSpan.FromMilliseconds(status.ExpireTicksUTC))
+            else if (pair.PairPerms.MaxMoodleTime < TimeSpan.FromMilliseconds(status.ExpireTicks))
                 return (error = "Moodle duration of requested Moodle was longer than the pair allows!") is null;
 
             return (error = null) is null;

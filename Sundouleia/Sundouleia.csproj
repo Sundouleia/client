@@ -48,8 +48,8 @@
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.2" />
         
         <!--For SignalR server connectivity, helpful for server connectivity processing-->
-        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
-        <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="8.0.11" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.1" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.1" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     </ItemGroup>
     

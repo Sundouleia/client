@@ -160,6 +160,7 @@ public static class SundouleiaServiceExtensions
         // Player Client
         .AddSingleton<BlockedUserManager>()
         .AddSingleton<RequestsManager>()
+        .AddSingleton<MoodlesCacheService>()
 
         // Player User
         .AddSingleton<SundesmoFactory>()

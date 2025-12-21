@@ -12,7 +12,7 @@ namespace Sundouleia.PlayerClient;
 /// <summary> 
 ///     Manages the cached moodle data and listens for updates to keep it in sync.
 /// </summary>
-public class MoodlesDataCache : DisposableMediatorSubscriberBase
+public class MoodlesCacheService : DisposableMediatorSubscriberBase
 {
     private readonly IpcProvider _ipcProvider;
     private readonly IpcCallerMoodles _ipc;
@@ -21,7 +21,7 @@ public class MoodlesDataCache : DisposableMediatorSubscriberBase
 
     public static readonly MoodleData MoodleCache = new();
 
-    public MoodlesDataCache(ILogger<MoodlesDataCache> logger, SundouleiaMediator mediator,
+    public MoodlesCacheService(ILogger<MoodlesCacheService> logger, SundouleiaMediator mediator,
         IpcProvider ipcProvider, IpcCallerMoodles moodles, SundesmoManager sundesmos,
         DistributionService distributor)
         : base(logger, mediator)
@@ -49,8 +49,7 @@ public class MoodlesDataCache : DisposableMediatorSubscriberBase
         _ipc.OnPresetUpdated.Unsubscribe((id, deleted) => _ = OnPresetModified(id, deleted));
     }
 
-    private void OnStatusManagerModified(IPlayerCharacter player)
-        => Mediator.Publish(new MoodlesChanged(player.Address));
+    private void OnStatusManagerModified(nint addr) => Mediator.Publish(new MoodlesChanged(addr));
 
     /// <summary> 
     ///     Get all info from moodles to store in the cache and distribute to others.

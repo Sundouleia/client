@@ -11,9 +11,9 @@ public sealed class IpcCallerMoodles : IIpcCaller
 {
     private readonly ICallGateSubscriber<int> ApiVersion;
 
-    public readonly ICallGateSubscriber<IPlayerCharacter, object>   OnStatusManagerModified;
-    public readonly ICallGateSubscriber<Guid, bool, object>         OnStatusUpdated;
-    public readonly ICallGateSubscriber<Guid, bool, object>         OnPresetUpdated;
+    public readonly ICallGateSubscriber<nint, object>       OnStatusManagerModified;
+    public readonly ICallGateSubscriber<Guid, bool, object> OnStatusUpdated;
+    public readonly ICallGateSubscriber<Guid, bool, object> OnPresetUpdated;
 
     // API Getters
     private readonly ICallGateSubscriber<string>                    GetOwnStatusManager;
@@ -54,7 +54,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
         RemoveStatusesByName = Svc.PluginInterface.GetIpcSubscriber<List<Guid>, string, object>("Moodles.RemoveStatusesByNameV2");
 
         // API Action Events:
-        OnStatusManagerModified = Svc.PluginInterface.GetIpcSubscriber<IPlayerCharacter, object>("Moodles.StatusManagerModified");
+        OnStatusManagerModified = Svc.PluginInterface.GetIpcSubscriber<nint, object>("Moodles.StatusManagerModified");
         OnStatusUpdated = Svc.PluginInterface.GetIpcSubscriber<Guid, bool, object>("Moodles.StatusUpdated");
         OnPresetUpdated = Svc.PluginInterface.GetIpcSubscriber<Guid, bool, object>("Moodles.PresetUpdated");
 
@@ -67,7 +67,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     {
         try
         {
-            var result = ApiVersion.InvokeFunc() >= 3;
+            var result = ApiVersion.InvokeFunc() >= 4;
             if(!APIAvailable && result)
                 _mediator.Publish(new MoodlesReady());
             APIAvailable = result;

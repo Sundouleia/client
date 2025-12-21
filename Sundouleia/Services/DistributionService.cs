@@ -113,7 +113,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         if (!MainHub.IsConnectionDataSynced) 
             return;
         Logger.LogDebug($"Pushing MoodlesData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-        await _hub.UserPushMoodlesData(new(trustedUsers, MoodlesDataCache.MoodleCache));
+        await _hub.UserPushMoodlesData(new(trustedUsers, MoodlesCacheService.MoodleCache));
     }
 
     public async Task PushMoodleStatusUpdate(List<UserData> trustedUsers, MoodlesStatusInfo status, bool wasDeleted)

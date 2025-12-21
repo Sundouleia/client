@@ -227,9 +227,9 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         AddPendingUpdate(OwnedObject.Player, IpcKind.Heels);
     }
 
-    private void OnMoodlesUpdate(IPlayerCharacter player)
+    private void OnMoodlesUpdate(nint playerAddr)
     {
-        if (player.Address != _watcher.WatchedPlayerAddr) return;
+        if (playerAddr != _watcher.WatchedPlayerAddr) return;
         AddPendingUpdate(OwnedObject.Player, IpcKind.Moodles);
     }
 
