@@ -16,3 +16,9 @@
 [submodule "Submodules/GameDataStrings"]
 	path = Submodules/GameDataStrings
 	url = https://github.com/Ottermandias/Penumbra.String.git
+[submodule "Submodules/GameData"]
+	path = Submodules/GameData
+	url = https://github.com/Ottermandias/Penumbra.GameData.git
+[submodule "Submodules/BrioAPI"]
+	path = Submodules/BrioAPI
+	url = https://github.com/Etheirys/Brio.API.git
