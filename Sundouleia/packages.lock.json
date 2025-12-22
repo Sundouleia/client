@@ -104,6 +104,16 @@
         "resolved": "0.8.6",
         "contentHash": "iP4jVLQoQmUjMU88g1WObiNr6YKZGvh4aOXn3yOJsHqZsflwRsxZPcIBvNXgjXO3vQKSLctXGLTpcBPLnWPS8A=="
       },
+      "FlatSharp.Compiler": {
+        "type": "Transitive",
+        "resolved": "7.9.0",
+        "contentHash": "MU6808xvdbWJ3Ev+5PKalqQuzvVbn1DzzQH8txRDHGFUNDvHjd+ejqpvnYc9BSJ8Qp8VjkkpJD8OzRYilbPp3A=="
+      },
+      "FlatSharp.Runtime": {
+        "type": "Transitive",
+        "resolved": "7.9.0",
+        "contentHash": "Bm8+WqzEsWNpxqrD5x4x+zQ8dyINlToCreM5FI2oNSfUVc9U9ZB+qztX/jd8rlJb3r0vBSlPwVLpw0xBtPa3Vw=="
+      },
       "JetBrains.Annotations": {
         "type": "Transitive",
         "resolved": "2024.3.0",
@@ -538,6 +548,9 @@
         "resolved": "8.0.1",
         "contentHash": "n1ZP7NM2Gkn/MgD8+eOT5MulMj6wfeQMNS2Pizvq5GHCZfjlFMXV2irQlQmJhwA2VABC57M0auudO89Iu2uRLg=="
       },
+      "brio.api": {
+        "type": "Project"
+      },
       "ckcommons": {
         "type": "Project",
         "dependencies": {
@@ -558,6 +571,16 @@
       },
       "penumbra.api": {
         "type": "Project"
+      },
+      "penumbra.gamedata": {
+        "type": "Project",
+        "dependencies": {
+          "C:\\Users\\buzzm\\OneDrive\\Desktop\\XIV Modding\\.Dalamud Plugins\\Sundouleia\\client\\Submodules\\Penumbra.Api\\Penumbra.Api.csproj": "[1.0.0, )",
+          "C:\\Users\\buzzm\\OneDrive\\Desktop\\XIV Modding\\.Dalamud Plugins\\Sundouleia\\client\\Submodules\\Penumbra.String\\Penumbra.String.csproj": "[1.0.0, )",
+          "FlatSharp.Compiler": "[7.9.0, )",
+          "FlatSharp.Runtime": "[7.9.0, )",
+          "OtterGui": "[1.0.0, )"
+        }
       },
       "penumbra.string": {
         "type": "Project"

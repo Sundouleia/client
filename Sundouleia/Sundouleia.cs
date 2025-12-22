@@ -141,9 +141,10 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<WhitelistDrawSystem>()
 
         // Modular Actor Data
-        .AddSingleton<SMAManager>()
+        .AddSingleton<SMAFileManager>()
         .AddSingleton<SMAFileHandler>()
-        .AddSingleton<GPoseActorHandler>()
+        .AddSingleton<GPoseManager>()
+        .AddSingleton<GPoseHandler>()
         .AddSingleton<ActorAnalyzer>()
 
         // Mod Files
@@ -249,7 +250,7 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Components
         .AddScoped<ProfileHelper>()
-        .AddScoped<UiFileCacheShared>()
+        .AddScoped<UiDataStorageShared>()
         .AddScoped<UiFactory>()
 
         // Scoped Handlers
@@ -343,8 +344,8 @@ public static class ValidateDependencyInjectorEx
                 var serviceType = service.ServiceType;
 
                 // Skip interfaces and abstract classes
-/*                if (serviceType.IsInterface || serviceType.IsAbstract)
-                    continue;*/
+                /*                if (serviceType.IsInterface || serviceType.IsAbstract)
+                                    continue;*/
 
                 var constructor = serviceType.GetConstructors().MaxBy(c => c.GetParameters().Length);
                 if (constructor == null)

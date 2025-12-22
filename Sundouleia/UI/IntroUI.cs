@@ -35,7 +35,7 @@ public class IntroUi : WindowMediatorSubscriberBase
     private readonly MainConfig _config;
     private readonly AccountManager _account;
     private readonly ServerConfigManager _serverConfigs;
-    private readonly UiFileCacheShared _fileCacheShared;
+    private readonly UiDataStorageShared _fileCacheShared;
     private readonly TutorialService _guides;
 
     private IntroUiPage _currentPage = IntroUiPage.Welcome;
@@ -45,7 +45,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
     public IntroUi(ILogger<IntroUi> logger, SundouleiaMediator mediator, MainHub mainHub, 
         MainConfig config, AccountManager account, ServerConfigManager serverConfigs, 
-        UiFileCacheShared fileCacheShared, TutorialService guides)
+        UiDataStorageShared fileCacheShared, TutorialService guides)
         : base(logger, mediator, "###SundouleiaWelcome")
     {
         _hub = mainHub;

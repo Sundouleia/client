@@ -1,232 +1,72 @@
 using Dalamud.Interface.Textures.TextureWraps;
-using K4os.Compression.LZ4.Legacy;
-using Lumina.Data.Parsing.Scd;
-using Penumbra.String.Classes;
-using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services;
-using Sundouleia.Watchers;
-using System.Diagnostics.CodeAnalysis;
-using System.Security.Cryptography;
-using System.Text.Json;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModularActor;
 
-/// <summary>
-///     Manager for all owned files.
-/// </summary>
-public class GPoseManager
-{
-    private readonly ILogger<GPoseManager> _logger;
-    private readonly MainConfig _mainConfig;
-    private readonly ModularActorsConfig _smaConfig;
-    private readonly FileCacheManager _fileCache;
-    private readonly SMAFileCacheManager _smaFileCache;
-
-    public GPoseManager(ILogger<GPoseManager> logger, MainConfig mainConfig,
-        ModularActorsConfig smaConfig, FileCacheManager fileCache,
-        SMAFileCacheManager smaFileCache)
-    {
-        _logger = logger;
-        _mainConfig = mainConfig;
-        _smaConfig = smaConfig;
-        _fileCache = fileCache;
-        _smaFileCache = smaFileCache;
-    }
-
-    public List<ModularActorData>   SMAD    { get; private set; } = [];
-    public List<ModularActorBase>   Bases   { get; private set; } = [];
-    public List<ModularActorOutfit> Outfits { get; private set; } = [];
-    public List<ModularActorItem>   Items   { get; private set; } = [];
-
-    public void LoadSMADFile(string smadFilePath)
-    {
-        // Attempt to load a SMAD file.
-    }
-
-    public void LoadSMABFile(string smabFilePath)
-    {
-        // Attempt to load a base file.
-    }
-
-    // Attempt to load in multiple of any kind.
-    // Accept regardless of inclusion (maybe?) (or reject if no base)
-
-    public void LoadFiles(IEnumerable<string> filePaths)
-    {
-        // Attempt to load in all of the files. 
-
-
-        // Get the directory we expect the files to be in
-        var dir = _mainConfig.Current.SMAExportFolder;
-
-        // If the string was not set, return.
-        if (string.IsNullOrEmpty(dir))
-            return;
-
-        // If the directory does not exist, create it, and then exit.
-        if (Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-            return;
-        }
-
-        // Process over all files and attempt to load them.
-        // Even if they fail, we should create a dummy object and mark it as invalid.
-
-        // Load all items first.
-
-        // Load all outfits next.
-
-        // Load all bases next.
-
-        // Load all SMAD files last.
-
-    }
-
-    public void RemoveItem(ModularActorItem item)
-    {
-        Items.Remove(item);
-    }
-
-    public void RemoveOutfit(ModularActorOutfit outfit)
-    {
-        Outfits.Remove(outfit);
-    }
-
-    public void RemoveBase(ModularActorBase actorBase)
-    {
-        Bases.Remove(actorBase);
-    }
-}
-
-public class SMAFileManager
-{
-    private readonly ILogger<SMAFileManager> _logger;
-    private readonly MainConfig _mainConfig;
-    private readonly ModularActorsConfig _smaConfig;
-    private readonly FileCacheManager _fileCache;
-    private readonly SMAFileCacheManager _smaFileCache;
-
-    public SMAFileManager(ILogger<SMAFileManager> logger, MainConfig mainConfig,
-        ModularActorsConfig smaConfig, FileCacheManager fileCache,
-        SMAFileCacheManager smaFileCache)
-    {
-        _logger = logger;
-        _mainConfig = mainConfig;
-        _smaConfig = smaConfig;
-        _fileCache = fileCache;
-        _smaFileCache = smaFileCache;
-
-        InitializeData();
-    }
-
-    public List<ModularActorData> SMAD { get; private set; } = [];
-    public List<ModularActorBase> Bases { get; private set; } = [];
-    public List<ModularActorOutfit> Outfits { get; private set; } = [];
-    public List<ModularActorItem> Items { get; private set; } = [];
-
-
-    public void InitializeData()
-    {
-        // Get the directory we expect the files to be in
-        var dir = _mainConfig.Current.SMAExportFolder;
-
-        // If the string was not set, return.
-        if (string.IsNullOrEmpty(dir))
-            return;
-
-        // If the directory does not exist, create it, and then exit.
-        if (Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-            return;
-        }
-
-        // Process over all files and attempt to load them.
-        // Even if they fail, we should create a dummy object and mark it as invalid.
-
-        // Load all items first.
-
-        // Load all outfits next.
-
-        // Load all bases next.
-
-        // Load all SMAD files last.
-
-    }
-
-    // Editor-based creation / build
-    public ModularActorDataBuilder CreateBuilder()
-    {
-        return new ModularActorDataBuilder(this);
-    }
-}
-
-public class ModularActorDataBuilder
-{
-    private readonly SMAFileManager _smaFileManager;
-
-    public ModularActorBase? Base { get; set; }
-    public List<ModularActorOutfit> Outfits { get; set; } = [];
-    public List<ModularActorItem> Items { get; set; } = [];
-
-    public ModularActorOutfit SelectedOutfit { get; set; }
-
-    public List<ModularActorItem> SelectedItems { get; set; } = [];
-
-    public ModularActorDataBuilder(SMAFileManager smaFileManager)
-    {
-        _smaFileManager = smaFileManager;
-    }
-
-    public void SaveToFile()
-    {
-        // Export it to the default export folder.
-        // Can use the manager to update the containers for included bases.
-    }
-}
-
 public abstract class FileDataSummary
 {
+    public byte Version { get; init; }
     public Guid FileId { get; init; }
-    public string Name { get; protected set; } = string.Empty;
-    public string Description { get; protected set; } = string.Empty;
-    public string ThumbnailBase64 { get; protected set; } = string.Empty; // Not used in base.
+    public OwnedObject ActorKind { get; init; }
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string ThumbnailBase64 { get; set; } = string.Empty; // Not used in base.
 
-    public JObject GlamourState { get; protected set; } = new();
+    public JObject GlamourState { get; set; } = new();
 
-    public string ModManips { get; protected set; } = string.Empty;
-    public List<FileModData> Files { get; protected set; } = [];
-    public List<FileSwap> FileSwaps { get; protected set; } = [];
+    public string ModManips { get; set; } = string.Empty;
+    public List<FileModData> Files { get; set; } = [];
+    public List<FileSwap> FileSwaps { get; set; } = [];
 
-    //public byte[] ToByteArray()
-    //    => Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(this));
+    protected abstract string GetMagic();
+    protected abstract byte GetVersion();
 
-    //// Convert a byte array of data back into a ModularActorBaseFileData object.
-    //public static ActorBaseFileData FromByteArray(byte[] data)
-    //    => System.Text.Json.JsonSerializer.Deserialize<ActorBaseFileData>(Encoding.UTF8.GetString(data))!;
+    public void WriteHeader(BinaryWriter writer)
+    {
+        writer.Write(Encoding.ASCII.GetBytes(GetMagic()));
+        writer.Write(GetVersion());
+        var headerData = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(this));
+        writer.Write(headerData.Length);
+        writer.Write(headerData);
+    }
 }
 
 public class BaseFileDataSummary : FileDataSummary
 {
-    public string CPlusData { get; set; } = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{}")); // Default empty JSON.
+    internal static readonly string Magic = "SMAB";
+    internal static readonly byte CurrentVersion = 1;
 
-    public BaseFileDataSummary()
-    { }
+    public string CPlusData { get; set; } = Convert.ToBase64String(Encoding.UTF8.GetBytes("{}")); // Default empty JSON.
 
-    public byte[] ToByteArray()
-        => Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(this));
+    protected override string GetMagic() => Magic;
+    protected override byte GetVersion() => CurrentVersion;
 
-    // Convert a byte array of data back into a ModularActorBaseFileData object.
-    public static BaseFileDataSummary FromByteArray(byte[] data)
-        => System.Text.Json.JsonSerializer.Deserialize<BaseFileDataSummary>(Encoding.UTF8.GetString(data))!;
+    public static BaseFileDataSummary FromHeader(BinaryReader reader, string filePath)
+    {
+        var magic = new string(reader.ReadChars(Magic.Length));
+        if (!string.Equals(magic, Magic, StringComparison.Ordinal))
+            throw new InvalidDataException($"Bad Magic! Expected {Magic}, got {magic}");
+
+        var version = reader.ReadByte();
+        // If versions are different, return the loaded migration data.
+        if (version != CurrentVersion)
+            return FromOldHeader(reader, filePath, version);
+
+        // Otherwise, it is on the right version, so read in expected data.
+        var summaryLen = reader.ReadInt32();
+        return JsonConvert.DeserializeObject<BaseFileDataSummary>(Encoding.UTF8.GetString(reader.ReadBytes(summaryLen)))!;
+    }
+
+    private static BaseFileDataSummary FromOldHeader(BinaryReader reader, string filePath, byte readVersion)
+        => throw new NotImplementedException();
 }
 
 public class OutfitFileDataSummary : FileDataSummary
 {
+    internal static readonly string Magic = "SMAO";
+    internal static readonly byte CurrentVersion = 1;
+
     public SMAGlamourParts PartsFilter { get; set; } = SMAGlamourParts.None;
     public SMAFileSlotFilter SlotFilter { get; set; } = SMAFileSlotFilter.MainHand;
     public SMAFileMetaFilter MetaFilter { get; set; } = SMAFileMetaFilter.None;
@@ -234,30 +74,62 @@ public class OutfitFileDataSummary : FileDataSummary
     // Optional: trimmed snapshot of GlamourState with filters? (Or maybe just keep full and trim on save?)
     // ((OR just keep the trimmed only and do a recalculation each time.))
 
-    public byte[] ToByteArray()
-        => Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(this));
+    protected override string GetMagic() => Magic;
+    protected override byte GetVersion() => CurrentVersion;
 
-    // Convert a byte array of data back into a ModularActorBaseFileData object.
-    public static OutfitFileDataSummary FromByteArray(byte[] data)
-        => System.Text.Json.JsonSerializer.Deserialize<OutfitFileDataSummary>(Encoding.UTF8.GetString(data))!;
+    public static OutfitFileDataSummary FromHeader(BinaryReader reader, string filePath)
+    {
+        var magic = new string(reader.ReadChars(Magic.Length));
+        if (!string.Equals(magic, Magic, StringComparison.Ordinal))
+            throw new InvalidDataException($"Bad Magic! Expected {Magic}, got {magic}");
+
+        var version = reader.ReadByte();
+        // If versions are different, return the loaded migration data.
+        if (version != CurrentVersion)
+            return FromOldHeader(reader, filePath, version);
+
+        // Otherwise, it is on the right version, so read in expected data.
+        var summaryLen = reader.ReadInt32();
+        return JsonConvert.DeserializeObject<OutfitFileDataSummary>(Encoding.UTF8.GetString(reader.ReadBytes(summaryLen)))!;
+    }
+
+    private static OutfitFileDataSummary FromOldHeader(BinaryReader reader, string filePath, byte readVersion)
+        => throw new NotImplementedException();
 }
 
 public class ItemFileDataSummary : FileDataSummary
 {
-    // Items do not have any extra data for now.
-    public byte[] ToByteArray()
-    => Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(this));
+    internal static readonly string Magic = "SMAI";
+    internal static readonly byte CurrentVersion = 1;
 
-    // Convert a byte array of data back into a ModularActorBaseFileData object.
-    public static ItemFileDataSummary FromByteArray(byte[] data)
-        => System.Text.Json.JsonSerializer.Deserialize<ItemFileDataSummary>(Encoding.UTF8.GetString(data))!;
+    protected override string GetMagic() => Magic;
+    protected override byte GetVersion() => CurrentVersion;
+
+    public static ItemFileDataSummary FromHeader(BinaryReader reader, string filePath)
+    {
+        var magic = new string(reader.ReadChars(Magic.Length));
+        if (!string.Equals(magic, Magic, StringComparison.Ordinal))
+            throw new InvalidDataException($"Bad Magic! Expected {Magic}, got {magic}");
+
+        var version = reader.ReadByte();
+        // If versions are different, return the loaded migration data.
+        if (version != CurrentVersion)
+            return FromOldHeader(reader, filePath, version);
+
+        // Otherwise, it is on the right version, so read in expected data.
+        var summaryLen = reader.ReadInt32();
+        return JsonConvert.DeserializeObject<ItemFileDataSummary>(Encoding.UTF8.GetString(reader.ReadBytes(summaryLen)))!;
+    }
+
+    private static ItemFileDataSummary FromOldHeader(BinaryReader reader, string filePath, byte readVersion)
+        => throw new NotImplementedException();
 }
 
 // Make Manager Interfaces for abstraction between GPose and file mode.
 public class ModularActorBase
 {
     // maybe reference back to the manager here to perform internal actions or something.
-    public ModularActorData Parent { get; } // Every base is connected to a SMAD container.
+    public ModularActorData Parent { get; internal set; } // Every base is connected to a SMAD container.
     public Guid ID { get; }
     public string Name { get; }
     public string Description { get; }
@@ -277,6 +149,12 @@ public class ModularActorBase
         GlamourState = summary.GlamourState;
         CPlusData = summary.CPlusData;
         ModManipString = summary.ModManips;
+    }
+
+    public ModularActorBase(BaseFileDataSummary summary, Dictionary<string, string> modDict)
+        : this(summary)
+    {
+        ModdedDict = modDict;
     }
 
     public bool IsValid => ID == Guid.Empty;
@@ -316,7 +194,7 @@ public class ModularActorOutfit : IDisposable // Does not reference to its base,
         Name = summary.Name;
         Description = summary.Description;
         ThumbnailBase64 = summary.ThumbnailBase64;
-        GlamourState = summary.GlamourState; 
+        GlamourState = summary.GlamourState;
         ModManipString = summary.ModManips;
 
         _imageData = new Lazy<byte[]>(() => ThumbnailBase64.Length > 0
@@ -484,8 +362,4 @@ public static class SMAExtensions
     //        }
     //    }
     //}
-
-    private static bool IsBodyLegModel(string gp)
-        => gp.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) &&
-        (gp.Contains("/body/", StringComparison.OrdinalIgnoreCase) || gp.Contains("/legs/", StringComparison.OrdinalIgnoreCase));
 }

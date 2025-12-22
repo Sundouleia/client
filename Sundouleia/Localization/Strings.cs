@@ -230,8 +230,8 @@ namespace Sundouleia.Localization
         public readonly string TabGeneral = Loc.Localize("Settings_TabsGeneral", "General");
         public readonly string TabPreferences = Loc.Localize("Settings_TabsPreferences", "Preferences");
         public readonly string TabAccounts = Loc.Localize("Settings_TabsAccounts", "My Account");
+        public readonly string TabSmaStorage = Loc.Localize("Settings_TagSmaStorage", "My SMA Files");
         public readonly string TabStorage = Loc.Localize("Settings_TabsStorage", "Storage");
-        public readonly string TabOwnedFiles = Loc.Localize("Settings_TabsOwnedFiles", "SMA Storage");
         public readonly string TabLogging = Loc.Localize("Settings_TabsLogging", "Logging"); // no sub-class needed.
 
         public GroupPrefs GroupPrefs { get; set; } = new();
@@ -352,7 +352,7 @@ namespace Sundouleia.Localization
         // UI Preferences Section
         public readonly string HeaderDownloads = Loc.Localize("Preferences_HeaderDownloadPref", "Downloads");
         public readonly string HeaderNotifier = Loc.Localize("Preferences_HeaderNotifier", "Notifier");
-        public readonly string HeaderExports = Loc.Localize("MainOptions_HeaderExports", "Exports");
+        public readonly string HeaderExports = Loc.Localize("MainOptions_HeaderExports", "SMA Files");
 
 
         // Download Section

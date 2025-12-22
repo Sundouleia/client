@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.10.35004.147
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11312.151 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CkCommons", "Submodules\CkCommons\CkCommons.csproj", "{9B903E63-9097-4327-9972-4BFB8AC00205}"
 EndProject
@@ -16,6 +16,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sundouleia", "Sundouleia\Sundouleia.csproj", "{836FEA9C-CF99-4494-BEC3-5362EAC87280}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.String", "Submodules\GameDataStrings\Penumbra.String.csproj", "{E143D37D-EC12-469C-996F-68E17EC98D15}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.GameData", "Submodules\GameData\Penumbra.GameData.csproj", "{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Brio.API", "Submodules\BrioAPI\Brio.API\Brio.API.csproj", "{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -111,8 +115,35 @@ Global
 		{E143D37D-EC12-469C-996F-68E17EC98D15}.Release|x64.Build.0 = Release|x64
 		{E143D37D-EC12-469C-996F-68E17EC98D15}.Release|x86.ActiveCfg = Release|x64
 		{E143D37D-EC12-469C-996F-68E17EC98D15}.Release|x86.Build.0 = Release|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Debug|Any CPU.Build.0 = Debug|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Debug|x64.ActiveCfg = Debug|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Debug|x64.Build.0 = Debug|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Debug|x86.ActiveCfg = Debug|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Debug|x86.Build.0 = Debug|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Release|Any CPU.ActiveCfg = Release|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Release|Any CPU.Build.0 = Release|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Release|x64.ActiveCfg = Release|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Release|x64.Build.0 = Release|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Release|x86.ActiveCfg = Release|x64
+		{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}.Release|x86.Build.0 = Release|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Debug|Any CPU.Build.0 = Debug|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Debug|x64.ActiveCfg = Debug|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Debug|x64.Build.0 = Debug|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Debug|x86.ActiveCfg = Debug|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Debug|x86.Build.0 = Debug|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Release|Any CPU.ActiveCfg = Release|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Release|Any CPU.Build.0 = Release|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Release|x64.ActiveCfg = Release|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Release|x64.Build.0 = Release|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Release|x86.ActiveCfg = Release|x64
+		{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}.Release|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C09AAE3D-1158-4931-A4B9-979DA9F04143}
 	EndGlobalSection
 EndGlobal

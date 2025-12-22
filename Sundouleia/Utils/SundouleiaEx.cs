@@ -64,6 +64,10 @@ public static class SundouleiaEx
         && !string.IsNullOrEmpty(config.Current.CacheFolder)
         && Directory.Exists(config.Current.CacheFolder);
 
+    public static bool HasValidExportFolderSetup(this MainConfig config)
+        => !string.IsNullOrEmpty(config.Current.SMAExportFolder)
+        && Directory.Exists(config.Current.SMAExportFolder);
+
     public static bool HasValidSMACache(this MainConfig config)
         => !string.IsNullOrEmpty(config.Current.CacheFolder) && Directory.Exists(config.Current.SMACacheFolder);
 

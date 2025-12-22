@@ -17,19 +17,16 @@ namespace Sundouleia.Gui;
 public class SMAManagerUI : WindowMediatorSubscriberBase
 {
     // Some config, probably.
-    private readonly SMAFileHandler _smaHandler;
-    private readonly FileCacheManager _fileCache;
-    private readonly SMAManager _smaManager;
+    private readonly SMAFileHandler _handler;
+    private readonly SMAFileManager _manager;
     private readonly TutorialService _guides;
 
     public SMAManagerUI(ILogger<SMACreatorUI> logger, SundouleiaMediator mediator,
-        SMAFileHandler smaHandler, FileCacheManager fileCache,
-        SMAManager smaManager, TutorialService guides) 
+        SMAFileHandler handler, SMAFileManager manager, TutorialService guides) 
         : base(logger, mediator, "Modular Actor Manager###SundouleiaSMAManager")
     {
-        _smaHandler = smaHandler;
-        _fileCache = fileCache;
-        _smaManager = smaManager;
+        _handler = handler;
+        _manager = manager;
         _guides = guides;
 
         this.PinningClickthroughFalse();

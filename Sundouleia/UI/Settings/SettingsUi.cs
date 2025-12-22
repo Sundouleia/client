@@ -27,17 +27,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly MainConfig _mainConfig;
     private readonly ProfilesTab _accountsTab;
     private readonly DebugTab _debugTab;
-    private readonly UiFileCacheShared _fileCacheShared;
+    private readonly UiDataStorageShared _storageShared;
 
     public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, MainHub hub,
-        MainConfig config, ProfilesTab accounts, DebugTab debug, UiFileCacheShared fileCacheShared)
+        MainConfig config, ProfilesTab accounts, DebugTab debug, UiDataStorageShared dataStorage)
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;
         _mainConfig = config;
         _accountsTab = accounts;
         _debugTab = debug;
-        _fileCacheShared = fileCacheShared;
+        _storageShared = dataStorage;
 
         Flags = WFlags.NoScrollbar;
         this.PinningClickthroughFalse();
@@ -101,6 +101,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
         CkGui.ColorTextBool("PetNames", IpcCallerPetNames.APIAvailable);
         CkGui.AttachToolTip(IpcCallerPetNames.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
+        ImGui.SameLine();
+        CkGui.ColorTextBool("Brio", IpcCallerBrio.APIAvailable);
+        CkGui.AttachToolTip(IpcCallerBrio.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+
         ImGui.Text("Register account:");
 
         ImGui.SameLine();
@@ -138,29 +142,25 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem(CkLoc.Settings.TabStorage))
+            if (ImGui.BeginTabItem(CkLoc.Settings.TabSmaStorage))
             {
-                _fileCacheShared.DrawFileCacheStorageBox();
-                ImGui.Separator();
-                _fileCacheShared.DrawCacheMonitoring(true, true, true);
-                ImGui.Separator();
-                _fileCacheShared.DrawFileCompactor(true);
-                ImGui.Separator();
-                _fileCacheShared.DrawTransfers();
+                // Temporary placeholder
+                _storageShared.DrawSmaStorage();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem(CkLoc.Settings.TabOwnedFiles))
+            if (ImGui.BeginTabItem(CkLoc.Settings.TabStorage))
             {
-                _fileCacheShared.DrawFileCacheStorageBox();
+                _storageShared.DrawFileCacheStorageBox();
                 ImGui.Separator();
-                _fileCacheShared.DrawCacheMonitoring(true, true, true);
+                _storageShared.DrawCacheMonitoring(true, true, true);
                 ImGui.Separator();
-                _fileCacheShared.DrawFileCompactor(true);
+                _storageShared.DrawFileCompactor(true);
                 ImGui.Separator();
-                _fileCacheShared.DrawTransfers();
+                _storageShared.DrawTransfers();
                 ImGui.EndTabItem();
             }
+
 
             if (ImGui.BeginTabItem("Debug"))
             {

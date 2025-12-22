@@ -18,7 +18,6 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
 {
     private const int SundouleiaApiVersion = 1;
 
-    private readonly SMAManager _actorFileManager;
     private readonly SundesmoManager _sundesmos;
     private readonly CharaObjectWatcher _watcher;
 
@@ -63,10 +62,9 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
     private ICallGateProvider<nint, List<MoodlesStatusInfo>, bool, object?>? ApplyToPairRequest;
 
     public IpcProvider(ILogger<IpcProvider> logger, SundouleiaMediator mediator,
-        SMAManager actorFileManager, SundesmoManager pairs, CharaObjectWatcher watcher)
+        SundesmoManager pairs, CharaObjectWatcher watcher)
         : base(logger, mediator)
     {
-        _actorFileManager = actorFileManager;
         _sundesmos = pairs;
         _watcher = watcher;
 

@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Helpers;
@@ -10,17 +9,20 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Interop;
+using Sundouleia.Localization;
 using Sundouleia.ModFiles;
 using Sundouleia.ModFiles.Cache;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
+using Sundouleia.Services.Configs;
 using Sundouleia.WebAPI.Files;
+using System.Text.RegularExpressions;
 
 namespace Sundouleia.Gui;
 
-public partial class UiFileCacheShared
+public partial class UiDataStorageShared
 {
-    private readonly ILogger<UiFileCacheShared> _logger;
+    private readonly ILogger<UiDataStorageShared> _logger;
     private readonly MainConfig _config;
     private readonly FileUploader _uploader;
     private readonly FileCompactor _compactor;
@@ -30,14 +32,15 @@ public partial class UiFileCacheShared
     private readonly UiFileDialogService _dialogService;
 
     // Cache location validators.
-    private FilePathValidation _pathValidation = FilePathValidation.InvalidPath;
+    private FilePathValidation _fileCacheValidation = FilePathValidation.InvalidPath;
+    private FilePathValidation _smaExportValidation = FilePathValidation.InvalidPath;
     private readonly string _rootPath;
     private readonly bool _isLinux;
 
     private bool _isMonitoring => _mainWatcher.Watcher is not null;
 
 
-    public UiFileCacheShared(ILogger<UiFileCacheShared> logger, MainConfig config, FileUploader uploader,
+    public UiDataStorageShared(ILogger<UiDataStorageShared> logger, MainConfig config, FileUploader uploader,
         FileCompactor compactor, CacheMonitor monitor, SundouleiaWatcher mainWatcher, PenumbraWatcher penumbraWatcher,
         UiFileDialogService dialogService)
     {
@@ -51,7 +54,10 @@ public partial class UiFileCacheShared
         _dialogService = dialogService;
 
         if (_config.HasValidCacheFolderSetup())
-            _pathValidation = FilePathValidation.Valid;
+            _fileCacheValidation = FilePathValidation.Valid;
+
+        if (_config.HasValidExportFolderSetup())
+            _smaExportValidation = FilePathValidation.Valid;
 
         // Path Rooting & OS Detection.
         _isLinux = Util.IsWine();
@@ -59,6 +65,33 @@ public partial class UiFileCacheShared
     }
 
     public bool IsCachePathValid => IsValidPath(_config.Current.CacheFolder);
+
+    public void DrawSmaStorage()
+    {
+        var smaFileDir = _config.Current.SMAExportFolder;
+        CkGui.FontText(CkLoc.Settings.TabSmaStorage, UiFontService.UidFont);
+
+        if (CkGui.IconButton(FAI.Folder))
+            OpenSmaStorageDialog();
+        CkGui.AttachToolTip("Open file dialog to choose a directory.");
+
+        ImUtf8.SameLineInner();
+        // Display the directory in a readonly input text so that we can open the file dailog for selection.
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+        ImGui.InputTextWithHint("##smaDirectory", $"new storage location (may be phased out later)", ref smaFileDir, 255, ImGuiInputTextFlags.ReadOnly);
+        if (!IsValidPath(_config.Current.SMAExportFolder))
+        {
+            CkGui.FramedIconText(FAI.ExclamationTriangle, ImGuiColors.DalamudRed);
+            CkGui.ColorTextFrameAlignedInline(_smaExportValidation switch
+            {
+                FilePathValidation.IsOneDrive => "Path cannot be in OneDrive! Try putting it closer to a root. (C:\\) (C:\\FFXIVModding\\)!",
+                FilePathValidation.NotWritable => "Path must be writable!",
+                FilePathValidation.HasOtherFiles => "Directory has files or other sub-folders not beloning to Sundouleia!",
+                FilePathValidation.InvalidPath => "Folder must contain only (A-Z), underscores (_), dashes (-) and arabic numbers (0-9).",
+                _ => string.Empty,
+            }, ImGuiColors.DalamudRed);
+        }
+    }
 
     /// <summary>
     ///     Draws out the FileCache Storage component of the mod storage UI. <para />
@@ -84,7 +117,7 @@ public partial class UiFileCacheShared
 
         // Draw out the folder icon first, prior to drawing out the file storage.
         if (CkGui.IconButton(FAI.Folder, disabled: _isMonitoring))
-            OpenDialogBox();
+            OpenFileCacheDialog();
         CkGui.AttachToolTip(_isMonitoring ? "Must stop monitoring the cache folder before changing it." : "Open file dialog to choose a directory.");
 
         ImUtf8.SameLineInner();
@@ -139,8 +172,8 @@ public partial class UiFileCacheShared
             "or after a file has not been accessed for 6 weeks.");
 
         // Below, if the path validation is not success, display the error text.
-        if (_pathValidation is not FilePathValidation.Valid)
-            CkGui.CenterColorTextAligned(_pathValidation switch
+        if (_fileCacheValidation is not FilePathValidation.Valid)
+            CkGui.CenterColorTextAligned(_fileCacheValidation switch
             {
                 FilePathValidation.IsOneDrive => "Path cannot be in OneDrive! Try putting it closer to a root. (C:\\) (C:\\FFXIVModding\\)!",
                 FilePathValidation.IsPenumbraDir => "Path cannot be the Penumbra directory!",
@@ -379,7 +412,43 @@ public partial class UiFileCacheShared
         }
     }
 
-    private void OpenDialogBox()
+    private void OpenSmaStorageDialog()
+    {
+        _dialogService.OpenFolderPicker("Pick an Export location for SMA Files", (success, path) =>
+        {
+            // Ensure dialog success is yippee 
+            if (!success)
+                return;
+
+            // Need to validate that the selected path is a valid path prior to setting it.
+            if (path.Contains("onedrive", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning($"User attempted to set export location to OneDrive folder: {path}");
+                _smaExportValidation = FilePathValidation.IsOneDrive;
+                return;
+            }
+            if (!IsDirectoryWritable(path))
+            {
+                _smaExportValidation = FilePathValidation.NotWritable;
+                return;
+            }
+            // Validate the format of the path.
+            if (!ValidPathRegex().IsMatch(path))
+            {
+                _smaExportValidation = FilePathValidation.InvalidPath;
+                return;
+            }
+            // Validate the existence of the path.
+            if (IsValidPath(path))
+            {
+                _smaExportValidation = FilePathValidation.Valid;
+                _config.Current.SMAExportFolder = path;
+                _config.Save();
+            }
+        }, ConfigFileProvider.SundouleiaDirectory, true);
+    }
+
+    private void OpenFileCacheDialog()
     {
         _dialogService.OpenFolderPicker("Pick Sundouleia's Cache Folder", (success, path) =>
         {
@@ -391,13 +460,13 @@ public partial class UiFileCacheShared
             if (path.Contains("onedrive", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning($"User attempted to set cache path to OneDrive folder: {path}");
-                _pathValidation = FilePathValidation.IsOneDrive;
+                _fileCacheValidation = FilePathValidation.IsOneDrive;
                 return;
             }
             if (string.Equals(path.ToLowerInvariant(), IpcCallerPenumbra.ModDirectory?.ToLowerInvariant(), StringComparison.Ordinal))
             {
                 _logger.LogWarning($"User attempted to set cache path to Penumbra Mod Directory: {path}");
-                _pathValidation = FilePathValidation.IsPenumbraDir;
+                _fileCacheValidation = FilePathValidation.IsPenumbraDir;
                 return;
             }
             var files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
@@ -406,7 +475,7 @@ public partial class UiFileCacheShared
                 var fileName = Path.GetFileNameWithoutExtension(file);
                 if (fileName.Length != 64 && !string.Equals(fileName, "desktop", StringComparison.OrdinalIgnoreCase))
                 {
-                    _pathValidation = FilePathValidation.HasOtherFiles;
+                    _fileCacheValidation = FilePathValidation.HasOtherFiles;
                     _logger.LogWarning($"Found illegal file in {path}: {file}");
                     return;
                 }
@@ -414,28 +483,28 @@ public partial class UiFileCacheShared
             var dirs = Directory.GetDirectories(path);
             if (dirs.Any())
             {
-                _pathValidation = FilePathValidation.HasOtherFiles;
+                _fileCacheValidation = FilePathValidation.HasOtherFiles;
                 _logger.LogWarning($"Found folders in {path} not belonging to Sundouleia: {string.Join(", ", dirs)}");
                 return;
             }
 
             if (!IsDirectoryWritable(path))
             {
-                _pathValidation = FilePathValidation.NotWritable;
+                _fileCacheValidation = FilePathValidation.NotWritable;
                 return;
             }
 
             // Validate the format of the path.
             if (!ValidPathRegex().IsMatch(path))
             {
-                _pathValidation = FilePathValidation.InvalidPath;
+                _fileCacheValidation = FilePathValidation.InvalidPath;
                 return;
             }
 
             // Validate the existence of the path.
             if (IsValidPath(path))
             {
-                _pathValidation = FilePathValidation.Valid;
+                _fileCacheValidation = FilePathValidation.Valid;
                 _config.Current.CacheFolder = path;
                 _config.Save();
                 _mainWatcher.StartWatcher(path);
@@ -445,6 +514,7 @@ public partial class UiFileCacheShared
     }
 
     private bool IsValidPath(string path) => !string.IsNullOrEmpty(path) && Directory.Exists(path);
+
     private bool CachePresetRootDirExists()
     {
         var sundouleiaCacheDir = Path.Combine(_rootPath, "SundouleiaCache");

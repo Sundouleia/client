@@ -1,28 +1,19 @@
-﻿using CkCommons;
-using CkCommons.Gui;
+﻿using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using OtterGui.Text;
-using Sundouleia.Gui.MainWindow;
 using Sundouleia.Interop;
-using Sundouleia.ModFiles;
 using Sundouleia.ModularActor;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
 
-// Doing the hecking brainstorm voodoo
-
 namespace Sundouleia.Gui;
-
 
 /// <summary>
 ///     Shows only in GPose. Allows you to import Sundouleia Modular Actor files and
@@ -35,29 +26,30 @@ namespace Sundouleia.Gui;
 public class SMAControllerUI : WindowMediatorSubscriberBase
 {
     private readonly SMAFileHandler _fileHandler;
-    private readonly GPoseActorHandler _smaHandler;
-    private readonly SMAManager _manager;
+    private readonly GPoseHandler _handler;
+    private readonly GPoseManager _manager;
     private readonly IpcManager _ipc;
     private readonly CharaObjectWatcher _watcher;
-    private readonly UiFileDialogService _dialogService;
+    private readonly UiFileDialogService _dialog;
 
     // Used to validate an imported file for decryption.
-    private ModularActorData? _selectedActor;
     private unsafe GameObject* _selectedGPoseActor = null;
-    private string _passwordForLoadedFile = string.Empty;
-
+    private ModularActorData? _selectedSmad;
+    private ModularActorBase? _selectedSmab;
+    private ModularActorOutfit? _selectedSmao;
+    private ModularActorItem? _selectedSmai;
 
     public SMAControllerUI(ILogger<SMAControllerUI> logger, SundouleiaMediator mediator,
-        SMAFileHandler fileHandler, GPoseActorHandler handler,
-        SMAManager manager, IpcManager ipc, CharaObjectWatcher watcher,
-        UiFileDialogService dialogService)
+        SMAFileHandler fileHandler, GPoseHandler handler, GPoseManager manager,
+        IpcManager ipc, CharaObjectWatcher watcher, UiFileDialogService dialog)
         : base(logger, mediator, "GPOSE - Modular Actor Control")
     {
         _fileHandler = fileHandler;
-        _smaHandler = handler;
+        _handler = handler;
         _manager = manager;
         _ipc = ipc;
-        _dialogService = dialogService;
+        _watcher = watcher;
+        _dialog = dialog;
 
         this.SetBoundaries(new(200, 400), ImGui.GetIO().DisplaySize);
 
@@ -88,87 +80,23 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        CkGui.FontText($"Loaded SMA Files:", UiFontService.UidFont);
-        ImGui.SameLine();
-        if (CkGui.IconTextButton(FontAwesomeIcon.FileImport, "Import SMAB"))
-        {
-            _dialogService.OpenSingleFilePicker("Import ActorBase", ".smab", (success, path) =>
-            {
-                if (!success)
-                    return;
-                // Try and import it. This could fail for various reasons.
-                _fileHandler.LoadActorBaseFile(path, _passwordForLoadedFile);
-            });
-        }
-
+        CkGui.FontText($"GPose Manager:", UiFontService.UidFont);
         ImGui.Separator();
-        using var table = ImRaii.Table("sma_controller_table", 3, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingFixedFit, ImGui.GetContentRegionAvail());
-        if (!table)
-            return;
-        // Create a child for the first area.
-        ImGui.TableSetupColumn("gpose_actors");
-        ImGui.TableSetupColumn("loaded_sma");
-        ImGui.TableSetupColumn("actor_options", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableNextRow();
+        
+        DrawListBoxes();
 
-        ImGui.TableNextColumn();
-        ImGui.Text("GPose Actors:");
-        using (ImRaii.ListBox("##gposemodularActors", new Vector2(200, ImGui.GetContentRegionAvail().Y)))
-        {
-            unsafe
-            {
-                foreach (var address in CharaObjectWatcher.GPoseActors)
-                {
-                    var gposeActor = (GameObject*)address;
-                    if (ImGui.Selectable(gposeActor->NameString, gposeActor == _selectedGPoseActor))
-                        _selectedGPoseActor = gposeActor;
-                }
-            }
-        }
+        ImGui.SameLine();
+        using var _ = ImRaii.Group();
 
-        ImGui.TableNextColumn();
-        var listboxHeight = (ImGui.GetContentRegionAvail().Y - ImUtf8.ItemSpacing.Y - ImUtf8.FrameHeightSpacing * 2 - ImUtf8.TextHeightSpacing * 2) / 2;
-        ImGui.Text("Handled SMA Entries:");
-        using (ImRaii.ListBox("##handledSMAEntries", new Vector2(150, listboxHeight)))
-        {
-            foreach (var (address, entry) in _smaHandler.HandledGPoseActors)
-                ImGui.Selectable($"{entry.DisplayName}({address:X})", false);
-        }
-
-        ImGui.Text("Loaded SMA Data:");
-        using (ImRaii.ListBox("##modularActors", new Vector2(150, listboxHeight)))
-        {
-            foreach (var actor in _manager.ProcessedActors)
-            {
-                if (ImGui.Selectable($"{actor.Description}##sma_{actor.Description}", actor == _selectedActor))
-                    _selectedActor = actor;
-            }
-        }
-        ImGui.SetNextItemWidth(150);
-        ImGui.InputTextWithHint("##import-password", "File Password...", ref _passwordForLoadedFile, 100);
-        // Draw out the buttons for loading here.
-        if (CkGui.IconTextButtonCentered(FontAwesomeIcon.FileImport, "Import SMAB", 150))
-        {
-            _dialogService.OpenSingleFilePicker("Import ActorBase", ".smab", (success, path) =>
-            {
-                if (!success)
-                    return;
-                // Try and import it. This could fail for various reasons.
-                _fileHandler.LoadActorBaseFile(path, _passwordForLoadedFile);
-            });
-        }
-
-        ImGui.TableNextColumn();
-        ImGui.Dummy(new(ImGui.GetContentRegionAvail().X, 0)); // Force alignment.
         unsafe
         {
             CkGui.ColorTextFrameAligned("Selected GPose Actor:", ImGuiColors.DalamudYellow);
             CkGui.TextFrameAlignedInline(_selectedGPoseActor != null ? _selectedGPoseActor->NameString : "<No GPose Actor Selected>");
             // Otherwise draw options for them.
             if (CkGui.IconTextButton(FAI.Crosshairs, "Target"))
-                _smaHandler.GPoseTarget = _selectedGPoseActor;
+                _handler.GPoseTarget = _selectedGPoseActor;
 
-            var handledEntry = _smaHandler.HandledGPoseActors.TryGetValue((nint)_selectedGPoseActor, out var entry) ? entry : null;
+            var handledEntry = _handler.HandledGPoseActors.TryGetValue((nint)_selectedGPoseActor, out var entry) ? entry : null;
 
             ImGui.SameLine();
             CkGui.IconText(FAI.InfoCircle);
@@ -184,14 +112,14 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
 
             ImGui.SameLine();
             if (CkGui.IconTextButton(FAI.Undo, "Remove SMA Data", disabled: UiService.DisableUI || handledEntry is null))
-                _smaHandler.RemoveActor(handledEntry!).ConfigureAwait(false);
+                _handler.RemoveActor(handledEntry!).ConfigureAwait(false);
             CkGui.AttachToolTip("Revert the applied SMA Data, removing them from the handled list.");
         }
 
         ImGui.Separator();
         CkGui.ColorTextFrameAligned("Selected Actor:", ImGuiColors.DalamudYellow);
-        CkGui.TextFrameAlignedInline(_selectedActor?.Description ?? "<No Actor Selected>");
-        if (_selectedActor is not { } selectedActor)
+        CkGui.TextFrameAlignedInline(_selectedSmad?.Description ?? "<No Actor Selected>");
+        if (_selectedSmad is not { } selectedActor)
             return;
 
         if (CkGui.IconTextButton(FAI.ArrowsSpin, "Get Latest Allowances", disabled: UiService.DisableUI))
@@ -200,14 +128,139 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
         }
         CkGui.AttachToolTip("Retrieves the latest list of allowed data hashes for the selected SMA Base.");
 
-        if (CkGui.IconTextButton(FAI.ArrowRight, "Apply to Target", disabled: UiService.DisableUI || _selectedActor is null || !_smaHandler.HasGPoseTarget))
-            UiService.SetUITask(async () => await _manager.ApplySMAToGPoseTarget(selectedActor));
+        if (CkGui.IconTextButton(FAI.ArrowRight, "Apply to Target", disabled: UiService.DisableUI || _selectedSmad is null || !_handler.HasGPoseTarget))
+            UiService.SetUITask(async () => await _handler.ApplySMAToGPoseTarget(selectedActor));
         CkGui.AttachToolTip("Applies the selected ActorBase to GPose Target.");
 
         ImGui.SameLine();
-        if (CkGui.IconTextButton(FAI.Plus, "Spawn & Apply Data", disabled: UiService.DisableUI || _selectedActor is null))
-            UiService.SetUITask(async () => await _manager.SpawnAndApplySMAData(selectedActor));
+        if (CkGui.IconTextButton(FAI.Plus, "Spawn & Apply Data", disabled: UiService.DisableUI || _selectedSmad is null))
+            UiService.SetUITask(async () => await _handler.SpawnAndApplySMAData(selectedActor));
         CkGui.AttachToolTip("Applies the selected ActorBase to a spawned BrioActor.");
+    }
+
+    private void DrawListBoxes()
+    {
+        using var table = ImRaii.Table("sma_controller_table", 6, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingFixedFit, new(800f, ImGui.GetContentRegionAvail().Y));
+        if (!table)
+            return;
+        // Create a child for the first area.
+        ImGui.TableSetupColumn("GPose Actors");
+        ImGui.TableSetupColumn("Handled Actors");
+        ImGui.TableSetupColumn("Loaded SMA Data");
+        ImGui.TableSetupColumn("Loaded SMA Base");
+        ImGui.TableSetupColumn("Loaded SMA Outfit");
+        ImGui.TableSetupColumn("Loaded SMA Item");
+        ImGui.TableHeadersRow();
+
+        ImGui.TableNextColumn();
+        DrawGPoseActors();
+        ImGui.TableNextColumn();
+        DrawHandledActors();
+        ImGui.TableNextColumn();
+        DrawLoadedSmadFiles();
+        ImGui.TableNextColumn();
+        DrawLoadedSmabFiles();
+        ImGui.TableNextColumn();
+        DrawLoadedSmaoFiles();
+        ImGui.TableNextColumn();
+        DrawLoadedSmaiFiles();
+    }
+
+    private unsafe void DrawGPoseActors()
+    {
+        // wa
+        using var _ = ImRaii.ListBox("##gposers", new Vector2(125, ImGui.GetContentRegionAvail().Y));
+        if (!_) return;
+
+        foreach (var address in CharaObjectWatcher.GPoseActors)
+        {
+            var gposeActor = (GameObject*)address;
+            if (ImGui.Selectable($"{gposeActor->NameString}##{gposeActor->NameString}{address}", gposeActor == _selectedGPoseActor))
+                _selectedGPoseActor = gposeActor;
+        }
+    }
+
+    private unsafe void DrawHandledActors()
+    {
+        using var _ = ImRaii.ListBox("##handledActors", new Vector2(125, ImGui.GetContentRegionAvail().Y));
+        if (!_) return;
+
+        foreach (var (address, entry) in _handler.HandledGPoseActors)
+            ImGui.Selectable($"{entry.DisplayName}({address:X})", false);
+    }
+
+    private void DrawLoadedSmadFiles()
+    {
+        using (ImRaii.ListBox("##smad_files", new Vector2(125, ImGui.GetContentRegionAvail().Y - ImUtf8.FrameHeightSpacing)))
+        {
+            foreach (var actor in _manager.SMAD)
+                if (ImGui.Selectable($"{actor.Description}##smad_{actor.Description}", actor == _selectedSmad))
+                    _selectedSmad = actor;
+        }
+        if (CkGui.IconTextButtonCentered(FontAwesomeIcon.FileImport, "Add Data File", 125))
+        {
+            _dialog.OpenSingleFilePicker("Import Actor Data File", "SMA Data{.smad}", (success, path) =>
+            {
+                if (!success) return;
+                _manager.LoadSMADFile(path);
+            });
+        }
+    }
+
+    private void DrawLoadedSmabFiles()
+    {
+        using (ImRaii.ListBox("##smab_files", new Vector2(125, ImGui.GetContentRegionAvail().Y - ImUtf8.FrameHeightSpacing)))
+        {
+            foreach (var actorBase in _manager.Bases)
+                if (ImGui.Selectable($"{actorBase.Description}##smab_{actorBase.Description}", actorBase == _selectedSmab))
+                    _selectedSmab = actorBase;
+        }
+
+        if (CkGui.IconTextButtonCentered(FontAwesomeIcon.FileImport, "Add Base File", 125))
+        {
+            _dialog.OpenSingleFilePicker("Import Actor Base File", "SMA Base{.smab}", (success, path) =>
+            {
+                if (!success) return;
+                _manager.LoadSMABFile(path);
+            });
+        }
+    }
+
+    private void DrawLoadedSmaoFiles()
+    {
+        using (ImRaii.ListBox("##smao_files", new Vector2(125, ImGui.GetContentRegionAvail().Y - ImUtf8.FrameHeightSpacing)))
+        {
+            foreach (var outfit in _manager.Outfits)
+                if (ImGui.Selectable($"{outfit.Description}##smao_{outfit.Description}", outfit == _selectedSmao))
+                    _selectedSmao = outfit;
+        }
+        if (CkGui.IconTextButtonCentered(FontAwesomeIcon.FileImport, "Add Outfit File", 125))
+        {
+            _dialog.OpenSingleFilePicker("Import Actor Outfit File", "SMA Outfit{.smao}", (success, path) =>
+            {
+                if (!success) return;
+                _manager.LoadSMAOFile(path);
+            });
+        }
+    }
+
+    private void DrawLoadedSmaiFiles()
+    {
+        using (ImRaii.ListBox("##smai_files", new Vector2(125, ImGui.GetContentRegionAvail().Y - ImUtf8.FrameHeightSpacing)))
+        {
+            foreach (var item in _manager.Items)
+                if (ImGui.Selectable($"{item.Description}##smai_{item.Description}", item == _selectedSmai))
+                    _selectedSmai = item;
+        }
+        if (CkGui.IconTextButtonCentered(FontAwesomeIcon.FileImport, "Add Item File", 125))
+        {
+            _dialog.OpenSingleFilePicker("Import Actor Item File(s)", "SMA Item{.smai},SMA ItemPack{.smaip}", (success, path) =>
+            {
+                if (!success) return;
+                // Load the item or item pack, based on the file type (add item packs later)
+                _manager.LoadSMAIFile(path);
+            });
+        }
     }
 
     protected override void PostDrawInternal()
