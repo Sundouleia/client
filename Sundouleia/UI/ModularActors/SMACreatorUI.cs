@@ -5,6 +5,7 @@ using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
@@ -59,7 +60,7 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
 
     protected override void PostDrawInternal()
     { }
-
+    
     protected override void DrawInternal()
     {
         CkGui.FontText("SMA Exporter", UiFontService.UidFont);
@@ -109,7 +110,10 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
     {
         if (IsExporting)
             return;
-       
+
+        // Extract the final, actual given name from the file.
+        _fileName = Path.GetFileNameWithoutExtension(filePath);
+
         // Perform the export to this location.
         _exportCTS = _exportCTS.SafeCancelRecreate();
         _exportTask = Task.Run(async () =>

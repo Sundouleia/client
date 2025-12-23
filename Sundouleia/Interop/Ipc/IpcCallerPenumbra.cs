@@ -378,9 +378,9 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
             Logger.LogTrace($"SMA-Base TempMod removed for Collection: {entry.CollectionId}, Success: [{retRemove}]", LoggerType.IpcPenumbra);
 
             // add the new temporary mod with the new paths.
-            var retAdded = AddTempMod.Invoke(entry.TempModName, entry.CollectionId, entry.Data.FinalModdedDict, entry.Data.CompositeManips, 0);
+            var retAdded = AddTempMod.Invoke(entry.TempModName, entry.CollectionId, entry.Data.FileReplacements, entry.Data.ManipString, 0);
             Logger.LogTrace($"Re-Adding SMA-Base TempMod for Collection: {entry.CollectionId}, Success: [{retAdded}]", LoggerType.IpcPenumbra);
-            Logger.LogDebug($"Added TempMod contained {entry.Data.FinalModdedDict.Count} paths.", LoggerType.IpcPenumbra);
+            Logger.LogDebug($"Added TempMod contained {entry.Data.FileReplacements.Count} paths.", LoggerType.IpcPenumbra);
         }).ConfigureAwait(false);
     }
 

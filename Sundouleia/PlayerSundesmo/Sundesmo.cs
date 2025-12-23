@@ -30,7 +30,6 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favorites;
     private readonly ServerConfigManager _nickConfig;
-    private readonly SundesmoHandlerFactory _factory;
     private readonly CharaObjectWatcher _watcher;
 
     private CancellationTokenSource _timeoutCTS = new();

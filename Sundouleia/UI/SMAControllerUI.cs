@@ -107,7 +107,7 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
                 $"\nDescription: {handledEntry.Data.Description}" +
                 $"\nCollectionID: {handledEntry.CollectionId}" +
                 $"\nCPlusID: {handledEntry.CplusProfile}" +
-                $"\nActorBase ID: {handledEntry.Data.Base.ID}";
+                $"\nActorBase ID: {handledEntry.Data.Base.Id}";
             CkGui.AttachToolTip(ttText);
 
             ImGui.SameLine();
@@ -138,7 +138,7 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
         CkGui.AttachToolTip("Applies the selected ActorBase to a spawned BrioActor.");
 
         ImGui.Separator();
-        foreach (var (path, replacement) in selectedActor.FinalModdedDict)
+        foreach (var (path, replacement) in selectedActor.FileReplacements)
         {
             ImGui.Text($"Path: {path} -> Replacement: {replacement}");
         }

@@ -10,6 +10,14 @@ using TerraFX.Interop.Windows;
 namespace Sundouleia.ModularActor;
 
 
+public enum FileIntegrity
+{
+    InvalidFilePath,
+    NoHeaderData,
+    NoModdedDictionary,
+    Valid
+}
+
 /// <summary>
 ///     Assists in how SMA Files are saved to and loaded from disk. <para />
 ///     Both services using these handles can necessary logic here. 
@@ -67,13 +75,10 @@ public class SMAFileHandler : IDisposable
     {
         // Collect Modded State (Preferably from Resource Tree Allocation.
         var curState = await _moddedState.CollectActorModdedState(actor, ct);
-
         // Generate unique id to assign for this file.
         var fileId = Guid.NewGuid();
-
         // generate a random decryption fileKey. Does not need to be anything complicated.
         var fileKey = SmadCryptography.Random(32); // 256 bit key. (used to be salt previously)
-
         // Construct the base fileData to be stored in the file's header region.
         var headerData = new BaseFileDataSummary()
         {

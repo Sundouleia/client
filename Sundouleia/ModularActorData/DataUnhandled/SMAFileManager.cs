@@ -19,8 +19,6 @@ public class SMAFileManager
     private readonly MainConfig _mainConfig;
     private readonly ModularActorsConfig _smaConfig;
     private readonly SMAFileHandler _fileHandler;
-
-
     public SMAFileManager(ILogger<SMAFileManager> logger, MainConfig mainConfig,
         ModularActorsConfig smaConfig, SMAFileHandler fileHandler)
     {
@@ -32,10 +30,10 @@ public class SMAFileManager
         CheckIntegrity();
     }
 
-    public List<OwnedModularActorData> SMAD { get; private set; } = [];
-    public List<OwnedModularActorBase> Bases { get; private set; } = [];
-    public List<OwnedModularActorOutfit> Outfits { get; private set; } = [];
-    public List<OwnedModularActorItem> Items { get; private set; } = [];
+    public List<ModularActorData>   SMAD    { get; private set; } = [];
+    public List<ModularActorBase>   Bases   { get; private set; } = [];
+    public List<ModularActorOutfit> Outfits { get; private set; } = [];
+    public List<ModularActorItem>   Items   { get; private set; } = [];
 
     public HashSet<Guid> InvalidFiles { get; private set; } = new();
 
@@ -64,9 +62,10 @@ public class SMAFileManager
             }
 
             _logger.LogInformation($"Loaded SMA Base Header: {fileMeta.FilePath}");
+            var moddedDict = _fileHandler.GetModdedDict(header);
             // Create a new OwnedModularActorBase object and append it to the list.
             // (Likely need something here to associate loaded bases with a matching loaded data or whatever)
-            var newActorBase = new OwnedModularActorBase(fileMeta, header);
+            var newActorBase = new ModularActorBase(header, fileMeta, moddedDict);
             Bases.Add(newActorBase);
         }
 
@@ -89,16 +88,14 @@ public class SMAFileManager
             return;
 
         var dataHash = SundouleiaSecurity.GetFileHashSHA256(filePath);
-        if (!_smaConfig.AddSMABFile(summary, filePath, dataHash, fileKey, password))
+        if (_smaConfig.AddSMABFile(summary, filePath, dataHash, fileKey, password))
         {
-            _logger.LogWarning($"Failed to add new SMAB file to config: {filePath}");
-            return;
+            Bases.Add(new ModularActorBase(summary, _smaConfig.Current.OwnedSMABFiles[summary.FileId]));
+            _logger.LogInformation($"Added new SMAB file to config and manager: {filePath}");
         }
-
-        // Add it as a new OwnedModularActorBase.
-        Bases.Add(new OwnedModularActorBase(_smaConfig.Current.OwnedSMABFiles[summary.FileId], summary));
-        _logger.LogInformation($"Added new SMAB file to config and manager: {filePath}");
     }
+
+
 
     // Editor-based creation / build
     public ModularActorDataBuilder CreateBuilder()

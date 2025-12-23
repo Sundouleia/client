@@ -18,8 +18,8 @@ public sealed record AttachedActor(string Name, ModularActorData Data)
 {
     public Guid CollectionId { get; set; } = Guid.Empty;
     public Guid? CplusProfile { get; set; } = null;
-    public string CollectionName => $"SMA_{Data.Base.ID}";
-    public string TempModName => $"SMA_Mod_{Data.Base.ID}";
+    public string CollectionName => $"SMA_{Data.Base.Id}";
+    public string TempModName => $"SMA_Mod_{Data.Base.Id}";
 }
 
 // ---- GPOSE HANDLER ----
@@ -124,7 +124,7 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
         }
 
         Logger.LogDebug($"SMA ({entry.Data.Name}) Applying Glamourer Data.");
-        await _ipc.Glamourer.ApplyStateByPtr(actorAddress, entry.Data.FinalGlamourData).ConfigureAwait(false);
+        await _ipc.Glamourer.ApplyStateByPtr(actorAddress, entry.Data.GlamourState).ConfigureAwait(false);
 
         Logger.LogDebug($"SMA ({entry.Data.Name}) Applying CustomizePlus Data.");
         if (!string.IsNullOrEmpty(entry.Data.CPlusData))
@@ -173,7 +173,7 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
         if (!IpcCallerBrio.APIAvailable)
             return;
 
-        Logger.LogInformation($"Spawning SMA Actor for BaseId: {data.Base.ID}.");
+        Logger.LogInformation($"Spawning SMA Actor for BaseId: {data.Base.Id}.");
         if (await _ipc.Brio.Spawn().ConfigureAwait(false) is not { } newActor)
             return;
 

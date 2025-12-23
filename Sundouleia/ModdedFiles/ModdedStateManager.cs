@@ -46,7 +46,6 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     private readonly CharaObjectWatcher _watcher; // saves my sanity.
 
     private string CurrentClientKey = string.Empty;
-    private uint _lastClassJobId = uint.MaxValue;
 
     // Tracks transients for each of the clients owned objects, to help with processing.
     private ConcurrentDictionary<OwnedObject, HashSet<string>>? _persistentTransients = null;
