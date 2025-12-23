@@ -1,49 +1,29 @@
-﻿using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Plugin;
-using Dalamud.Plugin.Ipc;
+﻿using Brio.API;
+using Brio.API.Enums;
+using Dalamud.Game.ClientState.Objects.Types;
 using System.Text.Json.Nodes;
 
 namespace Sundouleia.Interop;
 
-// Personal enum flag introduced in Brio's API 3.0
-// https://github.com/Etheirys/Brio.API/blob/main/Brio.API/Enums/SpawnFlags.cs
-[Flags]
-public enum SpawnFlags : ulong
-{
-    None = 0,
-    ReserveCompanionSlot = 1 << 1,
-    CopyPosition = 1 << 2,
-    IsProp = 1 << 4,
-    IsEffect = 1 << 8,
-    SetDefaultAppearance = 1 << 16,
-
-    Prop = IsProp | SetDefaultAppearance | CopyPosition,
-    Effect = IsEffect | SetDefaultAppearance | CopyPosition,
-    Default = CopyPosition,
-}
-
 public sealed class IpcCallerBrio : IIpcCaller
 {
     // Version Checks.
-    private readonly ICallGateSubscriber<(int, int)> ApiVersion;
-    private readonly ICallGateSubscriber<bool> IsAvailable;
+    private readonly ApiVersion ApiVersion;
+    private readonly IsAvailable IsAvailable;
 
-    // Event Calls. (None currently)
+    // Event calls (If needed ever)
 
     // API Getters
-    private readonly ICallGateSubscriber<IGameObject, (Vector3?, Quaternion?, Vector3?)> GetActorTransforms;
-    private readonly ICallGateSubscriber<IGameObject, string> GetPoseJson;
+    private readonly GetModelTransform GetTransform;
+    private readonly GetPoseAsJson GetPoseJson;
 
-    // API Enactors. (Hopefully use something besides gameObject idk)
-    private readonly ICallGateSubscriber<IGameObject, Vector3?, Quaternion?, Vector3?, bool, bool> SetActorTransform;
-    private readonly ICallGateSubscriber<SpawnFlags, bool, bool, IGameObject?>  SpawnActor;
-    private readonly ICallGateSubscriber<IGameObject, bool>                     DespawnActor;
-    private readonly ICallGateSubscriber<IGameObject, string, bool, bool>       SetPoseJson;
-
-    private readonly ICallGateSubscriber<IGameObject, bool> FreezeActor;
-    private readonly ICallGateSubscriber<IGameObject, bool> UnfreezeActor;
-    private readonly ICallGateSubscriber<bool> FreezePhysics;
-    private readonly ICallGateSubscriber<bool> UnfreezePhysics;
+    // API Enactors
+    private readonly SpawnActor SpawnActor;
+    private readonly DespawnActor DespawnActor;
+    private readonly SetModelTransform SetTransform;
+    private readonly LoadPoseFromJson SetPoseJson;
+    private readonly FreezeActor FreezeActor;
+    private readonly FreezePhysics FreezePhysics;
 
     private readonly ILogger<IpcCallerBrio> _logger;
 
@@ -51,20 +31,18 @@ public sealed class IpcCallerBrio : IIpcCaller
     {
         _logger = logger;
         // API Version Check
-        ApiVersion = Svc.PluginInterface.GetIpcSubscriber<(int, int)>("Brio.ApiVersion");
-        IsAvailable = Svc.PluginInterface.GetIpcSubscriber<bool>("Brio.IsAvailable");
-        // API Getter Functions
-        GetActorTransforms = Svc.PluginInterface.GetIpcSubscriber<IGameObject, (Vector3?, Quaternion?, Vector3?)>("Brio.GetModelTransform.V3");
-        GetPoseJson = Svc.PluginInterface.GetIpcSubscriber<IGameObject, string>("Brio.GetPoseAsJson.V3");
-        // API Enactor Functions
-        SetActorTransform = Svc.PluginInterface.GetIpcSubscriber<IGameObject, Vector3?, Quaternion?, Vector3?, bool, bool>("Brio.SetModelTransform.V3");
-        SpawnActor = Svc.PluginInterface.GetIpcSubscriber<SpawnFlags, bool, bool, IGameObject?>("Brio.SpawnActor.V3");
-        DespawnActor = Svc.PluginInterface.GetIpcSubscriber<IGameObject, bool>("Brio.DespawnActor.V3");
-        SetPoseJson = Svc.PluginInterface.GetIpcSubscriber<IGameObject, string, bool, bool>("Brio.LoadPoseFromJson.V3");
-        FreezeActor = Svc.PluginInterface.GetIpcSubscriber<IGameObject, bool>("Brio.FreezeActor.V3");
-        UnfreezeActor = Svc.PluginInterface.GetIpcSubscriber<IGameObject, bool>("Brio.FreezeActor.V3");
-        FreezePhysics = Svc.PluginInterface.GetIpcSubscriber<bool>("Brio.FreezePhysics.V3");
-        UnfreezePhysics = Svc.PluginInterface.GetIpcSubscriber<bool>("Brio.UnfreezePhysics.V3");
+        ApiVersion = new ApiVersion(Svc.PluginInterface);
+        IsAvailable = new IsAvailable(Svc.PluginInterface);
+        // API Getters
+        GetTransform = new GetModelTransform(Svc.PluginInterface);
+        GetPoseJson = new GetPoseAsJson(Svc.PluginInterface);
+        // API Enactors
+        SpawnActor = new SpawnActor(Svc.PluginInterface);
+        DespawnActor = new DespawnActor(Svc.PluginInterface);
+        SetTransform = new SetModelTransform(Svc.PluginInterface);
+        SetPoseJson = new LoadPoseFromJson(Svc.PluginInterface);
+        FreezeActor = new FreezeActor(Svc.PluginInterface);
+        FreezePhysics = new FreezePhysics(Svc.PluginInterface);
 
         CheckAPI();
     }
@@ -75,8 +53,7 @@ public sealed class IpcCallerBrio : IIpcCaller
     {
         try
         {
-            // Replace with IsAvailable later.
-            var version = ApiVersion.InvokeFunc();
+            var version = ApiVersion.Invoke();
             APIAvailable = (version.Item1 == 3 && version.Item2 >= 0);
         }
         catch
@@ -88,16 +65,16 @@ public sealed class IpcCallerBrio : IIpcCaller
     public void Dispose()
     { }
 
-    public IGameObject? SpawnBrioActor()
+    public async Task<IGameObject?> Spawn()
     {
         if (!APIAvailable)
             return null;
 
         _logger.LogDebug("Spawning Brio Actor");
-        return SpawnActor.InvokeFunc(SpawnFlags.Default, false, true);
+        return await Svc.Framework.RunOnFrameworkThread(() => SpawnActor.Invoke(SpawnFlags.Default, false, true)).ConfigureAwait(false);
     }
 
-    public async Task<bool> DespawnBrioActor(nint address)
+    public async Task<bool> Despawn(nint address)
     {
         if (!APIAvailable)
             return false;
@@ -110,7 +87,7 @@ public sealed class IpcCallerBrio : IIpcCaller
                 return false;
             }
             _logger.LogDebug($"Despawning Brio Actor {gameObj.Name.TextValue}");
-            DespawnActor.InvokeFunc(gameObj);
+            DespawnActor.Invoke(gameObj);
             return true;
         }).ConfigureAwait(false);
     }
@@ -126,7 +103,7 @@ public sealed class IpcCallerBrio : IIpcCaller
             if (Svc.Objects.CreateObjectReference(address) is { } obj && obj is IGameObject go)
             {
                 _logger.LogDebug($"Getting Pose for Brio Actor [{go.Name.TextValue}]");
-                return GetPoseJson.InvokeFunc(go);
+                return GetPoseJson.Invoke(go) ?? string.Empty;
             }
             return string.Empty;
         }).ConfigureAwait(false);
@@ -143,16 +120,22 @@ public sealed class IpcCallerBrio : IIpcCaller
             {
                 _logger.LogDebug($"Setting Pose for Brio Actor [{go.Name.TextValue}]");
                 var applicablePose = JsonNode.Parse(poseStr)!;
-                var currentPose = GetPoseJson.InvokeFunc(go);
+                var currentPose = GetPoseJson.Invoke(go);
+                if (currentPose is null)
+                {
+                    _logger.LogWarning($"Failed to set Pose for Brio Actor: Could not get current pose for {go.Name.TextValue}");
+                    return false;
+                }
+
                 // Get the model difference to set.
                 applicablePose["ModelDifference"] = JsonNode.Parse(JsonNode.Parse(currentPose)!["ModelDifference"]!.ToJsonString());
 
                 // Ensure they are frozen and have physics frozen.
                 _logger.LogDebug($"Freezing Brio Actor [{go.Name.TextValue}] for Pose Set");
-                FreezeActor.InvokeFunc(go);
-                FreezePhysics.InvokeFunc();
+                FreezeActor.Invoke(go);
+                FreezePhysics.Invoke();
                 // Then set the pose.
-                return SetPoseJson.InvokeFunc(go, poseStr, false);
+                return SetPoseJson.Invoke(go, poseStr, false);
 
             }
             _logger.LogWarning($"Failed to set Pose for Brio Actor: Invalid address {address}");

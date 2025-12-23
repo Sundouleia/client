@@ -23,8 +23,6 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     internal Hook<Character.Delegates.OnInitialize> OnCharaInitializeHook;
     internal Hook<Character.Delegates.Dtor> OnCharaDestroyHook;
     internal Hook<Character.Delegates.Terminate> OnCharaTerminateHook;
-    //internal Hook<Companion.Delegates.OnInitialize> OnCompanionInitializeHook;
-    //internal Hook<Companion.Delegates.Terminate> OnCompanionTerminateHook;
 
     private readonly CancellationTokenSource _runtimeCTS = new();
 
@@ -34,14 +32,10 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         OnCharaInitializeHook = Svc.Hook.HookFromAddress<Character.Delegates.OnInitialize>((nint)Character.StaticVirtualTablePointer->OnInitialize, InitializeCharacter);
         OnCharaTerminateHook = Svc.Hook.HookFromAddress<Character.Delegates.Terminate>((nint)Character.StaticVirtualTablePointer->Terminate, TerminateCharacter);
         OnCharaDestroyHook = Svc.Hook.HookFromAddress<Character.Delegates.Dtor>((nint)Character.StaticVirtualTablePointer->Dtor, DestroyCharacter);
-        //OnCompanionInitializeHook = Svc.Hook.HookFromAddress<Companion.Delegates.OnInitialize>((nint)Companion.StaticVirtualTablePointer->OnInitialize, InitializeCompanion);
-        //OnCompanionTerminateHook = Svc.Hook.HookFromAddress<Companion.Delegates.Terminate>((nint)Companion.StaticVirtualTablePointer->Terminate, TerminateCompanion);
 
         OnCharaInitializeHook.SafeEnable();
         OnCharaTerminateHook.SafeEnable();
         OnCharaDestroyHook.SafeEnable();
-        //OnCompanionInitializeHook.SafeEnable();
-        //OnCompanionTerminateHook.SafeEnable();
 
         // Collect data from existing objects
         CollectInitialData();
@@ -69,8 +63,6 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         OnCharaInitializeHook?.Dispose();
         OnCharaTerminateHook?.Dispose();
         OnCharaDestroyHook?.Dispose();
-        //OnCompanionInitializeHook?.Dispose();
-        //OnCompanionTerminateHook?.Dispose();
 
         RenderedCharas.Clear();
         RenderedCompanions.Clear();
@@ -255,6 +247,8 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         if (GPoseActors.Remove(address))
         {
             Logger.LogDebug($"GPose Character Removed: {(nint)chara:X} - {chara->NameString}");
+            // Include a snapshot of the data at time of destruction so we can properly get data
+            // such as the namestring after destruction.
             Mediator.Publish(new GPoseObjectDestroyed(address, *chara));
             return;
         }
@@ -288,39 +282,6 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
             Mediator.Publish(new WatchedObjectDestroyed(address));
         }
     }
-
-    // Best to leave this for logging mostly, and debug why we should include later.
-    // Causes a lot of duplicate additions as they can be called at the same time.
-    //private void NewCompanionRendered(Companion* companion)
-    //{
-    //    Logger.LogDebug($"New Companion Rendered: {(nint)companion:X} - {companion->NameString}");
-    //    var address = (nint)companion;
-    //    if (OwnedObjects.PlayerAddress != IntPtr.Zero && companion->ObjectKind == ObjectKind.BattleNpc && companion->OwnerId == OwnedObjects.PlayerObject->EntityId)
-    //    {
-    //        AddOwnedObject(OwnedObject.Companion, address);
-    //        WatchedCompanionAddr = address;
-    //    }
-    //    // if it doesn't exist already
-    //    RenderedCompanions.Add(address);
-    //    Mediator.Publish(new WatchedObjectCreated(address));
-    //}
-    // Best to leave this for logging mostly, and debug why we should include later.
-    // Causes a lot of duplicate additions as they can be called at the same time.
-    //private void CompanionRemoved(Companion* companion)
-    //{
-    //    //Logger.LogDebug($"Companion Removed: {(nint)companion:X} - {companion->NameString}");
-    //    var address = (nint)companion;
-    //    if (OwnedObjects.PlayerAddress != IntPtr.Zero && address == WatchedCompanionAddr)
-    //    {
-    //        RemoveOwnedObject(OwnedObject.Companion, address);
-    //        WatchedCompanionAddr = IntPtr.Zero;
-    //    }
-    //    else
-    //    {
-    //        RenderedCompanions.Remove(address);
-    //        Mediator.Publish(new WatchedObjectDestroyed(address));
-    //    }
-    //}
 
     private void AddOwnedObject(OwnedObject kind, nint address)
     {
@@ -364,44 +325,27 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         catch (Exception e) { Logger.LogError($"Error: {e}"); return null; }
     }
 
-    //private void InitializeCompanion(Companion* companion)
-    //{
-    //    try { OnCompanionInitializeHook!.OriginalDisposeSafe(companion); }
-    //    catch (Exception e) { Logger.LogError($"Error: {e}"); }
-    //    Svc.Framework.Run(() => NewCompanionRendered(companion));
-    //}
-
-    //private void TerminateCompanion(Companion* companion)
-    //{
-    //    CompanionRemoved(companion);
-    //    try { OnCompanionTerminateHook!.OriginalDisposeSafe(companion); }
-    //    catch (Exception e) { Logger.LogError($"Error: {e}"); }
-    //}
-
     public unsafe bool TryFindOwnedObjectByIdx(ushort objectIdx, [MaybeNullWhen(false)] out OwnedObject ownedObject)
     {
-        unsafe
+        if (WatchedPlayerAddr != IntPtr.Zero && ((GameObject*)WatchedPlayerAddr)->ObjectIndex == objectIdx)
         {
-            if (WatchedPlayerAddr != IntPtr.Zero && ((GameObject*)WatchedPlayerAddr)->ObjectIndex == objectIdx)
-            {
-                ownedObject = OwnedObject.Player;
-                return true;
-            }
-            else if (WatchedMinionMountAddr != IntPtr.Zero && ((GameObject*)WatchedMinionMountAddr)->ObjectIndex == objectIdx)
-            {
-                ownedObject = OwnedObject.MinionOrMount;
-                return true;
-            }
-            else if (WatchedPetAddr != IntPtr.Zero && ((GameObject*)WatchedPetAddr)->ObjectIndex == objectIdx)
-            {
-                ownedObject = OwnedObject.Pet;
-                return true;
-            }
-            else if (WatchedCompanionAddr != IntPtr.Zero && ((GameObject*)WatchedCompanionAddr)->ObjectIndex == objectIdx)
-            {
-                ownedObject = OwnedObject.Companion;
-                return true;
-            }
+            ownedObject = OwnedObject.Player;
+            return true;
+        }
+        else if (WatchedMinionMountAddr != IntPtr.Zero && ((GameObject*)WatchedMinionMountAddr)->ObjectIndex == objectIdx)
+        {
+            ownedObject = OwnedObject.MinionOrMount;
+            return true;
+        }
+        else if (WatchedPetAddr != IntPtr.Zero && ((GameObject*)WatchedPetAddr)->ObjectIndex == objectIdx)
+        {
+            ownedObject = OwnedObject.Pet;
+            return true;
+        }
+        else if (WatchedCompanionAddr != IntPtr.Zero && ((GameObject*)WatchedCompanionAddr)->ObjectIndex == objectIdx)
+        {
+            ownedObject = OwnedObject.Companion;
+            return true;
         }
         ownedObject = default;
         return false;

@@ -7,17 +7,17 @@
 [submodule "Submodules/OtterGui"]
 	path = Submodules/OtterGui
 	url = https://github.com/Ottermandias/OtterGui.git
-[submodule "Submodules/PenumbraAPI"]
-	path = Submodules/PenumbraAPI
+[submodule "Submodules/Penumbra.API"]
+	path = Submodules/Penumbra.API
 	url = https://github.com/Ottermandias/Penumbra.Api.git
 [submodule "Submodules/GlamourerAPI"]
 	path = Submodules/GlamourerAPI
 	url = https://github.com/Ottermandias/Glamourer.Api.git
-[submodule "Submodules/GameDataStrings"]
-	path = Submodules/GameDataStrings
+[submodule "Submodules/Penumbra.String"]
+	path = Submodules/Penumbra.String
 	url = https://github.com/Ottermandias/Penumbra.String.git
-[submodule "Submodules/GameData"]
-	path = Submodules/GameData
+[submodule "Submodules/Penumbra.GameData"]
+	path = Submodules/Penumbra.GameData
 	url = https://github.com/Ottermandias/Penumbra.GameData.git
 [submodule "Submodules/BrioAPI"]
 	path = Submodules/BrioAPI

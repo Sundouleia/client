@@ -90,21 +90,21 @@ public sealed class IpcCallerCustomize : IIpcCaller
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(profileStr));
     }
 
-    public async Task<Guid> ApplyTempProfile(HandledActorDataEntry gPoseActor)
+    public async Task<Guid> ApplyTempProfile(AttachedActor entry, ushort objIdx)
     {
-        if (!APIAvailable || !gPoseActor.IsValid) return Guid.Empty;
+        if (!APIAvailable) return Guid.Empty;
 
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
-            var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(gPoseActor.Data.CPlusData));
-            if (string.IsNullOrEmpty(gPoseActor.Data.CPlusData))
+            var decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(entry.Data.CPlusData));
+            if (string.IsNullOrEmpty(entry.Data.CPlusData))
             {
-                RevertUser.InvokeFunc(gPoseActor.ObjectIndex);
+                RevertUser.InvokeFunc(objIdx);
                 return Guid.Empty;
             }
             else
             {
-                return SetTempProfile.InvokeFunc(gPoseActor.ObjectIndex, decodedScale).Item2 ?? Guid.Empty;
+                return SetTempProfile.InvokeFunc(objIdx, decodedScale).Item2 ?? Guid.Empty;
             }
         }).ConfigureAwait(false);
     }

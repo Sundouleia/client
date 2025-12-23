@@ -195,6 +195,70 @@ public class SMAFileHandler : IDisposable
     private bool IsBodyLegModel(string gp) => gp.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase)
         && (gp.Contains("/body/", StringComparison.OrdinalIgnoreCase) || gp.Contains("/legs/", StringComparison.OrdinalIgnoreCase));
 
+
+    public BaseFileDataSummary? LoadSmabFileHeader(string filePath)
+    {
+        _logger.LogInformation($"Loading SMAB File Header from Disk: {filePath}");
+        try
+        {
+            using var fs = File.OpenRead(filePath);
+            using var lz4 = new LZ4Stream(fs, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
+            using var br = new BinaryReader(lz4);
+            var fileSummary = BaseFileDataSummary.FromHeader(br, filePath);
+            _logger.LogInformation($"SMAB FileDataSummary created. (Version: {fileSummary.Version})");
+            return fileSummary;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error loading SMAB Header: {ex}");
+            return null;
+        }
+    }
+
+    // Iterate through a file data summary to get the final modded dictionary.
+    // We should probably revise this later for some other method as cannot ensure proper extraction, but whatever.
+    public Dictionary<string, string> GetModdedDict(FileDataSummary summary)
+    {
+        var moddedPathDict = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Iterate first over each modded file.
+        foreach (var fileData in summary.Files)
+        {
+            // Get the file extension.
+            var fileExt = fileData.GamePaths.First().Split(".")[^1];
+            var hash = fileData.FileHash;
+            var fileLength = fileData.Length;
+            // If the file alreadyGetFileCacheByHash exists in the sundouleia cache, remap the link to that instead.
+            if (_fileCache.GetFileCacheByHash(hash) is { } fileEntity)
+            {
+                // Set all the fileData's gamepaths to this resolved filepath instead.
+                foreach (var gamepath in fileData.GamePaths)
+                {
+                    moddedPathDict[gamepath] = fileEntity.ResolvedFilepath;
+                    _logger.LogTrace($"{gamepath} => {fileEntity.ResolvedFilepath} [{hash}] (sundouleia cache)");
+                }
+            }
+            else
+            {
+                // Create a file in the SMACache.
+                var fileName = _smaFileCache.GetCacheFilePath(hash, fileExt);
+                foreach (var gamepath in fileData.GamePaths)
+                {
+                    moddedPathDict[gamepath] = fileName;
+                    _logger.LogTrace($"{gamepath} => {fileName} [{fileData.FileHash}] (SMA cache)");
+                }
+            }
+        }
+
+        // Allow FileSwaps to take priority here.
+        foreach (var entry in summary.FileSwaps.SelectMany(k => k.GamePaths, (k, p) => new KeyValuePair<string, string>(p, k.FileSwapPath)))
+        {
+            moddedPathDict[entry.Key] = entry.Value;
+            _logger.LogTrace($"[Swap] {entry.Key} => {entry.Value}");
+        }
+
+        return moddedPathDict;
+    }
+
     // Attempt to load a SMABase file from disk.
     public ModularActorBase? LoadSmabFile(string filePath)
     {

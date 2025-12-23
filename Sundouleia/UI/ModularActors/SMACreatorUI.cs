@@ -5,6 +5,7 @@ using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem;
@@ -25,6 +26,8 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
 {
     private readonly MainConfig _config;
     private readonly SMAFileHandler _fileHandler;
+    private readonly SMAFileManager _manager;
+    private readonly UiFileDialogService _fileDialog;
     private readonly TutorialService _guides;
 
     private CancellationTokenSource _exportCTS = new();
@@ -35,11 +38,14 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
     private OwnedObject _objToExport = OwnedObject.Player;
 
     public SMACreatorUI(ILogger<SMACreatorUI> logger, SundouleiaMediator mediator,
-        MainConfig config, SMAFileHandler fileHandler, TutorialService guides) 
+        MainConfig config, SMAFileHandler smaHandler, SMAFileManager smaManager,
+        UiFileDialogService fileDialog, TutorialService guides) 
         : base(logger, mediator, "Modular Actor Creator###SundouleiaSMACreator")
     {
         _config = config;
-        _fileHandler = fileHandler;
+        _fileHandler = smaHandler;
+        _manager = smaManager;
+        _fileDialog = fileDialog;
         _guides = guides;
 
         this.PinningClickthroughFalse();
@@ -77,7 +83,14 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
 
         // Maybe update with savefile later when things are not centralized for testing but idk.
         if (CkGui.IconTextButton(FontAwesomeIcon.FileExport, "Export ActorBase (SMAB)", disabled: IsExporting))
-            ExportSMAB();
+        {
+            _fileDialog.SaveFile("Export Sundouleia Modular Actor Base (SMAB)", "Actor Base{.smab}", _fileName, ".smab", (success, path) =>
+            {
+                if (!success)
+                    return;
+                ExportSMAB(path);
+            }, Directory.Exists(_config.Current.SMAExportFolder) ? _config.Current.SMAExportFolder : null, true);
+        }
 
         if (IsExporting)
         {
@@ -92,25 +105,28 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
             "\nYour chest and leg models will NOT be included for privacy reasons.", ImGuiColors.DalamudYellow);
     }
 
-    private void ExportSMAB()
+    private void ExportSMAB(string filePath)
     {
         if (IsExporting)
             return;
-        if (!_config.HasValidExportFolderSetup())
-        {
-            _logger.LogWarning("Cannot export with an invalid export folder!");
-            return;
-        }
-
-        var filePath = Path.Combine(_config.Current.SMAExportFolder, _fileName);
-        
+       
         // Perform the export to this location.
         _exportCTS = _exportCTS.SafeCancelRecreate();
         _exportTask = Task.Run(async () =>
         {
             _logger.LogInformation($"Starting export of ActorBase to {filePath}.");
-            var lastSavedData = await _fileHandler.SaveSMABFile(_objToExport, filePath, _fileName, _fileDesc, _exportCTS.Token);
+            // Process the file save.
+            if (await _fileHandler.SaveSMABFile(_objToExport, filePath, _fileName, _fileDesc, _exportCTS.Token) is not { } summary)
+            {
+                _logger.LogWarning($"Failed to export ActorBase to {filePath}.");
+                return;
+            }
+
             _logger.LogInformation($"Completed export of ActorBase to {filePath}.");
+            // Construct for saving, the modular actor owned metadata for out file.
+            // This includes things like if it is in protected mode, the file key, or password.
+            _manager.AddSavedBase(summary, filePath, string.Empty);
+            _logger.LogInformation($"Registered exported ActorBase to owned files: {filePath}.");
         }, _exportCTS.Token);
     }
 }

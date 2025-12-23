@@ -575,11 +575,11 @@
       "penumbra.gamedata": {
         "type": "Project",
         "dependencies": {
-          "C:\\Users\\buzzm\\OneDrive\\Desktop\\XIV Modding\\.Dalamud Plugins\\Sundouleia\\client\\Submodules\\Penumbra.Api\\Penumbra.Api.csproj": "[1.0.0, )",
-          "C:\\Users\\buzzm\\OneDrive\\Desktop\\XIV Modding\\.Dalamud Plugins\\Sundouleia\\client\\Submodules\\Penumbra.String\\Penumbra.String.csproj": "[1.0.0, )",
           "FlatSharp.Compiler": "[7.9.0, )",
           "FlatSharp.Runtime": "[7.9.0, )",
-          "OtterGui": "[1.0.0, )"
+          "OtterGui": "[1.0.0, )",
+          "Penumbra.Api": "[5.13.0, )",
+          "Penumbra.String": "[1.0.7, )"
         }
       },
       "penumbra.string": {

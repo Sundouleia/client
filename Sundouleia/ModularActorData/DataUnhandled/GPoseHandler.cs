@@ -1,3 +1,4 @@
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.Interop;
@@ -7,13 +8,26 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using System.Diagnostics.CodeAnalysis;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModularActor;
 
-/// <summary>
-///     Handles the lifetime of imported modular actor data 
-///     and their application state on GPose actors.
-/// </summary> 
+
+// We need to know the name in order to revert some cases properly. (Additionally profiles associate per-player)
+public sealed record AttachedActor(string Name, ModularActorData Data)
+{
+    public Guid CollectionId { get; set; } = Guid.Empty;
+    public Guid? CplusProfile { get; set; } = null;
+    public string CollectionName => $"SMA_{Data.Base.ID}";
+    public string TempModName => $"SMA_Mod_{Data.Base.ID}";
+}
+
+// ---- GPOSE HANDLER ----
+// RESPONSIBILITIES:
+//  - Handle the logic for binding certain actors to SMAD's
+//  - Manage the assignment and removal of IPC associations
+//  - Monitor actor removal and GPOSE lifetime.
+//  - Handle actor updates when the associated SMAD is updated.
 public class GPoseHandler : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _mainConfig;
@@ -22,8 +36,7 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
     private readonly IpcManager _ipc;
     private readonly CharaObjectWatcher _watcher;
 
-    // Data that is currently applied to a character in GPose, keyed by their pointer.
-    private readonly Dictionary<nint, HandledActorDataEntry> _handledActors = new();
+    private Dictionary<nint, AttachedActor> _attachedActors = new();
 
     public GPoseHandler(ILogger<GPoseHandler> logger, SundouleiaMediator mediator,
         MainConfig mainConfig, FileCacheManager cacheManager, SMAFileCacheManager smaFileCache, 
@@ -38,126 +51,151 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<GPoseObjectDestroyed>(this, _ =>
         {
-            Logger.LogInformation($"Handled Addresses at time of GPoseObjectDestroyed: " +
-                $"{string.Join("\n", _handledActors.Select(kvp => $"{kvp.Key:X} ({kvp.Value.DisplayName})"))}");
+            Logger.LogInformation($"Handled @ GPoseObjectDestroyed: " +
+                $"{string.Join("\n", _attachedActors.Select(kvp => $"{kvp.Value.Name} ({kvp.Key:X}) [SMAD: {kvp.Value.Data.Name}]"))}");
 
-            if (_handledActors.Remove(_.Address, out var entry))
-            {
-                Logger.LogInformation($"GPoseObject at address {_.Address:X} destroyed, removing {entry.DisplayName}.");
-                RevertInternal(entry).ConfigureAwait(false);
-            }
-            else
-            {
-                Logger.LogInformation($"GPoseObject at address {_.Address:X} destroyed, no handled actor found.");
-            }
+            // If the gpose object was handled, revert it.
+            if (_attachedActors.Remove(_.Address, out var attached))
+                DetachActorInternal(_.Address, attached).ConfigureAwait(false);
         });
     }
 
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+    }
+
+    public IReadOnlyDictionary<nint, AttachedActor> AttachedActors => _attachedActors;
+    public unsafe bool HasGPoseTarget => GPoseTarget != null;
     public unsafe GameObject* GPoseTarget
     {
         get => TargetSystem.Instance()->GPoseTarget;
         set => TargetSystem.Instance()->GPoseTarget = value;
     }
+    public unsafe nint GPoseTargetAddress => (nint)GPoseTarget;
 
-    public unsafe bool HasGPoseTarget => GPoseTarget != null;
-    public unsafe int GPoseTargetIdx => !HasGPoseTarget ? -1 : GPoseTarget->ObjectIndex;
+    private unsafe GameObject GetSnapshot(nint objAddress) => *(GameObject*)objAddress;
 
-    public IReadOnlyDictionary<nint, HandledActorDataEntry> HandledGPoseActors => _handledActors;
-
-    protected override void Dispose(bool disposing)
+    public async Task<AttachedActor?> AttachActor(ModularActorData data, nint address)
     {
-        base.Dispose(disposing);
-        RemoveAll();
-    }
+        // Fail if not in gpose.
+        if (!GameMain.IsInGPose())
+            return null;
 
-    internal async Task<bool> RemoveActor(HandledActorDataEntry toRemove)
-    {
-        if (!_handledActors.Remove(toRemove.ObjectAddress, out var removed))
+        // If the actor is already attached to a profile, be sure to revert that state first.
+        if (_attachedActors.Remove(address, out var existing))
         {
-            Logger.LogWarning($"Tried to remove actor {toRemove.DisplayName} that was not handled.");
-            return false;
+            Logger.LogInformation($"Actor at {address:X} is already attached to SMAD {existing.Data.Name}, reverting first.");
+            await DetachActorInternal(address, existing).ConfigureAwait(false);
         }
-        // Revert the actor.
-        await RevertInternal(removed).ConfigureAwait(false);
-        return true;
+
+        // Create a new AttachedActor entry.
+        var gameObj = GetSnapshot(address);
+
+        AttachedActor entry = new(gameObj.NameString, data);
+        entry.CollectionId = await _ipc.Penumbra.NewGPoseCollection(entry).ConfigureAwait(false);
+        await _ipc.Penumbra.AssignToGPoseCollection(entry, gameObj.ObjectIndex).ConfigureAwait(false);
+
+        return _attachedActors.TryAdd(address, entry) ? entry : null;
     }
 
-    // Do a revert by name or whatever idk.
-    public async Task<bool> RemoveActor(string actorName)
+    public async Task ApplyDataToActor(nint actorAddress)
     {
-        if (_handledActors.Values.FirstOrDefault(e => e.ActorName == actorName) is not { } entry)
-            return false;
+        if (actorAddress == nint.Zero)
+            return;
 
-        await RemoveActor(entry).ConfigureAwait(false);
-        return true;
+        if (!_attachedActors.TryGetValue(actorAddress, out var entry))
+        {
+            Logger.LogWarning($"Tried to apply SMA Data to actor at {actorAddress:X} that is not attached.");
+            return;
+        }
+
+        var gameObj = GetSnapshot(actorAddress);
+        await ApplyDataInternal(actorAddress, gameObj.ObjectIndex, entry).ConfigureAwait(false);
     }
 
-    private void RemoveAll()
+    private async Task ApplyDataInternal(nint actorAddress, ushort objIdx, AttachedActor entry)
     {
-        Logger.LogInformation("Removing all handled GPose actors.");
-        foreach (var (handledAddr, handledActor) in _handledActors)
-            RemoveActor(handledActor).ConfigureAwait(false);
+        // If it was correctly set, assign the actor.
+        if (entry.CollectionId != Guid.Empty)
+        {
+            Logger.LogDebug($"SMA ({entry.Data.Name}) had assigned collection {entry.CollectionId}.");
+            await _ipc.Penumbra.UpdateGPoseCollection(entry).ConfigureAwait(false);
+        }
+
+        Logger.LogDebug($"SMA ({entry.Data.Name}) Applying Glamourer Data.");
+        await _ipc.Glamourer.ApplyStateByPtr(actorAddress, entry.Data.FinalGlamourData).ConfigureAwait(false);
+
+        Logger.LogDebug($"SMA ({entry.Data.Name}) Applying CustomizePlus Data.");
+        if (!string.IsNullOrEmpty(entry.Data.CPlusData))
+            entry.CplusProfile = await _ipc.CustomizePlus.ApplyTempProfile(entry, objIdx).ConfigureAwait(false);
+
+        // Finally Redraw the actor.
+        Logger.LogInformation($"SMA ({entry.Data.Name}) Finished application, redrawing actor.");
+        _ipc.Penumbra.RedrawGameObject(objIdx);
     }
 
-    private async Task RevertInternal(HandledActorDataEntry entry)
+    public async Task DetachActor(nint address)
+    {
+        if (_attachedActors.Remove(address, out var attachedData))
+            await DetachActorInternal(address, attachedData).ConfigureAwait(false);
+    }
+
+    // Perform a full revert on the actor and remove their association from the handled SMAD.
+    private async Task DetachActorInternal(nint actorAddress, AttachedActor attached)
     {
         // Revert the glamourer.
-        Logger.LogInformation($"Reverting Glamourer for actor {entry.DisplayName}.");
-        await _ipc.Glamourer.ReleaseByName(entry.ActorName).ConfigureAwait(false);
+        Logger.LogInformation($"Reverting Glamourer for actor {attached.Name}.");
+        await _ipc.Glamourer.ReleaseByName(attached.Name).ConfigureAwait(false);
         // If CPlus is valid, revert it.
-        if (entry.CPlusId != null)
+        if (attached.CplusProfile != null)
         {
-            Logger.LogInformation($"Reverting CustomizePlus for actor {entry.DisplayName}.");
-            await _ipc.CustomizePlus.RevertTempProfile(entry.CPlusId).ConfigureAwait(false);
+            Logger.LogInformation($"Reverting CustomizePlus for actor {attached.Name}.");
+            await _ipc.CustomizePlus.RevertTempProfile(attached.CplusProfile).ConfigureAwait(false);
         }
+        // Remove their association to the collection.
 
         // Bomb the temporary collection.
-        Logger.LogInformation($"Removing Sundesmo collection for actor {entry.DisplayName}.");
-        await _ipc.Penumbra.RemoveSundesmoCollection(entry.CollectionId).ConfigureAwait(false);
-        // Redraw the actor.
-        if (entry.IsValid)
-            unsafe { _ipc.Penumbra.RedrawGameObject(entry.GPoseObject->ObjectIndex); }
+        Logger.LogInformation($"Removing Sundesmo collection for actor {attached.Name}.");
+        await _ipc.Penumbra.RemoveGPoseCollection(attached).ConfigureAwait(false);
+        unsafe
+        {
+            // Cast the address to a game object, and if it still valid, redraw the object.
+            var actorObj = (GameObject*)actorAddress;
+            if (actorObj != null)
+                _ipc.Penumbra.RedrawGameObject(actorObj->ObjectIndex);
+        }
     }
 
     // Might want to move this location or something?
     public async Task SpawnAndApplySMAData(ModularActorData data)
     {
         if (!IpcCallerBrio.APIAvailable)
-        {
-            Logger.LogWarning("Brio API is not available, cannot spawn SMA Actor.");
             return;
-        }
 
-        Logger.LogInformation($"Spawning SMA Actor for BaseId: {data.BaseId}.");
-        if (_ipc.Brio.SpawnBrioActor() is not { } newActor)
-        {
-            Logger.LogError("Failed to spawn SMA Actor via Brio.");
+        Logger.LogInformation($"Spawning SMA Actor for BaseId: {data.Base.ID}.");
+        if (await _ipc.Brio.Spawn().ConfigureAwait(false) is not { } newActor)
             return;
-        }
 
-        HandledActorDataEntry? entry = null;
         try
         {
-            unsafe { entry = new(newActor.Name.TextValue, (GameObject*)newActor.Address, data); }
-
-            if (entry is null)
-                throw new InvalidOperationException("Failed to create Entry for GPose Target.");
-
-            _handledActors.TryAdd(entry.ObjectAddress, entry);
-
             // Now wait for the actor to be fully loaded.
             Logger.LogInformation($"Waiting for spawned Actor: {newActor.Name.TextValue} to be fully loaded.");
-            await _watcher.WaitForFullyLoadedGameObject(entry.ObjectAddress).ConfigureAwait(false);
+            await _watcher.WaitForFullyLoadedGameObject(newActor.Address).ConfigureAwait(false);
 
-            // Perform the assignment of application.
+            // Assign the entry to the data.
+            if (await AttachActor(data, newActor.Address).ConfigureAwait(false) is not { } entry)
+                throw new Exception("Failed to attach object to SMAD!");
+
+            // Force an initial application of the data.
             Logger.LogInformation($"Applying SMA Data to spawned Actor: {newActor.Name.TextValue}.");
-            await ApplyDataInternal(entry).ConfigureAwait(false);
+            await ApplyDataToActor(newActor.Address).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to apply SMA Data to GPose Target.");
-            if (entry is not null)
-                await RemoveActor(entry).ConfigureAwait(false);
+            Logger.LogError(ex, "Failed to apply SMA Data to Spawned Actor.");
+            if (newActor != null && newActor.Address != nint.Zero)
+                _ = Task.Run(() => DetachActor(newActor.Address));
         }
     }
 
@@ -166,53 +204,25 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
         if (!HasGPoseTarget)
             return;
 
-        HandledActorDataEntry? entry = null;
+        AttachedActor? entry = null;
+        nint addr = GPoseTargetAddress;
+
         try
         {
-            unsafe { entry = new(GPoseTarget->NameString, GPoseTarget, data); }
-
+            // Assign the entry to the data.
+            entry = await AttachActor(data, addr).ConfigureAwait(false);
             if (entry is null)
-                throw new InvalidOperationException("Failed to create HandledActorDataEntry for GPose Target.");
+                throw new Exception("Failed to attach object to SMAD!");
 
-            _handledActors.TryAdd(entry.ObjectAddress, entry);
-            // Perform the assignment of application.
-            Logger.LogInformation($"Applying SMA Data to Actor: {entry.ActorName}.");
-            await ApplyDataInternal(entry).ConfigureAwait(false);
+            // Force an initial application of the data.
+            Logger.LogInformation($"Applying SMA Data to spawned Actor: {entry.Name}.");
+            await ApplyDataToActor(addr).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to apply SMA Data to GPose Target.");
-            if (entry is not null)
-                await RemoveActor(entry).ConfigureAwait(false);
+            if (entry != null && addr != nint.Zero)
+                _ = Task.Run(() => DetachActor(addr));
         }
-    }
-
-    // This does not work inside of a UITask and must be assigned to one if you intend to block operations.
-    private async Task ApplyDataInternal(HandledActorDataEntry entry)
-    {
-        // If there was a previous application, 
-        if (entry.CollectionId == Guid.Empty)
-        {
-            Logger.LogDebug($"SMA ({entry.Data.BaseId}) Had no collection. Assigning!");
-            entry.CollectionId = await _ipc.Penumbra.NewSMACollection(entry).ConfigureAwait(false);
-        }
-        // If it was correctly set, assign the actor.
-        if (entry.CollectionId != Guid.Empty)
-        {
-            Logger.LogDebug($"SMA ({entry.Data.BaseId}) Assigned collection {entry.CollectionId}.");
-            await _ipc.Penumbra.AssignSundesmoCollection(entry.CollectionId, entry.ObjectIndex).ConfigureAwait(false);
-            await _ipc.Penumbra.ReloadSMABase(entry).ConfigureAwait(false);
-        }
-
-        Logger.LogDebug($"SMA ({entry.Data.BaseId}) Applying Glamourer Data.");
-        await _ipc.Glamourer.ApplyStateByPtr(entry.ObjectAddress, entry.Data.FinalGlamourData).ConfigureAwait(false);
-
-        Logger.LogDebug($"SMA ({entry.Data.BaseId}) Applying CustomizePlus Data.");
-        if (!string.IsNullOrEmpty(entry.Data.CPlusData))
-            entry.CPlusId = await _ipc.CustomizePlus.ApplyTempProfile(entry).ConfigureAwait(false);
-
-        // Finally Redraw the actor.
-        Logger.LogInformation($"SMA ({entry.Data.BaseId}) Finished application, redrawing actor.");
-        _ipc.Penumbra.RedrawGameObject(entry.ObjectIndex);
     }
 }

@@ -138,6 +138,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<GroupsDrawSystem>()
         .AddSingleton<RadarDrawSystem>()
         .AddSingleton<RequestsDrawSystem>()
+        .AddSingleton<SmaDrawSystem>()
         .AddSingleton<WhitelistDrawSystem>()
 
         // Modular Actor Data

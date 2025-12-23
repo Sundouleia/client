@@ -26,10 +26,136 @@ public abstract class FileDataSummary
     {
         writer.Write(Encoding.ASCII.GetBytes(GetMagic()));
         writer.Write(GetVersion());
-        var headerData = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(this));
+        var headerData = ToByteArray();
         writer.Write(headerData.Length);
         writer.Write(headerData);
     }
+
+    public byte[] ToByteArray()
+        => Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(this));
+}
+
+// Everything collected together.
+public class SmadFileDataSummary
+{
+    internal static readonly string Magic = "SMAD";
+    internal static readonly byte CurrentVersion = 1;
+
+    public byte Version { get; init; }
+    public Guid FileId { get; init; }
+    public OwnedObject ActorKind { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; } = string.Empty;
+
+    public BaseFileDataSummary Base { get; set; } = new();
+    public List<OutfitFileDataSummary> Outfits { get; set; } = [];
+    public List<ItemFileDataSummary> Items { get; set; } = [];
+
+    public Guid SelectedOutfit { get; set; } = Guid.Empty;
+    public List<Guid> SelectedItems { get; set; } = [];
+
+    public void WriteHeader(BinaryWriter writer)
+    {
+        // write the magic & version.
+        writer.Write(Encoding.ASCII.GetBytes(Magic));
+        writer.Write(CurrentVersion);
+
+        // write global ActorKind
+        writer.Write((byte)ActorKind);
+
+        // write Base payload
+        var baseBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Base));
+        writer.Write(baseBytes.Length);
+        writer.Write(baseBytes);
+
+        // write Outfits payload
+        writer.Write(Outfits.Count);
+        foreach (var outfit in Outfits)
+        {
+            var outfitBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(outfit));
+            writer.Write(outfitBytes.Length);
+            writer.Write(outfitBytes);
+        }
+
+        // write Items payload
+        writer.Write(Items.Count);
+        foreach (var item in Items)
+        {
+            var itemBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(item));
+            writer.Write(itemBytes.Length);
+            writer.Write(itemBytes);
+        }
+
+        // write pre-defined selections
+        writer.Write(SelectedOutfit.ToByteArray());
+        writer.Write(SelectedItems.Count);
+        foreach (var guid in SelectedItems)
+            writer.Write(guid.ToByteArray());
+    }
+
+    public static SmadFileDataSummary FromHeader(BinaryReader reader, string filePath)
+    {
+        var magic = new string(reader.ReadChars(Magic.Length));
+        if (!string.Equals(magic, Magic, StringComparison.Ordinal))
+            throw new InvalidDataException($"Bad Magic! Expected {Magic}, got {magic}");
+
+        var version = reader.ReadByte();
+        // If versions are different, return the loaded migration data.
+        if (version != CurrentVersion)
+            return FromOldHeader(reader, filePath, version);
+
+        // Otherwise, it is on the right version, so read in expected data.
+        var actorKind = (OwnedObject)reader.ReadByte();
+
+        // Read Base payload
+        var baseLen = reader.ReadInt32();
+        var baseSummary = JsonConvert.DeserializeObject<BaseFileDataSummary>(Encoding.UTF8.GetString(reader.ReadBytes(baseLen)))!;
+
+        // Read Outfits payload
+        var outfitCount = reader.ReadInt32();
+        var outfits = new List<OutfitFileDataSummary>();
+        for (int i = 0; i < outfitCount; i++)
+        {
+            var outfitLen = reader.ReadInt32();
+            var outfitSummary = JsonConvert.DeserializeObject<OutfitFileDataSummary>(Encoding.UTF8.GetString(reader.ReadBytes(outfitLen)))!;
+            outfits.Add(outfitSummary);
+        }
+
+        // Read Items payload
+        var itemCount = reader.ReadInt32();
+        var items = new List<ItemFileDataSummary>();
+        for (int i = 0; i < itemCount; i++)
+        {
+            var itemLen = reader.ReadInt32();
+            var itemSummary = JsonConvert.DeserializeObject<ItemFileDataSummary>(Encoding.UTF8.GetString(reader.ReadBytes(itemLen)))!;
+            items.Add(itemSummary);
+        }
+
+        // Read pre-defined selections
+        var selectedOutfit = new Guid(reader.ReadBytes(16));
+        var selectedItemCount = reader.ReadInt32();
+        var selectedItems = new List<Guid>();
+        for (int i = 0; i < selectedItemCount; i++)
+        {
+            var itemGuid = new Guid(reader.ReadBytes(16));
+            selectedItems.Add(itemGuid);
+        }
+
+        // Ret the complete summary.
+        return new SmadFileDataSummary
+        {
+            Version = version,
+            ActorKind = actorKind,
+            Base = baseSummary,
+            Outfits = outfits,
+            Items = items,
+            SelectedOutfit = selectedOutfit,
+            SelectedItems = selectedItems
+        };
+    }
+
+    public static SmadFileDataSummary FromOldHeader(BinaryReader reader, string filePath, byte readVersion)
+        => throw new NotImplementedException();
 }
 
 public class BaseFileDataSummary : FileDataSummary
@@ -60,6 +186,14 @@ public class BaseFileDataSummary : FileDataSummary
 
     private static BaseFileDataSummary FromOldHeader(BinaryReader reader, string filePath, byte readVersion)
         => throw new NotImplementedException();
+
+    public static void MoveReaderToContents(BinaryReader reader)
+    {
+        reader.ReadChars(Magic.Length); // Magic
+        reader.ReadByte(); // Version
+        var summaryLen = reader.ReadInt32();
+        _ = reader.ReadBytes(summaryLen);
+    }
 }
 
 public class OutfitFileDataSummary : FileDataSummary
@@ -125,12 +259,92 @@ public class ItemFileDataSummary : FileDataSummary
         => throw new NotImplementedException();
 }
 
+public class ModularActorData
+{
+    public Guid FileId { get; init; }
+    public OwnedObject ActorKind { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public ModularActorBase Base { get; private set; }
+
+    // Stored fileData imported by each actor kind.
+    private Dictionary<Guid, ModularActorOutfit> _importedOutfits = new();
+    private Dictionary<Guid, ModularActorItem>   _importedItems = new();
+
+    // The outfit selected to apply to this base, from the ones currently selected.
+    public ModularActorOutfit?     _currentOutfit;
+    public List<ModularActorItem>  _currentItems = new();
+
+    public ModularActorData(ModularActorBase actorBase)
+    {
+        FileId = Guid.NewGuid();
+        ActorKind = actorBase.ActorKind;
+        Name = $"[I] {actorBase.Name}";
+        Description = $"[I] {actorBase.Description}";
+        Base = actorBase;
+    }
+
+    public ModularActorData(SmadFileDataSummary summary)
+    {
+        FileId = summary.FileId;
+        ActorKind = summary.ActorKind;
+        Name = summary.Name;
+        Description = summary.Description;
+        Base = new ModularActorBase(summary.Base);
+        // Link back to this data.
+        Base.Parent = this;
+        // Load in all outfits.
+        foreach (var outfitSummary in summary.Outfits)
+            _importedOutfits.TryAdd(outfitSummary.FileId, new ModularActorOutfit(outfitSummary));
+
+        // Load in all items.
+        foreach (var itemSummary in summary.Items)
+            _importedItems.TryAdd(itemSummary.FileId, new ModularActorItem(itemSummary));
+
+        // Set the current outfit if it exists.
+        if (summary.SelectedOutfit != Guid.Empty && _importedOutfits.TryGetValue(summary.SelectedOutfit, out var selectedOutfit))
+            CurrentOutfit = selectedOutfit;
+        // Set the current items if they exist.
+        foreach (var itemId in summary.SelectedItems)
+        {
+            if (_importedItems.TryGetValue(itemId, out var selectedItem))
+                CurrentItems.Add(selectedItem);
+        }
+    }
+
+    public ModularActorOutfit? CurrentOutfit { get; private set; } = null;
+    public List<ModularActorItem> CurrentItems { get; private set; } = [];
+
+    // Needs some finalized composite data. (such as composite glamourer settings ext)
+    public Dictionary<string, string> FinalModdedDict => Base.ModdedDict; // Not final.
+
+    public string CompositeManips => Base.ModManipString;
+    public JObject FinalGlamourData => Base.GlamourState; // Not final.
+    public string CPlusData = string.Empty;
+
+    public void Recalculate()
+    {
+        // Run a recalculation over the current base, selected outfit, and items to get the final modded dict and glamour data.
+    }
+}
+
+public sealed class OwnedModularActorData : ModularActorData
+{
+    public SMABaseFileMeta FileMeta { get; set; }
+    public OwnedModularActorData(SMABaseFileMeta fileMeta, SmadFileDataSummary summary)
+        : base(summary)
+    {
+        FileMeta = fileMeta;
+    }
+}
+
 // Make Manager Interfaces for abstraction between GPose and file mode.
 public class ModularActorBase
 {
     // maybe reference back to the manager here to perform internal actions or something.
     public ModularActorData Parent { get; internal set; } // Every base is connected to a SMAD container.
     public Guid ID { get; }
+    public OwnedObject ActorKind { get; }
     public string Name { get; }
     public string Description { get; }
 
@@ -144,6 +358,7 @@ public class ModularActorBase
     public ModularActorBase(BaseFileDataSummary summary)
     {
         ID = summary.FileId;
+        ActorKind = summary.ActorKind;
         Name = summary.Name;
         Description = summary.Description;
         GlamourState = summary.GlamourState;
@@ -156,11 +371,9 @@ public class ModularActorBase
     {
         ModdedDict = modDict;
     }
-
-    public bool IsValid => ID == Guid.Empty;
 }
 
-internal sealed class OwnedModularActorBase : ModularActorBase
+public sealed class OwnedModularActorBase : ModularActorBase
 {
     public SMABaseFileMeta FileMeta { get; set; }
     public OwnedModularActorBase(SMABaseFileMeta fileMeta, BaseFileDataSummary summary)
@@ -241,7 +454,7 @@ public class ModularActorOutfit : IDisposable // Does not reference to its base,
     }
 }
 
-internal sealed class OwnedModularActorOutfit : ModularActorOutfit
+public sealed class OwnedModularActorOutfit : ModularActorOutfit
 {
     public SMAFileMeta FileMeta { get; set; }
     public OwnedModularActorOutfit(SMAFileMeta fileMeta, OutfitFileDataSummary summary)

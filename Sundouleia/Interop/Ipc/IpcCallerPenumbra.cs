@@ -273,43 +273,6 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
     }
 
     /// <summary>
-    ///     Assign a SundouleiaModularActorData entry with a new temporary collection.
-    /// </summary>
-    public async Task<Guid> NewSMACollection(HandledActorDataEntry entry)
-    {
-        if (!APIAvailable)
-            return Guid.Empty;
-        
-        return await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            if (CreateTempCollection.Invoke(SUNDOULEIA_ID, entry.CollectionName, out Guid id) is { } ret && ret is PenumbraApiEc.Success)
-            {
-                Logger.LogDebug($"New Temp {{{entry.CollectionName}}} -> ID: {id}", LoggerType.IpcPenumbra);
-                return id;
-            }
-            return Guid.Empty;
-        }).ConfigureAwait(false);
-    }
-
-    // We could do this all at once, or we could handle it with the base mod on 0, outfit on 1, accessories on 2.
-    // This would allow us to apply distinct meta-manips, but at the moment I dont think it is that easy to overlap them?
-    public async Task ReloadSMABase(HandledActorDataEntry entry)
-    {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            // remove the existing temporary mod
-            var retRemove = RemoveTempMod.Invoke(entry.GetTempModBaseName(), entry.CollectionId, 0);
-            Logger.LogTrace($"SMA-Base TempMod removed for Collection: {entry.CollectionId}, Success: [{retRemove}]", LoggerType.IpcPenumbra);
-
-            // add the new temporary mod with the new paths.
-            var retAdded = AddTempMod.Invoke(entry.GetTempModBaseName(), entry.CollectionId, entry.Data.FinalModdedDict, entry.Data.CompositeManips, 0);
-            Logger.LogTrace($"Re-Adding SMA-Base TempMod for Collection: {entry.CollectionId}, Success: [{retAdded}]", LoggerType.IpcPenumbra);
-        }).ConfigureAwait(false);
-    }
-
-
-    /// <summary>
     ///     Assigns a Temporary Collection to a visible Sundesmo that we identify
     ///     with their associated game object index.
     /// </summary>
@@ -371,5 +334,61 @@ public class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
             var retAdded = AddTempMod.Invoke(SUNDOULEIA_META_MANIP_NAME, collection, [], manipulationDataString, 0);
             Logger.LogTrace($"Manipulation Data updated for Sundesmo Collection {{{collection}}} [RetCode: {retAdded}]", LoggerType.IpcPenumbra);
         }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Attach a loaded SMAD entry to a temporary collection.
+    /// </summary>
+    public async Task<Guid> NewGPoseCollection(AttachedActor attached)
+    {
+        if (!APIAvailable)
+            return Guid.Empty;
+
+        return await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            if (CreateTempCollection.Invoke(SUNDOULEIA_ID, attached.CollectionName, out Guid id) is { } ret && ret is PenumbraApiEc.Success)
+            {
+                Logger.LogDebug($"New Temp {{{attached.CollectionName}}} -> ID: {id}", LoggerType.IpcPenumbra);
+                return id;
+            }
+            return Guid.Empty;
+        }).ConfigureAwait(false);
+    }
+
+    public async Task AssignToGPoseCollection(AttachedActor entry, int actorIdx)
+    {
+        if (!APIAvailable) return;
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            var ret = AssignTempCollection.Invoke(entry.CollectionId, actorIdx, true);
+            Logger.LogTrace($"Assigning User Collection to {Svc.Objects[actorIdx]?.Name ?? "UNK"}, Success: [{ret}] ({entry.CollectionId})", LoggerType.IpcPenumbra);
+            return ret;
+        }).ConfigureAwait(false);
+    }
+
+    // We could do this all at once, or we could handle it with the base mod on 0, outfit on 1, accessories on 2.
+    // This would allow us to apply distinct meta-manips, but at the moment I dont think it is that easy to overlap them?
+    public async Task UpdateGPoseCollection(AttachedActor entry)
+    {
+        if (!APIAvailable) return;
+        await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            // remove the existing temporary mod
+            var retRemove = RemoveTempMod.Invoke(entry.TempModName, entry.CollectionId, 0);
+            Logger.LogTrace($"SMA-Base TempMod removed for Collection: {entry.CollectionId}, Success: [{retRemove}]", LoggerType.IpcPenumbra);
+
+            // add the new temporary mod with the new paths.
+            var retAdded = AddTempMod.Invoke(entry.TempModName, entry.CollectionId, entry.Data.FinalModdedDict, entry.Data.CompositeManips, 0);
+            Logger.LogTrace($"Re-Adding SMA-Base TempMod for Collection: {entry.CollectionId}, Success: [{retAdded}]", LoggerType.IpcPenumbra);
+            Logger.LogDebug($"Added TempMod contained {entry.Data.FinalModdedDict.Count} paths.", LoggerType.IpcPenumbra);
+        }).ConfigureAwait(false);
+    }
+
+    public async Task RemoveGPoseCollection(AttachedActor entry)
+    {
+        if (!APIAvailable) return;
+        Logger.LogDebug($"Removing Sundesmo Collection {{{entry.CollectionId}}}", LoggerType.IpcPenumbra);
+        var ret = await Svc.Framework.RunOnFrameworkThread(() => DeleteTempCollection.Invoke(entry.CollectionId)).ConfigureAwait(false);
+        Logger.LogDebug($"Sundesmo Collection {{{entry.CollectionId}}} deleted. [RetCode: {ret}]", LoggerType.IpcPenumbra);
     }
 }

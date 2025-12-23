@@ -9,15 +9,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Glamourer.Api", "Submodules
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OtterGui", "Submodules\OtterGui\OtterGui.csproj", "{07069787-A3E4-4353-9589-5AD92154398D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.Api", "Submodules\PenumbraAPI\Penumbra.Api.csproj", "{B0BA2C2A-BF08-48DA-9212-618A68A0726E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.Api", "Submodules\Penumbra.API\Penumbra.Api.csproj", "{B0BA2C2A-BF08-48DA-9212-618A68A0726E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SundouleiaAPI", "Submodules\SundouleiaAPI\SundouleiaAPI.csproj", "{44859AEF-577D-477C-90E9-0DF771042BA7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sundouleia", "Sundouleia\Sundouleia.csproj", "{836FEA9C-CF99-4494-BEC3-5362EAC87280}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.String", "Submodules\GameDataStrings\Penumbra.String.csproj", "{E143D37D-EC12-469C-996F-68E17EC98D15}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.String", "Submodules\Penumbra.String\Penumbra.String.csproj", "{E143D37D-EC12-469C-996F-68E17EC98D15}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.GameData", "Submodules\GameData\Penumbra.GameData.csproj", "{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.GameData", "Submodules\Penumbra.GameData\Penumbra.GameData.csproj", "{D5CD7ED8-8B69-F64B-E3E8-7E99A915D50F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Brio.API", "Submodules\BrioAPI\Brio.API\Brio.API.csproj", "{AE87E5B4-82B5-1E7C-9514-EEE381474DA3}"
 EndProject

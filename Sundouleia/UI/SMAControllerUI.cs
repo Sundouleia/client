@@ -72,7 +72,7 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
     public override void PreOpenCheck()
     {
         // Can maybe change this later, keep for debugging.
-        IsOpen = OnTickService.InGPose;
+        IsOpen = true; // OnTickService.InGPose;
     }
 
     protected override void PreDrawInternal()
@@ -96,23 +96,23 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
             if (CkGui.IconTextButton(FAI.Crosshairs, "Target"))
                 _handler.GPoseTarget = _selectedGPoseActor;
 
-            var handledEntry = _handler.HandledGPoseActors.TryGetValue((nint)_selectedGPoseActor, out var entry) ? entry : null;
+            var handledEntry = _handler.AttachedActors.TryGetValue((nint)_selectedGPoseActor, out var entry) ? entry : null;
 
             ImGui.SameLine();
             CkGui.IconText(FAI.InfoCircle);
             var ttText = handledEntry is null
                 ? "No SMA Data applied to this Actor."
                 : $"SMA Data applied:" +
-                $"\nLabel: {handledEntry.DisplayName}" +
+                $"\nLabel: {handledEntry.Data.Name}" +
                 $"\nDescription: {handledEntry.Data.Description}" +
                 $"\nCollectionID: {handledEntry.CollectionId}" +
-                $"\nCPlusID: {handledEntry.CPlusId}" +
-                $"\nActorBase ID: {handledEntry.Data.BaseId}";
+                $"\nCPlusID: {handledEntry.CplusProfile}" +
+                $"\nActorBase ID: {handledEntry.Data.Base.ID}";
             CkGui.AttachToolTip(ttText);
 
             ImGui.SameLine();
             if (CkGui.IconTextButton(FAI.Undo, "Remove SMA Data", disabled: UiService.DisableUI || handledEntry is null))
-                _handler.RemoveActor(handledEntry!).ConfigureAwait(false);
+                _handler.DetachActor((nint)_selectedGPoseActor).ConfigureAwait(false);
             CkGui.AttachToolTip("Revert the applied SMA Data, removing them from the handled list.");
         }
 
@@ -136,6 +136,12 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
         if (CkGui.IconTextButton(FAI.Plus, "Spawn & Apply Data", disabled: UiService.DisableUI || _selectedSmad is null))
             UiService.SetUITask(async () => await _handler.SpawnAndApplySMAData(selectedActor));
         CkGui.AttachToolTip("Applies the selected ActorBase to a spawned BrioActor.");
+
+        ImGui.Separator();
+        foreach (var (path, replacement) in selectedActor.FinalModdedDict)
+        {
+            ImGui.Text($"Path: {path} -> Replacement: {replacement}");
+        }
     }
 
     private void DrawListBoxes()
@@ -185,8 +191,8 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
         using var _ = ImRaii.ListBox("##handledActors", new Vector2(125, ImGui.GetContentRegionAvail().Y));
         if (!_) return;
 
-        foreach (var (address, entry) in _handler.HandledGPoseActors)
-            ImGui.Selectable($"{entry.DisplayName}({address:X})", false);
+        foreach (var (address, entry) in _handler.AttachedActors)
+            ImGui.Selectable($"{entry.Data.Name}({address:X})", false);
     }
 
     private void DrawLoadedSmadFiles()
