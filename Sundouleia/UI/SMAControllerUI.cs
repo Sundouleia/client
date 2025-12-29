@@ -63,6 +63,10 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
                     _selectedGPoseActor = null;
             }
         });
+
+        Mediator.Subscribe<GPoseStartMessage>(this, _ => IsOpen = true);
+
+        IsOpen = true;
     }
 
     /// <summary>
@@ -72,7 +76,7 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
     public override void PreOpenCheck()
     {
         // Can maybe change this later, keep for debugging.
-        IsOpen = true; // OnTickService.InGPose;
+        //IsOpen = true; // OnTickService.InGPose;
     }
 
     protected override void PreDrawInternal()
