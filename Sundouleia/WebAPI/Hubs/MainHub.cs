@@ -1,3 +1,4 @@
+using System.Reflection;
 using CkCommons;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Hosting;
@@ -10,7 +11,6 @@ using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
-using System.Reflection;
 
 namespace Sundouleia.WebAPI;
 /// <summary>
@@ -140,7 +140,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         Logger.LogInformation("MainHub is stopping. Closing down SundouleiaHub-Main!", LoggerType.ApiCore);
         _hubHealthCTS?.Cancel();
         // Notify of unloading upon halting the plugin.
-        await Disconnect(ServerState.Disconnected, DisconnectIntent.LogoutShutdown).ConfigureAwait(false);
+        await Disconnect(ServerState.Disconnected, DisconnectIntent.Shutdown).ConfigureAwait(false);
         _hubConnectionCTS?.Cancel();
         return;
     }
@@ -172,7 +172,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     {
         Logger.LogInformation("Stopping connection on logout", LoggerType.ApiCore);
         // as we are changing characters, we should fully unload any chara's we have data on.
-        await Disconnect(ServerState.Disconnected, DisconnectIntent.LogoutShutdown).ConfigureAwait(false);
+        await Disconnect(ServerState.Disconnected, DisconnectIntent.Logout).ConfigureAwait(false);
         // switch the server state to offline.
         ServerStatus = ServerState.Offline;
     }
@@ -191,7 +191,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
 
         OnAddPair(dto => _ = Callback_AddPair(dto));
         OnRemovePair(dto => _ = Callback_RemovePair(dto));
-        OnPersistPair(dto => _ = Callback_PersistPair(dto)); 
+        OnPersistPair(dto => _ = Callback_PersistPair(dto));
         OnAddRequest(dto => _ = Callback_AddRequest(dto));
         OnRemoveRequest(dto => _ = Callback_RemoveRequest(dto));
 

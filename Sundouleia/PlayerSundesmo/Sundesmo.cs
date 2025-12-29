@@ -53,16 +53,23 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         _folderConfig = folderConfig;
         _favorites = favorites;
         _nickConfig = nicks;
+        _factory = factory;
         _watcher = watcher;
 
         UserPair = userPairInfo;
         // Create handlers for each of the objects.
-        _player = factory.Create(this);
-        _mountMinion = factory.Create(OwnedObject.MinionOrMount, this);
-        _pet = factory.Create(OwnedObject.Pet, this);
-        _companion = factory.Create(OwnedObject.Companion, this);
+        CreateObjectHandlers();
 
         _logger.LogDebug($"Creating Sundesmo for ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
+    }
+
+    private void CreateObjectHandlers()
+    {
+        _logger.LogDebug($"Creating object handlers for ({GetNickAliasOrUid()}).");
+        _player = _factory.Create(this);
+        _mountMinion = _factory.Create(OwnedObject.MinionOrMount, this);
+        _pet = _factory.Create(OwnedObject.Pet, this);
+        _companion = _factory.Create(OwnedObject.Companion, this);
     }
 
     public bool IsReloading { get; private set; } = false;
@@ -263,9 +270,21 @@ public sealed class Sundesmo : IComparable<Sundesmo>
 
     /// <summary>
     ///     Removes all applied appearance data for the sundesmo if rendered, 
-    ///     and disposes all internal data.
+    ///     and disposes all internal data. Creates fresh handlers for re-initialization.
     /// </summary>
     public void TemporarilyDisposeData()
+    {
+        PermanentlyDisposeData();
+
+        // Re-create fresh object handlers so this Sundesmo is ready for re-initialization
+        CreateObjectHandlers();
+    }
+
+    /// <summary>
+    ///     Removes all applied appearance data for the sundesmo if rendered, 
+    ///     and disposes all internal data.
+    /// </summary>
+    public void PermanentlyDisposeData()
     {
         _logger.LogDebug($"Disposing data for [{PlayerName}] ({GetNickAliasOrUid()})", LoggerType.PairManagement);
         // Cancel any existing timeout task, and then dispose of all data.

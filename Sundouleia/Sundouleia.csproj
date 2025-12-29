@@ -9,6 +9,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <Deterministic>true</Deterministic>
         <CopyLocalLockfileAssemblies>true</CopyLocalLockfileAssemblies>
         <ImplicitUsings>enable</ImplicitUsings>

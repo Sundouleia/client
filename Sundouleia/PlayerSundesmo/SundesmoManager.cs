@@ -173,6 +173,11 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     /// </summary>
     public void OnClientDisconnected(DisconnectIntent intent)
     {
+        if (intent == DisconnectIntent.Shutdown)
+        {
+            // Plugin is shutting down, skip here and let Dispose() handle cleanup
+            return;
+        }
         Logger.LogInformation("Client disconnected, marking all sundesmos as offline.", LoggerType.PairManagement);
         // If a hard disconnect, dispose of the data after.
         Parallel.ForEach(_allSundesmos, s =>
@@ -181,7 +186,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
                 s.Value.MarkForUnload();
 
             // If it was a hard disconnect, we should dispose of the data.
-            if (intent is DisconnectIntent.LogoutShutdown)
+            if (intent is DisconnectIntent.Logout)
                 DisposeData(s.Value);
             else
                 s.Value.MarkOffline();
@@ -190,11 +195,20 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
-    private void DisposeData(Sundesmo sundesmo)
+    private void DisposeData(Sundesmo sundesmo, bool permanently = false)
     {
-        Logger.LogTrace($"Temporarily Disposing {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
-        sundesmo.MarkOffline();
-        sundesmo.TemporarilyDisposeData();
+        if (permanently)
+        {
+            Logger.LogDebug($"Permanently Disposing {sundesmo.PlayerName} ({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
+            sundesmo.MarkOffline();
+            sundesmo.PermanentlyDisposeData();
+        }
+        else
+        {
+            Logger.LogDebug($"Temporarily Disposing {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
+            sundesmo.MarkOffline();
+            sundesmo.TemporarilyDisposeData();
+        }
     }
 
     /// <summary>
@@ -208,7 +222,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         // Replace with Parallel.ForEach after testing.
         foreach (var sundesmo in _allSundesmos.Values)
         {
-            DisposeData(sundesmo);
+            DisposeData(sundesmo, true);
         }
         _allSundesmos.Clear();
         Logger.LogDebug($"Marked {pairCount} sundesmos as offline", LoggerType.PairManagement);
@@ -370,7 +384,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
-        
+
         Logger.LogTrace($"Received moodle update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         sundesmo.SetMoodleData(newMoodleData);
     }
