@@ -14,7 +14,7 @@
 	path = Submodules/BrioAPI
 	url = https://github.com/Etheirys/Brio.API.git
 [submodule "Submodules/Penumbra.API"]
-	path = Submodules/Penumbra.API
+	path = Submodules/Penumbra.Api
 	url = https://github.com/Ottermandias/Penumbra.Api.git
 [submodule "Submodules/Penumbra.String"]
 	path = Submodules/Penumbra.String
