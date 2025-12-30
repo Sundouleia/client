@@ -29,6 +29,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favorites;
+    private readonly SundesmoHandlerFactory _factory; // Polish / refine how this is implemented later... Things should be disposed of at proper times.
     private readonly ServerConfigManager _nickConfig;
     private readonly CharaObjectWatcher _watcher;
 

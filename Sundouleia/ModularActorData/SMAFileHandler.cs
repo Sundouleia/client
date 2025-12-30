@@ -9,7 +9,6 @@ using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModularActor;
 
-
 public enum FileIntegrity
 {
     InvalidFilePath,
