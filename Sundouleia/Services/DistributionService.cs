@@ -113,7 +113,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         if (!MainHub.IsConnectionDataSynced) 
             return;
         Logger.LogDebug($"Pushing MoodlesData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-        await _hub.UserPushMoodlesData(new(trustedUsers, MoodlesCacheService.MoodleCache));
+        await _hub.UserPushMoodlesData(new(trustedUsers, MoodlesCacheService.Data));
     }
 
     public async Task PushMoodleStatusUpdate(List<UserData> trustedUsers, MoodlesStatusInfo status, bool wasDeleted)
@@ -148,7 +148,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             LastCreatedData.GlamourerState[OwnedObject.Player] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
             LastCreatedData.CPlusState[OwnedObject.Player] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
             LastCreatedData.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.Moodles = await _ipc.Moodles.GetOwn().ConfigureAwait(false) ?? string.Empty;
+            LastCreatedData.Moodles = await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false) ?? string.Empty;
             LastCreatedData.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
             LastCreatedData.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
             LastCreatedData.GlamourerState[OwnedObject.MinionOrMount] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
@@ -442,7 +442,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         if (toUpdate.HasAny(IpcKind.ModManips)) data.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
         
         if (toUpdate.HasAny(IpcKind.Heels)) data.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-        if (toUpdate.HasAny(IpcKind.Moodles)) data.Moodles = await _ipc.Moodles.GetOwn().ConfigureAwait(false) ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.Moodles)) data.Moodles = await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Honorific)) data.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.PetNames)) data.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
     }
@@ -455,7 +455,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             IpcKind.Glamourer => await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty,
             IpcKind.CPlus => await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty,
             IpcKind.Heels => await _ipc.Heels.GetClientOffset().ConfigureAwait(false),
-            IpcKind.Moodles => await _ipc.Moodles.GetOwn().ConfigureAwait(false),
+            IpcKind.Moodles => await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false),
             IpcKind.Honorific => await _ipc.Honorific.GetTitle().ConfigureAwait(false),
             IpcKind.PetNames => _ipc.PetNames.GetPetNicknames(),
             _ => string.Empty,

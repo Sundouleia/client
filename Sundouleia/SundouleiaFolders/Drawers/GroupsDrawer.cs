@@ -38,7 +38,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     private readonly ServerConfigManager _serverConfigs;
     private readonly GroupsManager _groups;
     private readonly SundesmoManager _sundesmos;
-    private readonly StickyUIService _stickyService;
+    private readonly SidePanelService _stickyService;
 
     // Widgets
     private GroupFilterEditor _filterEditor;
@@ -64,7 +64,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
 
     public GroupsDrawer(ILogger<GroupsDrawer> logger, SundouleiaMediator mediator, MainConfig config, 
         FolderConfig folderConfig, FavoritesConfig favorites, ServerConfigManager serverConfig, 
-        GroupsManager groups, SundesmoManager sundesmos, StickyUIService stickyService, GroupsDrawSystem ds)
+        GroupsManager groups, SundesmoManager sundesmos, SidePanelService stickyService, GroupsDrawSystem ds)
         : base("##GroupsDrawer", logger, ds, new SundesmoCache(ds))
     {
         _mediator = mediator;

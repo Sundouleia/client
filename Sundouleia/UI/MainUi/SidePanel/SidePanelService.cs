@@ -1,13 +1,15 @@
 using CkCommons;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
+using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem;
 using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
-using TerraFX.Interop.Windows;
+using Sundouleia.WebAPI;
+using System.Runtime.CompilerServices;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -20,7 +22,7 @@ public enum SidePanelMode
     PendingRequests,
 }
 
-public interface IStickyUICache
+public interface ISidePanelCache
 {
     SidePanelMode Mode { get; }
 
@@ -31,32 +33,78 @@ public interface IStickyUICache
     public float DisplayWidth { get; }
 }
 
-public class InteractionsCache : IStickyUICache
+public class InteractionsCache : ISidePanelCache
 {
     public SidePanelMode Mode => SidePanelMode.Interactions;
-    public InteractionsCache(Sundesmo sundesmo)
-        => Sundesmo = sundesmo;
 
-    public Sundesmo Sundesmo { get; private set; }
-    public string DisplayName => Sundesmo.GetNickAliasOrUid();
+    // Stored internally for regenerators.
+    private readonly ILogger _log;
+    private readonly MainHub _hub;
 
-    public bool IsValid => Sundesmo is not null;
-    public float DisplayWidth
-        => (ImGui.CalcTextSize($"Preventing animations from {DisplayName}").X
-        + ImGui.GetFrameHeightWithSpacing()).AddWinPadX();
+    private OpenedInteraction _curOpened = OpenedInteraction.None;
+    public InteractionsCache(ILogger log, MainHub hub, Sundesmo sundesmo)
+    {
+        _log = log;
+        _hub = hub;
+
+        Sundesmo    = sundesmo;
+        OwnStatuses = new OwnStatusCombo(log, hub, Sundesmo, 1.3f);
+        OwnPresets  = new OwnPresetCombo(log, hub, Sundesmo, 1.3f);
+        Statuses    = new SundesmoStatusCombo(log, hub, Sundesmo, 1.3f);
+        Presets     = new SundesmoPresetCombo(log, hub, Sundesmo, 1.3f);
+        Remover     = new SundesmoStatusCombo(log, hub, Sundesmo, 1.3f, () =>
+        {
+            if (Sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveAny))
+                return [.. Sundesmo.SharedData.DataInfoList.OrderBy(x => x.Title)];
+            else if (Sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveApplied))
+                return [.. Sundesmo.SharedData.DataInfoList.Where(x => x.Applier == PlayerData.NameWithWorld).OrderBy(x => x.Title)];
+            else
+                return [];
+        });
+    }
+
+    public Sundesmo             Sundesmo    { get; private set; }
+    public OwnStatusCombo       OwnStatuses { get; private set; }
+    public OwnPresetCombo       OwnPresets  { get; private set; }
+    public SundesmoStatusCombo  Statuses    { get; private set; }
+    public SundesmoPresetCombo  Presets     { get; private set; }
+    public SundesmoStatusCombo  Remover     { get; private set; }
+
+    public OpenedInteraction OpenedInteraction => _curOpened;
+    public string   DisplayName  => Sundesmo.GetNickAliasOrUid();
+    public bool     IsValid      => Sundesmo is not null;
+    public float    DisplayWidth => (ImGui.CalcTextSize($"Preventing applying their moodles {DisplayName}.").X + ImGui.GetFrameHeightWithSpacing()).AddWinPadX();
+
+    public void ToggleInteraction(OpenedInteraction interaction)
+        => _curOpened = (_curOpened == interaction) ? OpenedInteraction.None : interaction;
 
     public void UpdateSundesmo(Sundesmo sundesmo)
-        => Sundesmo = sundesmo;
+    {
+        Sundesmo    = sundesmo;
+        OwnStatuses = new OwnStatusCombo(_log, _hub, Sundesmo, 1.3f);
+        OwnPresets  = new OwnPresetCombo(_log, _hub, Sundesmo, 1.3f);
+        Statuses    = new SundesmoStatusCombo(_log, _hub, Sundesmo, 1.3f);
+        Presets     = new SundesmoPresetCombo(_log, _hub, Sundesmo, 1.3f);
+        Remover     = new SundesmoStatusCombo(_log, _hub, Sundesmo, 1.3f, () =>
+        {
+            if (Sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveAny))
+                return [.. Sundesmo.SharedData.DataInfoList.OrderBy(x => x.Title)];
+            else if (Sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveApplied))
+                return [.. Sundesmo.SharedData.DataInfoList.Where(x => x.Applier == PlayerData.NameWithWorld).OrderBy(x => x.Title)];
+            else
+                return [];
+        });
+    }
 }
 
-public class GroupOrganizerCache : IStickyUICache
+public class GroupOrganizerCache : ISidePanelCache
 {
     public SidePanelMode Mode => SidePanelMode.GroupEditor;
     public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
     public bool IsValid => true;
 }
 
-public class ResponseCache : IStickyUICache
+public class ResponseCache : ISidePanelCache
 {
     private RequestCache? _cache;
     private DynamicSelections<RequestEntry>? _selections;
@@ -71,17 +119,21 @@ public class ResponseCache : IStickyUICache
     public IReadOnlyList<DynamicLeaf<RequestEntry>> Selected => _selections?.Leaves ?? [];
     public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
     public bool IsValid => _selections is not null && Selected.Count > 1;
-}
+} 
 
-public sealed class StickyUIService : DisposableMediatorSubscriberBase
+public sealed class SidePanelService : DisposableMediatorSubscriberBase
 {
+    private readonly MainHub _hub;
     private readonly FolderConfig _config;
-    public StickyUIService(ILogger<StickyUIService> logger, SundouleiaMediator mediator, FolderConfig config)
+    public SidePanelService(ILogger<SidePanelService> logger, SundouleiaMediator mediator,
+        MainHub hub, FolderConfig config)
         : base(logger, mediator)
     {
+        _hub = hub;
         _config = config;
         Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearDisplay());
         Mediator.Subscribe<MainWindowTabChangeMessage>(this, _ => UpdateForNewTab(_.NewTab));
+        Mediator.Subscribe<OpenSundesmoSidePanel>(this, _ => ForInteractions(_.Sundesmo, _.ForceOpen));
     }
 
     private void UpdateForNewTab(MainMenuTabs.SelectedTab newTab)
@@ -102,7 +154,7 @@ public sealed class StickyUIService : DisposableMediatorSubscriberBase
         }
     }
 
-    public IStickyUICache? DisplayCache { get; private set; }
+    public ISidePanelCache? DisplayCache { get; private set; }
 
     public SidePanelMode DisplayMode => DisplayCache?.Mode ?? SidePanelMode.None;
     public bool CanDraw => DisplayCache?.IsValid ?? false;
@@ -134,7 +186,7 @@ public sealed class StickyUIService : DisposableMediatorSubscriberBase
         // Was displaying something else, so make sure we update and open.
         else
         {
-            DisplayCache = new InteractionsCache(sundesmo);
+            DisplayCache = new InteractionsCache(Logger, _hub, sundesmo);
         }
     }
 

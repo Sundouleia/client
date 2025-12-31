@@ -16,12 +16,14 @@ public sealed class IpcCallerMoodles : IIpcCaller
     public readonly ICallGateSubscriber<Guid, bool, object> OnPresetUpdated;
 
     // API Getters
-    private readonly ICallGateSubscriber<string>                    GetOwnStatusManager;
-    private readonly ICallGateSubscriber<nint, string>              GetStatusManagerByPtr;
-    private readonly ICallGateSubscriber<Guid, MoodlesStatusInfo>   GetStatusInfo;
-    private readonly ICallGateSubscriber<List<MoodlesStatusInfo>>   GetStatusInfoList;
-    private readonly ICallGateSubscriber<Guid, MoodlePresetInfo>    GetPresetInfo;
-    private readonly ICallGateSubscriber<List<MoodlePresetInfo>>    GetPresetsInfoList;
+    private readonly ICallGateSubscriber<string>                        GetOwnStatusManager;
+    private readonly ICallGateSubscriber<nint, string>                  GetStatusManagerByPtr;
+    private readonly ICallGateSubscriber<List<MoodlesStatusInfo>>       GetOwnStatusManagerInfo;
+    private readonly ICallGateSubscriber<nint, List<MoodlesStatusInfo>> GetStatusManagerInfoByPtr;
+    private readonly ICallGateSubscriber<Guid, MoodlesStatusInfo>       GetStatusInfo;
+    private readonly ICallGateSubscriber<List<MoodlesStatusInfo>>       GetStatusInfoList;
+    private readonly ICallGateSubscriber<Guid, MoodlePresetInfo>        GetPresetInfo;
+    private readonly ICallGateSubscriber<List<MoodlePresetInfo>>        GetPresetsInfoList;
 
     // API Enactors
     private readonly ICallGateSubscriber<nint, string, object>          SetStatusManagerByPtr;
@@ -40,7 +42,10 @@ public sealed class IpcCallerMoodles : IIpcCaller
 
         // API Getters
         GetOwnStatusManager = Svc.PluginInterface.GetIpcSubscriber<string>("Moodles.GetClientStatusManagerV2");
+        GetOwnStatusManagerInfo = Svc.PluginInterface.GetIpcSubscriber<List<MoodlesStatusInfo>>("Moodles.GetClientStatusManagerInfoV2");
         GetStatusManagerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, string>("Moodles.GetStatusManagerByPtrV2");
+        GetStatusManagerInfoByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, List<MoodlesStatusInfo>>("Moodles.GetStatusManagerInfoByPtrV2");
+
         GetStatusInfo = Svc.PluginInterface.GetIpcSubscriber<Guid, MoodlesStatusInfo>("Moodles.GetStatusInfoV2");
         GetStatusInfoList = Svc.PluginInterface.GetIpcSubscriber<List<MoodlesStatusInfo>>("Moodles.GetStatusInfoListV2");
         GetPresetInfo = Svc.PluginInterface.GetIpcSubscriber<Guid, MoodlePresetInfo>("Moodles.GetPresetInfoV2");
@@ -85,19 +90,37 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// <summary> 
     ///     Gets the ClientPlayer's StatusManager string.
     /// </summary>
-    public async Task<string> GetOwn()
+    public async Task<string> GetOwnDataStr()
     {
         if (!APIAvailable) return string.Empty;
         return await Svc.Framework.RunOnFrameworkThread(() => GetOwnStatusManager.InvokeFunc() ?? string.Empty).ConfigureAwait(false);
     }
 
+    /// <summary>
+    ///     Gets the ClientPlayer's StatusManager in tuple format.
+    /// </summary>
+    public async Task<List<MoodlesStatusInfo>> GetOwnDataInfo()
+    {
+        if (!APIAvailable) return new List<MoodlesStatusInfo>();
+        return await Svc.Framework.RunOnFrameworkThread(GetOwnStatusManagerInfo.InvokeFunc).ConfigureAwait(false);
+    }
+
     /// <summary> 
     ///     Gets the StatusManager by pointer.
     /// </summary>
-    public async Task<string?> GetByPtr(nint charaAddr)
+    public async Task<string?> GetDataStrByPtr(nint charaAddr)
     {
         if (!APIAvailable) return null;
         return await Svc.Framework.RunOnFrameworkThread(() => GetStatusManagerByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Gets another player's StatusManager in tuple format by pointer.
+    /// </summary>
+    public async Task<List<MoodlesStatusInfo>> GetDataInfoByPtr(nint charaAddr)
+    {
+        if (!APIAvailable) return new List<MoodlesStatusInfo>();
+        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusManagerInfoByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
     }
 
     /// <summary>

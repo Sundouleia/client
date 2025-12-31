@@ -1,7 +1,9 @@
 using CkCommons;
 using CkCommons.Gui;
+using CkCommons.RichText;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Sundouleia.PlayerClient;
 using Sundouleia.WebAPI;
@@ -218,10 +220,4 @@ public static class SundouleiaEx
             _ => string.Empty
         };
     }
-
-    public static IPCMoodleAccessTuple ToIpc(this ProviderMoodleAccessTuple t)
-        => ((MoodleAccess)t.OtherAccessFlags, t.OtherMaxTime, (MoodleAccess)t.CallerAccessFlags, t.CallerMaxTime);
-
-    public static ProviderMoodleAccessTuple ToCallGate(this IPCMoodleAccessTuple t)
-        => ((short)t.OtherAccess, t.OtherMaxTime, (short)t.CallerAccess, t.CallerMaxTime);
 }

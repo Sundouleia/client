@@ -17,11 +17,11 @@ public class ClientDataCache
     public ConcurrentDictionary<OwnedObject, string> GlamourerState { get; set; } = [];
     public ConcurrentDictionary<OwnedObject, string> CPlusState { get; set; } = [];
 
-    public string ModManips { get; set; } = string.Empty;
-    public string HeelsOffset { get; set; } = string.Empty;
-    public string TitleData { get; set; } = string.Empty;
-    public string Moodles { get; set; } = string.Empty;
-    public string PetNames { get; set; } = string.Empty;
+    public string ModManips     { get; set; } = string.Empty;
+    public string HeelsOffset   { get; set; } = string.Empty;
+    public string Moodles       { get; set; } = string.Empty;
+    public string TitleData     { get; set; } = string.Empty;
+    public string PetNames      { get; set; } = string.Empty;
 
     public ClientDataCache()
     {
@@ -48,8 +48,8 @@ public class ClientDataCache
         CPlusState = new ConcurrentDictionary<OwnedObject, string>(other.CPlusState);
         ModManips = other.ModManips;
         HeelsOffset = other.HeelsOffset;
-        TitleData = other.TitleData;
         Moodles = other.Moodles;
+        TitleData = other.TitleData;
         PetNames = other.PetNames;
     }
 

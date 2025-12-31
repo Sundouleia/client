@@ -7,7 +7,7 @@ using Sundouleia.Watchers;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
 using System.Diagnostics.CodeAnalysis;
-using static CkCommons.Textures.MoodleDisplay;
+using static CkCommons.Textures.MoodleIcon;
 
 namespace Sundouleia.Interop;
 

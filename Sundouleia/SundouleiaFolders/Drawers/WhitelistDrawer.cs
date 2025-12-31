@@ -38,7 +38,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private readonly ServerConfigManager _serverConfigs;
     private readonly SundesmoManager _sundesmos;
     private readonly WhitelistDrawSystem _drawSystem;
-    private readonly StickyUIService _stickyService;
+    private readonly SidePanelService _stickyService;
 
 
     // If the FilterRow is to be expanded.
@@ -58,7 +58,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     public WhitelistDrawer(ILogger<WhitelistDrawer> logger, SundouleiaMediator mediator,
         MainConfig config, FolderConfig folderConfig, FavoritesConfig favoritesConfig,
         ServerConfigManager serverConfigs, SundesmoManager sundesmos,
-        StickyUIService stickyService, WhitelistDrawSystem ds)
+        SidePanelService stickyService, WhitelistDrawSystem ds)
         : base("##WhitelistDrawer", logger, ds, new SundesmoCache(ds))
     {
         _mediator = mediator;

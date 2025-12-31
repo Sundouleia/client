@@ -190,7 +190,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<NotificationService>()
         .AddSingleton<OnTickService>()
         .AddSingleton<SundouleiaMediator>()
-        .AddSingleton<StickyUIService>()
+        .AddSingleton<SidePanelService>()
         .AddSingleton<TutorialService>()
         .AddSingleton<UiFontService>()
 
@@ -262,12 +262,13 @@ public static class SundouleiaServiceExtensions
         // Scoped MainUI (Home)
         .AddScoped<WindowMediatorSubscriberBase, IntroUi>()
         .AddScoped<WindowMediatorSubscriberBase, MainUI>()
-        .AddScoped<WindowMediatorSubscriberBase, MainUISidePanel>()
+        .AddScoped<WindowMediatorSubscriberBase, SidePanelUI>()
         .AddScoped<HomeTab>()
         .AddScoped<RequestsTab>()
         .AddScoped<WhitelistTab>()
         .AddScoped<RadarTab>()
         .AddScoped<RadarChatTab>()
+        .AddScoped<SidePanelInteractions>()
 
         // Scoped Modules
         .AddScoped<WindowMediatorSubscriberBase, ActorOptimizerUI>()

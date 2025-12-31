@@ -31,12 +31,12 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
     private readonly FolderConfig _config; // Groups and defaults.
     private readonly RequestsManager _manager;
     private readonly SundesmoManager _sundesmos;
-    private readonly StickyUIService _sidePanel;
+    private readonly SidePanelService _sidePanel;
 
     private RequestCache _cache => (RequestCache)FilterCache;
 
     public RequestsOutDrawer(ILogger<RadarDrawer> logger, MainHub hub, FolderConfig folderConfig, 
-        RequestsManager manager, SundesmoManager sundesmos, StickyUIService sidePanelService, RequestsDrawSystem ds) 
+        RequestsManager manager, SundesmoManager sundesmos, SidePanelService sidePanelService, RequestsDrawSystem ds) 
         : base("##RequestsDrawer", logger, ds, new RequestCache(ds))
     {
         _hub = hub;

@@ -5,6 +5,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using Penumbra.GameData.Files.ShaderStructs;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.Services;
@@ -52,16 +53,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _watcher = watcher;
         _ipc = ipc;
 
-        // Initial collection creation if valid.
-        TryCreateAssignTempCollection().GetAwaiter().GetResult();
-
         // Listen to Penumbra init & dispose methods to re-assign collections.
         Mediator.Subscribe<PenumbraInitialized>(this, async _ =>
         {
-            // Create / Assign the temp collection.
+            // Do nothing if not yet rendered.
+            if (!IsRendered) 
+                return;
+            // If rendered, create and assign to the temp collection if not already done.
             await TryCreateAssignTempCollection().ConfigureAwait(false);
             // If there is replacement data, reapply it.
-            if (IsRendered && _replacements.Count > 0)
+            if (_replacements.Count > 0)
                 await ApplyMods().ConfigureAwait(false);
         });
 
@@ -246,6 +247,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
                 _tempProfile = Guid.Empty;
             }
+            if (_tempCollection != Guid.Empty)
+            {
+                Logger.LogTrace($"Removing {NameString}(({Sundesmo.GetNickAliasOrUid()})'s temporary collection.", LoggerType.PairHandler);
+                await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
+            }
             // Revert based on rendered state.
             if (IsRendered)
                 await RevertAlterationsInternal(Sundesmo.GetNickAliasOrUid(), NameString, Address, ObjIndex, ct).ConfigureAwait(false);
@@ -273,6 +279,18 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     private async Task RevertAlterationsInternal(string aliasOrUid, string name, IntPtr address, ushort objIdx, CancellationToken token)
     {
+        // These can revert regardless of validity (Im pretty sure)
+        if (_tempProfile != Guid.Empty)
+        {
+            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            _tempProfile = Guid.Empty;
+        }
+        if (_tempCollection != Guid.Empty)
+        {
+            Logger.LogTrace($"Removing {name}(({aliasOrUid})'s temporary collection.", LoggerType.PairHandler);
+            await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
+        }
+
         if (address == IntPtr.Zero)
             return;
         // We can care about parallel execution here if we really want to but i dont care atm.
@@ -281,11 +299,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
         await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
         await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
-        if (_tempProfile != Guid.Empty)
-        {
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-            _tempProfile = Guid.Empty;
-        }
     }
 
     // Don't entirely need to await this, but its an option we want it i guess.

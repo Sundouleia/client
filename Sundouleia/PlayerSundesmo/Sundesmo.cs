@@ -135,10 +135,8 @@ public sealed class Sundesmo : IComparable<Sundesmo>
 
     public void UpdateMoodleStatus(MoodlesStatusInfo status, bool deleted)
     {
-        if (deleted)
-            SharedData.Statuses.Remove(status.GUID);
-        else
-            SharedData.TryUpdateStatus(status);
+        if (deleted) SharedData.Statuses.Remove(status.GUID);
+        else SharedData.TryUpdateStatus(status);
     }
 
     public void SetMoodleStatuses(List<MoodlesStatusInfo> statuses)
@@ -146,10 +144,8 @@ public sealed class Sundesmo : IComparable<Sundesmo>
 
     public void UpdateMoodlePreset(MoodlePresetInfo preset, bool deleted)
     {
-        if (deleted)
-            SharedData.Presets.Remove(preset.GUID);
-        else
-            SharedData.TryUpdatePreset(preset);
+        if (deleted) SharedData.Presets.Remove(preset.GUID);
+        else SharedData.TryUpdatePreset(preset);
     }
 
     public void SetMoodlePresets(List<MoodlePresetInfo> presets)

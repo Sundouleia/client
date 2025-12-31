@@ -19,7 +19,7 @@ public class MoodlesCacheService : DisposableMediatorSubscriberBase
     private readonly SundesmoManager _sundesmos;
     private readonly DistributionService _distributor;
 
-    public static readonly MoodleData MoodleCache = new();
+    public static readonly MoodleData Data = new();
 
     public MoodlesCacheService(ILogger<MoodlesCacheService> logger, SundouleiaMediator mediator,
         IpcProvider ipcProvider, IpcCallerMoodles moodles, SundesmoManager sundesmos,
@@ -49,8 +49,6 @@ public class MoodlesCacheService : DisposableMediatorSubscriberBase
         _ipc.OnPresetUpdated.Unsubscribe((id, deleted) => _ = OnPresetModified(id, deleted));
     }
 
-    private void OnStatusManagerModified(nint addr) => Mediator.Publish(new MoodlesChanged(addr));
-
     /// <summary> 
     ///     Get all info from moodles to store in the cache and distribute to others.
     /// </summary>
@@ -58,11 +56,26 @@ public class MoodlesCacheService : DisposableMediatorSubscriberBase
     {
         var statuses = await _ipc.GetStatusListDetails().ConfigureAwait(false);
         var presets = await _ipc.GetPresetListDetails().ConfigureAwait(false);
-        MoodleCache.SetStatuses(statuses);
-        MoodleCache.SetPresets(presets);
+        Data.SetStatuses(statuses);
+        Data.SetPresets(presets);
         Logger.LogDebug("Moodles ready, pushing to all trusted pairs", LoggerType.IpcMoodles);
         var trusted = _sundesmos.DirectPairs.Where(x => x.IsRendered && x.OwnPerms.ShareOwnMoodles).Select(p => p.UserData).ToList();
         await _distributor.PushMoodlesData(trusted);
+    }
+
+
+    private async void OnStatusManagerModified(nint addr)
+    {
+        if (PlayerData.IsZoning || !PlayerData.Available)
+            return;
+
+        if (addr != PlayerData.ObjectAddress)
+            return;
+
+        // We had an update for ourselves, fetch latest data and then push to visible immediatly.
+        Data.UpdateDataInfo(await _ipc.GetOwnDataInfo().ConfigureAwait(false));
+        Mediator.Publish(new MoodlesChanged(addr));
+        Svc.Logger.Debug($"Client Status manager modified", LoggerType.IpcMoodles);
     }
 
     public async Task OnStatusModified(Guid id, bool wasDeleted)
@@ -70,14 +83,16 @@ public class MoodlesCacheService : DisposableMediatorSubscriberBase
         if (PlayerData.IsZoning || !PlayerData.Available)
             return;
 
+        Svc.Logger.Debug($"Status modified: {id} (deleted: {wasDeleted})", LoggerType.IpcMoodles);
+
         if (wasDeleted)
-            MoodleCache.Statuses.Remove(id);
+            Data.Statuses.Remove(id);
         else
-            MoodleCache.TryUpdateStatus(await _ipc.GetStatusDetails(id));
+            Data.TryUpdateStatus(await _ipc.GetStatusDetails(id));
 
         // push the update.
         var trusted = _sundesmos.DirectPairs.Where(x => x.IsRendered && x.OwnPerms.ShareOwnMoodles).Select(p => p.UserData).ToList();
-        await _distributor.PushMoodleStatusUpdate(trusted, MoodleCache.Statuses[id], wasDeleted);
+        await _distributor.PushMoodleStatusUpdate(trusted, Data.Statuses[id], wasDeleted);
     }
 
     /// <summary> Fired whenever we change any setting in any of our Moodles Presets via the Moodles UI </summary>
@@ -86,13 +101,15 @@ public class MoodlesCacheService : DisposableMediatorSubscriberBase
         if (PlayerData.IsZoning || !PlayerData.Available)
             return;
 
+        Svc.Logger.Debug($"Preset modified: {id} (deleted: {wasDeleted})", LoggerType.IpcMoodles);
+
         if (wasDeleted)
-            MoodleCache.Presets.Remove(id);
+            Data.Presets.Remove(id);
         else
-            MoodleCache.TryUpdatePreset(await _ipc.GetPresetDetails(id));
+            Data.TryUpdatePreset(await _ipc.GetPresetDetails(id));
 
         // push the update.
         var trusted = _sundesmos.DirectPairs.Where(x => x.IsRendered && x.OwnPerms.ShareOwnMoodles).Select(p => p.UserData).ToList();
-        await _distributor.PushMoodlePresetUpdate(trusted, MoodleCache.Presets[id], wasDeleted);
+        await _distributor.PushMoodlePresetUpdate(trusted, Data.Presets[id], wasDeleted);
     }
 }

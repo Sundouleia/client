@@ -180,7 +180,7 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeGlobalsBulk), dto);
     }
 
-    public async Task<HubResponse> ChangeUniquePerm(UserData user, string propName, bool newValue)
+    public async Task<HubResponse> ChangeUniquePerm(UserData user, string propName, object newValue)
         => await UserChangeUniqueSingle(new(user, propName, newValue));
 
     public async Task<HubResponse> UserChangeUniqueSingle(SingleChangeUnique dto)

@@ -38,7 +38,7 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly RadarTab _radar;
     private readonly RadarChatTab _radarChat;
     private readonly RequestsTab _requestsTab;
-    private readonly StickyUIService _stickyService;
+    private readonly SidePanelService _stickyService;
 
     // Some temp values used for sending requests.
     private bool  _creatingRequest  = false;
@@ -48,7 +48,7 @@ public class MainUI : WindowMediatorSubscriberBase
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
         ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
         SundesmoManager sundesmos, TutorialService guides, HomeTab homeTab, WhitelistTab whitelist,
-        RadarTab radar, RadarChatTab chat, RequestsTab requestsTab, StickyUIService stickyService)
+        RadarTab radar, RadarChatTab chat, RequestsTab requestsTab, SidePanelService stickyService)
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;

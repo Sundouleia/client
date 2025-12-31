@@ -1,4 +1,5 @@
 using Sundouleia.Gui.Components;
+using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
@@ -32,6 +33,8 @@ public record MainWindowTabChangeMessage(MainMenuTabs.SelectedTab NewTab) : Mess
 
 /// <summary> When a standalone profile UI is created. </summary>
 public record ProfileOpenMessage(UserData UserData) : MessageBase;
+
+public record OpenSundesmoSidePanel(Sundesmo Sundesmo, bool ForceOpen = false) : MessageBase;
 
 /// <summary> When the whitelist has a User hovered long enough and displays a profile, this is fired. </summary>
 public record OpenProfilePopout(UserData UserData) : MessageBase;
