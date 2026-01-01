@@ -5,7 +5,6 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
-using Penumbra.GameData.Files.ShaderStructs;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.Services;
@@ -166,6 +165,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
             await ReapplyAlterationsInternal().ConfigureAwait(false);
         }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during reinitialization of [{Sundesmo.GetNickAliasOrUid()}]: {ex}", LoggerType.PairHandler);
+            throw;
+        }
         finally
         {
             _dataLock.Release();
@@ -251,6 +255,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             {
                 Logger.LogTrace($"Removing {NameString}(({Sundesmo.GetNickAliasOrUid()})'s temporary collection.", LoggerType.PairHandler);
                 await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
+                _tempCollection = Guid.Empty;
             }
             // Revert based on rendered state.
             if (IsRendered)
@@ -289,10 +294,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             Logger.LogTrace($"Removing {name}(({aliasOrUid})'s temporary collection.", LoggerType.PairHandler);
             await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
+            _tempCollection = Guid.Empty;
         }
 
         if (address == IntPtr.Zero)
             return;
+
         // We can care about parallel execution here if we really want to but i dont care atm.
         await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
         await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);

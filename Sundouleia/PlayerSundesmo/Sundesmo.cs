@@ -267,18 +267,6 @@ public sealed class Sundesmo : IComparable<Sundesmo>
 
     /// <summary>
     ///     Removes all applied appearance data for the sundesmo if rendered, 
-    ///     and disposes all internal data. Creates fresh handlers for re-initialization.
-    /// </summary>
-    public void TemporarilyDisposeData()
-    {
-        PermanentlyDisposeData();
-
-        // Re-create fresh object handlers so this Sundesmo is ready for re-initialization
-        CreateObjectHandlers();
-    }
-
-    /// <summary>
-    ///     Removes all applied appearance data for the sundesmo if rendered, 
     ///     and disposes all internal data.
     /// </summary>
     public void PermanentlyDisposeData()

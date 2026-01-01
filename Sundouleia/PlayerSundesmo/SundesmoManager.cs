@@ -183,30 +183,18 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             if ((int)intent > 1)
                 s.Value.MarkForUnload();
 
-            // If it was a hard disconnect, we should dispose of the data.
-            if (intent is DisconnectIntent.Logout)
-                DisposeData(s.Value);
-            else
-                s.Value.MarkOffline();
+            // We don't dispose of data here, just mark offline. Full disposal only happens on shutdown, when SundesmoManager is disposed.
+            s.Value.MarkOffline();
         });
         // Recreate the lazy list.
         RecreateLazy();
     }
 
-    private void DisposeData(Sundesmo sundesmo, bool permanently = false)
+    private void DisposeData(Sundesmo sundesmo)
     {
-        if (permanently)
-        {
-            Logger.LogDebug($"Permanently Disposing {sundesmo.PlayerName} ({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
-            sundesmo.MarkOffline();
-            sundesmo.PermanentlyDisposeData();
-        }
-        else
-        {
-            Logger.LogDebug($"Temporarily Disposing {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
-            sundesmo.MarkOffline();
-            sundesmo.TemporarilyDisposeData();
-        }
+        Logger.LogDebug($"Permanently Disposing {sundesmo.PlayerName} ({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
+        sundesmo.MarkOffline();
+        sundesmo.PermanentlyDisposeData();
     }
 
     /// <summary>
@@ -220,7 +208,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         // Replace with Parallel.ForEach after testing.
         foreach (var sundesmo in _allSundesmos.Values)
         {
-            DisposeData(sundesmo, true);
+            DisposeData(sundesmo);
         }
         _allSundesmos.Clear();
         Logger.LogDebug($"Marked {pairCount} sundesmos as offline", LoggerType.PairManagement);
