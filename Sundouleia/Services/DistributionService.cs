@@ -40,6 +40,9 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     // Should only be modified while the dataUpdateLock is active.
     private readonly SemaphoreSlim _dataUpdateLock = new(1, 1);
+    private readonly SemaphoreSlim _invalidationLock = new(1, 1);
+
+    private Dictionary<OwnedObject, IpcKind> _invalidatedData = [];
     internal static ClientDataCache LastCreatedData { get; private set; } = new();
 
     /// <summary>
@@ -110,7 +113,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     public async Task PushMoodlesData(List<UserData> trustedUsers)
     {
-        if (!MainHub.IsConnectionDataSynced) 
+        if (!MainHub.IsConnectionDataSynced)
             return;
         Logger.LogDebug($"Pushing MoodlesData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
         await _hub.UserPushMoodlesData(new(trustedUsers, MoodlesCacheService.Data));
@@ -211,7 +214,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         // Upload any missing files not yet present on the hub. (We could optionally send a isUploading here but idk)
         Logger.LogDebug($"Uploading {filesNeedingUpload.Count} missing files to server...", LoggerType.DataDistributor);
         var uploadedFiles = await _fileUploader.UploadFiles(filesNeedingUpload).ConfigureAwait(false);
-        
+
         Logger.LogDebug($"Uploaded {uploadedFiles.Count}/{filesNeedingUpload.Count} missing files.", LoggerType.DataDistributor);
         // Empty manip string for now, change later if this has problems!
         await _hub.UserPushIpcMods(new PushIpcMods(usersToPushDataTo, new(uploadedFiles, []), string.Empty)).ConfigureAwait(false);
@@ -228,6 +231,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             NewVisibleUsers.Clear();
             try
             {
+                await ValidateCache();
                 var modData = LastCreatedData.ToModUpdates();
                 var appearance = LastCreatedData.ToVisualUpdate();
                 Logger.LogDebug($"(ResendAll) Collected [{modData.FilesToAdd.Count} Files to send] | [{modData.HashesToRemove.Count} Files to remove] | {(appearance.HasData() ? "With" : "Without")} Visual Changes", LoggerType.DataDistributor);
@@ -292,22 +296,17 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         await _dataUpdateLock.WaitAsync();
         try
         {
-            // Grab recipients.
-            var recipients = SundesmosForUpdatePush;
-            if (recipients.Count is 0)
-                return;
-
             // If flattened changes include Glamourer, or Mods, check manipulations & modded state.
             if (flattenedChanges.HasAny(IpcKind.Glamourer | IpcKind.Mods))
             {
                 // If manipulations changed, add it to the total changes changes.
-                if(LastCreatedData.ApplySingleIpc(OwnedObject.Player, IpcKind.ModManips, _ipc.Penumbra.GetMetaManipulationsString()))
+                if (LastCreatedData.ApplySingleIpc(OwnedObject.Player, IpcKind.ModManips, _ipc.Penumbra.GetMetaManipulationsString()))
                 {
                     manipStrDiff = true;
                     // Update newChanges to help with visual updates.
                     newChanges[OwnedObject.Player] |= IpcKind.ModManips;
                 }
-                
+
                 // It is also possible that the mods could have changed if a glamourer of mod change occurred.
                 // We need to update the mod state first.
                 changedMods = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
@@ -326,6 +325,14 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
             // If the flattened changes requires we check the visual state, then do so.
             if (flattenedChanges is not IpcKind.Mods)
                 changedVisuals = await UpdateVisualsInternal(newChanges, manipStrDiff).ConfigureAwait(false);
+
+            // Grab recipients.
+            var recipients = SundesmosForUpdatePush;
+
+            // This check is so late, because the previous steps are critical to keeping LastCreatedData up-to-date.
+            // LastCreatedData is not updated on full pushes, while changes can still occur without Sundesmos nearby.
+            if (recipients.Count is 0)
+                return;
 
             // MODS CONDITION - Flattened changes could be just Mods, or both but with a failed visual check.
             if (flattenedChanges is IpcKind.Mods || (!changedVisuals.HasData() && changedMods.HasChanges))
@@ -356,6 +363,36 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         finally
         {
             _dataUpdateLock.Release();
+        }
+    }
+
+    public void InvalidateCacheForKind(OwnedObject type, IpcKind kind)
+    {
+        _invalidationLock.Wait();
+        try
+        {
+            if (_invalidatedData.ContainsKey(type))
+                _invalidatedData[type] |= kind;
+            else
+                _invalidatedData[type] = kind;
+        }
+        finally
+        {
+            _invalidationLock.Release();
+        }
+    }
+
+    private async Task ValidateCache()
+    {
+        await _invalidationLock.WaitAsync();
+        try
+        {
+            await UpdateVisualsInternal(_invalidatedData, false);
+            _invalidatedData.Clear();
+        }
+        finally
+        {
+            _invalidationLock.Release();
         }
     }
 
@@ -440,7 +477,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
         // Special case, update regardless if the manips is an included change.
         if (toUpdate.HasAny(IpcKind.ModManips)) data.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
-        
+
         if (toUpdate.HasAny(IpcKind.Heels)) data.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Moodles)) data.Moodles = await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Honorific)) data.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;

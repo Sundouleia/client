@@ -153,6 +153,7 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         else
             _pendingUpdates[type] = kind;
         _allPendingUpdates |= kind;
+        _distributor.InvalidateCacheForKind(type, kind);
     }
 
     private void ClearPendingUpdates()
