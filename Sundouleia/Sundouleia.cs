@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+using System.Reflection;
 using CkCommons;
 using CkCommons.DrawSystem;
 using Dalamud.Interface.ImGuiFileDialog;
@@ -28,8 +30,6 @@ using Sundouleia.Services.Tutorial;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
-using System.Net.Http.Headers;
-using System.Reflection;
 
 namespace Sundouleia;
 
@@ -163,6 +163,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<BlockedUserManager>()
         .AddSingleton<RequestsManager>()
         .AddSingleton<ClientMoodles>()
+        .AddSingleton<ClientUpdateHandler>()
 
         // Player User
         .AddSingleton<SundesmoFactory>()

@@ -22,10 +22,11 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
     private readonly ClientDistributor _distributor;
 
     public ClientUpdateHandler(ILogger<ClientUpdateHandler> logger, SundouleiaMediator mediator,
-        IpcManager ipc, CharaObjectWatcher watcher, ClientUpdateService updater, 
+        IpcManager ipc, CharaObjectWatcher watcher, ClientUpdateService updater,
         ClientDistributor distributor)
         : base(logger, mediator)
     {
+        Logger.LogDebug($"Creating ClientUpdateHandler.", LoggerType.ClientUpdates);
         _ipc = ipc;
         _watcher = watcher;
         _updater = updater;
@@ -48,6 +49,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
 
     protected override void Dispose(bool disposing)
     {
+        Logger.LogDebug($"Disposing ClientUpdateHandler.", LoggerType.ClientUpdates);
         base.Dispose(disposing);
         _ipc.Penumbra.OnModSettingsChanged?.Dispose();
         _ipc.Glamourer.OnStateChanged?.Disable();
@@ -163,6 +165,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
     // Fired within the framework thread.
     private void OnGlamourerUpdate(IntPtr address, StateChangeType _)
     {
+        Logger.LogTrace($"OnGlamourerUpdate: [Address: {address}] [StateChangeType: {_}]", LoggerType.IpcGlamourer);
         if (!_watcher.WatchedTypes.TryGetValue(address, out OwnedObject type))
             return;
         _updater.AddPendingUpdate(type, IpcKind.Glamourer);
