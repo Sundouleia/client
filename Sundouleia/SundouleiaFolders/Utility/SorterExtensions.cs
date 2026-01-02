@@ -1,15 +1,11 @@
+using CkCommons.DrawSystem;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
 
 namespace Sundouleia.DrawSystem;
-public static class DynamicSorterEx
+public static class SorterExtensions
 {
-    public static ISortMethod<IDynamicCollection<T>> ByFolderName<T>() where T : class
-        => new FolderName<T>();
-    public static ISortMethod<IDynamicCollection<T>> ByTotalChildren<T>() where T : class
-        => new TotalChildren<T>();
-
     // Used here as Sundesmo is shared commonly across multiple draw systems.
     public static readonly ISortMethod<DynamicLeaf<Sundesmo>> ByRendered = new Rendered();
     public static readonly ISortMethod<DynamicLeaf<Sundesmo>> ByOnline = new Online();
@@ -53,21 +49,6 @@ public static class DynamicSorterEx
         = [ ByRendered, ByOnline, ByFavorite, ByPairName ];
 
     // Sort Helpers
-    public struct TotalChildren<T> : ISortMethod<IDynamicCollection<T>> where T : class
-    {
-        public string Name => "Total Count";
-        public FAI Icon => FAI.SortNumericDown; // Maybe change.
-        public string Tooltip => "Sort by number of items in the folder.";
-        public Func<IDynamicCollection<T>, IComparable?> KeySelector => c => c.TotalChildren;
-    }
-
-    public struct FolderName<T> : ISortMethod<IDynamicCollection<T>> where T : class
-    {
-        public string Name => "Name";
-        public FAI Icon => FAI.SortAlphaDown; // Maybe change.
-        public string Tooltip => "Sort by name.";
-        public Func<IDynamicCollection<T>, IComparable?> KeySelector => c => c.Name;
-    }
 
     public struct Rendered : ISortMethod<DynamicLeaf<Sundesmo>>
     {

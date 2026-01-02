@@ -1,3 +1,4 @@
+using CkCommons.DrawSystem;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -60,9 +61,8 @@ public class GroupFilterEditor(GroupsManager manager)
     public bool DrawFilterOptions(GroupFolder group, float width)
     {
         // Need to draw out the included options first, then the unincluded options.
-        var sorter = (IReadOnlyDynamicSorter<DynamicLeaf<Sundesmo>>)group.Sorter;
         var selectableSize = new Vector2(width - ImUtf8.FrameHeight, ImUtf8.TextHeight);
-        foreach (var (sortStep, stepIdx) in sorter.WithIndex())
+        foreach (var (sortStep, stepIdx) in group.FolderSorter.WithIndex())
         {
             using var id = ImRaii.PushId(stepIdx);
 
@@ -134,12 +134,12 @@ public class GroupFilterEditor(GroupsManager manager)
             // Shift: range select from last selection.
             else if (io.KeyShift && _dragDropFolder == group && _lastAnchor is not null)
             {
-                var lastAnchorIdx = group.Sorter.IndexOf(_lastAnchor);
+                var lastAnchorIdx = group.FolderSorter.IndexOf(_lastAnchor);
                 var start = Math.Min(lastAnchorIdx, idx);
                 var end = Math.Max(lastAnchorIdx, idx);
                 // Select all inbetween.
                 for (var i = start; i <= end; ++i)
-                    _selectedSteps.Add(group.Sorter[i]);
+                    _selectedSteps.Add(group.FolderSorter[i]);
             }
             // No modifier means it is a simple single select.
             else
@@ -178,7 +178,7 @@ public class GroupFilterEditor(GroupsManager manager)
         var stepsToMove = _dragDropSteps ?? [];
         // Map them to their indices.
         var fromIndices = stepsToMove
-            .Select(s => folder.Sorter.IndexOf(s))
+            .Select(s => folder.FolderSorter.IndexOf(s))
             .Where(i => i >= 0)
             .ToArray();
 

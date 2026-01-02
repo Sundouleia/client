@@ -1,5 +1,7 @@
+using CkCommons.DrawSystem;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using System.Linq;
 
 namespace Sundouleia.DrawSystem;
 
@@ -17,7 +19,7 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
         // Apply Stylizations.
         ApplyLatestStyle();
         // Set initial unsorted steps.
-        UnusedSteps = DynamicSorterEx.AllGroupSteps.Except(Sorter).ToList();
+        UnusedSteps = SorterExtensions.AllGroupSteps.Except(Sorter).ToList();
     }
 
     public GroupFolder(DynamicFolderGroup<Sundesmo> parent, uint id, SundesmoManager sundesmos, 
@@ -33,14 +35,16 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
         // Apply Stylizations.
         ApplyLatestStyle();
         // Set initial unsorted steps.
-        UnusedSteps = DynamicSorterEx.AllGroupSteps.Except(Sorter).ToList();
+        UnusedSteps = SorterExtensions.AllGroupSteps.Except(Sorter).ToList();
     }
 
     public bool ShowOffline => _group.ShowOffline;
-    public int Rendered => Children.Count(s => s.Data.IsRendered);
+    public int Rendered => GetChildren().Count(s => s.Data.IsRendered);
     public int Online => Children.Count(s => s.Data.IsOnline);
     protected override IReadOnlyList<Sundesmo> GetAllItems() => _generator();
     protected override DynamicLeaf<Sundesmo> ToLeaf(Sundesmo item) => new(this, item.UserData.UID, item);
+
+    public IReadOnlyDynamicSorter<DynamicLeaf<Sundesmo>> FolderSorter => Sorter;
 
     /// <summary>
     ///     Manually updated on every sort order update. <para />
@@ -68,7 +72,7 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
     public void ApplyLatestSorter()
     {
         // Retrieve all expected sort steps.
-        var all = DynamicSorterEx.AllGroupSteps;
+        var all = SorterExtensions.AllGroupSteps;
         // Fetch the new sort order from the group.
         var desired = _group.SortOrder.Select(f => f.ToSortMethod());
         // Update the Folders sorter to the new steps.

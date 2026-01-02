@@ -1,3 +1,4 @@
+using CkCommons.DrawSystem;
 using CkCommons.HybridSaver;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -147,7 +148,7 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
     // Special 'All Sundesmos' folder addition for the groups system.
     private bool TryAddAllFolder()
         => AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll,
-            uint.MaxValue, () => _sundesmos.DirectPairs, DynamicSorterEx.AllFolderSorter));
+            uint.MaxValue, () => _sundesmos.DirectPairs, SorterExtensions.AllFolderSorter));
 
     /// <summary>
     ///     Parses out a DynamicSorter Constructor from a FolderGroup's SortOrder.

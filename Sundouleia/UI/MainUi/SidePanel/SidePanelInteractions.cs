@@ -1,4 +1,5 @@
 using CkCommons;
+using CkCommons.DrawSystem;
 using CkCommons.Gui;
 using CkCommons.Helpers;
 using CkCommons.Raii;
@@ -7,20 +8,15 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui;
 using OtterGui.Text;
-using Sundouleia.DrawSystem;
-using Sundouleia.DrawSystem.Selector;
-using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Util;
 using System.Collections.Immutable;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Gui.MainWindow;
 

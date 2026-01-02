@@ -1,8 +1,9 @@
+using CkCommons.DrawSystem;
+using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Sundouleia.DrawSystem;
-using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -101,7 +102,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
 
         _folderDrawer.DrawButtonHeader(width);
         ImGui.Separator();
-        _folderDrawer.DrawContents<GroupFolder>(width, DynamicFlags.Organizer);
+        _folderDrawer.DrawContents<GroupFolder>(width, DynamicFlags.SelectableFolders | DynamicFlags.MultiSelect | DynamicFlags.RangeSelect | DynamicFlags.DragDropFolders);
     }
 
     private void DrawIncomingRequests(ResponseCache irc)

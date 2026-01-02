@@ -1,4 +1,6 @@
 using CkCommons;
+using CkCommons.DrawSystem;
+using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using CkCommons.Widgets;
@@ -7,12 +9,10 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
-using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Localization;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 
@@ -39,7 +39,6 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private readonly WhitelistDrawSystem _drawSystem;
     private readonly SidePanelService _stickyService;
 
-
     // If the FilterRow is to be expanded.
     private bool _configExpanded = false;
 
@@ -54,11 +53,11 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private bool          _profileShown = false;// If currently displaying a popout profile.
     private DateTime?     _lastHoverTime;       // time until we should show the profile.
 
-    public WhitelistDrawer(ILogger<WhitelistDrawer> logger, SundouleiaMediator mediator,
+    public WhitelistDrawer(SundouleiaMediator mediator,
         MainConfig config, FolderConfig folderConfig, FavoritesConfig favoritesConfig,
         NickConfig nicks, SundesmoManager sundesmos,
         SidePanelService stickyService, WhitelistDrawSystem ds)
-        : base("##WhitelistDrawer", logger, ds, new SundesmoCache(ds))
+        : base("##WhitelistDrawer", Svc.Logger.Logger, ds, new SundesmoCache(ds))
     {
         _mediator = mediator;
         _config = config;
@@ -371,7 +370,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         {
             _folderConfig.Current.VisibleFolder = showVisible;
             _folderConfig.Save();
-            Log.LogInformation("Regenerating Basic Folders due to Visible Folder setting change.");
+            Log.Information("Regenerating Basic Folders due to Visible Folder setting change.");
             // Update the folder structure to reflect this change.
             _drawSystem.UpdateVisibleFolderState(showVisible);
         }

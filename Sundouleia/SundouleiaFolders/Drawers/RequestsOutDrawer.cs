@@ -1,4 +1,6 @@
 using CkCommons;
+using CkCommons.DrawSystem;
+using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using CkCommons.Widgets;
@@ -7,7 +9,6 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
-using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -35,15 +36,16 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
 
     private RequestCache _cache => (RequestCache)FilterCache;
 
-    public RequestsOutDrawer(ILogger<RadarDrawer> logger, MainHub hub, FolderConfig folderConfig, 
-        RequestsManager manager, SundesmoManager sundesmos, SidePanelService sidePanelService, RequestsDrawSystem ds) 
-        : base("##RequestsDrawer", logger, ds, new RequestCache(ds))
+    public RequestsOutDrawer(MainHub hub, FolderConfig folderConfig, 
+        RequestsManager manager, SundesmoManager sundesmos, 
+        SidePanelService sidePanel,RequestsDrawSystem ds) 
+        : base("##RequestsDrawer", Svc.Logger.Logger, ds, new RequestCache(ds))
     {
         _hub = hub;
         _config = folderConfig;
         _manager = manager;
         _sundesmos = sundesmos;
-        _sidePanel = sidePanelService;
+        _sidePanel = sidePanel;
     }
 
     public IReadOnlyList<DynamicLeaf<RequestEntry>> SelectedRequests => Selector.Leaves;
@@ -127,8 +129,8 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
         if (CkGui.IconTextButton(FAI.Globe, "In World", null, true, UiService.DisableUI))
         {
             // Try and add to the selection all leaves within the folder that are from the current world.
-            var curWorld = (ushort)PlayerData.CurrentWorldId;
-            var toAdd = folder.Children.Where(x => x.Data.SentFromWorld(curWorld));
+            var curWorld = PlayerData.CurrentWorldId;
+            var toAdd = ((IDynamicFolder<RequestEntry>)folder).Children.Where(x => x.Data.SentFromWorld(curWorld));
             Selector.SelectMultiple(toAdd);
         }
         CkGui.AttachToolTip("Select requests sent from your current world.");
@@ -138,9 +140,9 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
         if (CkGui.IconTextButton(FAI.Map, "In Area", null, true, UiService.DisableUI))
         {
             // Try and add to the selection all leaves within the folder that are from the current area.
-            var curWorld = (ushort)PlayerData.CurrentWorldId;
+            var curWorld = PlayerData.CurrentWorldId;
             var curTerritory = PlayerContent.TerritoryID;
-            var toAdd = folder.Children.Where(x => x.Data.SentFromCurrentArea(curWorld, curTerritory));
+            var toAdd = ((IDynamicFolder<RequestEntry>)folder).Children.Where(x => x.Data.SentFromCurrentArea(curWorld, curTerritory));
             Selector.SelectMultiple(toAdd);
         }
         CkGui.AttachToolTip("Select requests sent from your current area.");

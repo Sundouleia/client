@@ -1,4 +1,6 @@
 using CkCommons;
+using CkCommons.DrawSystem;
+using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using CkCommons.Widgets;
@@ -8,16 +10,13 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using Microsoft.VisualBasic.ApplicationServices;
 using OtterGui.Text;
-using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem;
 
@@ -51,9 +50,9 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     private string _requestMsg = string.Empty;
     private bool _asTemporary;
 
-    public RadarDrawer(ILogger<RadarDrawer> logger, MainHub hub, RadarManager manager,
+    public RadarDrawer(MainHub hub, RadarManager manager,
         GroupsManager groups, SundesmoManager sundesmos, RequestsManager requests, RadarDrawSystem ds)
-        : base("##RadarDrawer", logger, ds, new RadarCache(ds))
+        : base("##RadarDrawer", Svc.Logger.Logger, ds, new RadarCache(ds))
     {
         _hub = hub;
         _manager = manager;
@@ -114,7 +113,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         ImUtf8.SameLineInner();
         if (ImGui.Checkbox("Requests Are Temporary", ref _defaultIsTemporary))
         {
-            Log.LogInformation($"Default Temporary Request setting changed to [{_defaultIsTemporary}]");
+            Log.Information($"Default Temporary Request setting changed to [{_defaultIsTemporary}]");
         }
     }
     #endregion Search

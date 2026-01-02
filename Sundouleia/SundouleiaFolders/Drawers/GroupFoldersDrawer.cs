@@ -1,5 +1,7 @@
 using CkCommons;
 using CkCommons.Classes;
+using CkCommons.DrawSystem;
+using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
@@ -8,7 +10,6 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
-using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
@@ -48,13 +49,14 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
     private string _nameEditTmp = string.Empty;
     private IDynamicCollection<Sundesmo>? _folderInEditor;
 
-    public GroupsFolderDrawer(ILogger<GroupsDrawer> logger, SundouleiaMediator mediator, MainConfig config, 
-        FolderConfig folderConfig, GroupsManager groups, SundesmoManager sundesmos, GroupsDrawSystem ds)
-        : base("##GroupsFolderDrawer", logger, ds, new SundesmoCache(ds))
+    public GroupsFolderDrawer(ILogger<GroupsFolderDrawer> logger, SundouleiaMediator mediator, 
+        MainConfig config, FolderConfig folders, GroupsManager groups, SundesmoManager sundesmos, 
+        GroupsDrawSystem ds)
+        : base("##GroupsFolderDrawer", Svc.Logger.Logger, ds, new SundesmoCache(ds))
     {
         _mediator = mediator;
         _config = config;
-        _folderConfig = folderConfig;
+        _folderConfig = folders;
         _groups = groups;
         _sundesmos = sundesmos;
         _drawSystem = ds;
@@ -110,21 +112,21 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
         {
             if (_addingFolderGroup)
             {
-                Log.LogDebug($"Attempting to add new Folder Group: [{_newGroupName}]");
+                Log.Debug($"Attempting to add new Folder Group: [{_newGroupName}]");
                 if (_drawSystem.TryAddFolderGroup(_newGroupName))
                 {
-                    Log.LogInformation($"Created FolderGroup [{_newGroupName}] in DDS ({Label})");
+                    Log.Information($"Created FolderGroup [{_newGroupName}] in DDS ({Label})");
                     // Reset the new group name, but keep us in adding folder groups if we ever wanted to add more.
                     _newGroupName = string.Empty;
                 }
             }
             else if (_creating is not null)
             {
-                Log.LogDebug("Attempting to add new Sundesmo Group.");
+                Log.Debug("Attempting to add new Sundesmo Group.");
                 _creating.Label = _newGroupName;
                 if (_groups.TryAddNewGroup(_creating) && _drawSystem.TryAddGroup(_creating))
                 {
-                    Log.LogInformation($"Created SundesmoGroup [{_creating.Label}] in DDS ({Label})");
+                    Log.Information($"Created SundesmoGroup [{_creating.Label}] in DDS ({Label})");
                     _creating = new SundesmoGroup();
                     _newGroupName = string.Empty;
                 }
@@ -158,13 +160,13 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
         ImUtf8.SameLineInner();
         if (CkGui.FancyButton(FAI.TrashAlt, "Delete", bWidth, noDelete))
         {
-            Log.LogInformation("Deleting selected groups.");
+            Log.Information("Deleting selected groups.");
             AddPostDrawLogic(() =>
             {
-                Log.LogDebug($"Deleting {Selector.Collections.Count} selected groups.");
+                Log.Debug($"Deleting {Selector.Collections.Count} selected groups.");
                 foreach (var folder in Selector.Collections)
                     DrawSystem.Delete(folder.Name);
-                Log.LogInformation("Deleted selected groups.");
+                Log.Information("Deleted selected groups.");
             });
         }
         CkGui.AttachToolTip("Delete ALL selected groups.--NL--" +
@@ -275,7 +277,7 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
             }
             else
             {
-                var toMove = shifting ? groups.SelectMany(g => g.Children) : groups;
+                var toMove = shifting ? groups.SelectMany(g => g.GetChildren()) : groups;
                 // Concat this with all of our folders.
                 toMove = toMove.Concat(folders);
                 // Perform a bulk move to the new location.
@@ -440,7 +442,7 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
         var showIfEmpty = f.Flags.HasAny(FolderFlags.ShowIfEmpty);
         if (CheckboxShowEmpty.Draw("Show Empty"u8, ref showIfEmpty))
         {
-            f.SetShowEmpty(showIfEmpty);
+            DrawSystem.SetShowIfEmpty(f, showIfEmpty);
             if (_groups.TrySetState(f.Name, f.ShowOffline, f.ShowIfEmpty))
                 FilterCache.MarkForReload(f);
         }

@@ -1,6 +1,6 @@
+using CkCommons.DrawSystem;
 using Dalamud.Bindings.ImGui;
 using Sundouleia.DrawSystem;
-using Sundouleia.DrawSystem.Selector;
 using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Gui.MainWindow;
@@ -24,12 +24,12 @@ public class RequestsTab
         if (_config.Current.ViewingIncoming)
         {
             _incoming.DrawFilterRow(width, 100);
-            _incoming.DrawIncomingRequests(width, DynamicFlags.RequestsList);
+            _incoming.DrawIncomingRequests(width, DynamicFlags.Selectable);
         }
         else
         {
             _outgoing.DrawFilterRow(width, 100);
-            _outgoing.DrawPendingRequests(width, DynamicFlags.RequestsList);
+            _outgoing.DrawPendingRequests(width, DynamicFlags.Selectable);
         }
     }
 }

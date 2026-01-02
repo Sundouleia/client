@@ -1,4 +1,5 @@
 using CkCommons;
+using CkCommons.DrawSystem;
 using CkCommons.HybridSaver;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -114,14 +115,14 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
             anyChanges |= Delete(Constants.FolderTagOnline);
             anyChanges |= Delete(Constants.FolderTagOffline);
             anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll,
-                                        uint.MaxValue, () => _sundesmos.DirectPairs, DynamicSorterEx.AllFolderSorter));
+                                        uint.MaxValue, () => _sundesmos.DirectPairs, SorterExtensions.AllFolderSorter));
         }
         // Return if anything was modified.
         return anyChanges;
     }
 
     private bool TryAdd(FAI icon, string name, uint iconColor, Func<IReadOnlyList<Sundesmo>> generator)
-        => AddFolder(new DefaultFolder(root, idCounter + 1u, icon, name, iconColor, generator, [DynamicSorterEx.ByPairName]));
+        => AddFolder(new DefaultFolder(root, idCounter + 1u, icon, name, iconColor, generator, [SorterExtensions.ByPairName]));
 
     // HybridSavable
     public int ConfigVersion => 0;

@@ -1,5 +1,7 @@
 using CkCommons;
 using CkCommons.Classes;
+using CkCommons.DrawSystem;
+using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using CkCommons.Widgets;
@@ -10,11 +12,9 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
-using Sundouleia.DrawSystem.Selector;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 
@@ -65,7 +65,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     public GroupsDrawer(ILogger<GroupsDrawer> logger, SundouleiaMediator mediator, MainConfig config, 
         FolderConfig folderConfig, FavoritesConfig favorites, NickConfig nicks, GroupsManager groups, 
         SundesmoManager sundesmos, SidePanelService stickyService, GroupsDrawSystem ds)
-        : base("##GroupsDrawer", logger, ds, new SundesmoCache(ds))
+        : base("##GroupsDrawer", Svc.Logger.Logger, ds, new SundesmoCache(ds))
     {
         _mediator = mediator;
         _config = config;
@@ -305,7 +305,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         var showIfEmpty = f.Flags.HasAny(FolderFlags.ShowIfEmpty);
         if (CheckboxShowEmpty.Draw("Show If Empty"u8, ref showIfEmpty))
         {
-            f.SetShowEmpty(showIfEmpty);
+            DrawSystem.SetShowIfEmpty(f, showIfEmpty);
             if (_groups.TrySetState(f.Name, f.ShowOffline, f.ShowIfEmpty))
                 FilterCache.MarkForReload(f);
         }

@@ -1,3 +1,4 @@
+using CkCommons.DrawSystem;
 using CkCommons.HybridSaver;
 using Sundouleia.Pairs;
 using Sundouleia.Radar;
@@ -78,7 +79,7 @@ public sealed class SmaDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSubsc
         => AddFolder(new RadarFolder(root, idCounter + 1u, icon, name, gen, [ByName]));
 
     // Sort Helpers.
-    private static readonly ISortMethod<DynamicLeaf<RadarUser>> ByName = new DynamicSorterEx.RadarName();
+    private static readonly ISortMethod<DynamicLeaf<RadarUser>> ByName = new SorterExtensions.RadarName();
 
     // HybridSavable
     public int ConfigVersion => 0;

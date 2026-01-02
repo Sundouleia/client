@@ -1,3 +1,4 @@
+using CkCommons.DrawSystem;
 using CkCommons.HybridSaver;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
@@ -71,7 +72,7 @@ public sealed class RequestsDrawSystem : DynamicDrawSystem<RequestEntry>, IMedia
         return anyAdded;
     }
 
-    private static readonly ISortMethod<DynamicLeaf<RequestEntry>> ByTime = new DynamicSorterEx.ByRequestTime();
+    private static readonly ISortMethod<DynamicLeaf<RequestEntry>> ByTime = new SorterExtensions.ByRequestTime();
 
 
     // HybridSavable
