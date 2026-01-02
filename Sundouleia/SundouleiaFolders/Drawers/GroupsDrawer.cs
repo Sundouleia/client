@@ -35,7 +35,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favoritesConfig;
-    private readonly ServerConfigManager _serverConfigs;
+    private readonly NickConfig _nicks;
     private readonly GroupsManager _groups;
     private readonly SundesmoManager _sundesmos;
     private readonly SidePanelService _stickyService;
@@ -63,15 +63,15 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     private DateTime?     _lastHoverTime;       // time until we should show the profile.
 
     public GroupsDrawer(ILogger<GroupsDrawer> logger, SundouleiaMediator mediator, MainConfig config, 
-        FolderConfig folderConfig, FavoritesConfig favorites, ServerConfigManager serverConfig, 
-        GroupsManager groups, SundesmoManager sundesmos, SidePanelService stickyService, GroupsDrawSystem ds)
+        FolderConfig folderConfig, FavoritesConfig favorites, NickConfig nicks, GroupsManager groups, 
+        SundesmoManager sundesmos, SidePanelService stickyService, GroupsDrawSystem ds)
         : base("##GroupsDrawer", logger, ds, new SundesmoCache(ds))
     {
         _mediator = mediator;
         _config = config;
         _folderConfig = folderConfig;
         _favoritesConfig = favorites;
-        _serverConfigs = serverConfig;
+        _nicks = nicks;
         _groups = groups;
         _sundesmos = sundesmos;
         _stickyService = stickyService;
@@ -438,7 +438,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         ImGui.SetNextItemWidth(width);
         if (ImGui.InputTextWithHint($"##{leaf.FullPath}-nick", "Give a nickname..", ref _nameEditStr, 45, ImGuiInputTextFlags.EnterReturnsTrue))
         {
-            _serverConfigs.SetNickname(leaf.Data.UserData.UID, _nameEditStr);
+            _nicks.SetNickname(leaf.Data.UserData.UID, _nameEditStr);
             _renaming = null;
         }
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))

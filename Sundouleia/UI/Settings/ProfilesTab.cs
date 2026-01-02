@@ -287,7 +287,7 @@ public class ProfilesTab
         else if (prevIdx == -1 && _selectedProfileIdx != -1)
         {
             // Grab the current player auth.
-            if (_account.TryGetAuthForPlayer(out var auth) && auth.ContentId == PlayerData.ContentIdInstanced)
+            if (_account.TryGetAuthForPlayer(out var auth) && auth.ContentId == PlayerData.CID)
                 _ = _hub.Reconnect();  // Will need to fix this, as reconnects are kind of busted atm.
         }
 

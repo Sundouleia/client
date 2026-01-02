@@ -15,7 +15,7 @@ namespace Sundouleia.CustomCombos;
 public sealed class OwnStatusCombo : MoodleComboBase<MoodlesStatusInfo>
 {
     public OwnStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale)
-        : base(log, hub, sundesmo, scale, () => [.. MoodlesCacheService.Data.Statuses.Values.OrderBy(x => x.Title)])
+        : base(log, hub, sundesmo, scale, () => [.. ClientMoodles.Data.Statuses.Values.OrderBy(x => x.Title)])
     { }
 
     protected override bool DisableCondition()
@@ -51,7 +51,7 @@ public sealed class OwnStatusCombo : MoodleComboBase<MoodlesStatusInfo>
 
         ImGui.SameLine(titleSpace);
         MoodleIcon.DrawMoodleIcon(myStatus.IconID, myStatus.Stacks, IconSize);
-        myStatus.AttachTooltip(MoodlesCacheService.Data.StatusList);
+        myStatus.AttachTooltip(ClientMoodles.Data.StatusList);
 
         ImUtf8.SameLineInner();
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;

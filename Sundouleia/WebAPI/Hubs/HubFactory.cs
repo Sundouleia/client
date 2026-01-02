@@ -13,16 +13,14 @@ namespace Sundouleia.WebAPI;
 public class HubFactory : MediatorSubscriberBase
 {
     private readonly ILoggerProvider _loggingProvider;
-    private readonly ServerConfigManager _serverConfigs;
     private readonly TokenProvider _tokenProvider;
     private HubConnection? _instance;
     private bool _isDisposed = false;
 
-    public HubFactory(ILogger<HubFactory> logger, SundouleiaMediator sundouleiaMediator,
-        ServerConfigManager serverConfigManager, TokenProvider tokenProvider, 
-        ILoggerProvider pluginLog) : base(logger, sundouleiaMediator)
+    public HubFactory(ILogger<HubFactory> logger, SundouleiaMediator mediator,
+        TokenProvider tokenProvider, ILoggerProvider pluginLog) 
+        : base(logger, mediator)
     {
-        _serverConfigs = serverConfigManager;
         _tokenProvider = tokenProvider;
         _loggingProvider = pluginLog;
     }

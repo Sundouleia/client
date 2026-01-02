@@ -57,16 +57,16 @@ public partial class MainHub
             _ = Task.Run(async () =>
             {
                 // pause the server state
-                _serverConfigs.AccountStorage.FullPause = true;
-                _serverConfigs.Save();
+                _accounts.Config.FullPause = true;
+                _accounts.SaveConfig();
                 _suppressNextNotification = true;
                 // If forcing a hard reconnect, fully unload the client & their sundesmos.
                 await Disconnect(ServerState.Disconnected, DisconnectIntent.Reload).ConfigureAwait(false);
                 // Clear our token cache between, incase we were banned.
                 _tokenProvider.ResetTokenCache();
                 // Revert full pause status and create a new connection.
-                _serverConfigs.AccountStorage.FullPause = false;
-                _serverConfigs.Save();
+                _accounts.Config.FullPause = false;
+                _accounts.SaveConfig();
                 _suppressNextNotification = true;
 
                 await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);

@@ -10,20 +10,21 @@ using TerraFX.Interop.Windows;
 namespace Sundouleia.PlayerClient;
 
 /// <summary> 
-///     Manages the cached moodle data and listens for updates to keep it in sync.
+///     Stores the client's Moodle StatusManager and info of their Statuses and Presets. <para/>
+///     When these are modified, updates are sent to their respective callers.
 /// </summary>
-public class MoodlesCacheService : DisposableMediatorSubscriberBase
+public class ClientMoodles : DisposableMediatorSubscriberBase
 {
     private readonly IpcProvider _ipcProvider;
     private readonly IpcCallerMoodles _ipc;
     private readonly SundesmoManager _sundesmos;
-    private readonly DistributionService _distributor;
+    private readonly ClientDistributor _distributor;
 
     public static readonly MoodleData Data = new();
 
-    public MoodlesCacheService(ILogger<MoodlesCacheService> logger, SundouleiaMediator mediator,
+    public ClientMoodles(ILogger<ClientMoodles> logger, SundouleiaMediator mediator,
         IpcProvider ipcProvider, IpcCallerMoodles moodles, SundesmoManager sundesmos,
-        DistributionService distributor)
+        ClientDistributor distributor)
         : base(logger, mediator)
     {
         _ipcProvider = ipcProvider;
@@ -69,7 +70,7 @@ public class MoodlesCacheService : DisposableMediatorSubscriberBase
         if (PlayerData.IsZoning || !PlayerData.Available)
             return;
 
-        if (addr != PlayerData.ObjectAddress)
+        if (addr != PlayerData.Address)
             return;
 
         // We had an update for ourselves, fetch latest data and then push to visible immediatly.

@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using CkCommons;
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
@@ -6,16 +5,15 @@ using Dalamud.Interface.ImGuiNotification;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using GagspeakAPI.Data;
-using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
 using SundouleiaAPI.Util;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.Pairs;
 
@@ -26,95 +24,85 @@ namespace Sundouleia.Pairs;
 public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 {
     // concurrent dictionary of all paired paired to the client. 
-    private readonly ConcurrentDictionary<UserData, Sundesmo> _allSundesmos;
+    private readonly ConcurrentDictionary<UserData, Sundesmo> _allSundesmos = new(UserDataComparer.Instance);
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
-    private readonly ServerConfigManager _serverConfigs;
+    private readonly NickConfig _nicks;
     private readonly SundesmoFactory _pairFactory;
+    private readonly LimboStateManager _limboManager;
 
     private Lazy<List<Sundesmo>> _directPairsInternal;  // the internal direct pairs lazy list for optimization
     public List<Sundesmo> DirectPairs => _directPairsInternal.Value; // the direct pairs the client has with other users.
 
     public SundesmoManager(ILogger<SundesmoManager> logger, SundouleiaMediator mediator,
-        MainConfig config, FolderConfig folderConfig, ServerConfigManager serverConfigs,
-        SundesmoFactory factory)
+        MainConfig config, FolderConfig folders, NickConfig nicks, SundesmoFactory factory,
+        LimboStateManager limboManager)
         : base(logger, mediator)
     {
-        _allSundesmos = new(UserDataComparer.Instance);
         _config = config;
-        _folderConfig = folderConfig;
-        _serverConfigs = serverConfigs;
+        _folderConfig = folders;
+        _nicks = nicks;
         _pairFactory = factory;
+        _limboManager = limboManager;
 
-        Mediator.Subscribe<ConnectedMessage>(this, _ => OnClientConnected());
-        Mediator.Subscribe<ReconnectedMessage>(this, _ => OnClientConnected());
         Mediator.Subscribe<DisconnectedMessage>(this, _ => OnClientDisconnected(_.Intent));
-
-        Mediator.Subscribe<CutsceneEndMessage>(this, _ => ReapplyAlterations());
+        Mediator.Subscribe<CutsceneEndMessage>(this, _ => ReapplyAllRendered());
         Mediator.Subscribe<TargetSundesmoMessage>(this, (msg) => TargetSundesmo(msg.Sundesmo));
 
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
-        Svc.ContextMenu.OnMenuOpened += OnOpenContextMenu;
-    }
-
-    private void OnOpenContextMenu(IMenuOpenedArgs args)
-    {
-        Logger.LogInformation("Opening Pair Context Menu of type " + args.MenuType, LoggerType.PairManagement);
-        if (args.MenuType is ContextMenuType.Inventory) return;
-        if (!_config.Current.ShowContextMenus) return;
-        if (args.Target is not MenuTargetDefault target || target.TargetObjectId == 0) return;
-        // Find the sundesmo that matches this and display the results.
-        if (DirectPairs.FirstOrDefault(p => p.IsRendered && p.PlayerObjectId == target.TargetObjectId && !p.IsPaused) is not { } match)
-            return;
-
-        Logger.LogDebug($"Found matching pair for context menu: {match.GetNickAliasOrUid()}", LoggerType.PairManagement);
-        // This only works when you create it prior to adding it to the args,
-        // otherwise the += has trouble calling. (it would fall out of scope)
-        var subMenu = new MenuItem();
-        subMenu.IsSubmenu = true;
-        subMenu.Name = "Sundouleia";
-        subMenu.PrefixChar = 'S';
-        subMenu.PrefixColor = 708;
-        subMenu.OnClicked += (args) => OpenSubMenu(match, args);
-        args.AddMenuItem(subMenu);
-    }
-
-    private void OpenSubMenu(Sundesmo sundesmo, IMenuItemClickedArgs args)
-    {
-        args.OpenSubmenu("Sundouleia Options", [ new MenuItem()
-        {
-            Name = new SeStringBuilder().AddText("Open Profile").Build(),
-            PrefixChar = 'S',
-            PrefixColor = 708,
-            OnClicked = (a) => { Mediator.Publish(new ProfileOpenMessage(sundesmo.UserData)); },
-        }, new MenuItem()
-        {
-            Name = new SeStringBuilder().AddText("Open Permissions").Build(),
-            PrefixChar = 'S',
-            PrefixColor = 708,
-            OnClicked = (a) => { Mediator.Publish(new OpenSundesmoSidePanel(sundesmo, true)); },
-        }]);
+        Svc.ContextMenu.OnMenuOpened += OnContextMenuOpened;
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        Svc.ContextMenu.OnMenuOpened -= OnOpenContextMenu;
-        DisposeSundesmos();
-    }
+        Svc.ContextMenu.OnMenuOpened -= OnContextMenuOpened;
 
-    public void AddSundesmo(UserPair dto)
-    {
-        var exists = _allSundesmos.ContainsKey(dto.User);
-        var msg = $"User ({dto.User.UID}) {(exists ? "found, applying latest!" : "not found. Creating!")}.";
-        Logger.LogDebug(msg, LoggerType.PairManagement);
-        if (exists)
-            _allSundesmos[dto.User].ReapplyAlterations();
-        else
-            _allSundesmos[dto.User] = _pairFactory.Create(dto);
+        // Dispose of all sundesmos.
+        Logger.LogInformation("Disposing all Sundesmos", LoggerType.PairManagement);
+        var pairCount = _allSundesmos.Count;
+        // Replace with Parallel.ForEach after testing.
+        foreach (var sundesmo in _allSundesmos.Values)
+            sundesmo.DisposeData();
+        // Clear all entries now.
+        _allSundesmos.Clear();
+        Logger.LogDebug($"Disposed {pairCount} Sundesmos.", LoggerType.PairManagement);
+        // dont know why we even need this.
         RecreateLazy();
     }
 
+    /// <summary>
+    ///     Adds a Sundesmo to the manager. Called by GetPairedUsers upon connection.
+    ///     Also called when a pair goes online, or after accepting a pair request.
+    /// </summary>
+    /// <remarks>
+    ///     Because Sundesmos are used in other classes and combos, and need to retain
+    ///     a reference to the original Sundesmo, they should not be disposed of when 
+    ///     disconnecting and recreated on reconnection. Instead, we check for existence 
+    ///     upon adding.
+    /// </remarks>
+    public void AddSundesmo(UserPair dto)
+    {
+        var exists = _allSundesmos.ContainsKey(dto.User);
+        Logger.LogDebug($"User ({dto.User.UID}) {(exists ? "found, applying latest!" : "not found. Creating!")}.", LoggerType.PairManagement);
+
+        // Determine if we perform a reapplication, or a creation. (Maybe change later)
+        if (exists) _allSundesmos[dto.User].ReapplyAlterations();
+        else _allSundesmos[dto.User] = _pairFactory.Create(dto);
+        
+        RecreateLazy();
+    }
+
+    /// <summary>
+    ///     Adds multiple Sundesmos to the manager. 
+    ///     Called upon connection, when someone goes online, or after accepting a request.
+    /// </summary>
+    /// <remarks>
+    ///     Because Sundesmos are used in other classes and combos, and need to retain
+    ///     a reference to the original Sundesmo, they should not be disposed of when 
+    ///     disconnecting and recreated on reconnection. Instead, we check for existence 
+    ///     upon adding.
+    /// </remarks>
     public void AddSundesmos(IEnumerable<UserPair> list)
     {
         var created = new List<string>();
@@ -134,18 +122,24 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         }
         RecreateLazy();
 
-        // Experimental.
         if (created.Count > 0) Logger.LogDebug($"Created: {string.Join(", ", created)}", LoggerType.PairManagement);
         if (refreshed.Count > 0) Logger.LogDebug($"Refreshed: {string.Join(", ", refreshed)}", LoggerType.PairManagement);
     }
 
+    /// <summary>
+    ///     Performs a hard-removal of a sundesmo from the manager.
+    ///     Usually called when unpairing from a sundesmo, or when a 
+    ///     sundesmo unpaired you.
+    /// </summary>
     public void RemoveSundesmo(UserDto dto)
     {
         if (!_allSundesmos.TryGetValue(dto.User, out var sundesmo))
             return;
+        // send the sundesmo offline, revert them, and clear their data.
+        // (This is safe to call because we plan on removing it after)
+        sundesmo.DisposeData();
 
-        // Remove the pair, marking it offline then disposing of its handler resources, and finally removing it from the manager.
-        DisposeData(sundesmo);
+        // Remove it from the manager and recreate the lazy list.
         _allSundesmos.TryRemove(dto.User, out _);
         RecreateLazy();
     }
@@ -158,73 +152,41 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         sundesmo.MarkAsPermanent();
     }
 
-    public void OnClientConnected()
-    {
-        Logger.LogInformation("Client connected, cancelling any disconnect timeouts.", LoggerType.PairManagement);
-        // Halt all timeouts that were in progress. (may cause issues since we do this after everyone goes online but we'll see)
-        Parallel.ForEach(_allSundesmos, s => s.Value.EndTimeout());
-    }
-
     /// <summary>
-    ///     Mark all sundesmos as offline upon a disconnection, ensuring that everyone follows the 
-    ///     same timeout flow.
+    ///     Occurs whenever our client disconnects from the SundouleiaServer. <para />
+    ///     What actions are taken depend on the disconnection intent.
     /// </summary>
+    /// <remarks>
+    ///     What still confuses me is why the manager seems to hold Sundesmos between logins, 
+    ///     since the plugin service scope should be disposing all instances whenever logged 
+    ///     out, and recreating them on login.
+    /// </remarks>
     public void OnClientDisconnected(DisconnectIntent intent)
     {
-        if (intent == DisconnectIntent.Shutdown)
+        Logger.LogInformation($"Client disconnected with intent: {intent}", LoggerType.PairManagement);
+        switch (intent)
         {
-            // Plugin is shutting down, skip here and let Dispose() handle cleanup
-            return;
-        }
-        Logger.LogInformation("Client disconnected, marking all sundesmos as offline.", LoggerType.PairManagement);
-        // If a hard disconnect, dispose of the data after.
-        Parallel.ForEach(_allSundesmos, s =>
-        {
-            if ((int)intent > 1)
-                s.Value.MarkForUnload();
+            // For normal or unexpected disconnects, simply mark all as offline. (but do not dispose)
+            case DisconnectIntent.Normal:
+            case DisconnectIntent.Unexpected:
+                Parallel.ForEach(_allSundesmos, s => s.Value.MarkOffline());
+                RecreateLazy();
+                break;
 
-            // If it was a hard disconnect, we should dispose of the data.
-            if (intent is DisconnectIntent.Logout)
-                DisposeData(s.Value);
-            else
-                s.Value.MarkOffline();
-        });
-        // Recreate the lazy list.
-        RecreateLazy();
-    }
+            // Reloads or logouts should revert and clear all sundesmos.
+            case DisconnectIntent.Reload:
+                // Perform the same as the above, except with an immidiate revert.
+                Parallel.ForEach(_allSundesmos, s => s.Value.MarkOffline(true));
+                RecreateLazy();
+                break;
 
-    private void DisposeData(Sundesmo sundesmo, bool permanently = false)
-    {
-        if (permanently)
-        {
-            Logger.LogDebug($"Permanently Disposing {sundesmo.PlayerName} ({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
-            sundesmo.MarkOffline();
-            sundesmo.PermanentlyDisposeData();
+            case DisconnectIntent.Logout:
+            case DisconnectIntent.Shutdown:
+                // If we logged out, there is no reason to have any pairs anymore.
+                // However, it also should trigger the managers disposal. If it doesn't, something's wrong.
+                Logger.LogInformation("Client in Logout/Shutdown, disposal will handle cleanup.");
+                break;
         }
-        else
-        {
-            Logger.LogDebug($"Temporarily Disposing {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
-            sundesmo.MarkOffline();
-            sundesmo.TemporarilyDisposeData();
-        }
-    }
-
-    /// <summary>
-    ///     Fully disposes of all Sundesmos and their handlers.
-    ///     This will stop all application of all data exchange.
-    /// </summary>
-    private void DisposeSundesmos()
-    {
-        Logger.LogDebug("Disposing all Pairs", LoggerType.PairManagement);
-        var pairCount = _allSundesmos.Count;
-        // Replace with Parallel.ForEach after testing.
-        foreach (var sundesmo in _allSundesmos.Values)
-        {
-            DisposeData(sundesmo, true);
-        }
-        _allSundesmos.Clear();
-        Logger.LogDebug($"Marked {pairCount} sundesmos as offline", LoggerType.PairManagement);
-        RecreateLazy();
     }
 
     /// <summary> 
@@ -250,7 +212,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         }
 
         // Init the proper first-time online message. (also prevent reload spamming logs)
-        if (notify && _config.Current.OnlineNotifications && !sundesmo.IsReloading)
+        if (notify && _config.Current.OnlineNotifications && ! sundesmo.IsReloading)
         {
             var nick = sundesmo.GetNickname();
             // Do not show if we limit it to nicked pairs and there is no nickname.
@@ -297,7 +259,10 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         }
     }
 
-    private void ReapplyAlterations()
+    /// <summary>
+    ///     Call to reapply all alterations to all sundesmos. (Used for post-cutscene)
+    /// </summary>
+    private void ReapplyAllRendered()
     {
         foreach (var pair in _allSundesmos.Values)
             pair.ReapplyAlterations();
@@ -305,7 +270,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
     private void TargetSundesmo(Sundesmo s)
     {
-        if (PlayerData.IsInPvP || !s.IsRendered) return;
+        if (PlayerData.InPvP || !s.IsRendered) return;
         unsafe
         {
             if (_folderConfig.Current.TargetWithFocus)
@@ -359,7 +324,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     /// </summary>
     public bool TryGetNickAliasOrUid(string uid, [NotNullWhen(true)] out string? nickAliasUid)
     {
-        nickAliasUid = _serverConfigs.GetNicknameForUid(uid) ?? _allSundesmos.Keys.FirstOrDefault(p => p.UID == uid)?.AliasOrUID;
+        nickAliasUid = _nicks.GetNicknameForUid(uid) ?? _allSundesmos.Keys.FirstOrDefault(p => p.UID == uid)?.AliasOrUID;
         return !string.IsNullOrWhiteSpace(nickAliasUid);
     }
 
@@ -368,7 +333,6 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         nickAliasUid = _allSundesmos.TryGetValue(user, out var s) ? s.GetNickAliasOrUid() : null;
         return !string.IsNullOrWhiteSpace(nickAliasUid);
     }
-
 
     /// <summary>
     ///     Attempt to retrieve a sundesmo by <see cref="UserData"/>. If failed, null is returned.
@@ -392,7 +356,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
         Logger.LogTrace($"Received moodle status update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
-        sundesmo.SetMoodleStatuses(newStatuses);
+        sundesmo.SharedData.SetStatuses(newStatuses);
     }
 
     public void ReceiveMoodlePresets(UserData target, List<MoodlePresetInfo> newPresets)
@@ -400,7 +364,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
         Logger.LogTrace($"Received moodle preset update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
-        sundesmo.SetMoodlePresets(newPresets);
+        sundesmo.SharedData.SetPresets(newPresets);
     }
 
     public void ReceiveMoodleStatusUpdate(UserData target, MoodlesStatusInfo status, bool deleted)
@@ -408,7 +372,9 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
         Logger.LogTrace($"Received moodle status single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
-        sundesmo.UpdateMoodleStatus(status, deleted);
+        
+        if (deleted) sundesmo.SharedData.Statuses.Remove(status.GUID);
+        else sundesmo.SharedData.TryUpdateStatus(status);
     }
 
     public void ReceiveMoodlePresetUpdate(UserData target, MoodlePresetInfo preset, bool deleted)
@@ -416,7 +382,9 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
         Logger.LogTrace($"Received moodle preset single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
-        sundesmo.UpdateMoodlePreset(preset, deleted);
+
+        if (deleted) sundesmo.SharedData.Presets.Remove(preset.GUID);
+        else sundesmo.SharedData.TryUpdatePreset(preset);
     }
 
 
@@ -550,4 +518,50 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     }
 
     #endregion Updates
+
+
+    /// <summary>
+    ///     Logic for ensuring that correct pairs display a context menu when right-clicked.
+    /// </summary>
+    private void OnContextMenuOpened(IMenuOpenedArgs args)
+    {
+        Logger.LogInformation("Opening Pair Context Menu of type " + args.MenuType, LoggerType.PairManagement);
+        if (args.MenuType is ContextMenuType.Inventory) return;
+        if (!_config.Current.ShowContextMenus) return;
+        if (args.Target is not MenuTargetDefault target || target.TargetObjectId == 0) return;
+        // Find the sundesmo that matches this and display the results.
+        if (DirectPairs.FirstOrDefault(p => p.IsRendered && p.PlayerObjectId == target.TargetObjectId && !p.IsPaused) is not { } match)
+            return;
+
+        Logger.LogDebug($"Found matching pair for context menu: {match.GetNickAliasOrUid()}", LoggerType.PairManagement);
+        // This only works when you create it prior to adding it to the args,
+        // otherwise the += has trouble calling. (it would fall out of scope)
+        var subMenu = new MenuItem();
+        subMenu.IsSubmenu = true;
+        subMenu.Name = "Sundouleia";
+        subMenu.PrefixChar = 'S';
+        subMenu.PrefixColor = 708;
+        subMenu.OnClicked += (args) => OpenSubMenu(match, args);
+        args.AddMenuItem(subMenu);
+    }
+
+    /// <summary>
+    ///     Required to show the nested menu in the opened context menus.
+    /// </summary>
+    private void OpenSubMenu(Sundesmo sundesmo, IMenuItemClickedArgs args)
+    {
+        args.OpenSubmenu("Sundouleia Options", [ new MenuItem()
+        {
+            Name = new SeStringBuilder().AddText("Open Profile").Build(),
+            PrefixChar = 'S',
+            PrefixColor = 708,
+            OnClicked = (a) => { Mediator.Publish(new ProfileOpenMessage(sundesmo.UserData)); },
+        }, new MenuItem()
+        {
+            Name = new SeStringBuilder().AddText("Open Permissions").Build(),
+            PrefixChar = 'S',
+            PrefixColor = 708,
+            OnClicked = (a) => { Mediator.Publish(new OpenSundesmoSidePanel(sundesmo, true)); },
+        }]);
+    }
 }

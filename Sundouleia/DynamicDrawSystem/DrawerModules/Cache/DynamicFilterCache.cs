@@ -128,7 +128,7 @@ public class DynamicFilterCache<T> : IDisposable where T : class
             // This will go through each folder and grab the filtered children again.
             // Also sorts the filtered result, and recursively calls BuildCachedFolder
             // on all sub-children.
-            foreach (var cachedNode in _toReload)
+            foreach (var cachedNode in _toReload.ToList())
                 BuildDynamicCache(cachedNode);
             // Clear the nodes to reload.
             _toReload.Clear();

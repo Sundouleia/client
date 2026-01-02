@@ -14,10 +14,10 @@ namespace Sundouleia.CustomCombos;
 
 public sealed class OwnPresetCombo : MoodleComboBase<MoodlePresetInfo>
 {
-    private int _maxPresetCount => MoodlesCacheService.Data.PresetList.Max(x => x.Statuses.Count);
+    private int _maxPresetCount => ClientMoodles.Data.PresetList.Max(x => x.Statuses.Count);
     private float _iconWithPadding => IconSize.X + ImGui.GetStyle().ItemInnerSpacing.X;
     public OwnPresetCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale)
-        : base(log, hub, sundesmo, scale, () => [ .. MoodlesCacheService.Data.PresetList.OrderBy(x => x.Title) ])
+        : base(log, hub, sundesmo, scale, () => [ .. ClientMoodles.Data.PresetList.OrderBy(x => x.Title) ])
     { }
 
     protected override bool DisableCondition()
@@ -51,14 +51,14 @@ public sealed class OwnPresetCombo : MoodleComboBase<MoodlePresetInfo>
             for (int i = 0, iconsDrawn = 0; i < moodlePreset.Statuses.Count; i++)
             {
                 var status = moodlePreset.Statuses[i];
-                if (!MoodlesCacheService.Data.Statuses.TryGetValue(status, out var info))
+                if (!ClientMoodles.Data.Statuses.TryGetValue(status, out var info))
                 {
                     ImGui.SameLine(0, _iconWithPadding);
                     continue;
                 }
 
                 MoodleIcon.DrawMoodleIcon(info.IconID, info.Stacks, IconSize);
-                info.AttachTooltip(MoodlesCacheService.Data.StatusList);
+                info.AttachTooltip(ClientMoodles.Data.StatusList);
 
                 if (++iconsDrawn < moodlePreset.Statuses.Count)
                     ImUtf8.SameLineInner();
@@ -77,7 +77,7 @@ public sealed class OwnPresetCombo : MoodleComboBase<MoodlePresetInfo>
     {
         var statuses = new List<MoodlesStatusInfo>(item.Statuses.Count);
         foreach (var guid in item.Statuses)
-            if (MoodlesCacheService.Data.Statuses.TryGetValue(guid, out var s))
+            if (ClientMoodles.Data.Statuses.TryGetValue(guid, out var s))
                 statuses.Add(s);
         // Check application.
         return MoodlesEx.CanApplyMoodles(_sundesmo.PairPerms, statuses);
@@ -92,7 +92,7 @@ public sealed class OwnPresetCombo : MoodleComboBase<MoodlePresetInfo>
         {
             var statuses = new List<MoodlesStatusInfo>();
             foreach (var guid in item.Statuses)
-                if (MoodlesCacheService.Data.Statuses.TryGetValue(guid, out var s))
+                if (ClientMoodles.Data.Statuses.TryGetValue(guid, out var s))
                     statuses.Add(s);
 
             var res = await _hub.UserApplyMoodleTuples(new(_sundesmo.UserData, statuses));

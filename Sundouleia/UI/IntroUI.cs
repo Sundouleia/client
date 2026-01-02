@@ -33,8 +33,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
     private readonly MainHub _hub;
     private readonly MainConfig _config;
-    private readonly AccountManager _account;
-    private readonly ServerConfigManager _serverConfigs;
+    private readonly AccountManager _accounts;
     private readonly UiDataStorageShared _fileCacheShared;
     private readonly TutorialService _guides;
 
@@ -44,14 +43,13 @@ public class IntroUi : WindowMediatorSubscriberBase
     private string _recoveryKey = string.Empty;
 
     public IntroUi(ILogger<IntroUi> logger, SundouleiaMediator mediator, MainHub mainHub, 
-        MainConfig config, AccountManager account, ServerConfigManager serverConfigs, 
-        UiDataStorageShared fileCacheShared, TutorialService guides)
+        MainConfig config, AccountManager accounts, UiDataStorageShared fileCacheShared, 
+        TutorialService guides)
         : base(logger, mediator, "###SundouleiaWelcome")
     {
         _hub = mainHub;
         _config = config;
-        _account = account;
-        _serverConfigs = serverConfigs;
+        _accounts = accounts;
         _fileCacheShared = fileCacheShared;
         _guides = guides;
 
@@ -77,7 +75,7 @@ public class IntroUi : WindowMediatorSubscriberBase
             _currentPage = IntroUiPage.CacheSetup;
             _furthestPage = IntroUiPage.CacheSetup;
         }
-        else if (!MainHub.IsServerAlive || !_serverConfigs.HasValidAccount())
+        else if (!MainHub.IsServerAlive || !_accounts.HasValidAccount())
         {
             _currentPage = IntroUiPage.AccountSetup;
             _furthestPage = IntroUiPage.AccountSetup;
@@ -262,7 +260,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
             case IntroUiPage.AccountSetup:
                 // Attempt to generate an account. If this is successful, advance the page to initialized.
-                if (_serverConfigs.HasValidAccount())
+                if (_accounts.HasValidAccount())
                 {
                     _furthestPage = IntroUiPage.Initialized;
                     _currentPage = IntroUiPage.Initialized;
@@ -275,7 +273,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         => page switch
         {
             IntroUiPage.CacheSetup => !_config.HasValidCacheFolderSetup(),
-            IntroUiPage.AccountSetup => !_serverConfigs.HasValidAccount(),
+            IntroUiPage.AccountSetup => !_accounts.HasValidAccount(),
             _ => false
         };
 
@@ -595,7 +593,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
     private void DrawNewAccountGeneration()
     {
-        var hasAnyProfile = _account.HasValidProfile();
+        var hasAnyProfile = _accounts.HasValidProfile();
         var generateWidth = CkGui.IconTextButtonSize(FAI.IdCardAlt, "Create Account (One-Time Use!)");
         var recoveryKeyInUse = !string.IsNullOrWhiteSpace(_recoveryKey);
 
@@ -611,7 +609,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         // Next line to display the account UID.
         var uid = string.Empty;
         var key = string.Empty;
-        if (_account.TryGetMainProfile(out var profile))
+        if (_accounts.TryGetMainProfile(out var profile))
         {
             uid = profile.UserUID;
             key = profile.Key;
@@ -653,7 +651,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         ImGui.InputTextWithHint("##RefRecoveryKey", "Existing Account Key / Recovered Account Key..", ref _recoveryKey, 64);
         ImUtf8.SameLineInner();
 
-        var blockButton = string.IsNullOrWhiteSpace(_recoveryKey) || _recoveryKey.Length != 64 || _account.HasValidProfile() || UiService.DisableUI;
+        var blockButton = string.IsNullOrWhiteSpace(_recoveryKey) || _recoveryKey.Length != 64 || _accounts.HasValidProfile() || UiService.DisableUI;
         if (CkGui.IconTextButton(FAI.Wrench, "Login with Key", disabled: blockButton))
             TryLoginWithExistingKeyAsync();
         CkGui.AttachToolTip("--COL--THIS WILL CREATE YOUR PRIMARY ACCOUNT. ENSURE YOUR KEY IS CORRECT.--COL--", ImGuiColors.DalamudRed);
@@ -684,10 +682,10 @@ public class IntroUi : WindowMediatorSubscriberBase
         {
             try
             {
-                if (_account.HasValidProfile())
+                if (_accounts.HasValidProfile())
                     throw new InvalidOperationException("Cannot recover account when a valid profile already exists!");
                 // Set the new profile to add using the key.
-                var addedIdx = _serverConfigs.AddProfileToAccount(new()
+                var addedIdx = _accounts.AddProfileToAccount(new()
                 {
                     ProfileLabel = $"Recovered Account Key - ({DateTime.Now:yyyy-MM-dd})",
                     Key = _recoveryKey,
@@ -695,7 +693,7 @@ public class IntroUi : WindowMediatorSubscriberBase
                 });
 
                 // Set the CharacterAuth for this profile.
-                _serverConfigs.SetProfileForLoginAuth(PlayerData.ContentId, addedIdx);
+                _accounts.SetProfileForLoginAuth(PlayerData.CID, addedIdx);
                 // Attempt an initialization connection test.
                 await TryConnectForInitialization();
             }
@@ -714,8 +712,8 @@ public class IntroUi : WindowMediatorSubscriberBase
             _config.Save();
             try
             {
-                if (!_serverConfigs.CharaHasLoginAuth())
-                    _serverConfigs.GenerateAuthForCurrentCharacter();
+                if (!_accounts.CharaHasLoginAuth())
+                    _accounts.GenerateAuthForCurrentCharacter();
 
                 // Begin by fetching the account details for the player. If this fails we will throw to the catch statement and perform an early return.
                 var accountDetails = await _hub.FetchFreshAccountDetails();
@@ -724,12 +722,12 @@ public class IntroUi : WindowMediatorSubscriberBase
                 // This means that we can not create the new authentication and validate our account as created.
                 _logger.LogInformation("Fetched Account Details, proceeding to create Primary Account authentication.");
                 // However, if an auth already exists for the current content ID, and we are trying to create a new primary account, this should not be possible, so early throw.
-                if (_serverConfigs.CharaHasValidLoginAuth())
+                if (_accounts.CharaHasValidLoginAuth())
                     throw new InvalidOperationException("Auth already exists, cannot create new Primary auth if one already exists!");
 
                 _logger.LogInformation("No existing authentication found, proceeding to create new Primary Account authentication.");
                 // set the key to that newly added authentication
-                var addedIdx = _serverConfigs.AddProfileToAccount(new()
+                var addedIdx = _accounts.AddProfileToAccount(new()
                 {
                     ProfileLabel = $"Main Account Key - ({DateTime.Now:yyyy-MM-dd})",
                     UserUID = accountDetails.Item1,
@@ -739,7 +737,7 @@ public class IntroUi : WindowMediatorSubscriberBase
                 });
                 // create the new secret key object to store.
                 _logger.LogInformation("Setting Profile for Login Auth.");
-                _serverConfigs.SetProfileForLoginAuth(PlayerData.ContentId, addedIdx);
+                _accounts.SetProfileForLoginAuth(PlayerData.CID, addedIdx);
                 _logger.LogInformation("Profile for Login Auth set successfully.");
                 _config.Save();
                 // Log the details.

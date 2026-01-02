@@ -64,13 +64,13 @@ public unsafe class OnTickService : IHostedService
         }
 
         // Check for GPose changes (this also is likely worthless.
-        if (PlayerData.IsInGPose && !InGPose)
+        if (PlayerData.InGPose && !InGPose)
         {
             _logger.LogDebug("Gpose start");
             InGPose = true;
             _mediator.Publish(new GPoseStartMessage());
         }
-        else if (!PlayerData.IsInGPose && InGPose)
+        else if (!PlayerData.InGPose && InGPose)
         {
             _logger.LogDebug("Gpose end");
             InGPose = false;

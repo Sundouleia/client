@@ -14,92 +14,54 @@ using SundouleiaAPI.Network;
 namespace Sundouleia.Services;
 
 /// <summary> 
-///     Tracks when sundesmos go online/offline, and visible/invisible. <para />
-///     Reliably tracks when offline/unrendered sundesmos are fully timed out or
-///     experiencing a brief reconnection / timeout, to prevent continuously redrawing data. <para />
-///     This additionally handles updates regarding when we send out changes to other sundesmos.
+///     Does the actual server calls to share client data or requests with other sundesmos.
 /// </summary>
-public sealed class DistributionService : DisposableMediatorSubscriberBase
+public sealed class ClientDistributor : DisposableMediatorSubscriberBase
 {
-    // likely file sending somewhere in here.
     private readonly MainHub _hub;
     private readonly MainConfig _config;
-    private readonly ActorAnalyzer _analyzer;
     private readonly IpcManager _ipc;
-    private readonly SundesmoManager _sundesmos;
-    private readonly FileCacheManager _cacheManager;
     private readonly FileUploader _fileUploader;
+    private readonly LimboStateManager _limbo;
     private readonly ModdedStateManager _moddedState;
     private readonly CharaObjectWatcher _watcher;
-
-    // Task runs the distribution of our data to other sundesmos.
-    // should always await the above task, if active, before firing.
-    private readonly SemaphoreSlim _distributionLock = new(1, 1);
-    private CancellationTokenSource _distributeDataCTS = new();
-    private Task? _distributeDataTask;
-
-    // Should only be modified while the dataUpdateLock is active.
-    private readonly SemaphoreSlim _dataUpdateLock = new(1, 1);
-    internal static ClientDataCache LastCreatedData { get; private set; } = new();
+    private readonly ClientUpdateService _updater;
 
     /// <summary>
-    ///     If OnHubConnected was sent yet. Helps prevent race condition with <para />
-    ///     Can optimize this later to remove the bool as it likely is not necessary and can be determined.
+    ///     If OnHubConnected was sent yet. Ensures a full data update is always sent first.
     /// </summary>
     private bool _hubConnectionSent = false;
 
-    public DistributionService(
-        ILogger<DistributionService> logger,
-        SundouleiaMediator mediator,
-        MainHub hub,
-        MainConfig config,
-        ActorAnalyzer analyzer,
-        IpcManager ipc,
-        SundesmoManager pairs,
-        FileCacheManager cacheManager,
-        FileUploader fileUploader,
-        ModdedStateManager moddedState,
-        CharaObjectWatcher watcher) : base(logger, mediator)
+    public ClientDistributor(ILogger<ClientDistributor> logger, SundouleiaMediator mediator,
+        MainHub hub, MainConfig config, IpcManager ipc, FileUploader fileUploader,
+        LimboStateManager limbo, ModdedStateManager moddedState, CharaObjectWatcher watcher, 
+        ClientUpdateService updater)
+        : base(logger, mediator)
     {
         _hub = hub;
         _config = config;
-        _analyzer = analyzer;
         _ipc = ipc;
-        _sundesmos = pairs;
-        _cacheManager = cacheManager;
         _fileUploader = fileUploader;
+        _limbo = limbo;
         _moddedState = moddedState;
         _watcher = watcher;
+        _updater = updater;
 
         // Process applyToPair change.
-        Mediator.Subscribe<MoodlesApplyStatusToPair>(this, _ => ApplyMoodleTuplesToSundesmo(_.ApplyStatusTupleDto).ConfigureAwait(false));
-
-        // Process sundesmo state changes.
-        Mediator.Subscribe<SundesmoOnline>(this, msg => { if (msg.RemoveFromLimbo) InLimbo.Remove(msg.Sundesmo.UserData); });
-        Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => NewVisibleUsers.Add(msg.Handler.Sundesmo.UserData));
-        Mediator.Subscribe<SundesmoEnteredLimbo>(this, msg => InLimbo.Add(msg.Sundesmo.UserData));
-        Mediator.Subscribe<SundesmoLeftLimbo>(this, msg => InLimbo.Remove(msg.Sundesmo.UserData));
+        Mediator.Subscribe<MoodlesApplyStatusToPair>(this, _ => ApplyStatusTuplesToSundesmo(_.ApplyStatusTupleDto).ConfigureAwait(false));
         // Process connections.
         Mediator.Subscribe<ConnectedMessage>(this, _ => OnHubConnected());
         Mediator.Subscribe<DisconnectedMessage>(this, _ =>
         {
-            NewVisibleUsers.Clear();
+            _updater.NewVisibleUsers.Clear();
             _hubConnectionSent = false;
         });
         // Process Update Checking.
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, _ => UpdateCheck());
     }
 
-    public bool UpdatingData => _dataUpdateLock.CurrentCount is 0;
-    public bool DistributingData => _distributionLock.CurrentCount is 0; // only use if we dont want to cancel distributions.
-
-    public HashSet<UserData> NewVisibleUsers { get; private set; } = new();
-    public HashSet<UserData> InLimbo { get; private set; } = new();
-
-    public List<UserData> SundesmosForUpdatePush => _sundesmos.GetVisibleConnected().Except([.. InLimbo, .. NewVisibleUsers]).ToList();
-
     #region Moodles
-    private async Task ApplyMoodleTuplesToSundesmo(ApplyMoodleStatus dto)
+    private async Task ApplyStatusTuplesToSundesmo(ApplyMoodleStatus dto)
     {
         Logger.LogDebug($"Pushing ApplyMoodlesByStatus to: {dto.User.AliasOrUID}", LoggerType.DataDistributor);
         if (await _hub.UserApplyMoodleTuples(dto).ConfigureAwait(false) is { } res && res.ErrorCode is not SundouleiaApiEc.Success)
@@ -113,7 +75,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         if (!MainHub.IsConnectionDataSynced) 
             return;
         Logger.LogDebug($"Pushing MoodlesData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-        await _hub.UserPushMoodlesData(new(trustedUsers, MoodlesCacheService.Data));
+        await _hub.UserPushMoodlesData(new(trustedUsers, ClientMoodles.Data));
     }
 
     public async Task PushMoodleStatusUpdate(List<UserData> trustedUsers, MoodlesStatusInfo status, bool wasDeleted)
@@ -138,65 +100,57 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     private async void OnHubConnected()
     {
         Logger.LogInformation("Hub Reconnected!");
-        Logger.LogDebug($"UID's in NewVisible are: {string.Join(", ", NewVisibleUsers.Select(x => x.AliasOrUID))}", LoggerType.DataDistributor);
-        Logger.LogDebug($"UID's in Limbo are: {string.Join(", ", InLimbo.Select(x => x.AliasOrUID))}", LoggerType.DataDistributor);
-
-        await _dataUpdateLock.WaitAsync();
-        try
+        // Update the latest data.
+        await _updater.RunOnDataUpdateSlim(async () =>
         {
-            LastCreatedData.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
-            LastCreatedData.GlamourerState[OwnedObject.Player] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.CPlusState[OwnedObject.Player] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.Moodles = await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
-            LastCreatedData.GlamourerState[OwnedObject.MinionOrMount] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.CPlusState[OwnedObject.MinionOrMount] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.GlamourerState[OwnedObject.Pet] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.CPlusState[OwnedObject.Pet] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.GlamourerState[OwnedObject.Companion] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
-            LastCreatedData.CPlusState[OwnedObject.Companion] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
+            _updater.LatestData.GlamourerState[OwnedObject.Player] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.CPlusState[OwnedObject.Player] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.Moodles = await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
+            _updater.LatestData.GlamourerState[OwnedObject.MinionOrMount] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.CPlusState[OwnedObject.MinionOrMount] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.GlamourerState[OwnedObject.Pet] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.CPlusState[OwnedObject.Pet] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.GlamourerState[OwnedObject.Companion] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.CPlusState[OwnedObject.Companion] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             // Cache mods.
             var moddedState = await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false);
             Logger.LogDebug($"(OnHubConnected) Collected modded state. [{moddedState.AllFiles.Count} Mod Files]", LoggerType.DataDistributor);
-            LastCreatedData.ApplyNewModState(moddedState);
+            _updater.LatestData.ApplyNewModState(moddedState);
 
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error during OnHubConnected: {ex}");
-        }
-        finally
-        {
-            _dataUpdateLock.Release();
-        }
+        }).ConfigureAwait(false);
 
-        // Send off to all visible users after awaiting for any other distribution task to process.
+        // Then send off to all visible users.
+        Logger.LogDebug($"UID's in NewVisible are: {string.Join(", ", _updater.NewVisibleUsers.Select(x => x.AliasOrUID))}", LoggerType.DataDistributor);
+        Logger.LogDebug($"UID's in Limbo are: {string.Join(", ", _limbo.InLimbo.Select(x => x.AliasOrUID))}", LoggerType.DataDistributor);
         Logger.LogInformation($"(OnHubConnected) Distributing to visible.", LoggerType.DataDistributor);
-        _distributeDataCTS = _distributeDataCTS.SafeCancelRecreate();
-        _distributeDataTask = Task.Run(async () =>
+        _updater.RefreshDistributionCTS();
+        _updater.SetDistributionTask(async () =>
         {
             await ResendAll().ConfigureAwait(false);
             _hubConnectionSent = true;
-
-        }, _distributeDataCTS.Token);
+        });
     }
 
     // Note that we are going to need some kind of logic for handling the edge cases where user A is receiving a new update and that 
     private void UpdateCheck()
     {
-        if (NewVisibleUsers.Count is 0) return;
-        // If we are zoning or not available, fail.
-        if (PlayerData.IsZoning || !PlayerData.Available || !MainHub.IsConnectionDataSynced) return;
-        // If we have no yet processed the connection update, fail.
-        if (!_hubConnectionSent) return;
-        // If we are already distributing data, fail.
-        if (_distributeDataTask is not null && !_distributeDataTask.IsCompleted) return;
+        // Do not run update checks if the hub connection update was never sent.
+        if (!_hubConnectionSent)
+            return;
+        if (_updater.NewVisibleUsers.Count is 0)
+            return;
+        if (!MainHub.IsConnectionDataSynced || PlayerData.IsZoning || !PlayerData.Available)
+            return;
+        if (_updater.Distributing)
+            return;
 
         // Process a distribution of full data to the newly visible users and then clear the update.
         Logger.LogInformation("(UpdateCheck) Distributing to new visible.", LoggerType.DataDistributor);
-        _distributeDataTask = Task.Run(ResendAll, _distributeDataCTS.Token);
+        _updater.SetDistributionTask(ResendAll);
     }
 
     /// <summary>
@@ -204,7 +158,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     /// </summary>
     private async Task UploadAndPushMissingMods(List<UserData> usersToPushDataTo, List<VerifiedModFile> filesNeedingUpload)
     {
-        // Do not bother uploading if we do not have a properly configured cache.
+        // Don't bother uploading if we do not have a properly configured cache.
         if (!_config.HasValidCacheFolderSetup())
             return;
 
@@ -221,32 +175,24 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     #region Cache Updates
     private async Task ResendAll()
     {
-        try
+        await _updater.RunOnDataUpdateSlim(async () =>
         {
-            await _dataUpdateLock.WaitAsync();
-            var recipients = NewVisibleUsers.ToList();
-            NewVisibleUsers.Clear();
-            try
-            {
-                var modData = LastCreatedData.ToModUpdates();
-                var appearance = LastCreatedData.ToVisualUpdate();
-                Logger.LogDebug($"(ResendAll) Collected [{modData.FilesToAdd.Count} Files to send] | [{modData.HashesToRemove.Count} Files to remove] | {(appearance.HasData() ? "With" : "Without")} Visual Changes", LoggerType.DataDistributor);
-                // Send off update.
-                var res = await _hub.UserPushIpcFull(new(recipients, modData, appearance, true)).ConfigureAwait(false);
-                Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} newly visible users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
-                // Handle any missing mods after.
-                if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
-                    _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
-            }
-            finally
-            {
-                _dataUpdateLock.Release();
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error during ResendAll: {ex}");
-        }
+            // grab the mod and appearnace data from the latest data to send off to the new visible users.
+            var modData = _updater.LatestData.ToModUpdates();
+            var appearance = _updater.LatestData.ToVisualUpdate();
+            Logger.LogDebug($"(ResendAll) Collected [{modData.FilesToAdd.Count} Files to send] | [{modData.HashesToRemove.Count} Files to remove] | {(appearance.HasData() ? "With" : "Without")} Visual Changes", LoggerType.DataDistributor);
+
+            // Collect the new users to send to and then clear the list.
+            var recipients = _updater.NewVisibleUsers.ToList();
+            _updater.NewVisibleUsers.Clear();
+
+            // Perform the initial send, then if any remaining missing files are present, upload them.
+            var res = await _hub.UserPushIpcFull(new(recipients, modData, appearance, true)).ConfigureAwait(false);
+            Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} newly visible users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
+            // Handle any missing mods after.
+            if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
+                _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
+        });
     }
 
     /// <summary>
@@ -254,28 +200,21 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     /// </summary>
     public async Task UpdateAndSendSingle(OwnedObject obj, IpcKind type)
     {
-        // Send this update off to all our visibly connected sundesmos that are not in limbo or new.
-        var recipients = SundesmosForUpdatePush;
-        // Apply new changes and store them for sending.
-        await _dataUpdateLock.WaitAsync();
-        try
+        await _updater.RunOnDataUpdateSlim(async () =>
         {
-            var newData = await UpdateCacheSingleInternal(obj, type, LastCreatedData).ConfigureAwait(false);
+            // Collect the latest data to send off.
+            var newData = await UpdateCacheSingleInternal(obj, type, _updater.LatestData).ConfigureAwait(false);
+            
+            // If no change occurred, do not push to others (our cache is still updated with the latest data)
             if (string.IsNullOrEmpty(newData))
                 return;
-            // Data changed, clear limbo.
-            InLimbo.Clear();
+
+            var recipients = _updater.UsersForUpdatePush;
+
+            // Send off the update.
             await _hub.UserPushIpcSingle(new(recipients, obj, type, newData)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcSingle to {recipients.Count} users.", LoggerType.DataDistributor);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error during UpdateAndSendSingle (UpdateCache): {ex}");
-        }
-        finally
-        {
-            _dataUpdateLock.Release();
-        }
+        });
     }
 
     /// <summary>
@@ -288,26 +227,23 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         ModUpdates changedMods = ModUpdates.Empty;
         bool manipStrDiff = false;
 
-        // Wait for data update to be free.
-        await _dataUpdateLock.WaitAsync();
-        try
+        await _updater.RunOnDataUpdateSlim(async () =>
         {
-            // Grab recipients.
-            var recipients = SundesmosForUpdatePush;
-            if (recipients.Count is 0)
-                return;
+            // ------------------------------------------
+            // =========== CACHE UPDATE LOGIC ===========
+            // ------------------------------------------
 
             // If flattened changes include Glamourer, or Mods, check manipulations & modded state.
             if (flattenedChanges.HasAny(IpcKind.Glamourer | IpcKind.Mods))
             {
                 // If manipulations changed, add it to the total changes changes.
-                if(LastCreatedData.ApplySingleIpc(OwnedObject.Player, IpcKind.ModManips, _ipc.Penumbra.GetMetaManipulationsString()))
+                if (_updater.LatestData.ApplySingleIpc(OwnedObject.Player, IpcKind.ModManips, _ipc.Penumbra.GetMetaManipulationsString()))
                 {
                     manipStrDiff = true;
                     // Update newChanges to help with visual updates.
                     newChanges[OwnedObject.Player] |= IpcKind.ModManips;
                 }
-                
+
                 // It is also possible that the mods could have changed if a glamourer of mod change occurred.
                 // We need to update the mod state first.
                 changedMods = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
@@ -320,12 +256,23 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 }
             }
 
-            // Collect the new flattened changes. Note that it is possible to have more than just mods, after a mods change.
+            // With these outliers taken into account, print the new flattened changes.
             Logger.LogDebug($"Flattened Changes: {flattenedChanges}", LoggerType.DataDistributor);
 
             // If the flattened changes requires we check the visual state, then do so.
             if (flattenedChanges is not IpcKind.Mods)
                 changedVisuals = await UpdateVisualsInternal(newChanges, manipStrDiff).ConfigureAwait(false);
+
+
+            // -----------------------------------------------
+            // =========== DATA DISTRIBUTION LOGIC ===========
+            // -----------------------------------------------
+
+            // Grab recipients. If there is nobody to send an update to, exit early.
+            // We update the cache regardless so that NewVisibleUsers are given the correct latest data.
+            var recipients = _updater.UsersForUpdatePush;
+            if (recipients.Count is 0)
+                return;
 
             // MODS CONDITION - Flattened changes could be just Mods, or both but with a failed visual check.
             if (flattenedChanges is IpcKind.Mods || (!changedVisuals.HasData() && changedMods.HasChanges))
@@ -348,24 +295,16 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
                 await SendVisualsUpdate(recipients, changedVisuals).ConfigureAwait(false);
                 return;
             }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error during CheckStateAndUpdate: {ex}");
-        }
-        finally
-        {
-            _dataUpdateLock.Release();
-        }
+        });
     }
 
     private async Task SendFullUpdate(List<UserData> recipients, ModUpdates modChanges, VisualUpdate visualChanges)
     {
         try
         {
-            InLimbo.Clear();
-            var res = await _hub.UserPushIpcFull(new(recipients, modChanges, visualChanges, false)).ConfigureAwait(false);
+            var res = await _hub.UserPushIpcFull(new(recipients, modChanges, visualChanges, false)).ConfigureAwait(false);            
             Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
+
             // Handle any missing mods after.
             if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
                 _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
@@ -380,10 +319,10 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     {
         try
         {
-            InLimbo.Clear();
-            string manipStr = newManipulations ? LastCreatedData.ModManips : string.Empty;
+            string manipStr = newManipulations ? _updater.LatestData.ModManips : string.Empty;
             var res = await _hub.UserPushIpcMods(new(recipients, modChanges, manipStr)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcMods to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading. [HadManipChange?: {newManipulations}]", LoggerType.DataDistributor);
+            
             // Handle any missing mods after.
             if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
                 _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
@@ -398,7 +337,6 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
     {
         try
         {
-            InLimbo.Clear();
             await _hub.UserPushIpcOther(new(recipients, visualChanges)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcOther to {recipients.Count} users.", LoggerType.DataDistributor);
         }
@@ -410,15 +348,14 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
 
     private async Task<ModUpdates> UpdateModsInternal(CancellationToken ct)
     {
-        // Collect the current modded state.
         var currentState = await _moddedState.CollectModdedState(ct).ConfigureAwait(false);
         // Apply the new state to the latest to get the new changed values from it.
-        return LastCreatedData.ApplyNewModState(currentState);
+        return _updater.LatestData.ApplyNewModState(currentState);
     }
 
     private async Task<VisualUpdate> UpdateVisualsInternal(Dictionary<OwnedObject, IpcKind> changes, bool forceManips)
     {
-        var changedData = new ClientDataCache(LastCreatedData);
+        var changedData = new ClientDataCache(_updater.LatestData);
         // process the tasks for each object in parallel.
         var tasks = new List<Task>();
         foreach (var (obj, kinds) in changes)
@@ -428,7 +365,7 @@ public sealed class DistributionService : DisposableMediatorSubscriberBase
         }
         // Execute in parallel.
         await Task.WhenAll(tasks).ConfigureAwait(false);
-        return LastCreatedData.ApplyAllIpc(changedData, forceManips);
+        return _updater.LatestData.ApplyAllIpc(changedData, forceManips);
     }
 
     private async Task UpdateDataCache(OwnedObject obj, IpcKind toUpdate, ClientDataCache data)

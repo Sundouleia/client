@@ -9,15 +9,13 @@ namespace Sundouleia.PlayerClient;
 public sealed class BlockedUserManager : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
-    private readonly ServerConfigManager _serverConfigs;
     private readonly ConfigFileProvider _fileNames;
 
     public BlockedUserManager(ILogger<BlockedUserManager> logger, SundouleiaMediator mediator,
-        MainConfig config, ServerConfigManager serverConfigs, ConfigFileProvider fileNames)
+        MainConfig config, ConfigFileProvider fileNames)
         : base(logger, mediator)
     {
         _config = config;
-        _serverConfigs = serverConfigs;
         _fileNames = fileNames;
     }
 }

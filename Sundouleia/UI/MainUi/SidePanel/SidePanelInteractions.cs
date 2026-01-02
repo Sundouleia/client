@@ -172,8 +172,8 @@ public class SidePanelInteractions
 
     private void DrawApplyMoodleOwn(InteractionsCache cache, Sundesmo s, string dispName, float width)
     {
-        var hasStatuses = MoodlesCacheService.Data.Statuses.Count > 0;
-        var hasPresets = MoodlesCacheService.Data.Presets.Count > 0;
+        var hasStatuses = ClientMoodles.Data.Statuses.Count > 0;
+        var hasPresets = ClientMoodles.Data.Presets.Count > 0;
         var isAllowed = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOther);
 
         var statusTxt = hasStatuses ? $"Apply a status to {dispName}" : $"No statuses to apply";

@@ -5,7 +5,6 @@ namespace Sundouleia;
 public static class Constants
 {
     public const int Blake3HashLength = 64;
-    public const int SundesmoTimeoutSeconds = 7;
     // Default, Unchangeable Tags used for base Sundesmo grouping.
     public const string FolderTagAllDragDrop    = "All Sundesmos (For Drag-Drop)";
     public const string FolderTagAll            = "All Sundesmos";

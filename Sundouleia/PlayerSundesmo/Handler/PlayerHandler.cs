@@ -5,7 +5,6 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
-using Penumbra.GameData.Files.ShaderStructs;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.Services;
@@ -40,6 +39,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private Dictionary<string, VerifiedModFile> _replacements = []; // Hash -> VerifiedFile with download link included if necessary.
     private Guid _tempProfile; // CPlus temp profile id.
     private IpcDataPlayerCache? _appearanceData = null;
+
     private readonly SemaphoreSlim _dataLock = new(1, 1);
 
     public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
@@ -133,15 +133,19 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     private unsafe void MarkRenderedInternal(IntPtr address)
     {
-        // End Timeouts if running as one of our states became valid again.
-        Sundesmo.EndTimeout();
+        // If we were in any timeout, end the timeout.
+        Sundesmo.ExitLimboState();
+
         // Set the game data.
         _player = (Character*)address;
         NameString = _player->NameString;
-        NameWithWorld = PlayerData.GetNameWorldUnsafe(_player);
+        NameWithWorld = _player->GetNameWithWorld();
+        
         // Notify other services.
         Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] rendered!", LoggerType.PairHandler);
         Mediator.Publish(new SundesmoPlayerRendered(this, Sundesmo));
+        
+        // ReInitialize our alterations for becoming visible again.
         ReInitializeInternal().ConfigureAwait(false);
     }
 
@@ -180,14 +184,29 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         if (Address == IntPtr.Zero || address != Address)
             return;
+
         // Clear the GameData.
         _player = null;
-        // Temp timeout inform.
-        Sundesmo.TriggerTimeoutTask();
-        // Refresh the list to reflect visible state.
+
+        // Unrendering should begin the Sundesmo's timeout process.
         Logger.LogDebug($"Marking {Sundesmo.GetNickAliasOrUid()} as unrendered @ [{address:X}]", LoggerType.PairHandler);
+        Sundesmo.EnterLimboState();
+
         Mediator.Publish(new SundesmoPlayerUnrendered(address));
         Mediator.Publish(new FolderUpdateSundesmos());
+    }
+
+    private async Task TryCreateAssignTempCollection()
+    {
+        if (!IpcCallerPenumbra.APIAvailable)
+            return;
+        // Create new Collection if we need one.
+        if (_tempCollection == Guid.Empty)
+            _tempCollection = await _ipc.Penumbra.NewSundesmoCollection(Sundesmo.UserData.UID).ConfigureAwait(false);
+
+        // If we are rendered, assign the collection
+        if (IsRendered)
+            await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
     }
 
     // Faze out as we move to watcher.
@@ -219,67 +238,77 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     #endregion Rendering
 
     #region Altaration Control
-    // Adds a temporary collection for this handler.
-    private async Task TryCreateAssignTempCollection()
-    {
-        if (!IpcCallerPenumbra.APIAvailable)
-            return;
-        // Create new Collection if we need one.
-        if (_tempCollection == Guid.Empty)
-            _tempCollection = await _ipc.Penumbra.NewSundesmoCollection(Sundesmo.UserData.UID).ConfigureAwait(false);
 
-        // If we are rendered, assign the collection
-        if (IsRendered)
-            await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
+    /// <inheritdoc cref="RevertAlterations(string, string, nint, ushort, CancellationToken)"/>
+    public async Task RevertAlterations(CancellationToken ct = default)
+    {
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // Revert penumbra collection and customize+ data if set.
+            await RevertAssignedAlterations();
+
+            // If not visible, skip all but GlamourerByName, since they won't be valid.
+            if (!IsRendered)
+            {
+                // Revert glamourer by name if possible.
+                if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
+                    await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
+                return;
+            }
+
+            // We can care about parallel execution here if we really want to but i dont care atm.
+            await _ipc.PetNames.ClearPetNamesByIdx(ObjIndex).ConfigureAwait(false);
+            await _ipc.Glamourer.ReleaseActor(ObjIndex).ConfigureAwait(false);
+            await _ipc.Heels.RestoreUserOffset(ObjIndex).ConfigureAwait(false);
+            await _ipc.Honorific.ClearTitleAsync(ObjIndex).ConfigureAwait(false);
+            await _ipc.Moodles.ClearByPtr(Address).ConfigureAwait(false);
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
+    }
+    /// <summary>
+    ///     Reverts the rendered alterations on a player.<br/>
+    ///     <b>This does not delete the alteration data. </b>
+    /// </summary>
+    private async Task RevertAlterations(string name, IntPtr address, ushort objIdx, CancellationToken token)
+    {
+        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // Revert penumbra collection and customize+ data if set.
+            await RevertAssignedAlterations();
+
+            // If not visible, skip all but GlamourerByName, since they won't be valid.
+            if (address == IntPtr.Zero)
+            {
+                // Revert glamourer by name if possible.
+                if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
+                    await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
+                return;
+            }
+
+            // We can care about parallel execution here if we really want to but i dont care atm.
+            await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
+            await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
+            await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
+            await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
+            await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
+        }
+        finally
+        {
+            _dataLock.Release();
+        }
     }
 
     /// <summary>
-    ///     Reverts the rendered alterations on a player. <b> This does not delete the alteration data. </b>
+    ///     Revert alterations that entrusted us with an ID, that dont require other actor info. <para/>
+    ///     <b>Currently Penumbra and Customize+</b>
     /// </summary>
-    public async Task RevertRenderedAlterations(CancellationToken ct = default)
+    private async Task RevertAssignedAlterations()
     {
-        await _dataLock.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            // Revert any C+ Data if we have any.
-            if (_tempProfile != Guid.Empty)
-            {
-                await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-                _tempProfile = Guid.Empty;
-            }
-            if (_tempCollection != Guid.Empty)
-            {
-                Logger.LogTrace($"Removing {NameString}(({Sundesmo.GetNickAliasOrUid()})'s temporary collection.", LoggerType.PairHandler);
-                await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
-            }
-            // Revert based on rendered state.
-            if (IsRendered)
-                await RevertAlterationsInternal(Sundesmo.GetNickAliasOrUid(), NameString, Address, ObjIndex, ct).ConfigureAwait(false);
-            else if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
-                await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
-        }
-        finally
-        {
-            _dataLock.Release();
-        }
-    }
-
-    public async Task RevertAlterations(string aliasOrUid, string name, IntPtr address, ushort objIdx, CancellationToken token)
-    {
-        await _dataLock.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            await RevertAlterationsInternal(aliasOrUid, name, address, objIdx, token).ConfigureAwait(false);
-        }
-        finally
-        {
-            _dataLock.Release();
-        }
-    }
-
-    private async Task RevertAlterationsInternal(string aliasOrUid, string name, IntPtr address, ushort objIdx, CancellationToken token)
-    {
-        // These can revert regardless of validity (Im pretty sure)
         if (_tempProfile != Guid.Empty)
         {
             await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
@@ -287,18 +316,29 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
         if (_tempCollection != Guid.Empty)
         {
-            Logger.LogTrace($"Removing {name}(({aliasOrUid})'s temporary collection.", LoggerType.PairHandler);
+            Logger.LogTrace($"Removing {NameString}(({Sundesmo.GetNickAliasOrUid()})'s temporary collection.", LoggerType.PairHandler);
             await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
+            _tempCollection = Guid.Empty;
+        }
+    }
+
+    public async Task ClearAlterations(CancellationToken ct = default)
+    {
+        await _dataLock.WaitAsync(ct).ConfigureAwait(false);
+        // Clear alterations.
+        if (_tempCollection != Guid.Empty || _tempProfile != Guid.Empty)
+        {
+            Logger.LogError("You are clearing alterations prior to reverting them!\n" +
+                "This will have consequences on the stability of your data sync!");
+            Logger.LogError("If you are getting this, find out why it is happening!");
         }
 
-        if (address == IntPtr.Zero)
-            return;
-        // We can care about parallel execution here if we really want to but i dont care atm.
-        await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
-        await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
-        await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
-        await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
-        await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
+        _replacements.Clear();
+        _appearanceData = null;
+        _tempCollection = Guid.Empty;
+        _tempProfile = Guid.Empty;
+
+        _dataLock.Release();
     }
 
     // Don't entirely need to await this, but its an option we want it i guess.
@@ -381,6 +421,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _dataLock.Release();
         }
     }
+
     public async Task ReapplyAlterations()
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
@@ -393,6 +434,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _dataLock.Release();
         }
     }
+
     private async Task ReapplyAlterationsInternal()
     {
         // Apply changes, then redraw if necessary.
@@ -673,7 +715,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     }
     #endregion Alteration Application
 
-    #region Ipc Helpers
+    #region Helpers
     private async Task ApplyGlamourer()
     {
         Logger.LogDebug($"Applying glamourer state for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairAppearance);
@@ -721,16 +763,26 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
     }
 
+    // Reapply the actor if we should.
+    // (Append conditions for a redraw over reapply later probably)
     public void ConditionalRedraw(bool condition)
     {
         if (condition && IsRendered)
         {
             Logger.LogDebug($"Redrawing [{Sundesmo.GetNickAliasOrUid()}] due to alteration changes.", LoggerType.PairHandler);
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
+            // Use the below when we know how to distinguish what redraw operation to perform.
+            //_ipc.Glamourer.ReapplyActor(ObjIndex);
         }
     }
+
     #endregion Ipc Helpers
 
+    /// <summary>
+    ///     Perform a true disposal on the handler, reverting rendered alterations,
+    ///     clearing alteration data, and disposing of download and runtime CTS. <para/>
+    ///     <b>Do not call this unless you are disposing the Sundesmo.</b>
+    /// </summary>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
@@ -739,8 +791,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // Stop any actively running tasks.
         _dlWaiterCTS.SafeCancelDispose();
-        // Cancel any tasks depending on runtime. (Do not dispose)
         _runtimeCTS.SafeCancel();
+
         // If they were valid before, parse out the event message for their disposal.
         if (!string.IsNullOrEmpty(NameString))
         {
@@ -757,51 +809,41 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
 
         // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
-        _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), NameString, addr, objIdx).ConfigureAwait(false);
-    }
+        // Everything in here, if it errors, should not crash the game as it is fire and forget.
+        _ = Task.Run(async () =>
+        {
+            var nickAliasOrUid = Sundesmo.GetNickAliasOrUid();
+            var name = NameString;
+            try
+            {
+                // Revert assigned alterations regardless of the conditional state.
+                await RevertAssignedAlterations();
 
-    /// <summary>
-    ///     What to fire whenever called on application shutdown instead of the normal disposal method.
-    /// </summary>
-    private async Task SafeRevertOnDisposal(string nickAliasOrUid, string name, IntPtr address, ushort objIdx)
-    {
-        try
-        {
-            if (_tempCollection != Guid.Empty)
-            {
-                Logger.LogTrace($"Removing {name}(({nickAliasOrUid})'s temporary collection.", LoggerType.PairHandler);
-                await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
+                // If we are not zoning and not in a cutscene, run the revert with a 30s timeout.
+                if (!PlayerData.IsZoning && !PlayerData.InCutscene)
+                {
+                    Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
+                    using var timeoutCTS = new CancellationTokenSource();
+                    timeoutCTS.CancelAfter(TimeSpan.FromSeconds(30));
+                    await RevertAlterations(name, addr, objIdx, timeoutCTS.Token);
+                }
             }
-            // revert glamourer by name.
-            if (!IsRendered && !string.IsNullOrEmpty(name))
+            catch (Exception ex)
             {
-                Logger.LogTrace($"Reverting {name}(({nickAliasOrUid})'s actor state", LoggerType.PairHandler);
-                await _ipc.Glamourer.ReleaseByName(name).ConfigureAwait(false);
+                Logger.LogError($"Error reverting {name}({nickAliasOrUid} on shutdown: {ex}");
             }
-            // Check for zone relative data.
-            if (!PlayerData.IsZoning && !PlayerData.InCutscene && IsRendered)
+            finally
             {
-                Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
-                using var timeoutCTS = new CancellationTokenSource();
-                timeoutCTS.CancelAfter(TimeSpan.FromSeconds(30));
-                await RevertAlterations(nickAliasOrUid, name, address, objIdx, timeoutCTS.Token);
+                // Clear internal data.
+                _tempCollection = Guid.Empty;
+                _replacements.Clear();
+                _tempProfile = Guid.Empty;
+                _appearanceData = null;
+                NameString = string.Empty;
+                NameWithWorld = string.Empty;
+                unsafe { _player = null; }
             }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error reverting {name}({nickAliasOrUid} on shutdown: {ex}");
-        }
-        finally
-        {
-            // Clear internal data.
-            _tempCollection = Guid.Empty;
-            _replacements.Clear();
-            _tempProfile = Guid.Empty;
-            _appearanceData = null;
-            NameString = string.Empty;
-            NameWithWorld = string.Empty;
-            unsafe { _player = null; }
-        }
+        });
     }
 
     public void DrawDebugInfo()
@@ -818,6 +860,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         using var node = ImRaii.TreeNode($"Mods##{Sundesmo.UserData.UID}-mod-replacements");
         if (!node) return;
+
+        if (CkGui.IconTextButton(FAI.Sync, "Glamourer Reapply Actor"))
+            ConditionalRedraw(true);
 
         using var table = ImRaii.Table("sundesmos-mods-table", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
         if (!table) return;

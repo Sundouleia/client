@@ -85,14 +85,14 @@ public partial class MainHub
                 await LoadOnlineSundesmos().ConfigureAwait(false);
                 await LoadRequests().ConfigureAwait(false);
                 // Load in all local data for the current profile.
-                _serverConfigs.UpdateFileProviderForConnection(ConnectionResponse!);
+                _accounts.UpdateFileProviderForConnection(ConnectionResponse!);
 
                 // once data is synchronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;
                 Mediator.Publish(new ConnectedMessage());
 
                 // Update our current authentication to reflect the information provided.
-                _serverConfigs.UpdateAuthentication(secretKey, ConnectionResponse!);
+                _accounts.UpdateAuthentication(secretKey, ConnectionResponse!);
             }
             catch (OperationCanceledException)
             {
@@ -296,16 +296,16 @@ public partial class MainHub
         }
 
         // if we have not yet made an account, abort this connection.
-        if (_serverConfigs.AccountStorage.LoginAuths.Count <= 0)
+        if (_accounts.Config.LoginAuths.Count <= 0)
         {
             Logger.LogDebug("No Authentications created. No Primary Account or Alt Account to connect with. Aborting!", LoggerType.ApiCore);
             return false;
         }
 
         // If we do not have an auth made for this character, make one, but still reject.
-        if (!_serverConfigs.CharaHasLoginAuth())
+        if (!_accounts.CharaHasLoginAuth())
         {
-            _serverConfigs.GenerateAuthForCurrentCharacter();
+            _accounts.GenerateAuthForCurrentCharacter();
             Logger.LogDebug("New LoginAuth made for character, but no key is connected!", LoggerType.ApiCore);
             return false;
         }
@@ -318,7 +318,7 @@ public partial class MainHub
         }
 
         // Obtain stored ServerKey for the current Character we are logged into.
-        var profileForChara = _serverConfigs.GetProfileForCharacter();
+        var profileForChara = _accounts.GetProfileForCharacter();
         fetchedSecretKey = profileForChara?.Key ?? string.Empty;
         if (string.IsNullOrEmpty(fetchedSecretKey))
         {

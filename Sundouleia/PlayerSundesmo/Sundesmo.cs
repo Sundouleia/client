@@ -15,13 +15,17 @@ using Sundouleia.Watchers;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
+using System.Threading.Tasks;
 
 namespace Sundouleia.Pairs;
 
 /// <summary>
-///     Stores information about a pairing (Sundesmo) between 2 users. <para />
-///     Created via the SundesmoFactory
+///     Stores information about a pairing (Sundesmo) between 2 users.
 /// </summary>
+/// <remarks>
+///     The handlers associated with the sundesmo must be disposed of when removing.
+///     However, don't make Sundesmo itself IDiposable.
+/// </remarks>
 public sealed class Sundesmo : IComparable<Sundesmo>
 {
     private readonly ILogger<Sundesmo> _logger;
@@ -29,63 +33,55 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favorites;
-    private readonly SundesmoHandlerFactory _factory; // Polish / refine how this is implemented later... Things should be disposed of at proper times.
-    private readonly ServerConfigManager _nickConfig;
+    private readonly NickConfig _nicks;
+    private readonly LimboStateManager _limboManager;
     private readonly CharaObjectWatcher _watcher;
-
-    private CancellationTokenSource _timeoutCTS = new();
-    private Task? _timeoutTask; // may not need? Could fire off thread but unsure.
 
     // Associated Player Data (Created once online).
     private OnlineUser? _onlineUser;
+
+    // Tracks information about their OwnedObjects. (Where the rendered data is)
     private PlayerHandler _player;
-    // possibility that some alterations could go out of sync? but debug later.
     private PlayerOwnedHandler _mountMinion;
     private PlayerOwnedHandler _pet;
     private PlayerOwnedHandler _companion;
 
     public Sundesmo(UserPair userPairInfo, ILogger<Sundesmo> logger, SundouleiaMediator mediator,
-        MainConfig config, FolderConfig folderConfig, FavoritesConfig favorites, ServerConfigManager nicks,
-        SundesmoHandlerFactory factory, CharaObjectWatcher watcher)
+        MainConfig config, FolderConfig folderConfig, FavoritesConfig favorites, NickConfig nicks,
+        SundesmoHandlerFactory factory, LimboStateManager limbo, CharaObjectWatcher watcher)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
         _folderConfig = folderConfig;
         _favorites = favorites;
-        _nickConfig = nicks;
-        _factory = factory;
+        _nicks = nicks;
+        _limboManager = limbo;
         _watcher = watcher;
 
         UserPair = userPairInfo;
+        // Initialize all handlers for the sundesmo, holding their lifetime until disposal.
         // Create handlers for each of the objects.
-        CreateObjectHandlers();
-
-        _logger.LogDebug($"Creating Sundesmo for ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
+        _player = factory.Create(this);
+        _mountMinion = factory.Create(OwnedObject.MinionOrMount, this);
+        _pet = factory.Create(OwnedObject.Pet, this);
+        _companion = factory.Create(OwnedObject.Companion, this);
+        _logger.LogDebug($"Initialized Sundesmo for ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
     }
-
-    private void CreateObjectHandlers()
-    {
-        _logger.LogDebug($"Creating object handlers for ({GetNickAliasOrUid()}).");
-        _player = _factory.Create(this);
-        _mountMinion = _factory.Create(OwnedObject.MinionOrMount, this);
-        _pet = _factory.Create(OwnedObject.Pet, this);
-        _companion = _factory.Create(OwnedObject.Companion, this);
-    }
-
-    public bool IsReloading { get; private set; } = false;
 
     // Associated ServerData.
-    public UserPair UserPair { get; private set; }
-    public UserData UserData => UserPair.User;
-    public PairPerms OwnPerms => UserPair.OwnPerms;
-    public GlobalPerms PairGlobals => UserPair.Globals;
-    public PairPerms PairPerms => UserPair.Perms;
+    public UserPair     UserPair { get; private set; }
+    public UserData     UserData    => UserPair.User;
+    public PairPerms    OwnPerms    => UserPair.OwnPerms;
+    public GlobalPerms  PairGlobals => UserPair.Globals;
+    public PairPerms    PairPerms   => UserPair.Perms;
 
-    // Shared MoodleData, if any.
-    public MoodleData SharedData = new();
+    // Shared MoodleData. Fresh / empty if not shared.
+    public MoodleData   SharedData { get; private set; } = new();
 
     // Internal Helpers
+    public bool IsReloading { get; private set; } = false;
+
     public bool IsTemporary => UserPair.IsTemporary;
     public bool IsRendered => _player.IsRendered;
     public bool IsOnline => _onlineUser != null;
@@ -114,14 +110,15 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         => (IsRendered && !string.IsNullOrEmpty(PlayerName)
             ? (_folderConfig.Current.NickOverPlayerName ? GetNickAliasOrUid() : PlayerName)
             : GetNickAliasOrUid());
+
     public string GetDisplayName()
     {
         var condition = IsRendered && !_folderConfig.Current.NickOverPlayerName && !string.IsNullOrEmpty(PlayerName);
         return condition ? PlayerName : GetNickAliasOrUid();
     }
 
-    public string? GetNickname() => _nickConfig.GetNicknameForUid(UserData.UID);
-    public string GetNickAliasOrUid() => _nickConfig.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
+    public string? GetNickname() => _nicks.GetNicknameForUid(UserData.UID);
+    public string GetNickAliasOrUid() => _nicks.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
 
     public IPCMoodleAccessTuple ToAccessTuple()
     {
@@ -133,34 +130,6 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     public void SetMoodleData(MoodleData newData)
         => SharedData = newData;
 
-    public void UpdateMoodleStatus(MoodlesStatusInfo status, bool deleted)
-    {
-        if (deleted) SharedData.Statuses.Remove(status.GUID);
-        else SharedData.TryUpdateStatus(status);
-    }
-
-    public void SetMoodleStatuses(List<MoodlesStatusInfo> statuses)
-        => SharedData.SetStatuses(statuses);
-
-    public void UpdateMoodlePreset(MoodlePresetInfo preset, bool deleted)
-    {
-        if (deleted) SharedData.Presets.Remove(preset.GUID);
-        else SharedData.TryUpdatePreset(preset);
-    }
-
-    public void SetMoodlePresets(List<MoodlePresetInfo> presets)
-        => SharedData.SetPresets(presets);
-
-    // Reapply all existing data to all rendered objects.
-    public void ReapplyAlterations()
-    {
-        _player.ReapplyAlterations().ConfigureAwait(false);
-        _mountMinion.ReapplyAlterations().ConfigureAwait(false);
-        _pet.ReapplyAlterations().ConfigureAwait(false);
-        _companion.ReapplyAlterations().ConfigureAwait(false);
-    }
-
-    // Tinker with async / no async later.
     public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
         if (newIpc.PlayerChanges != null)
@@ -198,61 +167,46 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     {
         await (obj switch
         {
-            OwnedObject.Player => _player.UpdateAndApplyIpc(kind, newData),
-            OwnedObject.MinionOrMount => _mountMinion.UpdateAndApplyIpc(kind, newData),
-            OwnedObject.Pet => _pet.UpdateAndApplyIpc(kind, newData),
-            OwnedObject.Companion => _companion.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.Player          => _player.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.MinionOrMount   => _mountMinion.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.Pet             => _pet.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.Companion       => _companion.UpdateAndApplyIpc(kind, newData),
             _ => Task.CompletedTask,
         }).ConfigureAwait(false);
     }
 
+    /// <summary>
+    ///     After a Sundesmo is initialized / created, it will then be marked as
+    ///     Online, if they are online. (Or after a reconnection, after being created) <para />
+    /// 
+    ///     Because of this, when a Sundesmo is marked online, abort any timeouts. <para />
+    ///     
+    ///     After a Sundesmo is marked online, check the sundesmos OwnedObjects for 
+    ///     visibility, rendering them if applicable.
+    /// </summary>
     public unsafe void MarkOnline(OnlineUser dto)
     {
-        _timeoutCTS.SafeCancel();
         _onlineUser = dto;
-        _mediator.Publish(new SundesmoOnline(this, IsReloading));
+        // If they are in any limbostate, abort it
+        _limboManager.CancelLimbo(dto.User);
+        // Inform mediator of Online update.
+        _mediator.Publish(new SundesmoOnline(this));
 
-        // Set IsReloading back to false.
+        // If we were marked for reloading, turn it back to false.
         IsReloading = false;
 
-        // Attempt to set visible if rendered.
-        // This also handles marking them as rendered and reapplication if any exists.
+        // Check each of the Sundesmo's potentially existing owned objects.
+        // If any of them are rendered, we should mark them as visible and
+        // bind the Objects to their data.
         _player.SetVisibleIfRendered().ConfigureAwait(false);
-
-        // If the player is not rendered, their owned objects should not be.
-        if (!IsRendered)
-            return;
-
         _mountMinion.SetVisibleIfRendered().ConfigureAwait(false);
         _pet.SetVisibleIfRendered().ConfigureAwait(false);
         _companion.SetVisibleIfRendered().ConfigureAwait(false);
     }
 
     /// <summary>
-    ///     Should occur whenever the sundesmo reloads the plugin or performs a manual full disconnect. <para />
-    ///     Any disconnects or temporary timeouts do not call this. It should be used to skip any timeouts,
-    ///     and immediately remove any active alterations the next time they are marked offline. <para />
-    ///     This also will prevent them from being sent into limbo in the distribution service.
+    ///     Convert a temporary Sundesmo to a permanent one.
     /// </summary>
-    public void MarkForUnload()
-    {
-        // Whenever IsReloading is true, marking as offline will skip the
-        // timeouts entirely and immediately force an unload of alterations.
-        _logger.LogDebug($"Marking [{PlayerName}] ({GetNickAliasOrUid()}) as reloading.", LoggerType.PairManagement);
-        IsReloading = true;
-    }
-
-    /// <summary>
-    ///     Marks the sundesmo as offline, triggering the alteration data revert timeout. <para />
-    ///     When this expires, all applied alterations will be removed, regardless of visibility state.
-    /// </summary>
-    public void MarkOffline()
-    {
-        _onlineUser = null;
-        TriggerTimeoutTask();
-        _mediator.Publish(new SundesmoOffline(this));
-    }
-
     public void MarkAsPermanent()
     {
         if (!UserPair.IsTemporary)
@@ -266,73 +220,120 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     }
 
     /// <summary>
-    ///     Removes all applied appearance data for the sundesmo if rendered, 
-    ///     and disposes all internal data. Creates fresh handlers for re-initialization.
+    ///     When logged out of unloading the plugin, data for a Sundesmo 
+    ///     should unload without any limbo state. <para />
+    ///     The next time they are marked as offline (which should happen 
+    ///     after this call), revert, and then clear all data for the handler. <br /> 
+    ///     <b>Don't dispose, so they show up as offline still.</b>
     /// </summary>
-    public void TemporarilyDisposeData()
+    public void MarkForUnload()
     {
-        PermanentlyDisposeData();
-
-        // Re-create fresh object handlers so this Sundesmo is ready for re-initialization
-        CreateObjectHandlers();
+        _logger.LogDebug($"Marking [{PlayerName}] ({GetNickAliasOrUid()}) as reloading.", LoggerType.PairManagement);
+        IsReloading = true;
     }
 
     /// <summary>
-    ///     Removes all applied appearance data for the sundesmo if rendered, 
-    ///     and disposes all internal data.
+    ///     Marks the sundesmo as offline, triggering the alteration data revert timeout. <para />
+    ///     When this expires, all applied alterations will be reverted, regardless of visibility state.
     /// </summary>
-    public void PermanentlyDisposeData()
+    /// <param name="immidiateRevert"> Skips the limbo timeout and reverts instantly. </param>
+    public async void MarkOffline(bool immidiateRevert = false)
+    {
+        _onlineUser = null;
+        // Inform the TransferBarUI of their offline state so they're removed from the dictionaries.
+        _mediator.Publish(new SundesmoOffline(this));
+
+        // If the Sundesmo is marked for Reloading or an immidiate revert is forced,
+        // revert the alterations and clear the data now.
+        if (IsReloading || immidiateRevert)
+        {
+            await RevertRenderedAlterations().ConfigureAwait(false);
+            await ClearAllAlterationData().ConfigureAwait(false);
+        }
+        // If they are rendered, we should place them into a timeout.
+        else if (IsRendered)
+        {
+            EnterLimboState();
+        }
+        // Otherwise they were not rendered so we have no reason to keep any data.
+        else
+        {
+            await ClearAllAlterationData().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Toss a rendered sundesmo into limbo state. <br/>
+    ///     This should be called when the Sundesmo becomes unrenders, 
+    ///     or when they go offline while still rendered.
+    /// </summary>
+    public bool EnterLimboState()
+        => _limboManager.EnterLimbo(this, RevertRenderedAlterations);
+
+    /// <summary>
+    ///     If this sundesmo is currently in a limbo state, escape it.
+    /// </summary>
+    public bool ExitLimboState()
+        => _limboManager.CancelLimbo(UserData);
+
+
+    /// <summary>
+    ///     Reapply cached Alterations to all visible OwnedObjects.
+    /// </summary>
+    public void ReapplyAlterations()
+    {
+        _player.ReapplyAlterations().ConfigureAwait(false);
+        _mountMinion.ReapplyAlterations().ConfigureAwait(false);
+        _pet.ReapplyAlterations().ConfigureAwait(false);
+        _companion.ReapplyAlterations().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Revert the rendered alterations for all owned objects of the Sundesmo.
+    /// </summary>
+    public async Task RevertRenderedAlterations()
+    {
+        _logger.LogDebug($"Reverting alterations for [{PlayerName}] ({GetNickAliasOrUid()}).", UserData.AliasOrUID);
+        await _player.RevertAlterations().ConfigureAwait(false);
+        await _mountMinion.RevertAlterations().ConfigureAwait(false);
+        await _pet.RevertAlterations().ConfigureAwait(false);
+        await _companion.RevertAlterations().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Cleanup all alteration data for all owned objects of the Sundesmo.
+    /// </summary>
+    public async Task ClearAllAlterationData()
+    {
+        _logger.LogDebug($"Clearing alteration data for [{PlayerName}] ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
+        await _player.ClearAlterations().ConfigureAwait(false);
+        await _mountMinion.ClearAlterations().ConfigureAwait(false);
+        await _pet.ClearAlterations().ConfigureAwait(false);
+        await _companion.ClearAlterations().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Disposes of the Sundesmo's Handlers. <br/>
+    ///     <b>Should be called prior to disposing a Sundesmo, and 
+    ///     treated like a disposal, prior to removing it.</b>
+    /// </summary>
+    public void DisposeData()
     {
         _logger.LogDebug($"Disposing data for [{PlayerName}] ({GetNickAliasOrUid()})", LoggerType.PairManagement);
-        // Cancel any existing timeout task, and then dispose of all data.
-        _timeoutCTS.SafeCancel();
+        // If online, just simply mark offline.
+        if (IsOnline)
+        {
+            _onlineUser = null;
+            // Inform the TransferBarUI of their offline state so they're removed from the dictionaries.
+            _mediator.Publish(new SundesmoOffline(this));
+        }
+
+        // The handler disposal methods effective perform a revert + data clear + final disposal state.
+        // Because of this calling mark offline prior is not necessary.
         _player.Dispose();
         _mountMinion.Dispose();
         _pet.Dispose();
         _companion.Dispose();
-    }
-
-    public void EndTimeout() => _timeoutCTS.SafeCancel();
-
-    /// <summary>
-    ///     Fired whenever the sundesmo goes offline, or they become unrendered. <para />
-    ///     If this needs to be fired while the task is already active, return.
-    /// </summary>
-    public void TriggerTimeoutTask()
-    {
-        if (_timeoutTask != null && !_timeoutTask.IsCompleted)
-            return;
-
-        _timeoutCTS = _timeoutCTS.SafeCancelRecreate();
-        // Process a task that awaits exactly 7 seconds, and then clear all alterations for all objects.
-        // Note that this is across all handled objects of the sundesmo.
-        _timeoutTask = Task.Run(async () =>
-        {
-            try
-            {
-                // If visible, send into limbo.
-                if (IsRendered)
-                    _mediator.Publish(new SundesmoEnteredLimbo(this));
-
-                // Await for the defined time, then clear the alterations
-                await Task.Delay(TimeSpan.FromSeconds(Constants.SundesmoTimeoutSeconds), _timeoutCTS.Token);
-
-                // Clear regardless of render or not.
-                _mediator.Publish(new SundesmoLeftLimbo(this));
-
-                // Revert all alterations.
-                _logger.LogDebug($"Timeout elapsed for [{PlayerName}] ({GetNickAliasOrUid()}). Clearing Alterations.", UserData.AliasOrUID);
-                await _player.RevertRenderedAlterations().ConfigureAwait(false);
-                await _mountMinion.RevertRenderedAlterations().ConfigureAwait(false);
-                await _pet.RevertRenderedAlterations().ConfigureAwait(false);
-                await _companion.RevertRenderedAlterations().ConfigureAwait(false);
-            }
-            catch (TaskCanceledException)
-            {
-                _logger.LogDebug($"Timeout cancelled for [{PlayerName}] ({GetNickAliasOrUid()}).", UserData.AliasOrUID);
-                _mediator.Publish(new SundesmoLeftLimbo(this));
-            }
-        }, _timeoutCTS.Token);
     }
 
     // --------------- Helper Methods -------------------

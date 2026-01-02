@@ -34,8 +34,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favoritesConfig;
-    // maybe make seperate config for nicks idk.
-    private readonly ServerConfigManager _serverConfigs;
+    private readonly NickConfig _nicks;
     private readonly SundesmoManager _sundesmos;
     private readonly WhitelistDrawSystem _drawSystem;
     private readonly SidePanelService _stickyService;
@@ -57,7 +56,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
 
     public WhitelistDrawer(ILogger<WhitelistDrawer> logger, SundouleiaMediator mediator,
         MainConfig config, FolderConfig folderConfig, FavoritesConfig favoritesConfig,
-        ServerConfigManager serverConfigs, SundesmoManager sundesmos,
+        NickConfig nicks, SundesmoManager sundesmos,
         SidePanelService stickyService, WhitelistDrawSystem ds)
         : base("##WhitelistDrawer", logger, ds, new SundesmoCache(ds))
     {
@@ -65,7 +64,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         _config = config;
         _folderConfig = folderConfig;
         _favoritesConfig = favoritesConfig;
-        _serverConfigs = serverConfigs;
+        _nicks = nicks;
         _sundesmos = sundesmos;
         _stickyService = stickyService;
         _drawSystem = ds;
@@ -241,7 +240,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         ImGui.SetNextItemWidth(width);
         if (ImGui.InputTextWithHint($"##{leaf.FullPath}-nick", "Give a nickname..", ref _nameEditStr, 45, ImGuiInputTextFlags.EnterReturnsTrue))
         {
-            _serverConfigs.SetNickname(leaf.Data.UserData.UID, _nameEditStr);
+            _nicks.SetNickname(leaf.Data.UserData.UID, _nameEditStr);
             _renaming = null;
         }
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))

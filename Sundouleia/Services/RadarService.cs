@@ -66,8 +66,8 @@ public class RadarService : DisposableMediatorSubscriberBase
     private async void OnLogin()
     {
         await SundouleiaEx.WaitForPlayerLoading();
-        CurrWorld = PlayerData.CurrentWorldIdInstanced;
-        CurrWorldName = PlayerData.CurrentWorldInstanced;
+        CurrWorld = PlayerData.CurrentWorldId;
+        CurrWorldName = PlayerData.CurrentWorldName;
         CurrZone = PlayerContent.TerritoryIdInstanced;
         Mediator.Publish(new RadarTerritoryChanged(0, CurrZone));
     }
@@ -87,7 +87,7 @@ public class RadarService : DisposableMediatorSubscriberBase
 
     private RadarZoneUpdate GetZoneUpdate()
     {
-        var world = PlayerData.CurrentWorldIdInstanced;
+        var world = PlayerData.CurrentWorldId;
         var zone = CurrZone;
         var joinChats = _config.Current.RadarJoinChats;
         var hashedCID = _config.Current.RadarSendPings ? SundouleiaSecurity.GetClientIdentHashThreadSafe() : string.Empty;

@@ -4,6 +4,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Gui.Components;
+using Sundouleia.Localization;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
@@ -27,7 +28,7 @@ public class MainUI : WindowMediatorSubscriberBase
     private bool THEME_PUSHED = false;
 
     private readonly MainConfig _config;
-    private readonly ServerConfigManager _serverConfigs;
+    private readonly AccountConfig _accounts;
     private readonly MainHub _hub;
     private readonly MainMenuTabs _tabMenu;
     private readonly RequestsManager _requests;
@@ -46,13 +47,13 @@ public class MainUI : WindowMediatorSubscriberBase
     public string _requestMessage   = string.Empty;
 
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
-        ServerConfigManager serverConfigs, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
+        AccountConfig accounts, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
         SundesmoManager sundesmos, TutorialService guides, HomeTab homeTab, WhitelistTab whitelist,
         RadarTab radar, RadarChatTab chat, RequestsTab requestsTab, SidePanelService stickyService)
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
-        _serverConfigs = serverConfigs;
+        _accounts = accounts;
         _hub = hub;
         _tabMenu = tabMenu;
         _requests = requests;
@@ -335,14 +336,14 @@ public class MainUI : WindowMediatorSubscriberBase
                     if (MainHub.IsConnected)
                     {
                         // If we are connected, we want to disconnect.
-                        _serverConfigs.AccountStorage.FullPause = true;
-                        _serverConfigs.Save();
+                        _accounts.Current.FullPause = true;
+                        _accounts.Save();
                         _ = _hub.Disconnect(ServerState.Disconnected, DisconnectIntent.Normal);
                     }
                     else if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                     {
-                        _serverConfigs.AccountStorage.FullPause = false;
-                        _serverConfigs.Save();
+                        _accounts.Current.FullPause = false;
+                        _accounts.Save();
                         _ = _hub.Connect();
                     }
                 }

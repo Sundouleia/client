@@ -7,7 +7,6 @@ using Microsoft.Extensions.Hosting;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
-using Sundouleia.Gui.Handlers;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Interop;
@@ -162,12 +161,13 @@ public static class SundouleiaServiceExtensions
         // Player Client
         .AddSingleton<BlockedUserManager>()
         .AddSingleton<RequestsManager>()
-        .AddSingleton<MoodlesCacheService>()
+        .AddSingleton<ClientMoodles>()
 
         // Player User
         .AddSingleton<SundesmoFactory>()
         .AddSingleton<SundesmoHandlerFactory>()
         .AddSingleton<SundesmoManager>()
+        .AddSingleton<LimboStateManager>()
 
         // Profiles
         .AddSingleton<ProfileFactory>()
@@ -176,7 +176,7 @@ public static class SundouleiaServiceExtensions
         // Distribution
         .AddSingleton<CharaObjectWatcher>()
         .AddSingleton<ClientUpdateService>()
-        .AddSingleton<DistributionService>()
+        .AddSingleton<ClientDistributor>()
         .AddSingleton<ModdedStateManager>()
         .AddSingleton<PlzNoCrashFrens>()
 
@@ -195,7 +195,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<UiFontService>()
 
         // UI (Probably mostly in Scoped)
-        .AddSingleton<IdDisplayHandler>()
         .AddSingleton<RadarChatLog>()
         .AddSingleton<PopoutRadarChatlog>()
         .AddSingleton<MainMenuTabs>()
@@ -240,7 +239,6 @@ public static class SundouleiaServiceExtensions
         // Config Managers / Savers
         .AddSingleton<GroupsManager>()
         .AddSingleton<AccountManager>()
-        .AddSingleton<ServerConfigManager>()
         .AddSingleton<HybridSaveService>();
 
     #region ScopedServices

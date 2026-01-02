@@ -21,17 +21,21 @@ public sealed class IpcCallerGlamourer : IIpcCaller
 
     // API Version
     private readonly ApiVersion ApiVersion;
+    private readonly AutoReloadGearEnabled AutoReloadSetting;
     // API EVENTS
+    public EventSubscriber<bool> OnAutoReloadChanged;               // Tells us when the AutoReloadGear setting changed.
     public EventSubscriber<nint, StateChangeType> OnStateChanged;   // Informs us when ANY Glamour Change has occurred.
     // API GETTERS
-    private readonly GetState       GetState;  // Obtain the JObject of the client's current state.
-    private readonly GetStateBase64 GetBase64; // Get the Base64string of the client's current state.
+    private readonly GetState       GetState;   // Obtain the JObject of the client's current state.
+    private readonly GetStateBase64 GetBase64;  // Get the Base64string of the client's current state.
     // API ENACTORS
-    private readonly ApplyState      ApplyState;       // Applies actor state with the obtained base64 strings.
-    private readonly UnlockState     UnlockUser;       // Unlocks a User's glamour state for modification.
-    private readonly UnlockStateName UnlockUserByName; // Unlock a User's glamour state by name. (try to avoid?)
-    private readonly RevertState     RevertUser;       // Revert a User to their game state.
-    private readonly RevertStateName RevertUserByName; // Revert a sundesmo to their game state by their name. (try to avoid?)
+    private readonly ApplyState         ApplyState;         // Applies actor state with the obtained base64 strings.
+    private readonly UnlockState        UnlockUser;         // Unlocks a User's glamour state for modification.
+    private readonly UnlockStateName    UnlockUserByName;   // Unlock a User's glamour state by name.
+    private readonly RevertState        RevertUser;         // Revert a User to their game state.
+    private readonly RevertStateName    RevertUserByName;   // Revert a sundesmo to their game state by their name.
+    private readonly ReapplyState       ReapplyState;       // Perform a redraw, but better.
+    private readonly ReapplyStateName   ReapplyStateByName; // Perform a redraw by name, but better.
 
     private readonly ILogger<IpcCallerGlamourer> _logger;
     private readonly SundouleiaMediator _mediator;
@@ -44,6 +48,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         _mediator = mediator;
 
         ApiVersion = new ApiVersion(Svc.PluginInterface);
+        AutoReloadSetting = new AutoReloadGearEnabled(Svc.PluginInterface);
 
         GetState = new GetState(Svc.PluginInterface);
         GetBase64 = new GetStateBase64(Svc.PluginInterface);
@@ -53,14 +58,18 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         UnlockUserByName = new UnlockStateName(Svc.PluginInterface);
         RevertUser = new RevertState(Svc.PluginInterface);
         RevertUserByName = new RevertStateName(Svc.PluginInterface);
+        ReapplyState = new ReapplyState(Svc.PluginInterface);
+        ReapplyStateByName = new ReapplyStateName(Svc.PluginInterface);
 
         CheckAPI();
     }
 
     public void Dispose()
-    { }
+    {
+    }
 
     public static bool APIAvailable { get; private set; } = false;
+
     public void CheckAPI()
     {
         var apiAvailable = false; // assume false at first
@@ -77,6 +86,11 @@ public sealed class IpcCallerGlamourer : IIpcCaller
             _shownGlamourerUnavailable = true;
             _mediator.Publish(new NotificationMessage("Glamourer inactive", "Features Using Glamourer will not function.", NotificationType.Error));
         }
+    }
+
+    private static void OnAutoReloadSettingChanged(bool newState)
+    {
+        // can do something with this later idk.
     }
 
     public async Task<JObject> GetClientState()
@@ -179,5 +193,21 @@ public sealed class IpcCallerGlamourer : IIpcCaller
             RevertUserByName.Invoke(playerName, SUNDOULEIA_LOCK);
             UnlockUserByName.Invoke(playerName, SUNDOULEIA_LOCK);
         }).ConfigureAwait(false);
+    }
+
+    public void ReapplyActor(ushort objIdx)
+    {
+        if (!APIAvailable)
+            return;
+
+        ReapplyState.Invoke(objIdx, SUNDOULEIA_LOCK);
+    }
+
+    public void ReapplyByName(string playerName)
+    {
+        if (!APIAvailable)
+            return;
+
+        ReapplyStateByName.Invoke(playerName, SUNDOULEIA_LOCK);
     }
 }

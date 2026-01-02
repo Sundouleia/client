@@ -96,7 +96,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
     private async Task WaitForPlayerAndLaunchCharacterManager()
     {
         // wait for the player to be present
-        while (PlayerData.AvailableThreadSafe is false)
+        while (!PlayerData.Available)
         {
             Svc.Logger.Debug("Waiting for player to be present");
             await Task.Delay(100).ConfigureAwait(false);
@@ -139,9 +139,9 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
             _runtimeServiceScope.ServiceProvider.GetRequiredService<UiFontService>();
             // get the required service for the online player manager (and notification service if we add it)
             _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientUpdateService>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<DistributionService>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientDistributor>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<RadarService>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<MoodlesCacheService>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientMoodles>();
             // stuff that should probably be a hosted service but isn't yet.
             _runtimeServiceScope.ServiceProvider.GetRequiredService<DtrBarService>();
         }

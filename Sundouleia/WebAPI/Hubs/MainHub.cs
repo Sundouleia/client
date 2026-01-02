@@ -22,9 +22,9 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public const string MAIN_SERVER_NAME = "Sundouleia Main";
     public const string MAIN_SERVER_URI = "wss://sundouleia.kinkporium.studio";
 
+    private readonly AccountManager _accounts;
     private readonly HubFactory _hubFactory;
     private readonly TokenProvider _tokenProvider;
-    private readonly ServerConfigManager _serverConfigs;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly IpcCallerMoodles _moodles;
@@ -49,18 +49,18 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
 
     public MainHub(ILogger<MainHub> logger,
         SundouleiaMediator mediator,
+        AccountManager accounts,
         HubFactory hubFactory,
         TokenProvider tokenProvider,
-        ServerConfigManager serverConfigs,
         RequestsManager requests,
         SundesmoManager sundesmos,
         IpcCallerMoodles moodles,
         IpcProvider ipcProvider)
         : base(logger, mediator)
     {
+        _accounts = accounts;
         _hubFactory = hubFactory;
         _tokenProvider = tokenProvider;
-        _serverConfigs = serverConfigs;
         _requests = requests;
         _sundesmos = sundesmos;
         _moodles = moodles;
@@ -120,7 +120,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public static bool IsConnectionDataSynced => _serverStatus is ServerState.ConnectedDataSynced;
     public static bool IsConnected => _serverStatus is ServerState.Connected or ServerState.ConnectedDataSynced;
     public static bool IsServerAlive => _serverStatus is ServerState.ConnectedDataSynced or ServerState.Connected or ServerState.Unauthorized or ServerState.Disconnected;
-    public bool ClientHasConnectionPaused => _serverConfigs.AccountStorage.FullPause;
+    public bool ClientHasConnectionPaused => _accounts.Config.FullPause;
 
     protected override void Dispose(bool disposing)
     {
@@ -305,7 +305,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     /// </summary>
     private async Task WaitForWhenPlayerIsPresent(CancellationToken token)
     {
-        while (!PlayerData.AvailableThreadSafe && !token.IsCancellationRequested)
+        while (!PlayerData.Available && !token.IsCancellationRequested)
         {
             Logger.LogDebug("Player not loaded in yet, waiting", LoggerType.ApiCore);
             await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);

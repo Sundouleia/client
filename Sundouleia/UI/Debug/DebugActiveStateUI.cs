@@ -6,6 +6,7 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.ModFiles;
+using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -16,17 +17,20 @@ namespace Sundouleia.Gui;
 
 public class DebugActiveStateUI : WindowMediatorSubscriberBase
 {
+    private readonly LimboStateManager _limboManager;
     private readonly ModdedStateManager _transients;
     private readonly CharaObjectWatcher _watcher;
-    private readonly DistributionService _distributor;
+    private readonly ClientUpdateService _updater;
 
     public DebugActiveStateUI(ILogger<DebugActiveStateUI> logger, SundouleiaMediator mediator,
-        ModdedStateManager transients, CharaObjectWatcher watcher, DistributionService distributor)
+        LimboStateManager limboManager, ModdedStateManager transients, CharaObjectWatcher watcher, 
+        ClientUpdateService updater)
         : base(logger, mediator, "Active State Debug")
     {
+        _limboManager = limboManager;
         _transients = transients;
         _watcher = watcher;
-        _distributor = distributor;
+        _updater = updater;
 
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
     }
@@ -51,25 +55,25 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
     {
         ImGui.Text("Updating Data: ");
         ImGui.SameLine();
-        CkGui.IconText(_distributor.UpdatingData ? FAI.Check : FAI.Times, _distributor.UpdatingData ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.IconText(_updater.UpdatingData ? FAI.Check : FAI.Times, _updater.UpdatingData ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
 
         ImGui.Text("Distributing Data: ");
         ImGui.SameLine();
-        CkGui.IconText(_distributor.DistributingData ? FAI.Check : FAI.Times, _distributor.DistributingData ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.IconText(_updater.Distributing ? FAI.Check : FAI.Times, _updater.Distributing ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
 
         ImGui.Text("NewVisibleUsers: ");
-        CkGui.ColorTextInline(string.Join(", ", _distributor.NewVisibleUsers.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+        CkGui.ColorTextInline(string.Join(", ", _updater.NewVisibleUsers.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
 
         ImGui.Text("InLimbo: ");
-        CkGui.ColorTextInline(string.Join(", ", _distributor.InLimbo.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+        CkGui.ColorTextInline(string.Join(", ", _limboManager.InLimbo.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
 
         ImGui.Text("For Update Push: ");
-        CkGui.ColorTextInline(string.Join(", ", _distributor.SundesmosForUpdatePush.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+        CkGui.ColorTextInline(string.Join(", ", _updater.UsersForUpdatePush.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
 
         using var node = ImRaii.TreeNode($"Distribution CharaDataCache##chara-data-cache-info");
         if (!node) return;
 
-        var dataCache = DistributionService.LastCreatedData;
+        var dataCache = _updater.LatestData;
         DebugAppliedMods(dataCache);
         DebugDataCachePlayer(dataCache);
         DebugDataCacheNonPlayer(dataCache, OwnedObject.MinionOrMount);

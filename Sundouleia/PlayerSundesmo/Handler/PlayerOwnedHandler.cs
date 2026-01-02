@@ -46,7 +46,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         _watcher = watcher;
 
         Mediator.Subscribe<WatchedObjectCreated>(this, msg => MarkVisibleForAddress(msg.Address));
-        Mediator.Subscribe<WatchedObjectDestroyed>(this, msg => UnrenderPlayer(msg.Address));
+        Mediator.Subscribe<WatchedObjectDestroyed>(this, msg => UnrenderObject(msg.Address));
     }
 
     // Public accessors.
@@ -103,13 +103,14 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
     private unsafe void MarkRenderedInternal(IntPtr address)
     {
-        // End Timeouts if running as one of our states became valid again.
-        Sundesmo.EndTimeout();
         // Set the game data.
         _gameObject = (GameObject*)address;
         NameString = _gameObject->NameString;
+        
         // Notify other services.
         Logger.LogInformation($"({Sundesmo.GetNickAliasOrUid()})'s {ObjectType} rendered!", LoggerType.PairHandler);
+
+        // ReInitialize alterations after becoming visible again.
         ReInitializeInternal().ConfigureAwait(false);
     }
 
@@ -130,13 +131,12 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     ///     Fired whenever the player is unrendered from the game world. <para />
     ///     Not linked to appearance alterations, but does begin its timeout if not set.
     /// </summary>
-    private unsafe void UnrenderPlayer(IntPtr address)
+    private unsafe void UnrenderObject(IntPtr address)
     {
         if (Address == IntPtr.Zero || address != Address)
             return;
         // Clear the GameData.
         _gameObject = null;
-        // Refresh the list to reflect visible state.
         Logger.LogDebug($"Marking {Sundesmo.GetNickAliasOrUid()}'s {ObjectType} as unrendered @ [{address:X}]", LoggerType.PairHandler);
     }
 
@@ -169,33 +169,52 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     #endregion Rendering
 
     #region Altaration Control
+
+    /// <inheritdoc cref="RevertAlterations(string, ushort?, CancellationToken)"/>
+    public async Task RevertAlterations(CancellationToken ct = default)
+        => await RevertAlterations(NameString, IsRendered ? ObjIndex : null, ct).ConfigureAwait(false);
+
     /// <summary>
-    ///     Reverts the rendered alterations on a player. <b> This does not delete the alteration data. </b>
+    ///     Reverts the rendered alterations on the Sundesmo-owned object. <br/>
+    ///     <b>This does not delete the alteration data. </b>
     /// </summary>
-    public async Task RevertRenderedAlterations()
+    private async Task RevertAlterations(string name, ushort? objIdx = null, CancellationToken ct = default)
     {
-        var idx = IsRendered ? ObjIndex : (ushort)0;
-        await RevertAlterationsInternal(NameString, idx).ConfigureAwait(false);
+        // Revert the customize+ alterations that do not require actor info.
+        await RevertAssignedAlterations().ConfigureAwait(false);
+
+        // Revert glamourer based on the rendered state.
+        if (objIdx is { } idx)
+            await _ipc.Glamourer.ReleaseActor(idx).ConfigureAwait(false);
+        else if (!string.IsNullOrEmpty(name))
+            await _ipc.Glamourer.ReleaseByName(name).ConfigureAwait(false);
+        // Otherwise do nothing.
     }
 
-    private async Task RevertAlterationsInternal(string name, ushort objectIdx)
+    /// <summary>
+    ///     Revert alterations that entrusted us with an ID, and dont require actor info. <para/>
+    ///     <b>Currently only Customize+</b>
+    /// </summary>
+    private async Task RevertAssignedAlterations()
     {
-        // Revert based on rendered state.
-        if (!PlayerData.IsZoning && !PlayerData.InCutscene && IsRendered)
+        if (_tempProfile != Guid.Empty)
         {
-            await _ipc.Glamourer.ReleaseActor(objectIdx).ConfigureAwait(false);
-            if (_tempProfile != Guid.Empty)
-            {
-                await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
-                _tempProfile = Guid.Empty;
-            }
+            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            _tempProfile = Guid.Empty;
         }
-        else if (!string.IsNullOrEmpty(name))
+    }
+
+    public async Task ClearAlterations(CancellationToken ct = default)
+    {
+        if (_tempProfile != Guid.Empty)
         {
-            // Glamourer Fallback.
-            await _ipc.Glamourer.ReleaseByName(name).ConfigureAwait(false);
-            // maybe CPlus here but idk.
+            Logger.LogError("You are clearing alterations prior to reverting them!\n" +
+                "This will have consequences on the stability of your data sync!");
+            Logger.LogError("If you are getting this, find out why it is happening!");
         }
+
+        _appearanceData = null;
+        _tempProfile = Guid.Empty;
     }
 
     public async Task UpdateAndApplyIpc(IpcDataUpdate ipcChanges, bool isInitialData)
@@ -206,7 +225,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         // Apply and redraw regardless (for now).
         await ApplyVisuals(visualDiff).ConfigureAwait(false);
         RedrawObject();
-
     }
 
     public async Task UpdateAndApplyIpc(IpcKind kind, string newData)
@@ -316,7 +334,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     #endregion Alteration Application
 
     #region Ipc Helpers
-
     private async Task ApplyGlamourer()
     {
         Logger.LogDebug($"Applying ({Sundesmo.GetNickAliasOrUid()}'s {ObjectType}) Glamourer data", LoggerType.PairAppearance);
@@ -344,19 +361,26 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         {
             Logger.LogDebug($"Redrawing ({Sundesmo.GetNickAliasOrUid()}'s {ObjectType}) due to alteration changes.", LoggerType.PairHandler);
             _ipc.Penumbra.RedrawGameObject(ObjIndex);
+            // Use the below when we know how to distinguish what redraw operation to perform.
+            //_ipc.Glamourer.ReapplyActor(ObjIndex);
         }
     }
     #endregion Ipc Helpers
 
-    // NOTE: This can be very prone to crashing or inconsistent states!
-    // Please be sure to look into it and verify everything is correct!
+    /// <summary>
+    ///     Perform a true disposal on the handler, reverting rendered alterations,
+    ///     clearing alteration data, and disposing of the runtime CTS. <para />
+    ///     <b>Do not call this unless you are disposing the Sundesmo.</b>
+    /// </summary>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         IntPtr addr = IsRendered ? Address : IntPtr.Zero;
         ushort objIdx = IsRendered ? ObjIndex : (ushort)0;
-        // Cancel any tasks depending on runtime. (Do not dispose)
+
+        // Stop any actively running tasks.
         _runtimeCTS.SafeCancel();
+
         // If they were valid before, parse out the event message for their disposal.
         if (!string.IsNullOrEmpty(NameString))
             Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.Disposed, "Disposed")));
@@ -369,43 +393,29 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             return;
         }
 
-        // If they were valid before, parse out the event message for their disposal.
-        if (!string.IsNullOrWhiteSpace(NameString))
-            Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.Disposed, "Owned Object Disposed")));
-
-        // Do not dispose if the framework is unloading!
-        // (means we are shutting down the game and cannot transmit calls to other ipcs without causing fatal errors!)
-        if (Svc.Framework.IsFrameworkUnloading)
-        {
-            Logger.LogWarning($"Framework is unloading, skipping disposal for {NameString}({Sundesmo.GetNickAliasOrUid()})");
-            return;
-        }
-
         // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
-        _ = SafeRevertOnDisposal(Sundesmo.GetNickAliasOrUid(), NameString, objIdx).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    ///     What to fire whenever called on application shutdown instead of the normal disposal method.
-    /// </summary>
-    private async Task SafeRevertOnDisposal(string nickAliasOrUid, string name, ushort objIdx)
-    {
-        try
+        // Everything in here, if it errors, should not crash the game as it is fire and forget.
+        _ = Task.Run(async () =>
         {
-            await RevertRenderedAlterations().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Error reverting ({nickAliasOrUid}'s {name}) on shutdown: {ex}");
-        }
-        finally
-        {
-            // Clear internal data.
-            _tempProfile = Guid.Empty;
-            _appearanceData = null;
-            NameString = string.Empty;
-            unsafe { _gameObject = null; }
-        }
+            var nickAliasOrUid = Sundesmo.GetNickAliasOrUid();
+            var name = NameString;
+            try
+            {
+                await RevertAlterations().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error reverting ({nickAliasOrUid}'s {name}) on disposal: {ex}");
+            }
+            finally
+            {
+                // Clear internal data.
+                _tempProfile = Guid.Empty;
+                _appearanceData = null;
+                NameString = string.Empty;
+                unsafe { _gameObject = null; }
+            }
+        });
     }
 
     public void DrawDebugInfo()

@@ -1,6 +1,5 @@
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI.Files;
@@ -14,19 +13,16 @@ public class SundesmoHandlerFactory
     private readonly FileDownloader _downloader;
     private readonly FileCacheManager _fileCache;
     private readonly IpcManager _ipc;
-    private readonly ServerConfigManager _configs;
     private readonly CharaObjectWatcher _watcher;
 
     public SundesmoHandlerFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
-        FileCacheManager fileCache, FileDownloader downloads, IpcManager ipc, 
-        ServerConfigManager configs, CharaObjectWatcher watcher)
+        FileCacheManager fileCache, FileDownloader downloads, IpcManager ipc, CharaObjectWatcher watcher)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;
         _fileCache = fileCache;
         _downloader = downloads;
         _ipc = ipc;
-        _configs = configs;
         _watcher = watcher;
     }
 

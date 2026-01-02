@@ -40,8 +40,6 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
     public List<RequestEntry> Incoming => _incomingInternal.Value;
     public List<RequestEntry> Outgoing => _outgoingInternal.Value;
 
-
-
     public void AddNewRequest(SundesmoRequest newRequest)
     {
         var entry = new RequestEntry(newRequest);

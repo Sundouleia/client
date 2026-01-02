@@ -1,5 +1,6 @@
 using CkCommons.HybridSaver;
 using Sundouleia.Services.Configs;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.PlayerClient;
 
@@ -72,4 +73,33 @@ public class NickConfig : IHybridSavable
     }
 
     public NickStorage Current { get; set; } = new NickStorage();
+
+    #region Helpers
+    /// <summary>
+    ///     Try to get a nickname for the provided UID.
+    /// </summary>
+    public bool TryGetNickname(string uid, [NotNullWhen(true)] out string? nickname)
+        => Current.Nicknames.TryGetValue(uid, out nickname);
+
+    /// <returns>
+    ///     Returns the nickname if found, null otherwise.
+    /// </returns>
+    public string? GetNicknameForUid(string uid)
+        => Current.Nicknames.TryGetValue(uid, out var n) && n is { Length: > 0 } ? n : null;
+
+
+    /// <summary> 
+    ///     Set a nickname for a user identifier.
+    /// </summary>
+    /// <param name="uid">the user identifier</param>
+    /// <param name="nickname">the nickname to add</param>
+    public void SetNickname(string uid, string nickname)
+    {
+        if (string.IsNullOrEmpty(uid))
+            return;
+
+        Current.Nicknames[uid] = nickname;
+        Save();
+    }
+    #endregion Helpers
 }

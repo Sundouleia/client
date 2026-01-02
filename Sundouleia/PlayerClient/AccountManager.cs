@@ -1,5 +1,8 @@
 using CkCommons;
+using Microsoft.Extensions.FileProviders;
+using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
+using SundouleiaAPI.Network;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.PlayerClient;
@@ -13,12 +16,15 @@ public class AccountManager
     private readonly ILogger<AccountManager> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly AccountConfig _config;
+    private readonly ConfigFileProvider _fileProvider;
 
-    public AccountManager(ILogger<AccountManager> logger, SundouleiaMediator mediator, AccountConfig config)
+    public AccountManager(ILogger<AccountManager> logger, SundouleiaMediator mediator, 
+        AccountConfig config, ConfigFileProvider files)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
+        _fileProvider = files;
     }
 
     public AccountStorage Config => _config.Current;
@@ -27,10 +33,13 @@ public class AccountManager
 
     public bool HasValidProfile() => Config.Profiles.Count > 0;
 
+    public void UpdateFileProviderForConnection(ConnectionResponse response)
+        => _fileProvider.UpdateConfigs(response.User.UID);
+
     public bool TryGetAuthForPlayer([NotNullWhen(true)] out CharaAuthentication auth)
     {
         // fetch the cid of our current player.
-        var cid = Svc.Framework.RunOnFrameworkThread(() => PlayerData.ContentIdInstanced).Result;
+        var cid = Svc.Framework.RunOnFrameworkThread(() => PlayerData.CID).Result;
         // if we cannot find any authentications with this data, it means that none exist.
         if (Config.LoginAuths.Find(la => la.ContentId == cid) is not { } match)
         {
@@ -56,23 +65,22 @@ public class AccountManager
         return false;
     }
 
+    /// <summary>
+    ///     Retrieves the SecretKey for the currently logged in character.
+    /// </summary>
+    public AccountProfile? GetProfileForCharacter()
+    {
+        if (!TryGetAuthForPlayer(out var auth))
+            return null;
+        // There was an account, so get the key index.
+        var profileIdx = auth.ProfileIdx;
 
-    ///// <summary>
-    /////     Retrieves the SecretKey for the currently logged in character.
-    ///// </summary>
-    //public AccountProfile? GetProfileForCharacter()
-    //{
-    //    if (!TryGetAuthForPlayer(out var auth))
-    //        return null;
-    //    // There was an account, so get the key index.
-    //    var profileIdx = auth.ProfileIdx;
-
-    //    // Now obtain the secret key using the profile index.
-    //    if (!AccountStorage.Profiles.TryGetValue(profileIdx, out var profile))
-    //        return null;
-    //    // Return the key as it exists.
-    //    return profile;
-    //}
+        // Now obtain the secret key using the profile index.
+        if (!Config.Profiles.TryGetValue(profileIdx, out var profile))
+            return null;
+        // Return the key as it exists.
+        return profile;
+    }
 
     public void UpdateAuthForNameAndWorldChange(ulong cid)
     {
@@ -80,112 +88,119 @@ public class AccountManager
         if (Config.LoginAuths.Find(la => la.ContentId == cid) is not { } auth)
             return;
         // Id was valid, compare against current.
-        var currentName = PlayerData.NameInstanced;
-        var currentWorld = PlayerData.HomeWorldIdInstanced;
+        var currentName = PlayerData.Name;
+        var currentWorld = PlayerData.HomeWorldId;
         // update the name if it has changed.
-        if (auth.PlayerName != currentName) auth.PlayerName = currentName;
-        // update the world ID if it has changed.
-        if (auth.WorldId != currentWorld) auth.WorldId = currentWorld;
+        if (auth.PlayerName == currentName && auth.WorldId == currentWorld)
+            return;
+
+        // Otherwise update and save.
+        if (auth.PlayerName != currentName)
+            auth.PlayerName = currentName;
+        
+        if (auth.WorldId != currentWorld)
+            auth.WorldId = currentWorld;
+        
+        _config.Save();
     }
 
-    //public bool CharaHasLoginAuth() => AccountStorage.LoginAuths.Any(a => a.ContentId == PlayerData.ContentId);
-    //public bool CharaHasValidLoginAuth()
-    //{
-    //    if (AccountStorage.LoginAuths.Find(a => a.ContentId == PlayerData.ContentId && a.ProfileIdx != -1) is not { } auth)
-    //        return false;
-    //    if (AccountStorage.Profiles.TryGetValue(auth.ProfileIdx, out var profile))
-    //        return !string.IsNullOrEmpty(profile.Key);
-    //    return false;
-    //}
+    /// <summary> Checks if the configuration is valid </summary>
+    /// <returns> True if the current server storage object is not null </returns>
+    public bool HasValidAccount() => Config.Profiles.Count is not 0;
+    public bool CharaHasLoginAuth() => Config.LoginAuths.Any(a => a.ContentId == PlayerData.CID);
+    public bool CharaHasValidLoginAuth()
+    {
+        if (Config.LoginAuths.Find(a => a.ContentId == PlayerData.CID && a.ProfileIdx != -1) is not { } auth)
+            return false;
+        if (Config.Profiles.TryGetValue(auth.ProfileIdx, out var profile))
+            return !string.IsNullOrEmpty(profile.Key);
+        return false;
+    }
 
-    //public void GenerateAuthForCurrentCharacter()
-    //{
-    //    var name = PlayerData.NameInstanced;
-    //    var world = PlayerData.HomeWorldIdInstanced;
-    //    var cid = PlayerData.ContentIdInstanced;
+    public void GenerateAuthForCurrentCharacter()
+    {
+        var name = PlayerData.Name;
+        var world = PlayerData.HomeWorldId;
+        var cid = PlayerData.CID;
 
-    //    // If we already have an auth for this character, do nothing.
-    //    if (AccountStorage.LoginAuths.Any(a => a.ContentId == cid))
-    //        return;
+        // If we already have an auth for this character, do nothing.
+        if (Config.LoginAuths.Any(a => a.ContentId == cid))
+            return;
 
-    //    _logger.LogDebug("Generating new auth for current character");
-    //    var autoSelectedKey = AccountStorage.Profiles.Keys.DefaultIfEmpty(-1).First();
-    //    AccountStorage.LoginAuths.Add(new CharaAuthentication
-    //    {
-    //        PlayerName = PlayerData.NameInstanced,
-    //        WorldId = PlayerData.HomeWorldIdInstanced,
-    //        ContentId = PlayerData.ContentIdInstanced,
-    //        ProfileIdx = autoSelectedKey
-    //    });
-    //    Save();
-    //}
+        _logger.LogDebug("Generating new auth for current character");
+        var autoSelectedKey = Config.Profiles.Keys.DefaultIfEmpty(-1).First();
+        Config.LoginAuths.Add(new CharaAuthentication
+        {
+            PlayerName = PlayerData.Name,
+            WorldId = PlayerData.HomeWorldId,
+            ContentId = PlayerData.CID,
+            ProfileIdx = autoSelectedKey
+        });
+        _config.Save();
+    }
 
-    //public int AddProfileToAccount(AccountProfile profile)
-    //{
-    //    // throw an exception if any existing profiles have a matching key.
-    //    if (AccountStorage.Profiles.Values.Any(p => p.Key == profile.Key))
-    //        throw new Exception("A profile with the same key already exists.");
-    //    // Append this to the dictionary, increasing its idx by 1 from the last.
-    //    var idx = AccountStorage.Profiles.Any() ? AccountStorage.Profiles.Max(p => p.Key) + 1 : 0;
-    //    if (AccountStorage.Profiles.TryAdd(idx, profile))
-    //    {
-    //        _logger.LogInformation($"Added new profile: {profile.ProfileLabel}");
-    //        return idx;
-    //    }
-    //    return -1;
-    //}
+    public int AddProfileToAccount(AccountProfile profile)
+    {
+        // throw an exception if any existing profiles have a matching key.
+        if (Config.Profiles.Values.Any(p => p.Key == profile.Key))
+            throw new Exception("A profile with the same key already exists.");
+        // Append this to the dictionary, increasing its idx by 1 from the last.
+        var idx = Config.Profiles.Any() ? Config.Profiles.Max(p => p.Key) + 1 : 0;
+        if (!Config.Profiles.TryAdd(idx, profile))
+            return -1;
 
-    //public void SetProfileForLoginAuth(ulong cid, int profileIdx)
-    //{
-    //    if (!AccountStorage.Profiles.ContainsKey(profileIdx))
-    //        throw new Exception("The specified profile index does not exist.");
+        _logger.LogInformation($"Profile added at index {idx}");
+        _config.Save();
+        return idx;
+    }
 
-    //    if (AccountStorage.LoginAuths.Find(la => la.ContentId == cid) is not { } auth)
-    //        throw new Exception("No authentication found for the current character.");
+    public void SetProfileForLoginAuth(ulong cid, int profileIdx)
+    {
+        if (!Config.Profiles.ContainsKey(profileIdx))
+            throw new Exception("The specified profile index does not exist.");
 
-    //    auth.ProfileIdx = profileIdx;
-    //    Save();
-    //}
+        if (Config.LoginAuths.Find(la => la.ContentId == cid) is not { } auth)
+            throw new Exception("No authentication found for the current character.");
 
-    ///// <summary> 
-    /////     Updates the authentication.
-    ///// </summary>
-    //public void UpdateAuthentication(string secretKey, ConnectionResponse response)
-    //{
-    //    // Locate the profile that we just connected with.
-    //    if (AccountStorage.Profiles.Values.FirstOrDefault(p => p.Key == secretKey) is not { } match)
-    //    {
-    //        Svc.Logger.Error("SHOULD NEVER SEE THIS.");
-    //        return;
-    //    }
+        auth.ProfileIdx = profileIdx;
+        _config.Save();
+    }
 
-    //    // Mark that it had a valid connection and update the userUID.
-    //    if (string.IsNullOrEmpty(match.ProfileLabel))
-    //        match.ProfileLabel = $"Auto-Profile Label [{DateTime.Now:yyyy-MM-dd}]";
-    //    match.UserUID = response.User.UID;
-    //    match.HadValidConnection = true;
+    /// <summary> 
+    ///     Updates the authentication.
+    /// </summary>
+    public void UpdateAuthentication(string secretKey, ConnectionResponse response)
+    {
+        // Locate the profile that we just connected with.
+        if (Config.Profiles.Values.FirstOrDefault(p => p.Key == secretKey) is not { } match)
+        {
+            Svc.Logger.Error("SHOULD NEVER SEE THIS.");
+            return;
+        }
 
-    //    // now we should iterate through the rest of our profiles, and check the UID's.
-    //    // if there is a UID that is listed inside that does not match any UIDS in the connected accounts,
-    //    // they are outdated.
-    //    var accountUids = new HashSet<string>(response.ActiveAccountUidList) { response.User.UID };
-    //    foreach (var (idx, profile) in AccountStorage.Profiles.ToArray())
-    //    {
-    //        if (string.IsNullOrWhiteSpace(profile.UserUID))
-    //            continue;
-    //        // If the account Uid list does not contain this profile's UID,
-    //        // it was deleted via discord, or a cleanup service.
-    //        if (!accountUids.Contains(profile.UserUID))
-    //        {
-    //            _logger.LogWarning($"Removing outdated profile {profile.ProfileLabel} with UID {profile.UserUID}");
-    //            AccountStorage.Profiles.Remove(idx);
-    //        }
-    //    }
-    //}
+        // Mark that it had a valid connection and update the userUID.
+        if (string.IsNullOrEmpty(match.ProfileLabel))
+            match.ProfileLabel = $"Auto-Profile Label [{DateTime.Now:yyyy-MM-dd}]";
+        match.UserUID = response.User.UID;
+        match.HadValidConnection = true;
 
-    ///// <summary> Checks if the configuration is valid </summary>
-    ///// <returns> True if the current server storage object is not null </returns>
-    //public bool HasValidAccount() => AccountStorage.Profiles.Count is not 0;
+        // now we should iterate through the rest of our profiles, and check the UID's.
+        // if there is a UID that is listed inside that does not match any UIDS in the connected accounts,
+        // they are outdated.
+        var accountUids = new HashSet<string>(response.ActiveAccountUidList) { response.User.UID };
+        foreach (var (idx, profile) in Config.Profiles.ToArray())
+        {
+            if (string.IsNullOrWhiteSpace(profile.UserUID))
+                continue;
+            // If the account Uid list does not contain this profile's UID,
+            // it was deleted via discord, or a cleanup service.
+            if (!accountUids.Contains(profile.UserUID))
+            {
+                _logger.LogWarning($"Removing outdated profile {profile.ProfileLabel} with UID {profile.UserUID}");
+                Config.Profiles.Remove(idx);
+            }
+        }
+    }
 
     ///// <summary> Requests to save the configuration service file to the clients computer. </summary>
     //public void Save()
