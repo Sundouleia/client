@@ -88,10 +88,12 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         using var node = ImRaii.TreeNode($"Applied Mods##chara-data-cache-mods");
         if (!node) return;
 
-        using (var modReps = ImRaii.Table("chara-mod-replacements", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
+        using (var modReps = ImRaii.Table("chara-mod-replacements", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
         {
             if (!modReps) return;
             ImGui.TableSetupColumn("Hash");
+            ImGui.TableSetupColumn("FileSwap");
+            ImGui.TableSetupColumn("Replacement");
             ImGui.TableSetupColumn("Game Paths");
             ImGui.TableSetupColumn("Resolved Path");
             ImGui.TableHeadersRow();
@@ -102,25 +104,26 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                 CkGui.HoverIconText(FAI.Hashtag, ImGuiColors.DalamudViolet.ToUint());
                 CkGui.AttachToolTip(hash);
 
+                DrawIconBoolColumn(mod.IsFileSwap);
+                DrawIconBoolColumn(mod.HasFileReplacement);
+
                 ImGui.TableNextColumn();
                 ImGui.Text(string.Join("\n", mod.GamePaths));
 
                 ImGui.TableNextColumn();
                 ImGui.Text(mod.ResolvedPath);
             }
-        }
-
-        using (var modSwaps = ImRaii.Table("chara-mod-swaps", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
-        {
-            if (!modSwaps) return;
-            ImGui.TableSetupColumn("Game Paths");
-            ImGui.TableSetupColumn("Resolved Path");
-            ImGui.TableHeadersRow();
 
             foreach (var (hash, mod) in dataCache.SwappedFiles)
             {
                 ImGui.TableNextColumn();
+
+                DrawIconBoolColumn(mod.IsFileSwap);
+                DrawIconBoolColumn(mod.HasFileReplacement);
+                
+                ImGui.TableNextColumn();
                 ImGui.Text(string.Join("\n", mod.GamePaths));
+                
                 ImGui.TableNextColumn();
                 ImGui.Text(mod.ResolvedPath);
             }

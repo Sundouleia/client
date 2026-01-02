@@ -88,12 +88,6 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
     /// </summary>
     private async Task DebounceAndApply()
     {
-        // If there is nobody to push the update to, do not push.
-        // We return early so that we exit before clearing the pending
-        // updates, ensuring they are included in the next valid check.
-        if (_updater.UsersForUpdatePush.Count is 0)
-            return;
-
         // snapshot the changes dictionary and clear after.
         var pendingSnapshot = new Dictionary<OwnedObject, IpcKind>(_updater.PendingUpdates);
         var allPendingSnapshot = _updater.AllPendingUpdates;

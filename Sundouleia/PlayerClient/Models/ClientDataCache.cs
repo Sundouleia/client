@@ -96,8 +96,8 @@ public class ClientDataCache
     {
         var updates = ModUpdates.Empty;
 
-        var curSwapKeys = new HashSet<string>(SwappedFiles.Keys);
         var curModKeys = new HashSet<string>(ModdedFiles.Keys);
+        var curSwapKeys = new HashSet<string>(SwappedFiles.Keys);
 
         foreach (var file in latestState.AllFiles)
         {
