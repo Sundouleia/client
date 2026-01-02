@@ -1,3 +1,4 @@
+using System.Reflection;
 using CkCommons;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -6,7 +7,6 @@ using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using System.Reflection;
 
 namespace Sundouleia;
 
@@ -42,7 +42,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
         // subscribe to the main UI message window for making the primary UI be the main UI interface.
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (msg) =>
         {
-            if (_launchTask is null || _launchTask.IsCompleted) 
+            if (_launchTask is null || _launchTask.IsCompleted)
                 _launchTask = Task.Run(WaitForPlayerAndLaunchCharacterManager);
         });
 
@@ -139,6 +139,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
             _runtimeServiceScope.ServiceProvider.GetRequiredService<UiFontService>();
             // get the required service for the online player manager (and notification service if we add it)
             _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientUpdateService>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientUpdateHandler>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientDistributor>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<RadarService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientMoodles>();
