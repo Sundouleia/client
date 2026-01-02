@@ -156,7 +156,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     /// <summary>
     ///     Upload any missing files not yet present on the hub. (We could optionally send a isUploading here but idk)
     /// </summary>
-    private async Task UploadAndPushMissingMods(List<UserData> usersToPushDataTo, List<VerifiedModFile> filesNeedingUpload)
+    private async Task UploadAndPushMissingMods(List<UserData> usersToPushDataTo, List<ValidFileHash> filesNeedingUpload)
     {
         // Don't bother uploading if we do not have a properly configured cache.
         if (!_config.HasValidCacheFolderSetup())
@@ -180,8 +180,9 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             // grab the mod and appearnace data from the latest data to send off to the new visible users.
             var modData = _updater.LatestData.ToModUpdates();
             var appearance = _updater.LatestData.ToVisualUpdate();
-            Logger.LogDebug($"(ResendAll) Collected [{modData.FilesToAdd.Count} Files to send] | [{modData.HashesToRemove.Count} Files to remove] | {(appearance.HasData() ? "With" : "Without")} Visual Changes", LoggerType.DataDistributor);
-
+            Logger.LogDebug($"(ResendAll) Collected:" +
+                $"[Hashes: ({modData.NewReplacements.Count} Added, {modData.HashesToRemove.Count} Removed)| Swaps: ({modData.NewSwaps.Count} Added, {modData.SwapsToRemove.Count} Removed)] " +
+                $"| {(appearance.HasData() ? "With" : "Without")} Visual Changes", LoggerType.DataDistributor);
             // Collect the new users to send to and then clear the list.
             var recipients = _updater.NewVisibleUsers.ToList();
             _updater.NewVisibleUsers.Clear();
@@ -248,9 +249,11 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
                 // We need to update the mod state first.
                 changedMods = await UpdateModsInternal(CancellationToken.None).ConfigureAwait(false);
                 // If the mods had changed, we need to ensure we send off the mods.
-                if (changedMods.HasChanges)
+                if (changedMods.HasAnyChanges)
                 {
-                    Logger.LogDebug($"Mods had changes: [{changedMods.FilesToAdd.Count} Added | {changedMods.HashesToRemove.Count} Removed]", LoggerType.DataDistributor);
+                    Logger.LogDebug($"Mods had changes: " +
+                        $"[FileHashes: ({changedMods.NewReplacements.Count} Added, {changedMods.HashesToRemove.Count} Removed) " +
+                        $"|FileSwaps: ({changedMods.NewSwaps.Count} Added, {changedMods.SwapsToRemove.Count} Removed)]", LoggerType.DataDistributor);
                     newChanges[OwnedObject.Player] |= IpcKind.Mods;
                     flattenedChanges |= IpcKind.Mods;
                 }
@@ -275,14 +278,14 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
                 return;
 
             // MODS CONDITION - Flattened changes could be just Mods, or both but with a failed visual check.
-            if (flattenedChanges is IpcKind.Mods || (!changedVisuals.HasData() && changedMods.HasChanges))
+            if (flattenedChanges is IpcKind.Mods || (!changedVisuals.HasData() && changedMods.HasAnyChanges))
             {
                 await SendModsUpdate(recipients, changedMods, manipStrDiff).ConfigureAwait(false);
                 return;
             }
 
             // FULL UPDATE CONDITION: Both results were valid.
-            if (changedMods.HasChanges)
+            if (changedMods.HasAnyChanges)
             {
                 Logger.LogWarning($"CheckStateAndUpdate found both mod and visual changes to send to {recipients.Count} users.", LoggerType.DataDistributor);
                 await SendFullUpdate(recipients, changedMods, changedVisuals).ConfigureAwait(false);

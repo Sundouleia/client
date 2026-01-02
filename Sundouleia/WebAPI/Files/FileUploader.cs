@@ -35,9 +35,9 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     /// <summary>
     ///     Uploads all necessary files via their authorized upload links to the server.
     /// </summary>
-    public async Task<List<ModFile>> UploadFiles(List<VerifiedModFile> filesToUpload)
+    public async Task<List<FileHashData>> UploadFiles(List<ValidFileHash> filesToUpload)
     {
-        var toReturn = new List<ModFile>();
+        var toReturn = new List<FileHashData>();
         foreach (var file in filesToUpload)
         {
             // If the file is not cached, we should not upload it. The file needs to be valid.
@@ -61,7 +61,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
                 // Attempt to upload the file using the authorized upload link.
                 await UploadFile(file, fileEntity, CancellationToken.None).ConfigureAwait(false);
                 Logger.LogDebug($"Successfully uploaded file {file.Hash}.", LoggerType.FileUploads);
-                toReturn.Add(new ModFile(file.Hash, file.GamePaths, file.SwappedPath));
+                toReturn.Add(new FileHashData(file.Hash, file.GamePaths));
             }
             catch (Exception ex)
             {
@@ -80,7 +80,7 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     ///     Inner file upload. Should contain the compressed data that we are doing to upload. WIP.
     /// </summary>
     /// <exception cref="FileNotFoundException"></exception>
-    private async Task UploadFile(VerifiedModFile modFile, FileCacheEntity fileInfo, CancellationToken cancelToken)
+    private async Task UploadFile(ValidFileHash modFile, FileCacheEntity fileInfo, CancellationToken cancelToken)
     {
         // Construct a new FileTransferProgress tracker to monitor the upload progress.
         Progress<long>? progressTracker = new((transferredBytes) =>

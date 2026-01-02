@@ -136,8 +136,7 @@ public class SMAFileHandler : IDisposable
         var grouped = state.AllFiles.GroupBy(f => f.Hash, StringComparer.OrdinalIgnoreCase);
         foreach (var file in grouped)
         {
-            // If there is no key, it is a file swap, so add it as a swap.
-            // However, do not add files that are body or leg models if present.
+            // If the key is empty, then this is the grouping of all file swaps in a modded state.
             if (string.IsNullOrEmpty(file.Key))
             {
                 foreach (var item in file)
@@ -152,6 +151,7 @@ public class SMAFileHandler : IDisposable
             else
             {
                 // If it is a valid modded file, add it to the file data.
+                // (this check might not even be needed since they should already be verified.)
                 if (_fileCache.GetFileCacheByHash(file.First().Hash)?.ResolvedFilepath is { } validFile)
                 {
                     // Do not add if a body/leg model and requested.

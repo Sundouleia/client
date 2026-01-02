@@ -176,7 +176,7 @@ public sealed class SMAFileCacheManager : IHostedService
     /// <returns>
     ///     Returns the verified mod files who's hashes are not currently cached in the manager.
     /// </returns>
-    public IEnumerable<VerifiedModFile> MissingHashes(IEnumerable<VerifiedModFile> modFiles)
+    public IEnumerable<ValidFileHash> MissingHashes(IEnumerable<ValidFileHash> modFiles)
     {
         foreach (var f in modFiles)
         {

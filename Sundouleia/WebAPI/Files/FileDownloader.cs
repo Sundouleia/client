@@ -60,7 +60,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
     }
 
-    private void ClearDownloadStatusForPlayer(PlayerHandler handler, List<VerifiedModFile> files)
+    private void ClearDownloadStatusForPlayer(PlayerHandler handler, List<ValidFileHash> files)
     {
         foreach (var file in files)
             _downloadStatus[handler].RemoveFile(file.Hash);
@@ -69,7 +69,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
     /// <summary>
     ///     Downloads a batch of files using authorized download links provided by Sundouleia's FileHost.
     /// </summary>
-    public void BeginDownloads(PlayerHandler handler, List<VerifiedModFile> moddedFiles)
+    public void BeginDownloads(PlayerHandler handler, List<ValidFileHash> moddedFiles)
     {
         // obtain the missing files from the fileCacheManager.
         var missingFiles = _dbManager.MissingHashes(moddedFiles);
@@ -148,7 +148,7 @@ public class FileDownloader : DisposableMediatorSubscriberBase
         return Task.CompletedTask;
     }
 
-    private async Task DownloadFileInternal(FileTransferProgress dlStatus, VerifiedModFile modFile, CancellationToken cancelToken)
+    private async Task DownloadFileInternal(FileTransferProgress dlStatus, ValidFileHash modFile, CancellationToken cancelToken)
     {
         try
         {
@@ -267,10 +267,10 @@ public class FileDownloader : DisposableMediatorSubscriberBase
     /// <summary>
     ///     Grab the modded dictionary of replacements from the list of verified files that we currently have downloaded and cached.
     /// </summary>
-    public List<VerifiedModFile> GetExistingFromCache(Dictionary<string, VerifiedModFile> replacements, out Dictionary<string, string> moddedDict, CancellationToken ct)
+    public List<ValidFileHash> GetExistingFromCache(IEnumerable<ValidFileHash> moddedFiles, out Dictionary<string, string> moddedDict, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
-        var missing = new ConcurrentBag<VerifiedModFile>();
+        var missing = new ConcurrentBag<ValidFileHash>();
         var outputDict = new ConcurrentDictionary<string, string>();
         moddedDict = [];
         // Update the csv if the FilePaths extension has changed.
@@ -279,9 +279,8 @@ public class FileDownloader : DisposableMediatorSubscriberBase
         try
         {
             // Flatten the current replacements that do not have a file replacement path.
-            var replacementList = replacements.Values.Where(vmf => string.IsNullOrEmpty(vmf.SwappedPath)).ToList();
             // Run in parallel to speed up download preparation and lookup time.
-            Parallel.ForEach(replacementList, new ParallelOptions()
+            Parallel.ForEach(moddedFiles, new ParallelOptions()
             {
                 CancellationToken = ct,
                 MaxDegreeOfParallelism = 4,
@@ -316,15 +315,6 @@ public class FileDownloader : DisposableMediatorSubscriberBase
 
             // Convert the output dictionary into a modded dictionary.
             moddedDict = outputDict.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
-            // Iterate again to check for any file swaps. These should take precedence in path replacement.
-            foreach (var item in replacements.Values.Where(vmf => !string.IsNullOrEmpty(vmf.SwappedPath)).ToList())
-            {
-                foreach (var gamePath in item.GamePaths)
-                {
-                    Logger.LogTrace($"Adding file swap for {gamePath}: {item.SwappedPath}", LoggerType.PairMods);
-                    moddedDict[gamePath] = item.SwappedPath;
-                }
-            }
         }
         catch (Exception ex)
         {

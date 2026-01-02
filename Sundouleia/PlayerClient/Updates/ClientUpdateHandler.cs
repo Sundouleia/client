@@ -63,18 +63,26 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
 
     private void OnUpdateTick(IFramework framework)
     {
+        // Fail if there is nothing pending to update.
         if (_updater.AllPendingUpdates is 0)
             return;
+        // Fail if zoning or not available.
         if (PlayerData.IsZoning || !PlayerData.Available)
             return;
+        // Fail if currently in a debouncing task.
         if (_updater.Debouncing)
             return;
 
+        // Assign the debounce and update/apply operation.
         _updater.SetDebounceTask(DebounceAndApply);
     }
 
     /// <summary>
-    ///     Waits for the debounce period, and then applies the current pending updates to the latest data.
+    ///     After the debounce period, obtain any pending updates for our cache. <para />
+    ///     
+    ///     We want to perform this operation regardless of if any users are around, so
+    ///     that the LatestData remains up to date. <para />
+    ///     This ensures that when new users appear, they recieve the most recent data.
     /// </summary>
     private async Task DebounceAndApply()
     {
@@ -85,7 +93,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
             return;
 
         // snapshot the changes dictionary and clear after.
-        var pendingSnapshot = new Dictionary<OwnedObject, IpcKind>(_updater.PendingUpdates );
+        var pendingSnapshot = new Dictionary<OwnedObject, IpcKind>(_updater.PendingUpdates);
         var allPendingSnapshot = _updater.AllPendingUpdates;
         _updater.ClearPendingUpdates();
 

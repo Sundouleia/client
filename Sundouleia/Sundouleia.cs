@@ -302,8 +302,9 @@ public static class SundouleiaServiceExtensions
     #endregion ScopedServices
 
     /// <summary>
-    ///     Services that must run logic on initialization to help with monitoring.
-    ///     If it does not, it can also be an important monitor background service.
+    ///     When a service should exist throughout the lifetime of the plugin <para/>
+    ///     <b> This Includes during login and logout states. </b>
+    ///     including during login and logout states.
     /// </summary>
     /// <remarks> Services that simply monitor actions should be invoked in 'WaitForPlayerAndLaunchCharacterManager' </remarks>
     public static IServiceCollection AddSundouleiaHosted(this IServiceCollection services)

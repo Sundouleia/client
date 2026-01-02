@@ -31,8 +31,11 @@ public partial class ModdedFile
     public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => !string.Equals(p, ResolvedPath, StringComparison.Ordinal));
     public bool IsFileSwap => !LocalPathRegex().IsMatch(ResolvedPath) && GamePaths.All(p => !LocalPathRegex().IsMatch(p));
 
-    public ModFile ToModFileDto()
-        => new ModFile(Hash, GamePaths.ToArray(), IsFileSwap ? ResolvedPath : string.Empty);
+    public FileHashData ToFileHashDto()
+        => new FileHashData(Hash, GamePaths.ToArray());
+
+    public FileSwapData ToFileSwapDto()
+        => new FileSwapData(ResolvedPath, GamePaths.ToArray());
 
     public override string ToString()
         => $"{(HasFileReplacement ? "Replaces" : "NoReplace")} | {(IsFileSwap ? "FileSwap" : "NoSwap")} | {string.Join(",", GamePaths)} => {ResolvedPath}";

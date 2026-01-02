@@ -1,3 +1,4 @@
+using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -87,29 +88,42 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         using var node = ImRaii.TreeNode($"Applied Mods##chara-data-cache-mods");
         if (!node) return;
 
-        using var table = ImRaii.Table("chara-data-cache-mods-table", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
-        if (!table) return;
-
-        ImGui.TableSetupColumn("Hash");
-        ImGui.TableSetupColumn("Replaced?");
-        ImGui.TableSetupColumn("Swap?");
-        ImGui.TableSetupColumn("Game Paths");
-        ImGui.TableSetupColumn("Resolved Path");
-        ImGui.TableHeadersRow();
-
-        foreach (var (hash, mod) in dataCache.AppliedMods)
+        using (var modReps = ImRaii.Table("chara-mod-replacements", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
         {
-            ImGui.TableNextColumn();
-            CkGui.ColorText(hash, ImGuiColors.DalamudViolet);
+            if (!modReps) return;
+            ImGui.TableSetupColumn("Hash");
+            ImGui.TableSetupColumn("Game Paths");
+            ImGui.TableSetupColumn("Resolved Path");
+            ImGui.TableHeadersRow();
 
-            DrawIconBoolColumn(mod.HasFileReplacement);
-            DrawIconBoolColumn(mod.IsFileSwap);
+            foreach (var (hash, mod) in dataCache.ModdedFiles)
+            {
+                ImGui.TableNextColumn();
+                CkGui.HoverIconText(FAI.Hashtag, ImGuiColors.DalamudViolet.ToUint());
+                CkGui.AttachToolTip(hash);
 
-            ImGui.TableNextColumn();
-            ImGui.Text(string.Join("\n", mod.GamePaths));
+                ImGui.TableNextColumn();
+                ImGui.Text(string.Join("\n", mod.GamePaths));
 
-            ImGui.TableNextColumn();
-            ImGui.Text(mod.ResolvedPath);
+                ImGui.TableNextColumn();
+                ImGui.Text(mod.ResolvedPath);
+            }
+        }
+
+        using (var modSwaps = ImRaii.Table("chara-mod-swaps", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
+        {
+            if (!modSwaps) return;
+            ImGui.TableSetupColumn("Game Paths");
+            ImGui.TableSetupColumn("Resolved Path");
+            ImGui.TableHeadersRow();
+
+            foreach (var (hash, mod) in dataCache.SwappedFiles)
+            {
+                ImGui.TableNextColumn();
+                ImGui.Text(string.Join("\n", mod.GamePaths));
+                ImGui.TableNextColumn();
+                ImGui.Text(mod.ResolvedPath);
+            }
         }
     }
 

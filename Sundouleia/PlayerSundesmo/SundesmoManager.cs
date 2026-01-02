@@ -50,25 +50,20 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<TargetSundesmoMessage>(this, (msg) => TargetSundesmo(msg.Sundesmo));
 
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
+
         Svc.ContextMenu.OnMenuOpened += OnContextMenuOpened;
+
+        // This manager class is not disposed of on logout so we need to ensure it is cleared here.
+        Svc.ClientState.Logout += (_, _) => DisposeSundesmos();
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         Svc.ContextMenu.OnMenuOpened -= OnContextMenuOpened;
-
-        // Dispose of all sundesmos.
-        Logger.LogInformation("Disposing all Sundesmos", LoggerType.PairManagement);
-        var pairCount = _allSundesmos.Count;
-        // Replace with Parallel.ForEach after testing.
-        foreach (var sundesmo in _allSundesmos.Values)
-            sundesmo.DisposeData();
-        // Clear all entries now.
-        _allSundesmos.Clear();
-        Logger.LogDebug($"Disposed {pairCount} Sundesmos.", LoggerType.PairManagement);
-        // dont know why we even need this.
-        RecreateLazy();
+        Svc.ClientState.Logout -= (_, _) => DisposeSundesmos();
+        // Run a disposal of all sundesmos.
+        DisposeSundesmos();
     }
 
     /// <summary>
@@ -141,6 +136,18 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
         // Remove it from the manager and recreate the lazy list.
         _allSundesmos.TryRemove(dto.User, out _);
+        RecreateLazy();
+    }
+
+    private void DisposeSundesmos()
+    {
+        Logger.LogInformation("Disposing all Sundesmos", LoggerType.PairManagement);
+        var pairCount = _allSundesmos.Count;
+        // Replace with Parallel.ForEach after testing.
+        foreach (var sundesmo in _allSundesmos.Values)
+            sundesmo.DisposeData();
+        _allSundesmos.Clear();
+        Logger.LogDebug($"Disposed {pairCount} Sundesmos.", LoggerType.PairManagement);
         RecreateLazy();
     }
 

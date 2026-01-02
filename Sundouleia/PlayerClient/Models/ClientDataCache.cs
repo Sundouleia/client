@@ -1,5 +1,6 @@
 using Sundouleia.ModFiles;
 using SundouleiaAPI.Data;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.PlayerClient;
 
@@ -9,9 +10,9 @@ namespace Sundouleia.PlayerClient;
 /// </summary>
 public class ClientDataCache
 {
-    // Key'd by mod hash. This is the collective modded state sent for mod updates.
-    // It contains modded files used by all owned actors at the time of the latest update.
-    public Dictionary<string, ModdedFile> AppliedMods { get; set; } = new();
+    // Mod Replacements.
+    public Dictionary<string, ModdedFile> ModdedFiles   { get; set; } = new(); // Keyed by hash.
+    public Dictionary<string, ModdedFile> SwappedFiles  { get; set; } = new(); // Keyed by resolvedpath.
 
     // Can be accessed by multiple tasks concurrently.
     public ConcurrentDictionary<OwnedObject, string> GlamourerState { get; set; } = [];
@@ -54,7 +55,10 @@ public class ClientDataCache
     }
 
     public ModUpdates ToModUpdates()
-        => new ModUpdates(AppliedMods.Values.Select(m => m.ToModFileDto()).ToList(), []);
+        => new ModUpdates(
+            ModdedFiles.Values.Select(m => m.ToFileHashDto()).ToList(),
+            SwappedFiles.Values.Select(m => m.ToFileSwapDto()).ToList()
+        );
 
     public VisualUpdate ToVisualUpdate()
     {
@@ -90,26 +94,58 @@ public class ClientDataCache
 
     public ModUpdates ApplyNewModState(ModdedState latestState)
     {
-        // We only want to process what has changed, and update that.
-        var toAdd = new List<ModFile>();
-        var toRemove = new List<string>();
+        var updates = ModUpdates.Empty;
 
-        // First determine which files are removed based on the most currentState.
-        toRemove.AddRange(AppliedMods.Keys.Except(latestState.AllFiles.Select(m => m.Hash)).ToList());
-        foreach (var hash in toRemove)
-            AppliedMods.Remove(hash, out _);
+        var curSwapKeys = new HashSet<string>(SwappedFiles.Keys);
+        var curModKeys = new HashSet<string>(ModdedFiles.Keys);
 
-        // Now iterate through the new hashes. Any that need to be added should be placed in the ToAdd.
-        foreach (var mod in latestState.AllFiles)
+        foreach (var file in latestState.AllFiles)
         {
-            // Skip unchanged mods. A mod is considered changed, if the set of replaced game paths is different.
-            if (AppliedMods.TryGetValue(mod.Hash, out var file) && file.GamePaths.SetEquals(mod.GamePaths))
-                continue;
-            // Add it as new.
-            AppliedMods[mod.Hash] = mod;
-            toAdd.Add(mod.ToModFileDto());
+            // If a file swap.
+            if (file.IsFileSwap)
+            {
+                // Get the resolved file and remove it from the remaining keys.
+                var key = file.ResolvedPath;
+                curSwapKeys.Remove(key); // Removes with O(1)
+
+                // Locate with O(1) and compare sets by O(n) over the gamepaths (always very small)
+                if (SwappedFiles.TryGetValue(key, out var existing) && existing.GamePaths.SetEquals(file.GamePaths))
+                    continue; // No change if both are valid.
+
+                // Otherwise, add/update it.
+                SwappedFiles[key] = file;
+                updates.NewSwaps.Add(new FileSwapData(key, [.. file.GamePaths]));
+            }
+            // Otherwise it is a mod replacement, so handle by hash.
+            else
+            {
+                var key = file.Hash;
+                curModKeys.Remove(key); // Removes with O(1)
+
+                // Locate with O(1) and compare sets by O(n) over the gamepaths (always very small)
+                if (ModdedFiles.TryGetValue(key, out var existing) && existing.GamePaths.SetEquals(file.GamePaths))
+                    continue; // No change if both are valid.
+
+                // Otherwise, add/update it.
+                ModdedFiles[key] = file;
+                updates.NewReplacements.Add(new FileHashData(key, [..file.GamePaths]));
+            }
         }
-        return new ModUpdates(toAdd, toRemove);
+
+        // Any remaining keys in cur*Keys are to be removed.
+        foreach (var hash in curModKeys)
+        {
+            ModdedFiles.Remove(hash, out _);
+            updates.HashesToRemove.Add(hash);
+        }
+
+        foreach (var path in curSwapKeys)
+        {
+            SwappedFiles.Remove(path, out _);
+            updates.SwapsToRemove.Add(path);
+        }
+
+        return updates;
     }
 
     public bool ApplySingleIpc(OwnedObject obj, IpcKind kind, string data)

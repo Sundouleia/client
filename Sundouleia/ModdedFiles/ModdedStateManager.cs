@@ -477,8 +477,9 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
         var objectFiles = (kind is OwnedObject.Player)
             ? await CollectPlayerModdedFiles(onScreenPaths, ct)
             : await CollectOtherModdedFiles(kind, onScreenPaths, ct);
-        Logger.LogDebug($"Processed owned object modded state for {{{kind}}} with {objectFiles.Count} modded files.");
+
         // Store the result into the modded state.
+        Logger.LogDebug($"Processed owned object modded state for {{{kind}}} with {objectFiles.Count} modded files.");
         moddedState.SetOwnedFiles(kind, objectFiles);
         return moddedState;
     }

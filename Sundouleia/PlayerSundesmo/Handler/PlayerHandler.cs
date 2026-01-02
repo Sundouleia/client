@@ -31,16 +31,19 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private CancellationTokenSource _runtimeCTS = new();
     private CancellationTokenSource _dlWaiterCTS = new();
     private Task? _dlWaiterTask;
-
+    
     public Sundesmo Sundesmo { get; init; }
     private unsafe Character* _player = null;
     // cached data for appearance.
     private Guid _tempCollection;
-    private Dictionary<string, VerifiedModFile> _replacements = []; // Hash -> VerifiedFile with download link included if necessary.
+    private Dictionary<string, ValidFileHash> _moddedFiles = [];
+    private Dictionary<string, FileSwapData>  _swappedFiles = [];
     private Guid _tempProfile; // CPlus temp profile id.
     private IpcDataPlayerCache? _appearanceData = null;
 
     private readonly SemaphoreSlim _dataLock = new(1, 1);
+
+    private bool _hasReplacements => _moddedFiles.Count > 0 || _swappedFiles.Count > 0;
 
     public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
         FileCacheManager fileCache, FileDownloader downloads, CharaObjectWatcher watcher, IpcManager ipc)
@@ -62,7 +65,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // If rendered, create and assign to the temp collection if not already done.
             await TryCreateAssignTempCollection().ConfigureAwait(false);
             // If there is replacement data, reapply it.
-            if (_replacements.Count > 0)
+            if (_hasReplacements)
                 await ApplyMods().ConfigureAwait(false);
         });
 
@@ -95,7 +98,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public string NameString { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
     public string NameWithWorld { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
     public unsafe bool IsRendered => _player != null;
-    public bool HasAlterations => _appearanceData != null || _replacements.Count is not 0;
+    public bool HasAlterations => _appearanceData != null || _hasReplacements;
 
     #region Rendering
     // Initializes Player Rendering for this object if the address matches the OnlineUserIdent.
@@ -333,7 +336,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogError("If you are getting this, find out why it is happening!");
         }
 
-        _replacements.Clear();
+        _moddedFiles.Clear();
+        _swappedFiles.Clear();
         _appearanceData = null;
         _tempCollection = Guid.Empty;
         _tempProfile = Guid.Empty;
@@ -350,7 +354,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // If initial data, clear replacements and appearance data.
             if (isInitialData)
             {
-                _replacements.Clear();
+                _moddedFiles.Clear();
+                _swappedFiles.Clear();
                 _appearanceData = null;
             }
 
@@ -455,19 +460,26 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         // Remove all keys to remove.
         foreach (var hash in modData.HashesToRemove)
-            _replacements.Remove(hash);
-        // Add all new files to add.
-        foreach (var file in modData.FilesToAdd)
-            _replacements[file.Hash] = file;
+            _moddedFiles.Remove(hash);
+        foreach (var swap in modData.SwapsToRemove)
+            _swappedFiles.Remove(swap);
+        // Add / Update all new files and swaps.
+        foreach (var file in modData.NewReplacements)
+            _moddedFiles[file.Hash] = file;
+        foreach (var swap in modData.NewSwaps)
+            _swappedFiles[swap.SwappedPath] = swap;
 
         Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data")));
-        Logger.LogTrace($"Mod Data received from {NameString}({Sundesmo.GetNickAliasOrUid()}) [{modData.FilesToAdd.Count} New | {modData.HashesToRemove.Count} ToRemove | {modData.FilesUploading} Uploading]", LoggerType.PairHandler);
+        Logger.LogTrace($"New ModData from {NameString}({Sundesmo.GetNickAliasOrUid()}) " +
+            $"[{modData.NewReplacements.Count} New ModFiles | {modData.NewSwaps.Count} New Swaps |" +
+            $" {modData.HashesToRemove.Count} Removed ModFiles | {modData.SwapsToRemove.Count} Removed Swaps]." +
+            $"(Still uploading ({modData.FilesUploading}) files to you.", LoggerType.PairHandler);
 
         // If we do not have any penumbraAPI or file cache, do not attempt downloads.
         if (!IpcCallerPenumbra.APIAvailable || !_fileCache.CacheFolderIsValid())
         {
             Logger.LogDebug("Either Penumbra IPC or File Cache is not available, cannot process mod data.", LoggerType.PairHandler);
-            return modData.HasChanges;
+            return modData.HasAnyChanges;
         }
         
         // Set the uploading text based on if we have new files to upload or not.
@@ -477,8 +489,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Mediator.Publish(new FilesUploaded(this));
 
         // We should take any new mods to add, and enqueue them to the file downloader.
-        _downloader.BeginDownloads(this, modData.FilesToAdd);
-        return modData.HasChanges;
+        _downloader.BeginDownloads(this, modData.NewReplacements);
+        return modData.HasAnyChanges;
     }
 
     // Returns the changes applied.
@@ -509,6 +521,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     }
 
     // True if data was applied, false otherwise. (useful for redraw)
+    // (TODO: Extend this to detect when a reapply or redraw should be done)
     private async Task<bool> ApplyMods()
     {
         // Sanity checks.
@@ -522,7 +535,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] does not have a temporary collection, skipping mod application.", LoggerType.PairMods);
             return false;
         }
-        if (_replacements.Count == 0)
+        if (!_hasReplacements)
         {
             Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] has no mod replacements, skipping mod application.", LoggerType.PairMods);
             return false;
@@ -530,6 +543,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // Wait for the mods to finish downloading (this can be interrupted by new mod data)
         var moddedPaths = await WaitForModDownloads().ConfigureAwait(false);
+
+        // Ensure that file swaps take precedence over modded paths.
+        foreach (var item in _swappedFiles.Values.ToList())
+        {
+            foreach (var gamePath in item.GamePaths)
+            {
+                Logger.LogTrace($"Adding file swap for {gamePath}: {item.SwappedPath}", LoggerType.PairMods);
+                moddedPaths[gamePath] = item.SwappedPath;
+            }
+        }
 
         // Await for true render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
@@ -558,8 +581,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // Grab the current files from the fileCacheCSV.
         Logger.LogDebug($"Checking cache for existing files for {NameString}({Sundesmo.GetNickAliasOrUid()})", LoggerType.PairMods);
-        var missingFiles = _downloader.GetExistingFromCache(_replacements, out var moddedDict, _runtimeCTS.Token);
-
+        var missingFiles = _downloader.GetExistingFromCache(_moddedFiles.Values, out var moddedDict, _runtimeCTS.Token);
         // Track attempts. Begin downloading the missing files, if any, until all are gone.
         // If at any point this process is interrupted, leave the white loop.
         try
@@ -591,7 +613,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 }
 
                 // Recheck missing files.
-                missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _dlWaiterCTS.Token);
+                missingFiles = _downloader.GetExistingFromCache(_moddedFiles.Values, out moddedDict, _dlWaiterCTS.Token);
 
                 // Delay ~2s with �15�20% random jitter to avoid synchronized polling
                 var jitter = 0.15 + Random.Shared.NextDouble() * 0.05; // 0.15..0.20
@@ -615,7 +637,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // Grab final partial progress. This could happen during unloading, so catch ObjectDisposedException as well.
             try
             {
-                missingFiles = _downloader.GetExistingFromCache(_replacements, out moddedDict, _runtimeCTS.Token);
+                missingFiles = _downloader.GetExistingFromCache(_moddedFiles.Values, out moddedDict, _runtimeCTS.Token);
             }
             catch (ObjectDisposedException)
             {
@@ -836,7 +858,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             {
                 // Clear internal data.
                 _tempCollection = Guid.Empty;
-                _replacements.Clear();
+                _moddedFiles.Clear();
+                _swappedFiles.Clear();
                 _tempProfile = Guid.Empty;
                 _appearanceData = null;
                 NameString = string.Empty;
@@ -862,23 +885,39 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!node) return;
 
         if (CkGui.IconTextButton(FAI.Sync, "Glamourer Reapply Actor"))
-            ConditionalRedraw(true);
-
-        using var table = ImRaii.Table("sundesmos-mods-table", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter);
-        if (!table) return;
-
-        ImGui.TableSetupColumn("Hash");
-        ImGui.TableSetupColumn("Game Paths");
-        ImGui.TableSetupColumn("Resolved Path");
-        ImGui.TableHeadersRow();
-        foreach (var (hash, mod) in _replacements)
         {
-            ImGui.TableNextColumn();
-            CkGui.ColorText(hash, ImGuiColors.DalamudViolet);
-            ImGui.TableNextColumn();
-            ImGui.Text(string.Join("\n", mod.GamePaths));
-            ImGui.TableNextColumn();
-            ImGui.Text(mod.SwappedPath);
+            if (IsRendered) _ipc.Glamourer.ReapplyActor(ObjIndex);
+        }
+
+        ImGui.SameLine();
+        if (CkGui.IconTextButton(FAI.Sync, "Penumbra Redraw"))
+        {
+            if (IsRendered) _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        }
+
+        using (var modReps = ImRaii.Table("sundesmo-mod-replacements", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersOuter))
+        {
+            if (!modReps) return;
+            ImGui.TableSetupColumn("Hash / Swapped Path");
+            ImGui.TableSetupColumn("Affected Game Paths");
+            ImGui.TableHeadersRow();
+
+            foreach (var (hash, mod) in _moddedFiles)
+            {
+                ImGui.TableNextColumn();
+                CkGui.HoverIconText(FAI.Hashtag, ImGuiColors.DalamudViolet.ToUint());
+                CkGui.AttachToolTip(hash);
+                ImGui.TableNextColumn();
+                ImGui.Text(string.Join("\n", mod.GamePaths));
+            }
+
+            foreach (var (swappedPath, swap) in _swappedFiles)
+            {
+                ImGui.TableNextColumn();
+                CkGui.ColorText(swappedPath, ImGuiColors.DalamudViolet);
+                ImGui.TableNextColumn();
+                ImGui.Text(string.Join("\n", swap.GamePaths));
+            }
         }
     }
 
