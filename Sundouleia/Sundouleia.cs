@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+using System.Reflection;
 using CkCommons;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
@@ -27,14 +29,13 @@ using Sundouleia.Services.Tutorial;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
-using System.Net.Http.Headers;
-using System.Reflection;
 
 namespace Sundouleia;
 
 public sealed class Sundouleia : IDalamudPlugin
 {
-    private readonly IHost _host;  // the host builder for the plugin instance. (What makes everything work)
+    private Lock _initLock = new();
+    private IHost? _host;  // the host builder for the plugin instance. (What makes everything work)
     private readonly HttpClientHandler _httpHandler = new() // the http client handler for the plugin instance.
     {
         AutomaticDecompression = System.Net.DecompressionMethods.All
@@ -46,10 +47,20 @@ public sealed class Sundouleia : IDalamudPlugin
         GameDataSvc.Init(pi);
         // init the CkCommons.
         CkCommonsHost.Init(pi, this, CkLogFilter.None);
-        // create the host builder for the plugin
-        _host = ConstructHostBuilder(pi);
-        // start up the host
-        _ = _host.StartAsync();
+
+        // Subscribe to login/logout events to manage the host lifecycle.
+        Svc.ClientState.Login += OnLogin;
+        Svc.ClientState.Logout += OnLogout;
+
+        // Initialize the Host immediately if we're already logged in when loading the plugin.
+        if (Svc.ClientState.IsLoggedIn)
+            OnLogin();
+    }
+
+    private void OnLogin()
+    {
+        Svc.Logger.Information("Detected login, initializing Sundouleia Host.");
+        InitializeHost();
     }
 
     // Method that creates the host builder for the Sundouleia plugin
@@ -68,6 +79,22 @@ public sealed class Sundouleia : IDalamudPlugin
                 //services.ValidateDependencyInjector();
             })
             .Build();
+    }
+
+    private void InitializeHost()
+    {
+        lock (_initLock)
+        {
+            if (_host is not null)
+            {
+                Svc.Logger.Error("Sundouleia Host is already initialized. THIS SHOULD BE IMPOSSIBLE UNLESS SOMETHING IS VERY WRONG WITH LOGIN/LOGOUT EVENTS.");
+                return;
+            }
+            // construct the host builder for the plugin
+            _host = ConstructHostBuilder(Svc.PluginInterface);
+            // start the host asynchronously
+            _host.StartAsync().GetAwaiter().GetResult();
+        }
     }
 
     /// <summary> Gets the log configuration for the plugin. </summary>
@@ -100,18 +127,35 @@ public sealed class Sundouleia : IDalamudPlugin
             .AddSundouleiaHosted();
     }
 
+    private void OnLogout(int type, int code)
+    {
+        lock (_initLock)
+        {
+            Svc.Logger.Information("Detected logout, disposing Sundouleia Host.");
+            _host!.StopAsync().GetAwaiter().GetResult();
+            _host!.Dispose();
+            _host = null;
+        }
+    }
+
     public void Dispose()
     {
-        // Stop the host.
-        _host.StopAsync().GetAwaiter().GetResult();
-        // Dispose of CkCommons.
-        CkCommonsHost.Dispose();
-        // Dispose cleanup of GameDataSvc.
-        GameDataSvc.Dispose();
-        // Dispose the HttpClientHandler.
-        _httpHandler.Dispose();
-        // Dispose the Host.
-        _host.Dispose();
+        lock (_initLock)
+        {
+            Svc.ClientState.Logout -= OnLogout;
+            Svc.ClientState.Login -= OnLogin;
+
+            // Stop the host.
+            _host?.StopAsync().GetAwaiter().GetResult();
+            // Dispose of CkCommons.
+            CkCommonsHost.Dispose();
+            // Dispose cleanup of GameDataSvc.
+            GameDataSvc.Dispose();
+            // Dispose the HttpClientHandler.
+            _httpHandler.Dispose();
+            // Dispose the Host.
+            _host?.Dispose();
+        }
 
     }
 }
