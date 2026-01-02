@@ -79,7 +79,7 @@ public sealed class LimboStateManager : DisposableMediatorSubscriberBase
                 // Inform the mediator that they left limbo, and revert their visual status.
                 Logger.LogDebug($"Timeout elapsed for [{s.PlayerName}] ({s.GetNickAliasOrUid()}).", LoggerType.PairManagement);
                 Mediator.Publish(new SundesmoLeftLimbo(s));
-                
+
                 // Run whatever we wanted to run after the timeout expired.
                 await onTimeout();
             }
@@ -87,6 +87,11 @@ public sealed class LimboStateManager : DisposableMediatorSubscriberBase
             {
                 Logger.LogDebug($"Timeout cancelled for [{s.PlayerName}] ({s.GetNickAliasOrUid()}).", LoggerType.PairManagement);
                 Mediator.Publish(new SundesmoLeftLimbo(s));
+            }
+            finally
+            {
+                // Clean up the dictionary entry.
+                _timeoutTasks.TryRemove(s.UserData, out _);
             }
         }, cts.Token);
 

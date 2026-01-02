@@ -332,8 +332,6 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
         throw new InvalidOperationException("No token present");
     }
 
-
-
     /// <summary> Unlike the <c>GetToken()</c> method, this both gets and updates the token</summary>
     /// <param name="ct">The cancelation token for the task</param>
     /// <returns>the token to be returned.</returns>
