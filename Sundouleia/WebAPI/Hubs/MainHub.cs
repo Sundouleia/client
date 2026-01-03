@@ -141,7 +141,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         _hubHealthCTS?.Cancel();
         // Notify of unloading upon halting the plugin.
         await Disconnect(ServerState.Disconnected, DisconnectIntent.Shutdown).ConfigureAwait(false);
-        _hubConnectionCTS?.Cancel();
+        _hubConnectionCTS.SafeCancel();
         return;
     }
 

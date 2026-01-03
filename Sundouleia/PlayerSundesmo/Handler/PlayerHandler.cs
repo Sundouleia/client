@@ -25,8 +25,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 {
     private readonly FileCacheManager _fileCache;
     private readonly FileDownloader _downloader;
-    private readonly CharaObjectWatcher _watcher;
     private readonly IpcManager _ipc;
+    private readonly CharaObjectWatcher _watcher;
 
     private CancellationTokenSource _runtimeCTS = new();
     private CancellationTokenSource _dlWaiterCTS = new();
@@ -242,7 +242,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     #region Altaration Control
 
-    /// <inheritdoc cref="RevertAlterations(string, string, nint, ushort, CancellationToken)"/>
+    /// <inheritdoc cref="RevertAlterations(string, nint, ushort, CancellationToken)"/>
     public async Task RevertAlterations(CancellationToken ct = default)
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
@@ -260,12 +260,26 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 return;
             }
 
+            // Ensure we have a valid address before we process a revert.
+            // (Helps safegaurd cases where a Sundesmo is disposed of before its handlers are finished)
+            // (Can touch this up later)
+            if (!CharaObjectWatcher.RenderedCharas.Contains(Address))
+                return;
+
             // We can care about parallel execution here if we really want to but i dont care atm.
             await _ipc.PetNames.ClearPetNamesByIdx(ObjIndex).ConfigureAwait(false);
             await _ipc.Glamourer.ReleaseActor(ObjIndex).ConfigureAwait(false);
             await _ipc.Heels.RestoreUserOffset(ObjIndex).ConfigureAwait(false);
             await _ipc.Honorific.ClearTitleAsync(ObjIndex).ConfigureAwait(false);
             await _ipc.Moodles.ClearByPtr(Address).ConfigureAwait(false);
+        }
+        catch (AccessViolationException)
+        {
+            Logger.LogWarning($"RevertAlterations for {NameString}({Sundesmo.GetNickAliasOrUid()}) was cancelled.", LoggerType.PairHandler);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"RevertAlterations for {NameString}({Sundesmo.GetNickAliasOrUid()}) failed unexpectedly.", LoggerType.PairHandler);
         }
         finally
         {
@@ -283,7 +297,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             // Revert penumbra collection and customize+ data if set.
             await RevertAssignedAlterations();
-
+             
             // If not visible, skip all but GlamourerByName, since they won't be valid.
             if (address == IntPtr.Zero)
             {
@@ -293,12 +307,26 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 return;
             }
 
+            // Ensure we have a valid address before we process a revert.
+            // (Helps safegaurd cases where a Sundesmo is disposed of before its handlers are finished)
+            // (Can touch this up later)
+            if (!CharaObjectWatcher.RenderedCharas.Contains(Address))
+                return;
+
             // We can care about parallel execution here if we really want to but i dont care atm.
             await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
             await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
             await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
             await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
             await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogWarning($"RevertAlterations for {NameString}({Sundesmo.GetNickAliasOrUid()}) was cancelled.", LoggerType.PairHandler);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"RevertAlterations for {NameString}({Sundesmo.GetNickAliasOrUid()}) failed unexpectedly.", LoggerType.PairHandler);
         }
         finally
         {

@@ -61,7 +61,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
                 NewCorbyMsg = false;
             }
         });
-        Mediator.Subscribe<RadarTerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
+        Mediator.Subscribe<TerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
 
         // Should just end up null or something empty.
         LoadTerritoryChatLog(RadarService.CurrWorld, RadarService.CurrZone);

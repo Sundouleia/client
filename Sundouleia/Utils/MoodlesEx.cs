@@ -1,12 +1,8 @@
-using CkCommons;
 using CkCommons.Gui;
 using CkCommons.RichText;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Component.GUI;
-using Sundouleia.PlayerClient;
-using Sundouleia.WebAPI;
 using SundouleiaAPI.Data.Permissions;
 
 namespace Sundouleia;

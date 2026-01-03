@@ -50,7 +50,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
             if (msg.NewTab is MainMenuTabs.SelectedTab.RadarChat)
                 ShouldScrollToBottom = true;
         });
-        Mediator.Subscribe<RadarTerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
+        Mediator.Subscribe<TerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
 
         // Should just end up null or something empty.
         LoadTerritoryChatLog(RadarService.CurrWorld, RadarService.CurrZone);

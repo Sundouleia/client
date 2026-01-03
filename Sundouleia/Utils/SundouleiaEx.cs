@@ -23,7 +23,7 @@ public static class SundouleiaEx
         }
     }
 
-    public static bool IsPlayerFullyLoaded()
+    public static bool  IsPlayerFullyLoaded()
         => PlayerData.Interactable && IsScreenReady();
 
     /// <summary>

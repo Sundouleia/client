@@ -9,6 +9,7 @@ using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using System.Diagnostics.CodeAnalysis;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Watchers;
 
@@ -200,8 +201,12 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     {
         var address = (nint)chara;
 
+        // Do not track if not a valid object type. (Maybe move to after gpose actor adding)
+        if (chara->GetObjectKind() is not (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
+            return;
+        
         // For GPose actors.
-        if (chara->ObjectIndex > 200)
+        if (chara->ObjectIndex > 200 && GameMain.IsInGPose())
         {
             Logger.LogDebug($"New GPose Character Rendered: {(nint)chara:X} - {chara->NameString}");
             GPoseActors.Add(address);

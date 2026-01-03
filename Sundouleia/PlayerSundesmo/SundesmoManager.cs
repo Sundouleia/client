@@ -52,16 +52,12 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());
 
         Svc.ContextMenu.OnMenuOpened += OnContextMenuOpened;
-
-        // This manager class is not disposed of on logout so we need to ensure it is cleared here.
-        Svc.ClientState.Logout += (_, _) => DisposeSundesmos();
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         Svc.ContextMenu.OnMenuOpened -= OnContextMenuOpened;
-        Svc.ClientState.Logout -= (_, _) => DisposeSundesmos();
         // Run a disposal of all sundesmos.
         DisposeSundesmos();
     }
@@ -163,11 +159,6 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     ///     Occurs whenever our client disconnects from the SundouleiaServer. <para />
     ///     What actions are taken depend on the disconnection intent.
     /// </summary>
-    /// <remarks>
-    ///     What still confuses me is why the manager seems to hold Sundesmos between logins, 
-    ///     since the plugin service scope should be disposing all instances whenever logged 
-    ///     out, and recreating them on login.
-    /// </remarks>
     public void OnClientDisconnected(DisconnectIntent intent)
     {
         Logger.LogInformation($"Client disconnected with intent: {intent}", LoggerType.PairManagement);
@@ -188,6 +179,11 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
                 break;
 
             case DisconnectIntent.Logout:
+                // Dispose of all sundesmos properly upon logout.
+                Logger.LogInformation("Client in Logout, disposing all Sundesmos.");
+                DisposeSundesmos();
+                break;
+
             case DisconnectIntent.Shutdown:
                 // If we logged out, there is no reason to have any pairs anymore.
                 // However, it also should trigger the managers disposal. If it doesn't, something's wrong.
@@ -286,6 +282,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
                 TargetSystem.Instance()->SetHardTarget((GameObject*)s.PlayerAddress);
         }
     }
+
     private void RecreateLazy()
     {
         _directPairsInternal = new Lazy<List<Sundesmo>>(() => _allSundesmos.Select(k => k.Value).ToList());

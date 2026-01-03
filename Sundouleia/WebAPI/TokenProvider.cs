@@ -366,39 +366,44 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
         // get the JWT identifier
         var jwtIdentifier = GetIdentifier();
         // if it is null, return null
-        if (jwtIdentifier == null) 
+        if (jwtIdentifier == null)
             return null;
 
         // assume we dont need a renewal
         var renewal = false;
-        if (_tokenCache.TryGetValue(jwtIdentifier, out var token))
+        lock (_tokenCache)
         {
-            // create a new handler for the JWT token
-            var handler = new JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(token);
-            if (jwt.ValidTo == DateTime.MinValue || jwt.ValidTo.Subtract(TimeSpan.FromMinutes(5)) > DateTime.UtcNow)
+            if (_tokenCache.TryGetValue(jwtIdentifier, out var token))
             {
-                // token was valid, so return it LOG NOTE: This is very spammy to the logs if left unchecked.
-                Logger.LogTrace("GetOrUpdate: Returning Valid token from cache", LoggerType.JwtTokens);
-                return token;
-            }
+                // create a new handler for the JWT token
+                var handler = new JwtSecurityTokenHandler();
+                var jwt = handler.ReadJwtToken(token);
+                if (jwt.ValidTo == DateTime.MinValue || jwt.ValidTo.Subtract(TimeSpan.FromMinutes(5)) > DateTime.UtcNow)
+                {
+                    // token was valid, so return it LOG NOTE: This is very spammy to the logs if left unchecked.
+                    Logger.LogTrace("GetOrUpdate: Returning Valid token from cache", LoggerType.JwtTokens);
+                    return token;
+                }
 
-            // token expired, requires renewal.
-            Logger.LogDebug("GetOrUpdate: Cached token was found but requires renewal, token valid to: "+jwt.ValidTo+" UTC is now: "+DateTime.UtcNow, LoggerType.JwtTokens);
-            renewal = true;
-        }
-        // if we did not find the token in the cache, log that we did not find it.
-        else
-        {
-            Logger.LogDebug("GetOrUpdate: Did not find token in cache, requesting a new one", LoggerType.JwtTokens);
+                // token expired, requires renewal.
+                Logger.LogDebug("GetOrUpdate: Cached token was found but requires renewal, token valid to: " + jwt.ValidTo + " UTC is now: " + DateTime.UtcNow, LoggerType.JwtTokens);
+                renewal = true;
+            }
+            // if we did not find the token in the cache, log that we did not find it.
+            else
+            {
+                Logger.LogDebug("GetOrUpdate: Did not find token in cache, requesting a new one", LoggerType.JwtTokens);
+            }
         }
 
         // if we are renewing, log that we are getting a new token, and return it
         Logger.LogTrace("GetOrUpdate: Getting new token", LoggerType.JwtTokens);
 
         // log if the identifier is secretkey or contentid
-        if (jwtIdentifier is SecretKeyJwtIdentifier secretKeyIdentifier) { Logger.LogDebug("GetOrUpdate: Using SecretKeyIdentifier", LoggerType.JwtTokens); }
-        else if (jwtIdentifier is LocalContentIDJwtIdentifier localContentIDIdentifier) { Logger.LogDebug("GetOrUpdate: Using LocalContentIdIdentifier", LoggerType.JwtTokens); }
+        if (jwtIdentifier is SecretKeyJwtIdentifier secretKeyIdentifier)
+            Logger.LogDebug("GetOrUpdate: Using SecretKeyIdentifier", LoggerType.JwtTokens);
+        else if (jwtIdentifier is LocalContentIDJwtIdentifier localContentIDIdentifier)
+            Logger.LogDebug("GetOrUpdate: Using LocalContentIdIdentifier", LoggerType.JwtTokens);
 
         return await GetNewToken(renewal, jwtIdentifier, ct).ConfigureAwait(false);
     }

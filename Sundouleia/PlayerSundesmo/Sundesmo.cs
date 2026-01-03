@@ -1,4 +1,3 @@
-using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -9,13 +8,11 @@ using GagspeakAPI.Data;
 using OtterGui;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
-using System.Threading.Tasks;
 
 namespace Sundouleia.Pairs;
 

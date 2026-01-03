@@ -69,7 +69,7 @@ public class RadarService : DisposableMediatorSubscriberBase
         CurrWorld = PlayerData.CurrentWorldId;
         CurrWorldName = PlayerData.CurrentWorldName;
         CurrZone = PlayerContent.TerritoryIdInstanced;
-        Mediator.Publish(new RadarTerritoryChanged(0, CurrZone));
+        Mediator.Publish(new TerritoryChanged(0, CurrZone));
     }
 
     private async void OnLogout(int type, int code)
@@ -100,7 +100,7 @@ public class RadarService : DisposableMediatorSubscriberBase
         if (!Svc.ClientState.IsLoggedIn)
             return;
 
-        Mediator.Publish(new RadarTerritoryChanged(CurrZone, newTerritory));
+        Mediator.Publish(new TerritoryChanged(CurrZone, newTerritory));
         
         // If we do not want to send radar updates, then dont.
         if (!_config.Current.RadarEnabled)

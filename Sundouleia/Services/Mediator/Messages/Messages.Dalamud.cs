@@ -14,6 +14,4 @@ public record CutsceneSkippedMessage : MessageBase;
 public record ClientPlayerInCutscene : MessageBase;
 public record CutsceneEndMessage : MessageBase;
 
-// Should probably process this in a zone service or something.
-public record ZoneSwitchStartMessage(uint prevZone) : MessageBase;
-public record ZoneSwitchEndMessage : MessageBase;
+public record TerritoryChanged(ushort PrevTerritory, ushort NewTerritory) : MessageBase;
