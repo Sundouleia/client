@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Glamourer.Api", "Submodules
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OtterGui", "Submodules\OtterGui\OtterGui.csproj", "{07069787-A3E4-4353-9589-5AD92154398D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.Api", "Submodules\Penumbra.API\Penumbra.Api.csproj", "{B0BA2C2A-BF08-48DA-9212-618A68A0726E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.Api", "Submodules\Penumbra.Api\Penumbra.Api.csproj", "{B0BA2C2A-BF08-48DA-9212-618A68A0726E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SundouleiaAPI", "Submodules\SundouleiaAPI\SundouleiaAPI.csproj", "{44859AEF-577D-477C-90E9-0DF771042BA7}"
 EndProject
