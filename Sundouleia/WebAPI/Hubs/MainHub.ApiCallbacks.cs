@@ -344,21 +344,21 @@ public partial class MainHub
     public Task Callback_RadarAddUpdateUser(OnlineUser dto)
     {
         Logger.LogDebug($"Callback_RadarAddUpdateUser Called", LoggerType.Callbacks);
-        Mediator.Publish(new RadarAddOrUpdateUser(dto));
+        _radar.AddOrUpdateUser(dto, IntPtr.Zero);
         return Task.CompletedTask;
     }
 
     public Task Callback_RadarRemoveUser(UserDto dto)
     {
         Logger.LogDebug($"Callback_RadarRemoveUser Called", LoggerType.Callbacks);
-        Mediator.Publish(new RadarRemoveUser(dto.User));
+        _radar.RemoveUser(dto.User);
         return Task.CompletedTask;
     }
 
     public Task Callback_RadarChat(RadarChatMessage dto)
     {
         // If for some ungodly reason we get this message from a different world / territory, ignore it.
-        if (dto.WorldId != RadarService.CurrWorld || dto.TerritoryId != RadarService.CurrZone)
+        if (dto.WorldId != LocationService.CurrWorld || dto.TerritoryId != LocationService.CurrZone)
         {
             Logger.LogWarning($"Callback_RadarChat: Ignoring message from different world / zone. {dto.WorldId}/{dto.TerritoryId}", LoggerType.Callbacks);
             return Task.CompletedTask;

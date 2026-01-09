@@ -155,6 +155,7 @@ public class GroupsManager
     }
 
     #endregion Style Edits
+    
     public bool TryMergeFolder(string fromFolder, string toFolder)
     {
         if (!_lookupMap.TryGetValue(fromFolder, out var fromGroup))
@@ -266,6 +267,19 @@ public class GroupsManager
     {
         foreach (string uid in uids)
             group.LinkedUids.Remove(uid);
+        _config.Save();
+    }
+
+    public void DeleteGroup(string groupLabel)
+    {
+        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(groupLabel, StringComparison.Ordinal)) is not { } group)
+        {
+            _logger.LogWarning($"No group found with the name {{{groupLabel}}} to delete.");
+            return;
+        }
+
+        Config.Groups.Remove(group);
+        _logger.LogInformation($"Deleted group {{{group.Label}}} from config.");
         _config.Save();
     }
 }

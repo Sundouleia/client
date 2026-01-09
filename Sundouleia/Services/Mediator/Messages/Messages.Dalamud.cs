@@ -14,4 +14,5 @@ public record CutsceneSkippedMessage : MessageBase;
 public record ClientPlayerInCutscene : MessageBase;
 public record CutsceneEndMessage : MessageBase;
 
+// Could make SameThreadMessage if we want.
 public record TerritoryChanged(ushort PrevTerritory, ushort NewTerritory) : MessageBase;

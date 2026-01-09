@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
@@ -27,6 +28,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private readonly TokenProvider _tokenProvider;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
+    private readonly RadarManager _radar;
     private readonly IpcCallerMoodles _moodles;
     private readonly IpcProvider _ipcProvider;
 
@@ -54,6 +56,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         TokenProvider tokenProvider,
         RequestsManager requests,
         SundesmoManager sundesmos,
+        RadarManager radar,
         IpcCallerMoodles moodles,
         IpcProvider ipcProvider)
         : base(logger, mediator)
@@ -63,6 +66,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         _tokenProvider = tokenProvider;
         _requests = requests;
         _sundesmos = sundesmos;
+        _radar = radar;
         _moodles = moodles;
         _ipcProvider = ipcProvider;
 

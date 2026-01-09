@@ -30,7 +30,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favorites;
-    private readonly NickConfig _nicks;
+    private readonly NicksConfig _nicks;
     private readonly LimboStateManager _limboManager;
     private readonly CharaObjectWatcher _watcher;
 
@@ -44,7 +44,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     private PlayerOwnedHandler _companion;
 
     public Sundesmo(UserPair userPairInfo, ILogger<Sundesmo> logger, SundouleiaMediator mediator,
-        MainConfig config, FolderConfig folderConfig, FavoritesConfig favorites, NickConfig nicks,
+        MainConfig config, FolderConfig folderConfig, FavoritesConfig favorites, NicksConfig nicks,
         SundesmoHandlerFactory factory, LimboStateManager limbo, CharaObjectWatcher watcher)
     {
         _logger = logger;

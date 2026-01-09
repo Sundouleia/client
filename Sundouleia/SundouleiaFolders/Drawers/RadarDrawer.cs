@@ -93,24 +93,9 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     {
         var bgCol = _configExpanded ? ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f) : 0;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
-        using var child = CkRaii.ChildPaddedW("RadarConfig", width, CkStyle.GetFrameRowsHeight(2), bgCol, 5f);
-
-        // Maybe move the variables into a config so we can store them between plugin states.
-        CkGui.FramedIconText(FAI.PeopleGroup);
-        // Combo inline here holding the groups.
-        CkGui.ColorTextFrameAlignedInline("[Dummy Combo Placeholder]", ImGuiColors.ParsedGrey);
-        // Note that when the combo is dropped down, there are buttons to clear, search filter, and also to add a new one.
-        // Selections also will not close the combo.
-        ImUtf8.SameLineInner();
-        CkGui.FramedHoverIconText(FAI.InfoCircle, ImGuiColors.TankBlue.ToUint());
-        if (ImGui.IsItemHovered())
-        {
-            // Show the popup, at the location of the framed icon text to the right, displaying the groups that the request, when accepted, are added to.
-        }
+        using var child = CkRaii.ChildPaddedW("RadarConfig", width, ImUtf8.FrameHeight, bgCol, 5f);
 
         // next row, checkbox.
-        CkGui.FramedIconText(FAI.Stopwatch);
-        ImUtf8.SameLineInner();
         if (ImGui.Checkbox("Requests Are Temporary", ref _defaultIsTemporary))
         {
             Log.Information($"Default Temporary Request setting changed to [{_defaultIsTemporary}]");
@@ -178,7 +163,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     private void DrawUnpairedUser(IDynamicLeaf<RadarUser> leaf, UnpairedRadarUser uru, DynamicFlags flags, bool selected)
     {
         bool drafting = _inDrafter == leaf;
-        var height = drafting ? CkStyle.GetFrameRowsHeight(3) : ImUtf8.FrameHeight;
+        var height = drafting ? CkStyle.GetFrameRowsHeight(2) : ImUtf8.FrameHeight;
         var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), height);  
         var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
         var frameCol = drafting ? ImGui.GetColorU32(ImGuiCol.Button) : 0;

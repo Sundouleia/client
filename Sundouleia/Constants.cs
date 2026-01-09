@@ -13,7 +13,7 @@ public static class Constants
     public const string FolderTagOffline        = "Offline";
     public const string FolderTagRadarPaired    = "Paired";
     public const string FolderTagRadarUnpaired  = "Unpaired";
-    public const string FolderTagRequestIncoming= "Incoming Requests";
+    public const string FolderTagRequestInc= "Incoming Requests";
     public const string FolderTagRequestPending = "Pending Requests";
     // Sundouleia Folder Labels
     public static readonly IEnumerable<string> OwnedFolders = [
@@ -24,7 +24,7 @@ public static class Constants
         FolderTagOffline,
         FolderTagRadarPaired,
         FolderTagRadarUnpaired,
-        FolderTagRequestIncoming,
+        FolderTagRequestInc,
         FolderTagRequestPending
     ];
 

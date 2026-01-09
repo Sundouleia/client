@@ -1,19 +1,17 @@
 using CkCommons.DrawSystem;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using System.Linq;
 
 namespace Sundouleia.DrawSystem;
 
 public sealed class GroupFolder : DynamicFolder<Sundesmo>
 {
     // We store this to have a dynamically generated list without the need of a generator.
-    private SundesmoGroup _group;
     private Func<IReadOnlyList<Sundesmo>> _generator;
     public GroupFolder(DynamicFolderGroup<Sundesmo> parent, uint id, SundesmoManager sundesmos, SundesmoGroup g)
         : base(parent, g.Icon, g.Label, id)
     {
-        _group = g;
+        Group = g;
         // Define the generator.
         _generator = () => [.. sundesmos.DirectPairs.Where(u => g.LinkedUids.Contains(u.UserData.UID) && (g.ShowOffline || u.IsOnline))];
         // Apply Stylizations.
@@ -27,7 +25,7 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
         : base(parent, g.Icon, g.Label, id, new(sortSteps))
     {
         // Store the group.
-        _group = g;
+        Group = g;
         // Define the generator.
         _generator = () => ShowOffline 
             ? [.. sundesmos.DirectPairs.Where(u => g.LinkedUids.Contains(u.UserData.UID))]
@@ -38,7 +36,8 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
         UnusedSteps = SorterExtensions.AllGroupSteps.Except(Sorter).ToList();
     }
 
-    public bool ShowOffline => _group.ShowOffline;
+    internal SundesmoGroup Group;
+    public bool ShowOffline => Group.ShowOffline;
     public int Rendered => GetChildren().Count(s => s.Data.IsRendered);
     public int Online => Children.Count(s => s.Data.IsOnline);
     protected override IReadOnlyList<Sundesmo> GetAllItems() => _generator();
@@ -58,11 +57,11 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
     /// </summary>
     public void ApplyLatestStyle()
     {
-        Icon = _group.Icon;
-        IconColor = _group.IconColor;
-        NameColor = _group.LabelColor;
-        BorderColor = _group.BorderColor;
-        GradientColor = _group.GradientColor;
+        Icon = Group.Icon;
+        IconColor = Group.IconColor;
+        NameColor = Group.LabelColor;
+        BorderColor = Group.BorderColor;
+        GradientColor = Group.GradientColor;
     }
 
     /// <summary>
@@ -74,7 +73,7 @@ public sealed class GroupFolder : DynamicFolder<Sundesmo>
         // Retrieve all expected sort steps.
         var all = SorterExtensions.AllGroupSteps;
         // Fetch the new sort order from the group.
-        var desired = _group.SortOrder.Select(f => f.ToSortMethod());
+        var desired = Group.SortOrder.Select(f => f.ToSortMethod());
         // Update the Folders sorter to the new steps.
         Sorter.SetSteps(desired);
         // Update the unused steps for the filter editor.

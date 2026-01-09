@@ -263,16 +263,14 @@ public class MainUI : WindowMediatorSubscriberBase
     /// <summary> Draws the current status of the server, including the number of people online. </summary>
     private void DrawServerStatus()
     {
-        var windowPadding = ImGui.GetStyle().WindowPadding;
-        var addUserIcon = FAI.UserPlus;
-        var connectionButtonSize = CkGui.IconButtonSize(FAI.Link);
-        var addUserButtonSize = CkGui.IconButtonSize(addUserIcon);
+        using var style = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, 12f);
+
+        var padding = ImGui.GetStyle().WindowPadding;
+        var height = CkGui.CalcFontTextSize("A", UiFontService.Default150Percent);
+        var connectSize = CkGui.IconButtonSize(FAI.Link);
+        var addSize = CkGui.IconButtonSize(FAI.UserPlus);
 
         var userCount = MainHub.OnlineUsers.ToString(CultureInfo.InvariantCulture);
-        var userSize = ImGui.CalcTextSize(userCount);
-        var textSize = ImGui.CalcTextSize("Users Online");
-        var serverText = "Main Sundouleia Server";
-        var shardTextSize = ImGui.CalcTextSize(serverText);
         var totalHeight = ImGui.GetTextLineHeight()*2 + ImGui.GetStyle().ItemSpacing.Y;
 
         // create a table
@@ -280,14 +278,14 @@ public class MainUI : WindowMediatorSubscriberBase
         using (ImRaii.Table("ServerStatusMainUI", 3))
         {
             // define the column lengths.
-            ImGui.TableSetupColumn("##addUser", ImGuiTableColumnFlags.WidthFixed, addUserButtonSize.X);
+            ImGui.TableSetupColumn("##addUser", ImGuiTableColumnFlags.WidthFixed, addSize.X);
             ImGui.TableSetupColumn("##serverState", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##connectionButton", ImGuiTableColumnFlags.WidthFixed, connectionButtonSize.X);
+            ImGui.TableSetupColumn("##connectionButton", ImGuiTableColumnFlags.WidthFixed, connectSize.X);
 
             // draw the add user button
             ImGui.TableNextColumn();
-            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (totalHeight - addUserButtonSize.Y) / 2);
-            if (CkGui.IconButton(addUserIcon, disabled: !MainHub.IsConnected))
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (totalHeight - addSize.Y) / 2);
+            if (CkGui.IconButton(FAI.UserPlus, disabled: !MainHub.IsConnected))
                 _creatingRequest = !_creatingRequest;
             CkGui.AttachToolTip("Add New User to Whitelist");
             _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.AddingUsers, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => _creatingRequest = !_creatingRequest);
@@ -295,11 +293,13 @@ public class MainUI : WindowMediatorSubscriberBase
             // in the next column, draw the centered status.
             ImGui.TableNextColumn();
 
+            var offsetX = (ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth()) / 2 - ImGui.CalcTextSize($"{userCount} Users Online").X / 2 - ImUtf8.ItemSpacing.X / 2;
+
+            ImGui.SetCursorPosX(offsetX);
             if (MainHub.IsConnected)
             {
                 // fancy math shit for clean display, adjust when moving things around
-                ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth())
-                    / 2 - (userSize.X + textSize.X) / 2 - ImGui.GetStyle().ItemSpacing.X / 2);
+                ImGui.SetCursorPosX(offsetX);
                 using (ImRaii.Group())
                 {
                     ImGui.TextColored(ImGuiColors.ParsedPink, userCount);
@@ -318,12 +318,12 @@ public class MainUI : WindowMediatorSubscriberBase
             }
 
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.Y);
-            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth()) / 2 - shardTextSize.X / 2);
-            ImGui.TextUnformatted(serverText);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth()) / 2 - ImGui.CalcTextSize("Main Sundouleia Server").X / 2);
+            ImGui.TextUnformatted("Main Sundouleia Server");
 
             // draw the connection link button
             ImGui.TableNextColumn();
-            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (totalHeight - addUserButtonSize.Y) / 2);
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (totalHeight - addSize.Y) / 2);
             // now we need to display the connection link button beside it.
             var color = SundouleiaEx.ServerStateColor();
             var connectedIcon = SundouleiaEx.ServerStateIcon(MainHub.ServerStatus);

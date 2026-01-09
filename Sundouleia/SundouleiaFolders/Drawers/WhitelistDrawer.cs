@@ -7,6 +7,7 @@ using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Gui.MainWindow;
@@ -28,16 +29,17 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private static readonly string NormalTooltip =
         "--COL--[L-CLICK]--COL-- Swap Between Name/Nick/Alias & UID." +
         "--NL----COL--[M-CLICK]--COL-- Open Profile" +
+        "--NL----COL--[R-CLICK]--COL-- Edit Groups" +
         "--NL----COL--[SHIFT + R-CLICK]--COL-- Edit Nickname";
 
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favoritesConfig;
-    private readonly NickConfig _nicks;
+    private readonly NicksConfig _nicks;
     private readonly SundesmoManager _sundesmos;
+    private readonly SidePanelService _sidePanel;
     private readonly WhitelistDrawSystem _drawSystem;
-    private readonly SidePanelService _stickyService;
 
     // If the FilterRow is to be expanded.
     private bool _configExpanded = false;
@@ -53,19 +55,18 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private bool          _profileShown = false;// If currently displaying a popout profile.
     private DateTime?     _lastHoverTime;       // time until we should show the profile.
 
-    public WhitelistDrawer(SundouleiaMediator mediator,
-        MainConfig config, FolderConfig folderConfig, FavoritesConfig favoritesConfig,
-        NickConfig nicks, SundesmoManager sundesmos,
-        SidePanelService stickyService, WhitelistDrawSystem ds)
+    public WhitelistDrawer(SundouleiaMediator mediator,MainConfig config, FolderConfig folders, 
+        FavoritesConfig favorites, NicksConfig nicks, SundesmoManager sundesmos,
+        SidePanelService sidePanel, WhitelistDrawSystem ds)
         : base("##WhitelistDrawer", Svc.Logger.Logger, ds, new SundesmoCache(ds))
     {
         _mediator = mediator;
         _config = config;
-        _folderConfig = folderConfig;
-        _favoritesConfig = favoritesConfig;
+        _folderConfig = folders;
+        _favoritesConfig = favorites;
         _nicks = nicks;
         _sundesmos = sundesmos;
-        _stickyService = stickyService;
+        _sidePanel = sidePanel;
         _drawSystem = ds;
     }
 
@@ -223,7 +224,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         {
             ImGui.AlignTextToFramePadding();
             if (CkGui.IconButton(FAI.ChevronRight, inPopup: true))
-                _stickyService.ForInteractions(leaf.Data);
+                _sidePanel.ForInteractions(leaf.Data);
 
             currentRightSide -= interactionsSize.X;
             ImGui.SameLine(currentRightSide);
@@ -254,6 +255,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         // For handling Interactions.
         var isDragDrop = flags.HasAny(DynamicFlags.DragDropLeaves);
         var pos = ImGui.GetCursorPos();
+
         if (ImGui.InvisibleButton($"{leaf.FullPath}-name-area", region))
             HandleClick(leaf, flags);
         HandleDetections(leaf, flags);
@@ -266,6 +268,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         CkGui.AttachToolTip(isDragDrop ? DragDropTooltip : NormalTooltip, ImGuiColors.DalamudOrange);
         if (isDragDrop)
             return;
+
         // Handle hover state.
         if (ImGui.IsItemHovered())
         {
@@ -326,14 +329,18 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
                 if (!_showingUID.Remove(node))
                     _showingUID.Add(node);
             }
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
+            else if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
             {
                 _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
             }
-            if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            else if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
                 _renaming = node;
                 _nameEditStr = node.Data.GetNickname() ?? string.Empty;
+            }
+            else if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
+
             }
         }
     }
@@ -411,6 +418,26 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.FocusTargetTT);
     }
+
+    public bool DrawPopup(string popupId, GroupFolder folder, float width)
+    {
+        // Set next popup position, style, color, and display.
+        ImGui.SetNextWindowPos(ImGui.GetItemRectMin() + new Vector2(ImGui.GetItemRectSize().X, 0));
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.PopupBorderSize, 1f)
+            .Push(ImGuiStyleVar.PopupRounding, 5f)
+            .Push(ImGuiStyleVar.WindowPadding, ImGuiHelpers.ScaledVector2(4f, 1f));
+        using var c = ImRaii.PushColor(ImGuiCol.Border, ImGuiColors.ParsedGold);
+        using var popup = ImRaii.Popup(popupId, WFlags.NoMove | WFlags.NoResize | WFlags.NoCollapse | WFlags.NoScrollbar);
+        if (!popup)
+            return false;
+
+        // Display the filter editor inside, after drawing the filter popup display.
+        CkGui.InlineSpacingInner();
+        CkGui.ColorTextFrameAligned("Filters:", ImGuiColors.ParsedGold);
+        ImGui.Separator();
+        return false;
+    }
+
     #endregion Utility
 }
 

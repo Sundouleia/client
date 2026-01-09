@@ -18,10 +18,10 @@ namespace Sundouleia.DrawSystem;
 
 /// <summary>
 ///     A drawer for Groups that only displays folders. Used for managing Sundouleia's Group System. <para />
-///     This references the same DrawSystem as the <see cref="GroupsDrawer"/> but only displays folders <para />
+///     This references the same DrawSystem as the <see cref="WhitelistGroupsDrawer"/> but only displays folders <para />
 ///     Also using this to draw group creators and deletions
 /// </summary>
-public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
+public class GroupOrganizer : DynamicDrawer<Sundesmo>
 {
     private static readonly IconCheckboxEx CheckboxOffline = new(FAI.Unlink);
     private static readonly IconCheckboxEx CheckboxShowEmpty = new(FAI.FolderOpen);
@@ -49,7 +49,7 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
     private string _nameEditTmp = string.Empty;
     private IDynamicCollection<Sundesmo>? _folderInEditor;
 
-    public GroupsFolderDrawer(ILogger<GroupsFolderDrawer> logger, SundouleiaMediator mediator, 
+    public GroupOrganizer(ILogger<GroupOrganizer> logger, SundouleiaMediator mediator, 
         MainConfig config, FolderConfig folders, GroupsManager groups, SundesmoManager sundesmos, 
         GroupsDrawSystem ds)
         : base("##GroupsFolderDrawer", Svc.Logger.Logger, ds, new SundesmoCache(ds))
@@ -165,7 +165,11 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
             {
                 Log.Debug($"Deleting {Selector.Collections.Count} selected groups.");
                 foreach (var folder in Selector.Collections)
+                {
                     DrawSystem.Delete(folder.Name);
+                    if (folder is GroupFolder f)
+                        _groups.DeleteGroup(f.Name);
+                }
                 Log.Information("Deleted selected groups.");
             });
         }
@@ -285,7 +289,6 @@ public class GroupsFolderDrawer : DynamicDrawer<Sundesmo>
             }
         }
     }
-
 
     protected override void DrawFolderBanner(IDynamicFolder<Sundesmo> f, DynamicFlags flags, bool selected)
     {

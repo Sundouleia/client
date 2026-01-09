@@ -67,7 +67,7 @@ public sealed class RequestsDrawSystem : DynamicDrawSystem<RequestEntry>, IMedia
     protected override bool EnsureAllFolders(Dictionary<string, string> _)
     {
         bool anyAdded = false;
-        anyAdded |= AddFolder(new RequestFolder(root, idCounter + 1u, FAI.Folder, Constants.FolderTagRequestIncoming, () => _requests.Incoming, [ByTime]));
+        anyAdded |= AddFolder(new RequestFolder(root, idCounter + 1u, FAI.Folder, Constants.FolderTagRequestInc, () => _requests.Incoming, [ByTime]));
         anyAdded |= AddFolder(new RequestFolder(root, idCounter + 1u, FAI.Folder, Constants.FolderTagRequestPending, () => _requests.Outgoing, [ByTime]));
         return anyAdded;
     }

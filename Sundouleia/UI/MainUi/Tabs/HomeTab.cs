@@ -2,9 +2,11 @@ using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using OtterGui.Text;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Services;
@@ -64,6 +66,48 @@ public class HomeTab
         DrawProfileInfo(_.InnerRegion, profile);
         ImGui.Spacing();
         DrawMenuOptions();
+        ImGui.Separator();
+        // Use for further debugging if nessisary.
+        try
+        {
+            unsafe
+            {
+                if (HousingManager.Instance()->GetCurrentHousingTerritoryType() is HousingTerritoryType.None)
+                {
+                    ImGui.Text("You are not in a housing territory.");
+                    return;
+                }
+
+                if (HousingManager.Instance()->IsOutside())
+                {
+                    ImGui.Text("You are currently outside of housing.");
+                    ImGui.Text($"WardIdx: {HousingManager.Instance()->GetCurrentWard()}");
+                    ImGui.Text($"PlotIdx: {HousingManager.Instance()->GetCurrentPlot()}");
+                    ImGui.Text($"Division: {HousingManager.Instance()->GetCurrentDivision()}");
+
+                    return;
+                }
+
+                var hausInfo = HousingManager.Instance()->IndoorTerritory->HouseId;
+                ImGui.Text($"HouseId: {hausInfo.Id}");
+                ImGui.Text($"Territory: {hausInfo.TerritoryTypeId} | ({PlayerContent.GetTerritoryName(hausInfo.TerritoryTypeId)})");
+                ImGui.Text($"WorldId: {hausInfo.WorldId} | ({GameDataSvc.WorldData[hausInfo.WorldId]})");
+                ImGui.Text($"WardIdx: {hausInfo.WardIndex}");
+                ImGui.Text($"PlotIdx: {hausInfo.PlotIndex}");
+                ImGui.Text($"RoomNumber: {hausInfo.RoomNumber}");
+                ImGui.Text($"IsApartment: {hausInfo.IsApartment}");
+                if (hausInfo.IsApartment)
+                {
+                    ImGui.Text($"ApartmentDivision: {hausInfo.ApartmentDivision}");
+                }
+                ImGui.Text($"IsWorkshop: {hausInfo.IsWorkshop}");
+
+            }
+        }
+        catch (Bagagwa e)
+        {
+            ImGui.Text($"Failed to get housing info: {e.Message}");
+        }
     }
 
     private void DrawProfileInfo(Vector2 region, Profile profile)

@@ -20,7 +20,7 @@ using Sundouleia.Services.Textures;
 
 namespace Sundouleia.DrawSystem;
 
-public class GroupsDrawer : DynamicDrawer<Sundesmo>
+public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
 {
     private static readonly IconCheckboxEx CheckboxOffline = new(FAI.Unlink);
     private static readonly IconCheckboxEx CheckboxShowEmpty = new(FAI.FolderOpen);
@@ -35,7 +35,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favoritesConfig;
-    private readonly NickConfig _nicks;
+    private readonly NicksConfig _nicks;
     private readonly GroupsManager _groups;
     private readonly SundesmoManager _sundesmos;
     private readonly SidePanelService _stickyService;
@@ -62,8 +62,8 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     private bool          _profileShown = false;// If currently displaying a popout profile.
     private DateTime?     _lastHoverTime;       // time until we should show the profile.
 
-    public GroupsDrawer(ILogger<GroupsDrawer> logger, SundouleiaMediator mediator, MainConfig config, 
-        FolderConfig folderConfig, FavoritesConfig favorites, NickConfig nicks, GroupsManager groups, 
+    public WhitelistGroupsDrawer(ILogger<WhitelistGroupsDrawer> logger, SundouleiaMediator mediator, MainConfig config, 
+        FolderConfig folderConfig, FavoritesConfig favorites, NicksConfig nicks, GroupsManager groups, 
         SundesmoManager sundesmos, SidePanelService stickyService, GroupsDrawSystem ds)
         : base("##GroupsDrawer", Svc.Logger.Logger, ds, new SundesmoCache(ds))
     {

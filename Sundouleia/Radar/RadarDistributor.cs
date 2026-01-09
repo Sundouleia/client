@@ -11,16 +11,16 @@ using SundouleiaAPI.Network;
 namespace Sundouleia.Services;
 
 /// <summary>
-///     Resolvers for current radar users and radar zone changing.
+///     Distributes RadarChanges.
 /// </summary>
-public class RadarService : DisposableMediatorSubscriberBase
+public class RadarDistributor : DisposableMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly MainConfig _config;
     private readonly RadarManager _manager;
     private readonly CharaObjectWatcher _watcher;
 
-    public RadarService(ILogger<RadarService> logger, SundouleiaMediator mediator,
+    public RadarDistributor(ILogger<RadarDistributor> logger, SundouleiaMediator mediator,
         MainHub hub, MainConfig config, RadarManager manager, CharaObjectWatcher watcher)
         : base(logger, mediator)
     {
@@ -29,8 +29,6 @@ public class RadarService : DisposableMediatorSubscriberBase
         _manager = manager;
         _watcher = watcher;
 
-        Mediator.Subscribe<WatchedObjectCreated>(this, _ => OnObjectCreated(_.Address));
-        Mediator.Subscribe<WatchedObjectDestroyed>(this, _ => OnObjectDeleted(_.Address));
         Mediator.Subscribe<RadarConfigChanged>(this, _ => OnConfigChanged(_.OptionName));
         Mediator.Subscribe<ConnectedMessage>(this, async _ =>
         {
@@ -40,44 +38,22 @@ public class RadarService : DisposableMediatorSubscriberBase
                 await JoinZoneAndAssignUsers(GetZoneUpdate()).ConfigureAwait(false);
             }
         });
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => _manager.ClearUsers());
+        Mediator.Subscribe<TerritoryChanged>(this, _ => OnTerritoryChanged(_.PrevTerritory, _.NewTerritory));
 
-        // Listen to zone changes.
-        Svc.ClientState.TerritoryChanged += OnTerritoryChanged;
-        Svc.ClientState.Login += OnLogin;
+        // Listen for logout event to properly disconnect.
         Svc.ClientState.Logout += OnLogout;
-
-        if (Svc.ClientState.IsLoggedIn)
-            OnLogin();
     }
-
-    public static ushort CurrWorld { get; private set; } = 0;
-    public static string CurrWorldName { get; private set; } = string.Empty;
-    public static ushort CurrZone { get; private set; } = 0;
-    public static string CurrZoneName => PlayerContent.GetTerritoryName(CurrZone);
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        Svc.ClientState.TerritoryChanged -= OnTerritoryChanged;
-        Svc.ClientState.Login -= OnLogin;
         Svc.ClientState.Logout -= OnLogout;
     }
 
-    private async void OnLogin()
-    {
-        await SundouleiaEx.WaitForPlayerLoading();
-        CurrWorld = PlayerData.CurrentWorldId;
-        CurrWorldName = PlayerData.CurrentWorldName;
-        CurrZone = PlayerContent.TerritoryIdInstanced;
-        Mediator.Publish(new TerritoryChanged(0, CurrZone));
-    }
 
     private async void OnLogout(int type, int code)
     {
-        CurrWorld = 0;
-        CurrWorldName = string.Empty;
-        CurrZone = 0;
-
         if (!_config.Current.RadarEnabled)
             return;
         Logger.LogInformation("User logged out, leaving radar zone and clearing users.", LoggerType.RadarData);
@@ -88,30 +64,19 @@ public class RadarService : DisposableMediatorSubscriberBase
     private RadarZoneUpdate GetZoneUpdate()
     {
         var world = PlayerData.CurrentWorldId;
-        var zone = CurrZone;
+        var zone = LocationService.CurrZone;
         var joinChats = _config.Current.RadarJoinChats;
         var hashedCID = _config.Current.RadarSendPings ? SundouleiaSecurity.GetClientIdentHashThreadSafe() : string.Empty;
         return new(world, zone, joinChats, hashedCID);
     }
 
-    private async void OnTerritoryChanged(ushort newTerritory)
-    {
-        // Ignore territories from login zone / title screen (if any even exist)
-        if (!Svc.ClientState.IsLoggedIn)
-            return;
-
-        Mediator.Publish(new TerritoryChanged(CurrZone, newTerritory));
-        
+    private async void OnTerritoryChanged(ushort prevTerritory, ushort newTerritory)
+    {       
         // If we do not want to send radar updates, then dont.
         if (!_config.Current.RadarEnabled)
-        {
-            CurrZone = newTerritory;
             return;
-        }
 
-        Logger.LogInformation($"Territory changed from {CurrZone} to {newTerritory}", LoggerType.RadarData);
-        CurrZone = newTerritory;
-        
+        Logger.LogInformation($"Territory changed from {prevTerritory} to {newTerritory}", LoggerType.RadarData);      
         // Leave the current radar zone, notifying all users of the disconnect.
         await _hub.RadarZoneLeave().ConfigureAwait(false);
         // Clear all current radar users from the manager.
@@ -129,7 +94,7 @@ public class RadarService : DisposableMediatorSubscriberBase
             var zoneInfo = await _hub.RadarZoneJoin(info).ConfigureAwait(false);
             if (zoneInfo.ErrorCode is not SundouleiaApiEc.Success || zoneInfo.Value is null)
             {
-                Logger.LogWarning($"Failed to join radar zone {CurrZone} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
+                Logger.LogWarning($"Failed to join radar zone {LocationService.CurrZone} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
                 return;
             }
 
@@ -143,40 +108,6 @@ public class RadarService : DisposableMediatorSubscriberBase
         {
             Logger.LogError(ex, "Exception occurred while joining radar zone.");
         }
-    }
-
-    /// <summary>
-    ///     Whenever a new object is rendered. Should check against the list of current radar users.
-    /// </summary>
-    private unsafe void OnObjectCreated(IntPtr address)
-    {
-        // Obtain the list of all users except the valid ones to get the invalid ones.
-        var invalidUsers = _manager.RadarUsers.Where(u => (!u.IsValid && u.CanSendRequests)).ToList();
-        // If there are no invalid users, we can skip processing.
-        if (invalidUsers.Count == 0)
-            return;
-
-        // Try to locate a match for this object.
-        foreach (var invalid in invalidUsers)
-            if (_watcher.TryGetExisting(invalid.HashedIdent, out IntPtr match) && match == address)
-            {
-                Logger.LogDebug($"(Radar) Unresolved user [{invalid.DisplayName}] now visible.", LoggerType.RadarData);
-                _manager.UpdateVisibility(new(invalid.UID), address);
-                break;
-            }
-    }
-
-    /// <summary>
-    ///     Whenever an object is deleted. Or 'unrendered', set visibility to false, but do not remove.
-    /// </summary>
-    private unsafe void OnObjectDeleted(IntPtr address)
-    {
-        // Locate the user matching this address.
-        if (_manager.RadarUsers.FirstOrDefault(u => u.Address == address) is not { } match)
-            return;
-        // Update their visibility.
-        Logger.LogDebug($"(Radar) Resolved user [{match.DisplayName}] no longer visible.", LoggerType.RadarData);
-        _manager.UpdateVisibility(new(match.UID), IntPtr.Zero);
     }
 
     // Config options related to radar state changed. Send update to server.

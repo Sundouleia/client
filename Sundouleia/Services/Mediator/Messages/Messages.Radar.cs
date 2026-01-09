@@ -12,14 +12,3 @@ public record RadarConfigChanged(string OptionName) : MessageBase;
 ///     For sending Radar Chats. Can be possibly moved out of mediator.
 /// </summary>
 public record NewRadarChatMessage(RadarChatMessage Message, bool FromSelf) : MessageBase;
-
-/// <summary>
-///     User was either added, or has a state update.
-/// </summary>
-public record RadarAddOrUpdateUser(OnlineUser UpdatedUser) : MessageBase;
-
-/// <summary>
-///     Radar User should be removed.
-/// </summary>
-/// <param name="User"></param>
-public record RadarRemoveUser(UserData User) : MessageBase;

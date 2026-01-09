@@ -406,6 +406,11 @@ public class SidePanelInteractions
 
             if (response.ErrorCode is not SundouleiaApiEc.Success)
                 throw new InvalidOperationException($"Failed to change {propertyName} to {finalVal} for self. Reason: {response.ErrorCode}");
+
+            // If it was a moodle access change, inform Moodles.
+            if (propertyName == nameof(PairPerms.MoodleAccess))
+                _mediator.Publish(new MoodleAccessPermsChanged(sundesmo));
+
         }
         catch (InvalidOperationException ex)
         {

@@ -111,6 +111,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         }
     }
 
+    // Stylizations to move to SundColors later.
     private static readonly Vector4 _sundouleiaGoldAlpha = new(.957f, .682f, .294f, .7f);
     private static readonly Vector4 _sundouleiaGold = new(.957f, .682f, .294f, 1f);
     private static readonly Vector4 _sundouleiaLight = new(.318f, .137f, .196f, 1f);

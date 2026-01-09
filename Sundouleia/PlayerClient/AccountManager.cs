@@ -201,46 +201,4 @@ public class AccountManager
             }
         }
     }
-
-    ///// <summary> Requests to save the configuration service file to the clients computer. </summary>
-    //public void Save()
-    //{
-    //    var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
-    //    _logger.LogDebug("{caller} Calling config save", caller);
-    //    _accountConfig.Save();
-    //}
-
-    ///// <summary>Retrieves the nickname associated with a given UID (User Identifier).</summary>
-    ///// <returns>Returns the nickname as a string if found; otherwise, returns null.</returns>
-    //internal string? GetNicknameForUid(string uid)
-    //{
-    //    if (NicknameStorage.Nicknames.TryGetValue(uid, out var nickname))
-    //    {
-    //        if (string.IsNullOrEmpty(nickname))
-    //            return null;
-    //        // Return the found nickname
-    //        return nickname;
-    //    }
-    //    return null;
-    //}
-
-
-    ///// <summary> Set a nickname for a user identifier. </summary>
-    ///// <param name="uid">the user identifier</param>
-    ///// <param name="nickname">the nickname to add</param>
-    //internal void SetNicknameForUid(string uid, string nickname)
-    //{
-    //    if (string.IsNullOrEmpty(uid))
-    //        return;
-
-    //    NicknameStorage.Nicknames[uid] = nickname;
-    //    _nickConfig.Save();
-    //}
-
-    //// Updates the opened default public folders in the groups config.
-    //public void ToggleWhitelistFolderState(string folder)
-    //{
-    //    _groupConfig.Current.OpenedDefaultFolders.SymmetricExceptWith(new[] { folder });
-    //    _groupConfig.Save();
-    //}
 }

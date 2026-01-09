@@ -1,5 +1,6 @@
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
@@ -39,9 +40,9 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
 
         _usersInternal = new Lazy<List<RadarUser>>(() => _allRadarUsers.Values.ToList());
 
-        Mediator.Subscribe<RadarAddOrUpdateUser>(this, _ => AddOrUpdateUser(_.UpdatedUser, IntPtr.Zero));
-        Mediator.Subscribe<RadarRemoveUser>(this, _ => RemoveUser(_.User));
-        Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearUsers());
+        Mediator.Subscribe<WatchedObjectCreated>(this, _ => OnObjectCreated(_.Address));
+        Mediator.Subscribe<WatchedObjectDestroyed>(this, _ => OnObjectDeleted(_.Address));
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearUsers()); // Can maybe move over to the distributor.
         Svc.ContextMenu.OnMenuOpened += OnRadarContextMenu;
 
 #if DEBUG
@@ -67,6 +68,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         Svc.ContextMenu.OnMenuOpened -= OnRadarContextMenu;
     }
 
+    #region Events
     private void OnRadarContextMenu(IMenuOpenedArgs args)
     {
         if (args.MenuType is ContextMenuType.Inventory) return;
@@ -96,8 +98,44 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         }
     }
 
+    /// <summary>
+    ///     Whenever a new object is rendered. Should check against the list of current radar users.
+    /// </summary>
+    private unsafe void OnObjectCreated(IntPtr address)
+    {
+        // Obtain the list of all users except the valid ones to get the invalid ones.
+        var invalidUsers = RadarUsers.Where(u => (!u.IsValid && u.CanSendRequests)).ToList();
+        // If there are no invalid users, we can skip processing.
+        if (invalidUsers.Count == 0)
+            return;
+
+        // Try to locate a match for this object.
+        foreach (var invalid in invalidUsers)
+            if (_watcher.TryGetExisting(invalid.HashedIdent, out IntPtr match) && match == address)
+            {
+                Logger.LogDebug($"(Radar) Unresolved user [{invalid.DisplayName}] now visible.", LoggerType.RadarData);
+                UpdateVisibility(new(invalid.UID), address);
+                break;
+            }
+    }
+
+    /// <summary>
+    ///     Whenever an object is deleted. Or 'unrendered', set visibility to false, but do not remove.
+    /// </summary>
+    private unsafe void OnObjectDeleted(IntPtr address)
+    {
+        // Locate the user matching this address.
+        if (RadarUsers.FirstOrDefault(u => u.Address == address) is not { } match)
+            return;
+        // Update their visibility.
+        Logger.LogDebug($"(Radar) Resolved user [{match.DisplayName}] no longer visible.", LoggerType.RadarData);
+        UpdateVisibility(new(match.UID), IntPtr.Zero);
+    }
+    #endregion Events
+
     public bool ContainsUser(UserData user)
         => _allRadarUsers.ContainsKey(user);
+
     public bool IsUserRendered(UserData user)
         => _allRadarUsers.TryGetValue(user, out var match) && match.IsValid;
 

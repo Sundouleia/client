@@ -30,7 +30,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     private readonly MainHub _hub;
     private readonly MainMenuTabs _tabMenu;
     private readonly SundesmoManager _sundesmos;
-    private readonly RadarService _service;
+    private readonly LocationService _service;
     private readonly TutorialService _guides;
 
     // Private variables that are used by internal methods.
@@ -39,7 +39,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
     // Allow a circular buffer of 1k messages.
     public RadarChatLog(ILogger<RadarChatLog> logger, SundouleiaMediator mediator, MainHub hub,
-        MainMenuTabs tabs, SundesmoManager sundesmos, RadarService service, TutorialService guides) 
+        MainMenuTabs tabs, SundesmoManager sundesmos, LocationService service, TutorialService guides) 
         : base(0, "Radar Chat", 1000)
     {
         _logger = logger;
@@ -64,7 +64,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         Mediator.Subscribe<TerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
 
         // Should just end up null or something empty.
-        LoadTerritoryChatLog(RadarService.CurrWorld, RadarService.CurrZone);
+        LoadTerritoryChatLog(LocationService.CurrWorld, LocationService.CurrZone);
     }
 
     public SundouleiaMediator Mediator { get; }
@@ -80,7 +80,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     {
         Mediator.UnsubscribeAll(this);
         // Save the chat log prior to disposal.
-        SaveChatLog(RadarService.CurrWorld, RadarService.CurrZone);
+        SaveChatLog(LocationService.CurrWorld, LocationService.CurrZone);
         GC.SuppressFinalize(this);
     }
 
@@ -296,7 +296,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         if (string.IsNullOrWhiteSpace(previewMessage))
             return;
         // Send message to the server
-        _hub.RadarChatMessage(new(MainHub.OwnUserData, RadarService.CurrWorld, RadarService.CurrZone, previewMessage)).ConfigureAwait(false);
+        _hub.RadarChatMessage(new(MainHub.OwnUserData, LocationService.CurrWorld, LocationService.CurrZone, previewMessage)).ConfigureAwait(false);
         // Clear preview
         previewMessage = string.Empty;
     }
@@ -372,7 +372,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     private void ChangeChatLog(ushort prevLoc, ushort newLoc)
     {
         // Save the current chat log first.
-        SaveChatLog(RadarService.CurrWorld, prevLoc);
+        SaveChatLog(LocationService.CurrWorld, prevLoc);
         // Clear the current chat log.
         Messages.Clear();
         UserColors.Clear();
@@ -380,7 +380,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         NewMsgCount = 0;
         NewCorbyMsg = false;
         // Load the new territory chat log.
-        LoadTerritoryChatLog(RadarService.CurrWorld, newLoc);
+        LoadTerritoryChatLog(LocationService.CurrWorld, newLoc);
     }
 
     public void LoadTerritoryChatLog(ushort worldId, ushort zoneId)
@@ -450,7 +450,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
                 // Maybe replace with territory intended use later or something.
                 _logger.LogWarning(logMessage);
                 AddMessage(new(new("System"), "System",
-                    $"[color=grey2]Welcome to {RadarService.CurrZoneName}'s Radar Chat! Your Name displays as " +
+                    $"[color=grey2]Welcome to {LocationService.CurrZoneName}'s Radar Chat! Your Name displays as " +
                     $"[color=yellow]{MainHub.OwnUserData.AnonName}[/color] to others! Feel free to say hi![/color][line]"));
             }
             catch (Exception ex)

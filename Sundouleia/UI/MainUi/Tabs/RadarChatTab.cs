@@ -17,10 +17,10 @@ public class RadarChatTab
 {
     private readonly MainMenuTabs _tabMenu;
     private readonly RadarChatLog _chat;
-    private readonly RadarService _service;
+    private readonly LocationService _service;
     private readonly TutorialService _guides;
 
-    public RadarChatTab(MainMenuTabs tabs, RadarChatLog chat, RadarService service, TutorialService guides)
+    public RadarChatTab(MainMenuTabs tabs, RadarChatLog chat, LocationService service, TutorialService guides)
     {
         _tabMenu = tabs;
         _chat = chat;
@@ -34,7 +34,7 @@ public class RadarChatTab
         var max = min + ImGui.GetContentRegionAvail();
         var col = RadarChatLog.AccessBlocked ? ImGuiColors.DalamudGrey : ImGuiColors.DalamudWhite;
         var isInside = HousingManager.Instance()->IsInside();
-        var text = isInside ? "Chat Disabled Indoors" : $"Radar Chat - {RadarService.CurrZoneName}";
+        var text = isInside ? "Chat Disabled Indoors" : $"Radar Chat - {LocationService.CurrZoneName}";
 
         // Add some CkRichText variant here later.
         CkGui.FontTextCentered(text, UiFontService.Default150Percent, col);

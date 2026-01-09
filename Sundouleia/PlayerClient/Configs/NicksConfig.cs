@@ -4,14 +4,14 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Sundouleia.PlayerClient;
 
-public class NickStorage
+public class NicksStorage
 {
     public Dictionary<string, string> Nicknames { get; set; } = new(StringComparer.Ordinal);
 }
 
-public class NickConfig : IHybridSavable
+public class NicksConfig : IHybridSavable
 {
-    private readonly ILogger<NickConfig> _logger;
+    private readonly ILogger<NicksConfig> _logger;
     private readonly HybridSaveService _saver;
     public DateTime LastWriteTimeUTC { get; private set; } = DateTime.MinValue;
     public int ConfigVersion => 0;
@@ -26,7 +26,7 @@ public class NickConfig : IHybridSavable
             ["Nicknames"] = JObject.FromObject(Current),
         }.ToString(Formatting.Indented);
     }
-    public NickConfig(ILogger<NickConfig> logger, HybridSaveService saver)
+    public NicksConfig(ILogger<NicksConfig> logger, HybridSaveService saver)
     {
         _logger = logger;
         _saver = saver;
@@ -66,13 +66,13 @@ public class NickConfig : IHybridSavable
     {
         if (data is not JObject serverNicknames)
             return;
-        Current = serverNicknames.ToObject<NickStorage>() ?? throw new Exception("Failed to load NicknamesStorage.");
+        Current = serverNicknames.ToObject<NicksStorage>() ?? throw new Exception("Failed to load NicknamesStorage.");
         // clean out any kvp with null or whitespace values.
         foreach (var kvp in Current.Nicknames.Where(kvp => string.IsNullOrWhiteSpace(kvp.Value)).ToList())
             Current.Nicknames.Remove(kvp.Key);
     }
 
-    public NickStorage Current { get; set; } = new NickStorage();
+    public NicksStorage Current { get; set; } = new NicksStorage();
 
     #region Helpers
     /// <summary>

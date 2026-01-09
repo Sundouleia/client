@@ -24,12 +24,12 @@ public class RequestsTab
         if (_config.Current.ViewingIncoming)
         {
             _incoming.DrawFilterRow(width, 100);
-            _incoming.DrawIncomingRequests(width, DynamicFlags.Selectable);
+            _incoming.DrawRequests(width, DynamicFlags.Selectable);
         }
         else
         {
             _outgoing.DrawFilterRow(width, 100);
-            _outgoing.DrawPendingRequests(width, DynamicFlags.Selectable);
+            _outgoing.DrawRequests(width, DynamicFlags.Selectable);
         }
     }
 }

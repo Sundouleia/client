@@ -17,13 +17,13 @@ public class SundesmoFactory
     private readonly MainConfig _config;
     private readonly FolderConfig _folders;
     private readonly FavoritesConfig _favorites;
-    private readonly NickConfig _nicks;
+    private readonly NicksConfig _nicks;
     private readonly LimboStateManager _limbo;
     private readonly CharaObjectWatcher _watcher;
 
     public SundesmoFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
         SundesmoHandlerFactory factory, MainConfig config, FolderConfig folderConfig,
-        FavoritesConfig favorites, NickConfig nicks, LimboStateManager limbo,
+        FavoritesConfig favorites, NicksConfig nicks, LimboStateManager limbo,
         CharaObjectWatcher watcher)
     {
         _loggerFactory = loggerFactory;

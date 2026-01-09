@@ -10,7 +10,6 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
-using System.Runtime.CompilerServices;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -20,7 +19,6 @@ public enum SidePanelMode
     Interactions,
     GroupEditor,
     IncomingRequests,
-    PendingRequests,
 }
 
 public interface ISidePanelCache
@@ -107,19 +105,18 @@ public class GroupOrganizerCache : ISidePanelCache
 
 public class ResponseCache : ISidePanelCache
 {
+    public SidePanelMode Mode => SidePanelMode.IncomingRequests;
     private RequestCache? _cache;
     private DynamicSelections<RequestEntry>? _selections;
-    public ResponseCache(SidePanelMode mode, RequestCache cache, DynamicSelections<RequestEntry> selections)
+    public ResponseCache(RequestCache cache, DynamicSelections<RequestEntry> selections)
     {
-        Mode = mode;
         _cache = cache;
         _selections = selections;
     }
 
-    public SidePanelMode Mode { get; init; }
     public IReadOnlyList<DynamicLeaf<RequestEntry>> Selected => _selections?.Leaves ?? [];
     public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
-    public bool IsValid => _selections is not null && Selected.Count > 1;
+    public bool IsValid => _selections is not null && Selected.Count > 0;
 } 
 
 public sealed class SidePanelService : DisposableMediatorSubscriberBase
@@ -141,7 +138,6 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
     {
         switch (DisplayMode)
         {
-            case SidePanelMode.PendingRequests:
             case SidePanelMode.IncomingRequests:
                 if (newTab is not MainMenuTabs.SelectedTab.Requests)
                     ClearDisplay();
@@ -204,15 +200,12 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
     /// <summary>
     ///     Set the side panel to display pending request selections.
     /// </summary>
-    public void ForRequests(SidePanelMode requestKind, RequestCache cache, DynamicSelections<RequestEntry> selections)
+    public void ForRequests(RequestCache cache, DynamicSelections<RequestEntry> selections)
     {
-        if (requestKind == DisplayMode)
+        if (DisplayMode is SidePanelMode.IncomingRequests)
             return;
 
-        if (requestKind is not (SidePanelMode.IncomingRequests or SidePanelMode.PendingRequests))
-            throw new ArgumentException("Request kind must be IncomingRequests or PendingRequests.", nameof(requestKind));
-
         // Update the display cache.
-        DisplayCache = new ResponseCache(requestKind, cache, selections);
+        DisplayCache = new ResponseCache(cache, selections);
     }
 }

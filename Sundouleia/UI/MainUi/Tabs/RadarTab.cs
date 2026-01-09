@@ -58,7 +58,7 @@ public class RadarTab : DisposableMediatorSubscriberBase
 
     private void DrawContentBody(float width)
     {
-        CkGui.FontTextCentered($"{RadarService.CurrWorldName} - {RadarService.CurrZoneName}", UiFontService.Default150Percent);
+        CkGui.FontTextCentered($"{LocationService.CurrWorldName} - {LocationService.CurrZoneName}", UiFontService.Default150Percent);
         ImGui.Spacing();
         _drawer.DrawFilterRow(width, 25);
         _drawer.DrawContents(width, DynamicFlags.None);

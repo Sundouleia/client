@@ -20,9 +20,9 @@ public class RequestEntry(SundesmoRequest request) : IEquatable<RequestEntry>, I
 
     // Information about said request.
     public bool IsTemporaryRequest => request.Details.IsTemp;
-    public string AttachedMessage => request.Details.Message;
+    public string Message => request.Details.Message;
 
-    // About expiration time.
+    public bool HasMessage => request.Details.Message.Length > 0;
     public bool HasExpired => request.IsExpired();
     public TimeSpan TimeToRespond => request.TimeLeft();
     public DateTime SentTime => request.CreatedAt;
@@ -34,6 +34,12 @@ public class RequestEntry(SundesmoRequest request) : IEquatable<RequestEntry>, I
 
     public bool SentFromWorld(ushort worldId)
         => request.Details.FromWorldId == worldId;
+
+    public string GetRemainingTimeString()
+    {
+        var timeLeft = TimeToRespond;
+        return timeLeft.Days > 0 ? $"{timeLeft.Days}d {timeLeft.Hours}h" : $"{timeLeft.Hours}h {timeLeft.Minutes}m";
+    }
 
     // Equality members.
     public bool Equals(RequestEntry? other)

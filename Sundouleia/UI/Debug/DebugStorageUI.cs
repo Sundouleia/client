@@ -120,7 +120,7 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
                 ImGui.TableNextColumn();
                 ImGui.Text(incRequest.TimeToRespond.ToTimeSpanStr());
                 ImGui.TableNextColumn();
-                ImGui.Text(incRequest.AttachedMessage ?? "N/A");
+                ImGui.Text(incRequest.Message ?? "N/A");
                 DrawIconBoolColumn(incRequest.SentFromWorld((ushort)PlayerData.CurrentWorldId));
                 DrawIconBoolColumn(incRequest.SentFromCurrentArea((ushort)PlayerData.CurrentWorldId, PlayerContent.TerritoryID));
             }
@@ -153,7 +153,7 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
                 ImGui.TableNextColumn();
                 ImGui.Text(penRequest.TimeToRespond.ToTimeSpanStr());
                 ImGui.TableNextColumn();
-                ImGui.Text(penRequest.AttachedMessage ?? "N/A");
+                ImGui.Text(penRequest.Message ?? "N/A");
                 DrawIconBoolColumn(penRequest.SentFromWorld((ushort)PlayerData.CurrentWorldId));
                 DrawIconBoolColumn(penRequest.SentFromCurrentArea((ushort)PlayerData.CurrentWorldId, PlayerContent.TerritoryID));
             }

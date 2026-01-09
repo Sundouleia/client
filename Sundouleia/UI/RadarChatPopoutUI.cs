@@ -57,7 +57,7 @@ public class RadarChatPopoutUI : WindowMediatorSubscriberBase
         var max = min + ImGui.GetContentRegionAvail();
         var col = RadarChatLog.AccessBlocked ? ImGuiColors.DalamudGrey : ImGuiColors.DalamudWhite;
         // Add some CkRichText variant here later.
-        CkGui.FontTextCentered($"Radar Chat - {RadarService.CurrZoneName}", UiFontService.Default150Percent, col);
+        CkGui.FontTextCentered($"Radar Chat - {LocationService.CurrZoneName}", UiFontService.Default150Percent, col);
         ImGui.Separator();
 
         // Restrict drawing the chat if their not verified or blocked from using it.

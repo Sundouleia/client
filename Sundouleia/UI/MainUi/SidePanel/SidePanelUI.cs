@@ -1,8 +1,12 @@
+using CkCommons;
 using CkCommons.DrawSystem;
 using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
+using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
@@ -11,6 +15,9 @@ using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
+using System;
+using static FFXIVClientStructs.FFXIV.Client.UI.Misc.GroupPoseModule;
+using static System.ComponentModel.Design.ObjectSelectorEditor;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -19,18 +26,24 @@ namespace Sundouleia.Gui.MainWindow;
 // It would allow us to process the logic in the draw-loop like we want.
 public class SidePanelUI : WindowMediatorSubscriberBase
 {
-    private readonly GroupsFolderDrawer _folderDrawer;
+    private readonly GroupOrganizer _folderDrawer;
+    private readonly RequestsInDrawer _requestsDrawer;
     private readonly SidePanelInteractions _interactions;
     private readonly SidePanelService _service;
 
+    private RequestsGroupSelector GroupSelector;
+
     public SidePanelUI(ILogger<SidePanelUI> logger, SundouleiaMediator mediator,
-        GroupsFolderDrawer drawer, SidePanelInteractions interactions,
-        SidePanelService service)
+        GroupOrganizer drawer, RequestsInDrawer requestsDrawer, SidePanelInteractions interactions,
+        SidePanelService service, GroupsDrawSystem groupsDDS)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
         _folderDrawer = drawer;
+        _requestsDrawer = requestsDrawer;
         _interactions = interactions;
         _service = service;
+
+        GroupSelector = new(logger, groupsDDS);
 
         Flags = WFlags.NoCollapse | WFlags.NoTitleBar | WFlags.NoScrollbar;
     }
@@ -84,11 +97,8 @@ public class SidePanelUI : WindowMediatorSubscriberBase
             case InteractionsCache ic:
                 _interactions.DrawContents(ic);
                 return;
-            case ResponseCache irc when irc.Mode is SidePanelMode.IncomingRequests:
+            case ResponseCache irc:
                 DrawIncomingRequests(irc);
-                return;
-            case ResponseCache prc when prc.Mode is SidePanelMode.PendingRequests:
-                DrawPendingRequests(prc);
                 return;
         }
     }
@@ -102,30 +112,60 @@ public class SidePanelUI : WindowMediatorSubscriberBase
 
         _folderDrawer.DrawButtonHeader(width);
         ImGui.Separator();
-        _folderDrawer.DrawContents<GroupFolder>(width, DynamicFlags.SelectableFolders | DynamicFlags.MultiSelect | DynamicFlags.RangeSelect | DynamicFlags.DragDropFolders);
+        _folderDrawer.DrawContents<GroupFolder>(width, DynamicFlags.SelectableDragDrop);
     }
 
+    // TODO: Update this so that it reflects the incoming requests folder format,
+    // also set scrollable selections for the selected requests for a more dynamic height.
+    // 
+    // It might also be more benificial to bind this to a dynamic menu of sorts so that the selections
+    // are searchable, reverting back to the selector method we had before, but using a fully custom draw override.
+    // This would allow us to have more managable context menus.
     private void DrawIncomingRequests(ResponseCache irc)
     {
         using var _ = CkRaii.Child("RequestResponder", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
 
-        CkGui.FontTextCentered("Request Responder", UiFontService.Default150Percent);
+        CkGui.FontTextCentered("Bulk Request Responder", UiFontService.Default150Percent);
+        ImGui.Separator();
 
-        CkGui.FramedIconText(FAI.ObjectGroup);
-        CkGui.TextFrameAlignedInline("Bulk Selector Area");
-        CkGui.TextFrameAligned($"There are currently: {irc.Selected.Count} selected requests.");
+        ImGui.Text("Selected Requests");
+        _requestsDrawer.DrawSelectedRequests(width);
+
+        ImGui.Separator();
+        ImGui.Text("Added Groups");
+
+        if (CkGui.IconTextButton(FAI.Plus, "In Area"))
+        {
+            _logger.LogInformation("Adding selected requests from player location.");
+        }
+        CkGui.AttachToolTip("Add Groups linked to this area.--NL--(All inner scopes are also included)");
+        ImUtf8.SameLineInner();
+        if (CkGui.IconTextButton(FAI.Plus, "In World"))
+        {
+            _logger.LogInformation("Adding selected requests from player world.");
+        }
+        CkGui.AttachToolTip("Add Groups linked to this world.--NL--(All inner scopes are also included)");
+        ImUtf8.SameLineInner();
+        var comboWidth = ImGui.GetContentRegionAvail().X;
+        GroupSelector.DrawSelectorCombo("ReqResp", "Add To Groups..", comboWidth, comboWidth * 1.5f);
+
+        var selHeight = ImGui.GetContentRegionAvail().Y - ImUtf8.FrameHeightSpacing;
+        using (var sel = CkRaii.FramedChildPaddedWH("Selected", new(width, selHeight), 0, ImGui.GetColorU32(ImGuiCol.FrameBg), 0, 1, wFlags: WFlags.NoScrollbar))
+            GroupSelector.DrawSelectedList("Selected", sel.InnerRegion.X);
+
+        // Accept and reject all buttons.
+        var halfW = (width - ImUtf8.ItemInnerSpacing.X) / 2;
+        using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.HealerGreen))
+            if (CkGui.IconTextButtonCentered(FAI.Check, "Accept All", halfW))
+                _logger.LogInformation("Accepting all selected requests.");
+        CkGui.AttachToolTip("Accept all selected requests.");
+
+        ImUtf8.SameLineInner();
+        using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DPSRed))
+            if (CkGui.IconTextButtonCentered(FAI.Times, "Reject All", halfW))
+                _logger.LogInformation("Rejecting all selected requests.");
+        CkGui.AttachToolTip("Reject all selected requests.");
     }
 
-    private void DrawPendingRequests(ResponseCache prc)
-    {
-        using var _ = CkRaii.Child("PendingRequests", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-        var width = _.InnerRegion.X;
-
-        CkGui.FontTextCentered("Pending Requests", UiFontService.Default150Percent);
-
-        CkGui.FramedIconText(FAI.ObjectGroup);
-        CkGui.TextFrameAlignedInline("Bulk Selector Area");
-        CkGui.TextFrameAligned($"There are currently: {prc.Selected.Count} selected requests.");
-    }
 }

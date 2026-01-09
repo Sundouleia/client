@@ -27,7 +27,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     private readonly ConcurrentDictionary<UserData, Sundesmo> _allSundesmos = new(UserDataComparer.Instance);
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
-    private readonly NickConfig _nicks;
+    private readonly NicksConfig _nicks;
     private readonly SundesmoFactory _pairFactory;
     private readonly LimboStateManager _limboManager;
 
@@ -35,7 +35,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public List<Sundesmo> DirectPairs => _directPairsInternal.Value; // the direct pairs the client has with other users.
 
     public SundesmoManager(ILogger<SundesmoManager> logger, SundouleiaMediator mediator,
-        MainConfig config, FolderConfig folders, NickConfig nicks, SundesmoFactory factory,
+        MainConfig config, FolderConfig folders, NicksConfig nicks, SundesmoFactory factory,
         LimboStateManager limboManager)
         : base(logger, mediator)
     {

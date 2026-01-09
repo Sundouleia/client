@@ -129,8 +129,8 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaLoc>()
 
         // Draw Systems
-        .AddSingleton<GroupsFolderDrawer>()
-        .AddSingleton<GroupsDrawer>()
+        .AddSingleton<GroupOrganizer>()
+        .AddSingleton<WhitelistGroupsDrawer>()
         .AddSingleton<RadarDrawer>()
         .AddSingleton<RequestsInDrawer>()
         .AddSingleton<RequestsOutDrawer>()
@@ -184,7 +184,7 @@ public static class SundouleiaServiceExtensions
 
         // Radar
         .AddSingleton<RadarManager>()
-        .AddSingleton<RadarService>()
+        .AddSingleton<LocationService>()
 
         // Misc. Services
         .AddSingleton<CosmeticService>()
@@ -232,7 +232,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<MainConfig>()
         .AddSingleton<FolderConfig>()
         .AddSingleton<ModularActorsConfig>()
-        .AddSingleton<NickConfig>()
+        .AddSingleton<NicksConfig>()
         .AddSingleton<FavoritesConfig>()
         .AddSingleton<AccountConfig>()
         .AddSingleton<NoCrashFriendsConfig>()

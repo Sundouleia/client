@@ -1,3 +1,4 @@
+using CkCommons.DrawSystem;
 using Dalamud.Bindings.ImGui;
 using Sundouleia.DrawSystem;
 using Sundouleia.PlayerClient;
@@ -8,8 +9,8 @@ public class WhitelistTab
 {
     private readonly FolderConfig _config;
     private readonly WhitelistDrawer _defaultDrawer;
-    private readonly GroupsDrawer _groupsDrawer;
-    public WhitelistTab(FolderConfig config, WhitelistDrawer main, GroupsDrawer groups)
+    private readonly WhitelistGroupsDrawer _groupsDrawer;
+    public WhitelistTab(FolderConfig config, WhitelistDrawer main, WhitelistGroupsDrawer groups)
     {
         _config = config;
         _defaultDrawer = main;
