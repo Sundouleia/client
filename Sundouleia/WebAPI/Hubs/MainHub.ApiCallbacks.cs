@@ -358,7 +358,7 @@ public partial class MainHub
     public Task Callback_RadarChat(RadarChatMessage dto)
     {
         // If for some ungodly reason we get this message from a different world / territory, ignore it.
-        if (dto.WorldId != LocationService.CurrWorld || dto.TerritoryId != LocationService.CurrZone)
+        if (dto.WorldId != LocationSvc.Current.WorldId || dto.TerritoryId != LocationSvc.Current.TerritoryId)
         {
             Logger.LogWarning($"Callback_RadarChat: Ignoring message from different world / zone. {dto.WorldId}/{dto.TerritoryId}", LoggerType.Callbacks);
             return Task.CompletedTask;

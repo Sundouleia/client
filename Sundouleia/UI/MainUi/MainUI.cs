@@ -84,7 +84,7 @@ public class MainUI : WindowMediatorSubscriberBase
         if(_config.Current.OpenUiOnStartup)
             Toggle();
         // Update the tab menu selection.
-        _tabMenu.TabSelection = _config.Current.MainUiTab;
+        _tabMenu.TabSelection = _config.Current.CurMainUiTab;
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);

@@ -1,6 +1,7 @@
 using CkCommons.HybridSaver;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 
 namespace Sundouleia.PlayerClient;
@@ -10,13 +11,8 @@ public class FolderStorage
     // All Created groups. Not tracked as a dictionary with label keys to allow renaming while keeping references.
     public List<SundesmoGroup> Groups { get; set; } = new();
 
-    // Cached sort order filters. Maybe revise later idk.
-    public List<FolderSortPreset> SortPresets { get; set; } = new();
-
     // RequestFolder Config
     public bool ViewingIncoming { get; set; } = true;
-    public List<string> DefaultAcceptGroups { get; set; } = [];
-    public bool ApplyRequestedNick { get; set; } = true;
 
     // WhitelistFolder Swapper
     public bool ViewingGroups { get; set; } = false;
@@ -39,11 +35,13 @@ public class SundesmoGroup
     public uint GradientColor { get; set; } = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.TextDisabled), .9f);
     public bool ShowIfEmpty { get; set; } = true;
     public bool ShowOffline { get; set; } = true;
-    public List<FolderSortFilter> SortOrder { get; set; } = new(); // Refactor?
-    public HashSet<string> LinkedUids { get; set; } = new();
-}
 
-public record FolderSortPreset(string Name, List<FolderSortFilter> SortFilters);
+    // The UserUID's contained in this group.
+    public HashSet<string> LinkedUids { get; set; } = new();
+
+    // Becomes a DynamicSorter over conversion.
+    public List<FolderSortFilter> SortOrder { get; set; } = new();
+}
 
 // Configuration for everything relating to dynamic folder and draw entity displays.
 public class FolderConfig : IHybridSavable

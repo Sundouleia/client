@@ -50,6 +50,20 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
 
         if (ImGui.CollapsingHeader("Transient Resources"))
             DrawTransients();
+
+        using var t = ImRaii.Table("Location Data", 2, ImGuiTableFlags.BordersOuter | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame);
+        if (!t) return;
+
+        ImGui.TableSetupColumn("Previous");
+        ImGui.TableSetupColumn("Current");
+        ImGui.TableHeadersRow();
+
+        ImGui.TableNextColumn();
+        LocationSvc.DebugArea(LocationSvc.Previous);
+
+        ImGui.TableNextColumn();
+        LocationSvc.DebugArea(LocationSvc.Current);
+        ImGui.TableNextRow();
     }
 
     private void DrawDataDistributor()

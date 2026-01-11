@@ -29,7 +29,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         get => base.TabSelection;
         set
         {
-            _config.Current.MainUiTab = value;
+            _config.Current.CurMainUiTab = value;
             _config.Save();
             base.TabSelection = value;
         }
@@ -41,7 +41,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
     {
         _mediator = mediator;
         _config = config;
-        TabSelection = _config.Current.MainUiTab;
+        TabSelection = _config.Current.CurMainUiTab;
 
         AddDrawButton(FontAwesomeIcon.Home, SelectedTab.Homepage, "Homepage",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Homepage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.Whitelist));

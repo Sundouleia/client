@@ -27,7 +27,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
     {
         get
         {
-            var cfgName = $"{LocationService.CurrWorld}-{LocationService.CurrZone}-recent-chat.log";
+            var cfgName = $"{LocationSvc.Current.WorldId}-{LocationSvc.Current.TerritoryId}-recent-chat.log";
             return Path.Combine(ConfigFileProvider.ChatDirectory, cfgName);
         }
     }
@@ -53,7 +53,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         Mediator.Subscribe<TerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
 
         // Should just end up null or something empty.
-        LoadTerritoryChatLog(LocationService.CurrWorld, LocationService.CurrZone);
+        LoadTerritoryChatLog(LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId);
     }
 
     public SundouleiaMediator Mediator { get; }
@@ -271,7 +271,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         if (string.IsNullOrWhiteSpace(previewMessage))
             return;
         // Send message to the server
-        _hub.RadarChatMessage(new(MainHub.OwnUserData, LocationService.CurrWorld, LocationService.CurrZone, previewMessage)).ConfigureAwait(false);
+        _hub.RadarChatMessage(new(MainHub.OwnUserData, LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId, previewMessage)).ConfigureAwait(false);
         // Clear preview
         previewMessage = string.Empty;
     }
@@ -325,7 +325,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         UserColors.Clear();
         unreadSinceScroll = 0;
         // Load the new territory chat log.
-        LoadTerritoryChatLog(LocationService.CurrWorld, newLoc);
+        LoadTerritoryChatLog(LocationSvc.Current.WorldId, newLoc);
     }
 
     public void LoadTerritoryChatLog(ushort worldId, ushort zoneId)
@@ -393,7 +393,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         {
             // Maybe replace with territory intended use later or something.
             AddMessage(new(new("System"), "System",
-                $"[color=grey2]Welcome to {LocationService.CurrZoneName}'s Radar Chat! Your Name displays as " +
+                $"[color=grey2]Welcome to {LocationSvc.Current.TerritoryName}'s Radar Chat! Your Name displays as " +
                 $"[color=yellow]AnonUser-XXXX[/color] to others! Feel free to say hi![/color][line]"));
         }
     }

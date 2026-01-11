@@ -52,17 +52,25 @@ public class SidePanelInteractions
         _service = service;
     }
 
-    public void DrawContents(InteractionsCache cache)
+    public void DrawInteractions(InteractionsCache cache, Sundesmo sundesmo, string dispName, float width)
     {
-        using var _ = CkRaii.Child("InteractionsDisplay", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-        var width = _.InnerRegion.X;
-        var dispName = cache.DisplayName;
-        var sundesmo = cache.Sundesmo!;
+        ImGuiUtil.Center($"Interactions with {dispName}");
+        ImGui.Separator();
 
-        DrawHeader(sundesmo, dispName);
-
-        ImGui.Text("Pair Options");
+        ImGui.Text("Common");
         DrawCommon(sundesmo, dispName, width);
+        ImGui.Separator();
+
+        ImGui.Text("Moodles");
+        DrawApplyMoodleOwn(cache, sundesmo, dispName, width);
+        DrawApplyMoodleOther(cache, sundesmo, dispName, width);
+    }
+
+    public void DrawPermissions(InteractionsCache cache, Sundesmo sundesmo, string dispName, float width)
+    {
+        ImGuiUtil.Center($"Permissions for {dispName}");
+        ImGui.Separator();
+        DrawHeader(sundesmo, dispName);
         ImGui.Separator();
 
         ImGui.Text("Data Syncronization");
@@ -71,7 +79,7 @@ public class SidePanelInteractions
         DrawPermRow(sundesmo, dispName, width, SIID.DataSyncVfx, nameof(PairPerms.AllowVfx), sundesmo.OwnPerms.AllowVfx);
         ImGui.Separator();
 
-        ImGui.Text("Moodle Permissions");
+        ImGui.Text("Moodles Permissions");
         DrawPermRow(sundesmo, dispName, width, SIID.ShareMoodles, nameof(PairPerms.ShareOwnMoodles), sundesmo.OwnPerms.ShareOwnMoodles);
         DrawPermRow(sundesmo, dispName, width, SIID.AllowPositve, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.Positive);
         DrawPermRow(sundesmo, dispName, width, SIID.AllowNegative, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.Negative);
@@ -82,33 +90,84 @@ public class SidePanelInteractions
         DrawPermRow(sundesmo, dispName, width, SIID.AllowPermanent, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.Permanent);
         DrawPermRow(sundesmo, dispName, width, SIID.RemoveApplied, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.RemoveApplied);
         DrawPermRow(sundesmo, dispName, width, SIID.RemoveAny, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.RemoveAny);
-        ImGui.Separator();
-
-        ImGui.Text("Moodle Interactions");
-        DrawApplyMoodleOwn(cache, sundesmo, dispName, width);
-        DrawApplyMoodleOther(cache, sundesmo, dispName, width);
     }
 
     private void DrawHeader(Sundesmo s, string dispName)
     {
-        CkGui.CenterText($"{dispName}'s Interactions");
-        var width = CkGui.IconSize(FAI.VolumeUp).X + CkGui.IconSize(FAI.Running).X + CkGui.IconSize(FAI.PersonBurst).X + ImUtf8.ItemInnerSpacing.X * 2;
+        // Data Sync Row
+        var width = CkGui.IconsSize([FAI.VolumeUp, FAI.Running, FAI.PersonBurst]).X + ImUtf8.ItemInnerSpacing.X * 2;
         CkGui.SetCursorXtoCenter(width);
-
         var sounds = s.PairPerms.AllowSounds;
         var anims = s.PairPerms.AllowAnimations;
         var vfx = s.PairPerms.AllowVfx;
-
-        CkGui.IconText(FAI.VolumeUp, sounds ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.IconTextAligned(FAI.VolumeUp, sounds ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
         CkGui.AttachToolTip($"{dispName} {(sounds ? "can hear your modded SFX/Music." : "disabled your modded SFX/Music.")}");
         ImUtf8.SameLineInner();
-        CkGui.IconText(FAI.Running, anims ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.IconTextAligned(FAI.Running, anims ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
         CkGui.AttachToolTip($"{dispName} {(anims ? "can see your modded animations." : "disabled your modded animations.")}");
         ImUtf8.SameLineInner();
-        CkGui.IconText(FAI.PersonBurst, vfx ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.IconTextAligned(FAI.PersonBurst, vfx ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
         CkGui.AttachToolTip($"{dispName} {(vfx ? "can see your modded VFX." : "disabled your modded VFX.")}");
 
-        ImGui.Separator();
+        // Moodles Row
+        var iconsW = CkGui.IconsSize([FAI.TheaterMasks, FAI.SmileBeam, FAI.FrownOpen, FAI.WandMagicSparkles,
+            FAI.PersonArrowUpFromLine, FAI.PersonArrowDownToLine, FAI.Stopwatch, FAI.Infinity, FAI.Eraser]).X;
+        var moodlesW = iconsW + ImUtf8.ItemInnerSpacing.X * 8;
+
+        CkGui.SetCursorXtoCenter(moodlesW);
+        var sharing = s.PairPerms.ShareOwnMoodles;
+        var pos = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.Positive);
+        var neg = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.Negative);
+        var spec = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.Special);
+        var own = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOwn);
+        var other = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOther);
+        var perm = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.Permanent);
+        var remApp = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveApplied);
+        var remAny = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveAny);
+        CkGui.IconTextAligned(FAI.TheaterMasks, sharing ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip($"{dispName} {(sharing ? "is sharing their Moodles with you." : "is not sharing their Moodles with you.")}");
+
+        ImUtf8.SameLineInner();
+        CkGui.IconTextAligned(FAI.SmileBeam, pos ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Positive Moodles." : "prevents Positive Moodles.")}");
+
+        ImUtf8.SameLineInner();
+        CkGui.IconTextAligned(FAI.FrownOpen, neg ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Negative Moodles." : "prevents Negative Moodles.")}");
+
+        ImUtf8.SameLineInner();
+        CkGui.IconTextAligned(FAI.WandMagicSparkles, spec ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Special Moodles." : "prevents Special Moodles.")}");
+
+        ImUtf8.SameLineInner();
+        CkGui.IconTextAligned(FAI.PersonArrowUpFromLine, own ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip(pos ? $"You can apply {dispName}'s own Moodles." : $"Applying {dispName}'s Moodles is forbidden.");
+
+        ImUtf8.SameLineInner();
+        CkGui.IconTextAligned(FAI.PersonArrowDownToLine, other ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip(other ? $"You can apply your Moodles" : "Applying of your Moodles is forbidden.");
+
+        ImUtf8.SameLineInner();
+        CkGui.IconTextAligned(FAI.Stopwatch, s.PairPerms.MaxMoodleTime != TimeSpan.Zero ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip(s.PairPerms.MaxMoodleTime != TimeSpan.Zero ? $"{dispName}'s Maximum Moodle Duration is: {s.PairPerms.MaxMoodleTime.ToTimeSpanStr()}." : "You can not apply timed Moodles.");
+
+        ImUtf8.SameLineInner();
+        CkGui.IconTextAligned(FAI.Infinity, perm ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip(perm ? $"{dispName} allows Permanent Moodles." : $"{dispName} prevents Permanent Moodles.");
+
+        if (remAny)
+        {
+            ImUtf8.SameLineInner();
+            CkGui.IconTextAligned(FAI.Eraser, remAny ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+            CkGui.AttachToolTip(remAny ? $"You can remove {dispName}'s Moodles." : $"You cannot remove {dispName}'s Moodles.");
+        }
+        else
+        {
+            ImUtf8.SameLineInner();
+            CkGui.IconTextAligned(FAI.Eraser, remApp ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+            CkGui.AttachToolTip(remApp ? $"You can remove Moodles applied by you." : $"You cannot remove {dispName}'s Moodles.");
+        }
+
     }
 
     private void DrawCommon(Sundesmo s, string dispName, float width)

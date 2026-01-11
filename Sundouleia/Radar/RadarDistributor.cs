@@ -64,7 +64,7 @@ public class RadarDistributor : DisposableMediatorSubscriberBase
     private RadarZoneUpdate GetZoneUpdate()
     {
         var world = PlayerData.CurrentWorldId;
-        var zone = LocationService.CurrZone;
+        var zone = LocationSvc.Current.TerritoryId;
         var joinChats = _config.Current.RadarJoinChats;
         var hashedCID = _config.Current.RadarSendPings ? SundouleiaSecurity.GetClientIdentHashThreadSafe() : string.Empty;
         return new(world, zone, joinChats, hashedCID);
@@ -94,7 +94,7 @@ public class RadarDistributor : DisposableMediatorSubscriberBase
             var zoneInfo = await _hub.RadarZoneJoin(info).ConfigureAwait(false);
             if (zoneInfo.ErrorCode is not SundouleiaApiEc.Success || zoneInfo.Value is null)
             {
-                Logger.LogWarning($"Failed to join radar zone {LocationService.CurrZone} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
+                Logger.LogWarning($"Failed to join radar zone {LocationSvc.Current.TerritoryId} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
                 return;
             }
 

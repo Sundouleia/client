@@ -1,6 +1,4 @@
-using CkCommons;
 using CkCommons.DrawSystem;
-using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
@@ -9,15 +7,9 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
-using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
-using Sundouleia.WebAPI;
-using System;
-using static FFXIVClientStructs.FFXIV.Client.UI.Misc.GroupPoseModule;
-using static System.ComponentModel.Design.ObjectSelectorEditor;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -26,7 +18,9 @@ namespace Sundouleia.Gui.MainWindow;
 // It would allow us to process the logic in the draw-loop like we want.
 public class SidePanelUI : WindowMediatorSubscriberBase
 {
-    private readonly GroupOrganizer _folderDrawer;
+    private readonly InteractionTabs _sundesmoTabs;
+    private readonly GroupEditorTabs _groupTabs;
+    private readonly GroupOrganizer _folderDrawer; // Modify?
     private readonly RequestsInDrawer _requestsDrawer;
     private readonly SidePanelInteractions _interactions;
     private readonly SidePanelService _service;
@@ -34,10 +28,13 @@ public class SidePanelUI : WindowMediatorSubscriberBase
     private RequestsGroupSelector GroupSelector;
 
     public SidePanelUI(ILogger<SidePanelUI> logger, SundouleiaMediator mediator,
-        GroupOrganizer drawer, RequestsInDrawer requestsDrawer, SidePanelInteractions interactions,
+        InteractionTabs actionTabs, GroupEditorTabs groupTabs, GroupOrganizer drawer, 
+        RequestsInDrawer requestsDrawer, SidePanelInteractions interactions,
         SidePanelService service, GroupsDrawSystem groupsDDS)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
+        _sundesmoTabs = actionTabs;
+        _groupTabs = groupTabs;
         _folderDrawer = drawer;
         _requestsDrawer = requestsDrawer;
         _interactions = interactions;
@@ -95,7 +92,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
                 DrawGroupOrganizer(goc);
                 return;
             case InteractionsCache ic:
-                _interactions.DrawContents(ic);
+                DrawInteractionsPanel(ic);
                 return;
             case ResponseCache irc:
                 DrawIncomingRequests(irc);
@@ -113,6 +110,25 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         _folderDrawer.DrawButtonHeader(width);
         ImGui.Separator();
         _folderDrawer.DrawContents<GroupFolder>(width, DynamicFlags.SelectableDragDrop);
+    }
+
+    private void DrawInteractionsPanel(InteractionsCache ic)
+    {
+        using var _ = CkRaii.Child("SundesmoInteractions", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+        var dispName = ic.DisplayName;
+
+        if (ic.Sundesmo is not { } sundesmo)
+            return;
+
+        // Draw tabs
+        _sundesmoTabs.Draw(width);
+
+        // Draw content based on tab.
+        if (_sundesmoTabs.TabSelection is InteractionTabs.SelectedTab.Interactions)
+            _interactions.DrawInteractions(ic, sundesmo, dispName, width);
+        else
+            _interactions.DrawPermissions(ic, sundesmo, dispName, width);
     }
 
     // TODO: Update this so that it reflects the incoming requests folder format,

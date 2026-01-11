@@ -184,7 +184,7 @@ public static class SundouleiaServiceExtensions
 
         // Radar
         .AddSingleton<RadarManager>()
-        .AddSingleton<LocationService>()
+        .AddSingleton<LocationSvc>()
 
         // Misc. Services
         .AddSingleton<CosmeticService>()
@@ -200,6 +200,8 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<RadarChatLog>()
         .AddSingleton<PopoutRadarChatlog>()
         .AddSingleton<MainMenuTabs>()
+        .AddSingleton<InteractionTabs>()
+        .AddSingleton<GroupEditorTabs>()
 
         // WebAPI (Server stuff)
         .AddSingleton<MainHub>()

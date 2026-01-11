@@ -22,8 +22,11 @@ public class ConfigStorage
     public string CacheScanComplete { get; set; } = string.Empty;
     [JsonIgnore] public string SMACacheFolder => Path.Combine(CacheFolder, Constants.SMAFolderName);
 
+    // Tab Selection Memory
+    public MainMenuTabs.SelectedTab CurMainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
+    public InteractionTabs.SelectedTab CurInteractionsTab { get; set; } = InteractionTabs.SelectedTab.Interactions;
+    public GroupEditorTabs.SelectedTab CurGroupEditTab { get; set; } = GroupEditorTabs.SelectedTab.Organizer;
     // General
-    public MainMenuTabs.SelectedTab MainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
     public bool OpenUiOnStartup { get; set; } = true;
     public bool ShowContextMenus { get; set; } = true;
     public bool ShowProfiles { get; set; } = true;

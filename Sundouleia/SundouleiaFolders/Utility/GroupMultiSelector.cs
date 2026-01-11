@@ -9,6 +9,9 @@ using Sundouleia.Pairs;
 namespace Sundouleia.DrawSystem;
 
 // TODO:
+// First, try to do this with a selected pair, using context menu access.
+// Will likely run into problems. If so, do the following:
+//
 // Revise this to work instead inside of a draw system dependancy.
 // We should only do this because for pairs when we want to add or remove them from groups,
 // we will need to track which folders should be visible, or which folders are applied.
