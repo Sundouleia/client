@@ -67,8 +67,6 @@ public class HomeTab
         DrawProfileInfo(_.InnerRegion, profile);
         ImGui.Spacing();
         DrawMenuOptions();
-        ImGui.Separator();
-
     }
 
     private void DrawProfileInfo(Vector2 region, Profile profile)

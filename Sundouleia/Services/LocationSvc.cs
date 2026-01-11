@@ -103,6 +103,7 @@ public class LocationSvc : DisposableMediatorSubscriberBase
         Current = new LocationEntry();
     }
 
+    // Set a slightly delayed territory changed update to make sure all data is correctly loaded in.
     private async void OnTerritoryChanged(ushort newTerritory)
     {
         // Ignore territories from login zone / title screen (if any even exist)
@@ -111,6 +112,9 @@ public class LocationSvc : DisposableMediatorSubscriberBase
 
         Logger.LogDebug($"Territory changed to: {newTerritory} ({PlayerContent.GetTerritoryName(newTerritory)})");
         var prevData = Current;
+        // Await for the player to be loaded
+        await SundouleiaEx.WaitForPlayerLoading();
+        Logger.LogDebug("Player Finished Loading, updating location data.");
         Current = GetEntryForArea();
         Mediator.Publish(new TerritoryChanged(prevData.TerritoryId, Current.TerritoryId));
     }
