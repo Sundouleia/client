@@ -13,6 +13,7 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
 using Sundouleia.Gui.MainWindow;
+using Sundouleia.Localization;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
@@ -23,7 +24,7 @@ namespace Sundouleia.DrawSystem;
 public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
 {
     private static readonly IconCheckboxEx CheckboxOffline = new(FAI.Unlink);
-    private static readonly IconCheckboxEx CheckboxShowEmpty = new(FAI.FolderOpen);
+    private static readonly IconCheckboxEx CheckboxPin = new(FAI.MapPin);
 
     // Used for normal leaf interaction.
     private static readonly string Tooltip =
@@ -44,23 +45,17 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
     private GroupFilterEditor _filterEditor;
     private FAIconCombo       _iconSelector;
 
-    // If we have the group editor window open.
-    private bool _editorShown = false;
-    // Single Group editor temp name storage.
-    private string _nameEditTmp = string.Empty;
+    private SundesmoCache _cache => (SundesmoCache)FilterCache;
 
-    // Track which folder has its config open.
+    // For Group editing
+    private string _nameEditTmp = string.Empty;
     private IDynamicCollection<Sundesmo>? _folderInEditor;
 
-    // We want to do the same state tracking as the whitelist drawer since we draw the same node types.
-    private HashSet<IDynamicNode<Sundesmo>> _showingUID = new(); // Nodes in here show UID.
-    private IDynamicNode<Sundesmo>?         _renaming   = null;
-    private string                          _nameEditStr= string.Empty; // temp nick text.
-    
+    // Popout Tracking.
     private IDynamicNode? _hoveredTextNode;     // From last frame.
     private IDynamicNode? _newHoveredTextNode;  // Tracked each frame.
-    private bool          _profileShown = false;// If currently displaying a popout profile.
-    private DateTime?     _lastHoverTime;       // time until we should show the profile.
+    private bool _profileShown = false;         // If currently displaying a popout profile.
+    private DateTime? _lastHoverTime;           // time until we should show the profile.
 
     public WhitelistGroupsDrawer(ILogger<WhitelistGroupsDrawer> logger, SundouleiaMediator mediator, MainConfig config, 
         FolderConfig folderConfig, FavoritesConfig favorites, NicksConfig nicks, GroupsManager groups, 
@@ -92,20 +87,29 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
             FilterCache.Filter = tmp;
     }
 
+    // Draws the grey line around the filtered content when expanded and stuff.
+    protected override void PostSearchBar()
+    {
+        if (_cache.FilterConfigOpen)
+            ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
+    }
+
     private void DrawButtons()
     {
-        if (CkGui.IconTextButton(FAI.PeopleGroup, "Groups", null, true, _editorShown))
+        if (CkGui.IconTextButton(FAI.PeopleGroup, "Groups", null, true, _cache.FilterConfigOpen))
         {
-            _editorShown = false;
+            _cache.FilterConfigOpen = false;
             _folderConfig.Current.ViewingGroups = false;
             _folderConfig.Save();
         }
         CkGui.AttachToolTip("Switch to Basic View");
 
         ImGui.SameLine(0, 0);
-        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGold, InOrganizer))
-            if (CkGui.IconButton(FAI.Wrench, inPopup: !InOrganizer))
-                _stickyService.ForOrganizer();
+        if (CkGui.IconButton(FAI.Wrench, inPopup: !InOrganizer))
+        {
+            _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
+            _stickyService.ForOrganizer();
+        }
         CkGui.AttachToolTip("Edit, Add, Rearrange, or Remove Groups.");
     }
     #endregion Search
@@ -205,8 +209,8 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
         if (_iconSelector.Draw("IconSel", folder.Icon, 10))
         {
             // Update the icon within the group manager.
-            if (_groups.TrySetIcon(folder.Name, _iconSelector.Current, folder.IconColor))
-                folder.ApplyLatestStyle();
+            _groups.SetIcon(folder.Group, _iconSelector.Current, folder.IconColor);
+            folder.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Edit the icon for your group.");
 
@@ -216,7 +220,7 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
         ImGui.InputTextWithHint("##GroupNameEdit", "Set Name..", ref _nameEditTmp, 40);
         if (ImGui.IsItemDeactivatedAfterEdit())
         {
-            if (_groups.TryRename(folder.Name, _nameEditTmp))
+            if (_groups.TryRename(folder.Group, _nameEditTmp))
             {
                 DrawSystem.Rename(folder, _nameEditTmp);
                 // Mark the parent for a reload, since its new name may not be filtered anymore.
@@ -254,38 +258,37 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
 
         ImGui.TableNextColumn();
         var iconCol = ImGui.ColorConvertU32ToFloat4(f.IconColor);
-        if (ImGui.ColorEdit4("Icon Color", ref iconCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+        if (ImGui.ColorEdit4("Icon", ref iconCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
         {
-
-            if (_groups.TrySetStyle(f.Name, ImGui.ColorConvertFloat4ToU32(iconCol), f.NameColor, f.BorderColor, f.GradientColor))
-                f.ApplyLatestStyle();
+            _groups.SetStyle(f.Group, ImGui.ColorConvertFloat4ToU32(iconCol), f.NameColor, f.BorderColor, f.GradientColor);
+            f.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Change the color of the folder icon.");
 
 
         var labelCol = ImGui.ColorConvertU32ToFloat4(f.NameColor);
-        if (ImGui.ColorEdit4("Label Color", ref labelCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+        if (ImGui.ColorEdit4("Label", ref labelCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
         {
-            if (_groups.TrySetStyle(f.Name, f.IconColor, ImGui.ColorConvertFloat4ToU32(labelCol), f.BorderColor, f.GradientColor))
-                f.ApplyLatestStyle();
+            _groups.SetStyle(f.Group, f.IconColor, ImGui.ColorConvertFloat4ToU32(labelCol), f.BorderColor, f.GradientColor);
+            f.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Change the color of the folder label.");
 
         // Other two colors.
         ImGui.TableNextColumn();
         var borderCol = ImGui.ColorConvertU32ToFloat4(f.BorderColor);
-        if (ImGui.ColorEdit4("Border Color", ref borderCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+        if (ImGui.ColorEdit4("Border", ref borderCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
         {
-            if (_groups.TrySetStyle(f.Name, f.IconColor, f.NameColor, ImGui.ColorConvertFloat4ToU32(borderCol), f.GradientColor))
-                f.ApplyLatestStyle();
+            _groups.SetStyle(f.Group, f.IconColor, f.NameColor, ImGui.ColorConvertFloat4ToU32(borderCol), f.GradientColor);
+            f.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Change the color of the folder border.");
 
         var gradCol = ImGui.ColorConvertU32ToFloat4(f.GradientColor);
-        if (ImGui.ColorEdit4("Gradient Color", ref gradCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
+        if (ImGui.ColorEdit4("Gradient", ref gradCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
         {
-            if (_groups.TrySetStyle(f.Name, f.IconColor, f.NameColor, f.BorderColor, ImGui.ColorConvertFloat4ToU32(gradCol)))
-                f.ApplyLatestStyle();
+            _groups.SetStyle(f.Group, f.IconColor, f.NameColor, f.BorderColor, ImGui.ColorConvertFloat4ToU32(gradCol));
+            f.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Change the color of the folder gradient.");
 
@@ -293,23 +296,19 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
         var showOffline = f.ShowOffline;
         if (CheckboxOffline.Draw("Show Offline"u8, ref showOffline))
         {
-            if (_groups.TrySetState(f.Name, showOffline, f.ShowIfEmpty))
-            {
-                // Update the folder within the file system and mark things for a reload.
-                DrawSystem.UpdateFolder(f);
-                FilterCache.MarkForReload(f);
-            }
+            _groups.SetState(f.Group, showOffline);
+            DrawSystem.UpdateFolder(f);
+            FilterCache.MarkForReload(f);
         }
         CkGui.AttachToolTip("Show offline pairs in this folder.");
 
-        var showIfEmpty = f.Flags.HasAny(FolderFlags.ShowIfEmpty);
-        if (CheckboxShowEmpty.Draw("Show If Empty"u8, ref showIfEmpty))
+        var areaBound = f.Group.AreaBound;
+        if (CheckboxPin.Draw("Location Sorting"u8, ref areaBound))
         {
-            DrawSystem.SetShowIfEmpty(f, showIfEmpty);
-            if (_groups.TrySetState(f.Name, f.ShowOffline, f.ShowIfEmpty))
-                FilterCache.MarkForReload(f);
+            f.Group.AreaBound = areaBound;
+            FilterCache.MarkForReload(f);
         }
-        CkGui.AttachToolTip("Folder is shown even with 0 items are filtered");
+        CkGui.AttachToolTip("If others rendered in a location's scope are added to the group.");
     }
 
     private float DrawFolderOptions(GroupFolder folder)
@@ -336,7 +335,7 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
         // If right clicked, we should clear the folders filters and refresh.
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
         {
-            _groups.ClearFilters(folder.Name);
+            _groups.ClearFilters(folder.Group);
             folder.ApplyLatestSorter();
             FilterCache.MarkForSortUpdate(folder);
         }
@@ -362,7 +361,7 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
     {
         var cursorPos = ImGui.GetCursorPos();
         var size = new Vector2(CkGui.GetWindowContentRegionWidth() - cursorPos.X, ImUtf8.FrameHeight);
-        var editing = _renaming == leaf;
+        var editing = _cache.RenamingNode == leaf;
         var bgCol = (!editing && selected) ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
         using (var _ = CkRaii.Child(Label + leaf.Name, size, bgCol, 5f))
             DrawLeafInner(leaf, _.InnerRegion, flags, editing);
@@ -436,13 +435,13 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
     private void DrawNameEditor(IDynamicLeaf<Sundesmo> leaf, float width)
     {
         ImGui.SetNextItemWidth(width);
-        if (ImGui.InputTextWithHint($"##{leaf.FullPath}-nick", "Give a nickname..", ref _nameEditStr, 45, ImGuiInputTextFlags.EnterReturnsTrue))
+        if (ImGui.InputTextWithHint($"##{leaf.FullPath}-nick", "Give a nickname..", ref _cache.NameEditStr, 45, ImGuiInputTextFlags.EnterReturnsTrue))
         {
-            _nicks.SetNickname(leaf.Data.UserData.UID, _nameEditStr);
-            _renaming = null;
+            _nicks.SetNickname(leaf.Data.UserData.UID, _cache.NameEditStr);
+            _cache.RenamingNode = null;
         }
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            _renaming = null;
+            _cache.RenamingNode = null;
         // Helper tooltip.
         CkGui.AttachToolTip("--COL--[ENTER]--COL-- To save" +
             "--NL----COL--[R-CLICK]--COL-- Cancel edits.", ImGuiColors.DalamudOrange);
@@ -495,8 +494,8 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
             // Additional, SundesmoLeaf-Specific interaction handles.
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
-                if (!_showingUID.Remove(node))
-                    _showingUID.Add(node);
+                if (!_cache.ShowingUID.Remove(node))
+                    _cache.ShowingUID.Add(node);
             }
             if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
             {
@@ -504,14 +503,15 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
             }
             if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
-                _renaming = node;
-                _nameEditStr = node.Data.GetNickname() ?? string.Empty;
+                _cache.RenamingNode = node;
+                _cache.NameEditStr = node.Data.GetNickname() ?? string.Empty;
             }
         }
     }
     #endregion Leaves
 
     #region Utility
+
     private void ToggleEditor(GroupFolder folder)
     {
         if (_folderInEditor == folder)
@@ -525,16 +525,17 @@ public class WhitelistGroupsDrawer : DynamicDrawer<Sundesmo>
             _nameEditTmp = folder.Name;
         }
     }
+
     private void DrawSundesmoName(IDynamicLeaf<Sundesmo> s)
     {
         // Assume we use mono font initially.
         var useMono = true;
         // Get if we are set to show the UID over the name.
-        var showUidOverName = _showingUID.Contains(s);
+        var showUidOverName = _cache.ShowingUID.Contains(s);
         // obtain the DisplayName (Player || Nick > Alias/UID).
         var dispName = string.Empty;
         // If we should be showing the uid, then set the display name to it.
-        if (_showingUID.Contains(s))
+        if (_cache.ShowingUID.Contains(s))
         {
             // Mono Font is enabled.
             dispName = s.Data.UserData.AliasOrUID;

@@ -87,36 +87,36 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
 
         // For each existing group, ensure its folder exists.
         // If it is in the folder map, assign it to the respective parent, otherwise root.
-        foreach (var groupToAdd in toCreate)
+        foreach (var (label, group) in toCreate)
         {
             // If the folder exists, continue to prevent unnecessary work.
-            if (FolderExists(groupToAdd.Label))
+            if (FolderExists(label))
             {
-                _logger.LogDebug($"Folder for Group [{groupToAdd.Label}] already exists, skipping creation.");
+                _logger.LogDebug($"Folder for Group [{label}] already exists, skipping creation.");
                 continue;
             }
 
             // It does not exist, so try and obtain it via mapping, with root as fallback.
             DynamicFolderGroup<Sundesmo> parent = root;
-            if (!map.TryGetValue(groupToAdd.Label, out var parentName))
+            if (!map.TryGetValue(label, out var parentName))
             {
-                _logger.LogDebug($"No parent mapping found for Group [{groupToAdd.Label}], defaulting to root.");
+                _logger.LogDebug($"No parent mapping found for Group [{label}], defaulting to root.");
             }
             else
             {
                 if (TryGetFolderGroup(parentName, out var mappedParent))
                 {
-                    _logger.LogDebug($"Mapped parent folder [{parentName}] for Group [{groupToAdd.Label}] found.");
+                    _logger.LogDebug($"Mapped parent folder [{parentName}] for Group [{label}] found.");
                     parent = mappedParent;
                 }
                 else
                 {
-                    _logger.LogWarning($"Mapped parent folder [{parentName}] for Group [{groupToAdd.Label}] not found, defaulting to root.");
+                    _logger.LogWarning($"Mapped parent folder [{parentName}] for Group [{label}] not found, defaulting to root.");
                 }
             }
 
             // Now that we have defined the parent, ensure we are creating with the next peeked id.
-            anyCreated |= TryAddFolder(parent, groupToAdd);
+            anyCreated |= TryAddFolder(parent, group);
         }
 
         // Dont forget to add the 'AllSundesmos' folder at the end, the WhitelistFolder.

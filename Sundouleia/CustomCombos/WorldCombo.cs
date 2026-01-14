@@ -2,7 +2,6 @@ using Dalamud.Bindings.ImGui;
 
 namespace Sundouleia.CustomCombos;
 
-/// <summary> A combo for selecting worlds WITHOUT the Any World entry. Used for Lifestream IPC. </summary>
 public sealed class WorldCombo : CkFilterComboCache<KeyValuePair<ushort, string>>
 {
     private ushort _current;

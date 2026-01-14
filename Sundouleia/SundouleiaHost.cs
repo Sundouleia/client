@@ -141,6 +141,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
             _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientUpdateService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientUpdateHandler>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientDistributor>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<RadarDistributor>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<LocationSvc>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientMoodles>();
             // stuff that should probably be a hosted service but isn't yet.

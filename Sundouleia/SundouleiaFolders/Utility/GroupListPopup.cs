@@ -71,7 +71,7 @@ public class GroupListPopup(GroupsManager manager)
             // Checkbox, then filter option.
             bool active = true;
             if (ImUtf8.Checkbox("##toggle", ref active))
-                _postDrawAction = () => manager.RemoveFilter(group.Name, stepIdx);
+                _postDrawAction = () => manager.RemoveFilter(group.Group, stepIdx);
         }
 
         // For all remaining unused options, draw these too.
@@ -84,7 +84,7 @@ public class GroupListPopup(GroupsManager manager)
             // Checkbox, then filter option.
             bool inactive = false;
             if (ImUtf8.Checkbox("##toggle", ref inactive))
-                _postDrawAction = () => manager.AddFilter(group.Name, step.ToFolderSortFilter());
+                _postDrawAction = () => manager.AddFilter(group.Group, step.ToFolderSortFilter());
         }
 
         ImGui.Spacing();
@@ -190,7 +190,7 @@ public class GroupListPopup(GroupsManager manager)
         }
 
         // Enqueue the move in a post-draw action.
-        _postDrawAction = () => manager.MoveFilters(folder.Name, fromIndices, idx);
+        _postDrawAction = () => manager.MoveFilters(folder.Group, fromIndices, idx);
         Clear();
 
         // Clear the dragdrop state.

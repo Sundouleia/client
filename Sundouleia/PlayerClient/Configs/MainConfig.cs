@@ -25,7 +25,7 @@ public class ConfigStorage
     // Tab Selection Memory
     public MainMenuTabs.SelectedTab CurMainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
     public InteractionTabs.SelectedTab CurInteractionsTab { get; set; } = InteractionTabs.SelectedTab.Interactions;
-    public GroupEditorTabs.SelectedTab CurGroupEditTab { get; set; } = GroupEditorTabs.SelectedTab.Organizer;
+    public GroupEditorTabs.SelectedTab CurGroupEditTab { get; set; } = GroupEditorTabs.SelectedTab.Arranger;
     // General
     public bool OpenUiOnStartup { get; set; } = true;
     public bool ShowContextMenus { get; set; } = true;

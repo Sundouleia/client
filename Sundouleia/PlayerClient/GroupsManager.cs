@@ -1,39 +1,98 @@
+using Sundouleia.Pairs;
+using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.WebAPI;
 
 namespace Sundouleia.PlayerClient;
+
+// Need to be careful with how we make changes here as things that affect the draw system but not the config can lead to desyncs.
 
 /// <summary> 
 ///     Config Management for all Server related configs in one, including
 ///     helper methods to make interfacing with config data easier.
 /// </summary>
-public class GroupsManager
+public class GroupsManager : DisposableMediatorSubscriberBase
 {
-    private readonly ILogger<GroupsManager> _logger;
-    private readonly SundouleiaMediator _mediator;
     private readonly FolderConfig _config;
+    private readonly SundesmoManager _sundesmos;
 
-    private Dictionary<string, SundesmoGroup> _lookupMap = new();
-
-    public GroupsManager(ILogger<GroupsManager> logger, SundouleiaMediator mediator, FolderConfig config)
+    public GroupsManager(ILogger<GroupsManager> logger, SundouleiaMediator mediator, 
+        FolderConfig config, SundesmoManager sundesmos)
+        : base(logger, mediator)
     {
-        _logger = logger;
-        _mediator = mediator;
         _config = config;
+        _sundesmos = sundesmos;
 
-        _lookupMap = Config.Groups.ToDictionary(g => g.Label, g => g);
+        // Update the groups based on location changes.
+        Mediator.Subscribe<TerritoryChanged>(this, _ => LinkByMatchingLocation());
+        // Run a check after each hub connection.
+        // Ensure that a newly rendered sundesmo is checked against for location-sorted groups.
+        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ => LinkByMatchingLocation(_.Sundesmo));
     }
 
     public FolderStorage Config => _config.Current;
+    public Dictionary<string, SundesmoGroup> Groups => _config.Current.Groups;
+    public List<SundesmoGroup> GroupsList => _config.Current.Groups.Values.ToList();
 
-    public List<SundesmoGroup> Groups => _config.Current.Groups;
+    public void LinkByMatchingLocation()
+    {
+        var curVisibleUids = _sundesmos.GetVisibleConnected().Select(s => s.UID).ToHashSet();
+
+        // Check against all location-scoped groups. If there is any groups that match,
+        // and can have new users appended, append them. Ensure matches are validated using
+        // the groups LocationScope.
+        foreach (var group in GroupsList.Where(g => g.AreaBound && g.Scope > 0).ToList())
+        {
+            // If no location data is present, skip.
+            if (group.Scope is LocationScope.None || group.Location is not { } location)
+                continue;
+
+            // Ensure that it matches to our current location scope.
+            if (!LocationSvc.IsMatch(location, group.Scope))
+                continue;
+
+            Logger.LogInformation($"Group {{{group.Label}}} matches current location scope {{{group.Scope}}}.");
+            Logger.LogInformation($"Group Current Users: {string.Join(", ", group.LinkedUids)}");
+            Logger.LogInformation($"Visible Users: {string.Join(", ", curVisibleUids)}");
+            var toAdd = curVisibleUids.Except(group.LinkedUids).ToList();
+            Logger.LogInformation($"Found new Users to add: {string.Join(", ", toAdd)}");
+
+            // Link them to the group and save.
+            LinkToGroup(toAdd, group);
+            // Placeholder.
+            Mediator.Publish(new FolderUpdateGroups());
+        }
+    }
+
+    public void LinkByMatchingLocation(Sundesmo sundesmo)
+    {
+        // Avoid if not fully connected yet.
+        if (!MainHub.IsConnectionDataSynced)
+            return;
+
+        var uid = sundesmo.UserData.UID;
+        foreach (var group in GroupsList.Where(g => g.AreaBound && g.Scope > 0).ToList())
+        {
+            if (group.LinkedUids.Contains(uid))
+                continue;
+
+            // If no location data is present, skip.
+            if (group.Scope is LocationScope.None || group.Location is not { } location)
+                continue;
+            // Ensure that it matches to our current location scope.
+            if (!LocationSvc.IsMatch(location, group.Scope))
+                continue;
+            
+            Logger.LogInformation($"[{group.Label}] Matches Loc. Scope ({group.Scope}) for {sundesmo.GetDisplayName()}.");
+            LinkToGroup(uid, group);
+            Mediator.Publish(new FolderUpdateGroups());
+        }
+    }
 
     #region Filter Edits
     // Moves the sort filters of selected indexes to a new target index location in the list
-    public bool MoveFilters(string groupName, int[] fromIndices, int targetIdx)
+    public bool MoveFilters(SundesmoGroup group, int[] fromIndices, int targetIdx)
     {
-        if (!_lookupMap.TryGetValue(groupName, out var group))
-            return false;
-
         var sortOrder = group.SortOrder;
         // Sort in descending order for efficient removal
         Array.Sort(fromIndices);
@@ -53,81 +112,63 @@ public class GroupsManager
         return true;
     }
 
-    public bool RemoveFilter(string groupName, int idx)
+    public bool RemoveFilter(SundesmoGroup group, int idx)
     {
-        if (!_lookupMap.TryGetValue(groupName, out var group) || (idx < 0 || idx >= group.SortOrder.Count))
-            return false;
         group.SortOrder.RemoveAt(idx);
         _config.Save();
         return true;
     }
 
-    public bool AddFilter(string groupName, FolderSortFilter filter)
+    public bool AddFilter(SundesmoGroup group, FolderSortFilter filter)
     {
-        if (!_lookupMap.TryGetValue(groupName, out var group) || group.SortOrder.Contains(filter))
+        if (group.SortOrder.Contains(filter))
             return false;
+
         group.SortOrder.Add(filter);
         _config.Save();
         return true;
     }
 
-    public bool ClearFilters(string groupName)
+    public bool ClearFilters(SundesmoGroup group)
     {
-        if (!_lookupMap.TryGetValue(groupName, out var group))
-            return false;
         group.SortOrder.Clear();
         _config.Save();
         return true;
     }
     #endregion FilterEdits
 
-    public bool TryRename(string groupName, string newName)
-    {
-        if (!_lookupMap.TryGetValue(groupName, out var group))
-            return false;
-        return TryRename(group, newName);
-    }
-
     public bool TryRename(SundesmoGroup group, string newName)
     {
-        if (_config.LabelExists(newName))
+        if (group is null)
+            throw new ArgumentNullException(nameof(group));
+        
+        var oldName = group.Label;
+
+        // No-op rename
+        if (string.Equals(oldName, newName, StringComparison.Ordinal))
+            return true;
+
+        // Ensure the group exists under its current label
+        if (!Groups.TryGetValue(oldName, out var existing) || !ReferenceEquals(existing, group))
         {
-            _logger.LogWarning($"A group with the name {{{newName}}} already exists!");
+            Logger.LogError($"Group lookup desync for {{{oldName}}}.");
             return false;
         }
 
-        // Remove the old lookup.
-        _lookupMap.Remove(group.Label);
-        // Update the name.
+        // Move the SAME instance to the new key
+        Groups.Remove(oldName);
         group.Label = newName;
-        // Update lookup map
-        _lookupMap[newName] = group;
+        Groups.Add(newName, group);
         _config.Save();
         return true;
     }
 
     #region Style Edits
-    public bool TrySetIcon(string groupName, FAI newIcon, uint newColor)
-    {
-        if (!_lookupMap.TryGetValue(groupName, out var group))
-            return false;
-        SetIcon(group, newIcon, newColor);
-        return true;
-    }
-
     public void SetIcon(SundesmoGroup group, FAI newIcon, uint newColor)
     {
         group.Icon = newIcon;
         group.IconColor = newColor;
         _config.Save();
-    }
-
-    public bool TrySetStyle(string groupName, uint icon, uint label, uint border, uint gradient)
-    {
-        if (!_lookupMap.TryGetValue(groupName, out var group))
-            return false;
-        SetStyle(group, icon, label, border, gradient);
-        return true;
     }
 
     public void SetStyle(SundesmoGroup group, uint icon, uint label, uint border, uint gradient)
@@ -139,33 +180,15 @@ public class GroupsManager
         _config.Save();
     }
 
-    public bool TrySetState(string groupName, bool showOffline, bool showIfEmpty)
-    {
-        if (!_lookupMap.TryGetValue(groupName, out var group))
-            return false;
-        SetState(group, showOffline, showIfEmpty);
-        return true;
-    }
-
-    public void SetState(SundesmoGroup group, bool showOffline, bool showIfEmpty)
+    public void SetState(SundesmoGroup group, bool showOffline)
     {
         group.ShowOffline = showOffline;
-        group.ShowIfEmpty = showIfEmpty;
         _config.Save();
     }
 
+    public void Save() => _config.Save();
+
     #endregion Style Edits
-    
-    public bool TryMergeFolder(string fromFolder, string toFolder)
-    {
-        if (!_lookupMap.TryGetValue(fromFolder, out var fromGroup))
-            return false;
-        if (!_lookupMap.TryGetValue(toFolder, out var toGroup))
-            return false;
-        // Perform the merge.
-        MergeGroups(fromGroup, toGroup);
-        return true;
-    }
 
     /// <summary>
     ///     Merges all users from one group into another, 
@@ -177,7 +200,7 @@ public class GroupsManager
     public void MergeGroups(SundesmoGroup from, SundesmoGroup to)
     {
         to.LinkedUids = from.LinkedUids.Union(to.LinkedUids).ToHashSet();
-        Config.Groups.Remove(from);
+        Config.Groups.Remove(from.Label);
         _config.Save();
     }
 
@@ -185,40 +208,17 @@ public class GroupsManager
     // Fails if the name already exists. 
     public bool TryAddNewGroup(SundesmoGroup group)
     {
-        if (_config.LabelExists(group.Label))
+        if (group is null) throw new ArgumentNullException(nameof(group));
+
+        if (Groups.ContainsKey(group.Label))
         {
-            _logger.LogWarning($"A group with the name {{{group.Label}}} already exists!");
+            Logger.LogWarning($"A group with the name {{{group.Label}}} already exists!");
             return false;
         }
         // Default the linked UID's.
-        _logger.LogInformation($"Adding new group {{{group.Label}}} to config.");
-        group.LinkedUids = new();
-        Config.Groups.Add(group);
+        Logger.LogInformation($"Adding new group {{{group.Label}}} to config.");
+        Config.Groups.TryAdd(group.Label, group);
         _config.Save();
-        return true;
-    }
-
-    public bool LinkToGroup(string uid, string groupLabel)
-    {
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(groupLabel, StringComparison.Ordinal)) is not { } match)
-        {
-            _logger.LogWarning($"No group found with the name {{{groupLabel}}} to link user {{{uid}}} to.");
-            return false;
-        }
-
-        LinkToGroup(uid, match);
-        return true;
-    }
-
-    public bool LinkToGroup(IEnumerable<string> uids, string groupLabel)
-    {
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(groupLabel, StringComparison.Ordinal)) is not { } match)
-        {
-            _logger.LogWarning($"No group found with the name {{{groupLabel}}} to link users to.");
-            return false;
-        }
-
-        LinkToGroup(uids, match);
         return true;
     }
 
@@ -230,31 +230,8 @@ public class GroupsManager
 
     public void LinkToGroup(IEnumerable<string> uids, SundesmoGroup group)
     {
-        foreach (string uid in uids)
-            group.LinkedUids.Add(uid);
+        group.LinkedUids.UnionWith(uids);
         _config.Save();
-    }
-
-    public bool UnlinkFromGroup(string uid, string groupLabel)
-    {
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(groupLabel, StringComparison.Ordinal)) is not { } match)
-        {
-            _logger.LogWarning($"No group found with the name {{{groupLabel}}} to unlink user {{{uid}}} from.");
-            return false;
-        }
-        UnlinkFromGroup(uid, match);
-        return true;
-    }
-
-    public bool UnlinkFromGroup(IEnumerable<string> uids, string groupLabel)
-    {
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(groupLabel, StringComparison.Ordinal)) is not { } match)
-        {
-            _logger.LogWarning($"No group found with the name {{{groupLabel}}} to unlink users from.");
-            return false;
-        }
-        UnlinkFromGroup(uids, match);
-        return true;
     }
 
     public void UnlinkFromGroup(string uid, SundesmoGroup group)
@@ -265,21 +242,14 @@ public class GroupsManager
 
     public void UnlinkFromGroup(IEnumerable<string> uids, SundesmoGroup group)
     {
-        foreach (string uid in uids)
-            group.LinkedUids.Remove(uid);
+        group.LinkedUids.ExceptWith(uids);
         _config.Save();
     }
 
-    public void DeleteGroup(string groupLabel)
+    public void DeleteGroup(SundesmoGroup group)
     {
-        if (Config.Groups.FirstOrDefault(g => g.Label.Equals(groupLabel, StringComparison.Ordinal)) is not { } group)
-        {
-            _logger.LogWarning($"No group found with the name {{{groupLabel}}} to delete.");
-            return;
-        }
-
-        Config.Groups.Remove(group);
-        _logger.LogInformation($"Deleted group {{{group.Label}}} from config.");
+        Config.Groups.Remove(group.Label);
+        Logger.LogInformation($"Deleted group {{{group.Label}}} from config.");
         _config.Save();
     }
 }

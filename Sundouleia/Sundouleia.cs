@@ -179,6 +179,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<CharaObjectWatcher>()
         .AddSingleton<ClientUpdateService>()
         .AddSingleton<ClientDistributor>()
+        .AddSingleton<RadarDistributor>()
         .AddSingleton<ModdedStateManager>()
         .AddSingleton<PlzNoCrashFrens>()
 

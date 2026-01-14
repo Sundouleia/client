@@ -12,7 +12,7 @@ public class GroupEditorTabs : IconTabBar<GroupEditorTabs.SelectedTab>
 {
     public enum SelectedTab
     {
-        Organizer,
+        Arranger,
         Editor,
         Creator,
     }
@@ -34,8 +34,8 @@ public class GroupEditorTabs : IconTabBar<GroupEditorTabs.SelectedTab>
         _config = config;
         TabSelection = _config.Current.CurGroupEditTab;
 
-        AddDrawButton(FontAwesomeIcon.FolderTree, SelectedTab.Organizer, "Organize Your Groups");
-        AddDrawButton(FontAwesomeIcon.Edit, SelectedTab.Editor, "Modify Existing Groups");
+        AddDrawButton(FontAwesomeIcon.FolderTree, SelectedTab.Arranger, "Arrange Your Groups");
+        AddDrawButton(FontAwesomeIcon.Edit, SelectedTab.Editor, "Manage Groups");
         AddDrawButton(FontAwesomeIcon.FolderPlus, SelectedTab.Creator, "Create New Groups");
     }
 

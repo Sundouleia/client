@@ -154,8 +154,8 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
                 ImGui.Text(penRequest.TimeToRespond.ToTimeSpanStr());
                 ImGui.TableNextColumn();
                 ImGui.Text(penRequest.Message ?? "N/A");
-                DrawIconBoolColumn(penRequest.SentFromWorld((ushort)PlayerData.CurrentWorldId));
-                DrawIconBoolColumn(penRequest.SentFromCurrentArea((ushort)PlayerData.CurrentWorldId, PlayerContent.TerritoryID));
+                DrawIconBoolColumn(penRequest.SentFromWorld(PlayerData.CurrentWorldId));
+                DrawIconBoolColumn(penRequest.SentFromCurrentArea(PlayerData.CurrentWorldId, PlayerContent.TerritoryID));
             }
         }
     }
@@ -170,13 +170,12 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
             ImGui.TableSetupColumn("Icon");
             ImGui.TableSetupColumn("Label");
             ImGui.TableSetupColumn("BorderCol");
-            ImGui.TableSetupColumn("ShowIfEmpty");
             ImGui.TableSetupColumn("ShowOffline");
             ImGui.TableSetupColumn("SortOrder");
             ImGui.TableSetupColumn("Linked UIDs");
             ImGui.TableHeadersRow();
 
-            foreach (var group in _groups.Config.Groups)
+            foreach (var (label, group) in _groups.Config.Groups)
             {
                 ImGui.TableNextColumn();
                 CkGui.IconText(group.Icon, group.IconColor);
@@ -185,7 +184,6 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
                 ImGui.TableNextColumn();
                 var borderCol = ImGui.ColorConvertU32ToFloat4(group.BorderColor);
                 ImGui.ColorEdit4($"##BorderCol-{group.Label}", ref borderCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.NoOptions | ImGuiColorEditFlags.NoPicker);
-                DrawIconBoolColumn(group.ShowIfEmpty);
                 DrawIconBoolColumn(group.ShowOffline);
                 ImGui.TableNextColumn();
                 ImGui.Text(string.Join(", ", group.SortOrder));

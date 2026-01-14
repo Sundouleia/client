@@ -5,5 +5,6 @@ namespace Sundouleia.Services.Mediator;
 // Recalculate whenever entities are added / removed.
 public record FolderUpdateSundesmos : MessageBase;
 public record FolderUpdateGroups : MessageBase;
+public record FolderUpdateGroup(string GroupName) : MessageBase;
 public record FolderUpdateRadar : MessageBase;
 public record FolderUpdateRequests : MessageBase;

@@ -17,16 +17,6 @@ public class RequestCache(DynamicDrawSystem<RequestEntry> parent) : DynamicFilte
     /// </summary>
     public List<string> AssignedGroups { get; set; } = [];
 
-    /// <summary>
-    ///     The nickname applied to an accepted request. (Unused on bulk accepting)
-    /// </summary>
-    public string AppliedNick { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     If the nickname requested by the requester should be applied or not.
-    /// </summary>
-    public bool AcceptRequestedNick { get; set; } = true;
-
     protected override bool IsVisible(IDynamicNode<RequestEntry> node)
     {
         if (Filter.Length is 0)

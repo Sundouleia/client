@@ -51,19 +51,37 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         if (ImGui.CollapsingHeader("Transient Resources"))
             DrawTransients();
 
-        using var t = ImRaii.Table("Location Data", 2, ImGuiTableFlags.BordersOuter | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame);
-        if (!t) return;
+        using (var t = ImRaii.Table("Location Data", 2, ImGuiTableFlags.BordersOuter | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame))
+        {
+            if (!t) return;
 
-        ImGui.TableSetupColumn("Previous");
-        ImGui.TableSetupColumn("Current");
-        ImGui.TableHeadersRow();
+            ImGui.TableSetupColumn("Previous");
+            ImGui.TableSetupColumn("Current");
+            ImGui.TableHeadersRow();
 
-        ImGui.TableNextColumn();
-        LocationSvc.DebugArea(LocationSvc.Previous);
+            ImGui.TableNextColumn();
+            LocationSvc.DebugArea(LocationSvc.Previous);
 
-        ImGui.TableNextColumn();
-        LocationSvc.DebugArea(LocationSvc.Current);
-        ImGui.TableNextRow();
+            ImGui.TableNextColumn();
+            LocationSvc.DebugArea(LocationSvc.Current);
+            ImGui.TableNextRow();
+        }
+        try
+        {
+            unsafe
+            {
+                ImGui.Text($"ConnectedToZone: {GameMain.Instance()->ConnectedToZone}");
+                ImGui.Text($"TerritoryLoadState: {GameMain.Instance()->TerritoryLoadState}");
+                ImGui.Text($"NextTerritoryTypeId: {GameMain.Instance()->NextTerritoryTypeId}");
+                ImGui.Text($"CurrentTerritoryTypeId: {GameMain.Instance()->CurrentTerritoryTypeId}");
+                ImGui.Text($"TransitionTerritoryTypeId: {GameMain.Instance()->TransitionTerritoryTypeId}");
+                ImGui.Text($"TerritoryTransitionState: {GameMain.Instance()->TerritoryTransitionState}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error drawing GameMain info: {ex}");
+        }
     }
 
     private void DrawDataDistributor()

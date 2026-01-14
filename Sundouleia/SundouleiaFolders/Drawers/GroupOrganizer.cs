@@ -3,6 +3,7 @@ using CkCommons.Classes;
 using CkCommons.DrawSystem;
 using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
+using CkCommons.Gui.Utility;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
@@ -12,9 +13,20 @@ using OtterGui.Text;
 using Sundouleia.CustomCombos;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.DrawSystem;
+
+// Temporary placeholder while i figure out the mess that is my brain.
+public enum EditorKind
+{
+    None,
+    Settings,
+    Location,
+    Users,
+}
+
 
 /// <summary>
 ///     A drawer for Groups that only displays folders. Used for managing Sundouleia's Group System. <para />
@@ -24,7 +36,7 @@ namespace Sundouleia.DrawSystem;
 public class GroupOrganizer : DynamicDrawer<Sundesmo>
 {
     private static readonly IconCheckboxEx CheckboxOffline = new(FAI.Unlink);
-    private static readonly IconCheckboxEx CheckboxShowEmpty = new(FAI.FolderOpen);
+    private static readonly IconCheckboxEx CheckboxPin = new(FAI.MapPin);
     // Used when arranging Groups.
     private static readonly string Tooltip =
         "--COL--[DRAG]:--COL-- Move the folder around, re-ordering it.--NL--" +
@@ -39,7 +51,11 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
     private readonly GroupsDrawSystem _drawSystem;
 
     // Widgets
-    private FAIconCombo       _iconSelector;
+    private DataCenterCombo _dcCombo;
+    private WorldCombo      _worldCombo;
+    private TerritoryCombo  _territoryCombo;
+
+    private FAIconCombo     _iconSelector;
 
     // Track which folder has its config open.
     private bool _addingFolderGroup = false;
@@ -48,6 +64,7 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
 
     private string _nameEditTmp = string.Empty;
     private IDynamicCollection<Sundesmo>? _folderInEditor;
+    private EditorKind _editorKind;
 
     public GroupOrganizer(ILogger<GroupOrganizer> logger, SundouleiaMediator mediator, 
         MainConfig config, FolderConfig folders, GroupsManager groups, SundesmoManager sundesmos, 
@@ -62,6 +79,10 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         _drawSystem = ds;
 
         _iconSelector = new FAIconCombo(logger);
+
+        _dcCombo = new DataCenterCombo(logger);
+        _worldCombo = new WorldCombo(logger);
+        _territoryCombo = new TerritoryCombo(logger);
 
         FilterCache.MarkCacheDirty();
     }
@@ -168,7 +189,7 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
                 {
                     DrawSystem.Delete(folder.Name);
                     if (folder is GroupFolder f)
-                        _groups.DeleteGroup(f.Name);
+                        _groups.DeleteGroup(f.Group);
                 }
                 Log.Information("Deleted selected groups.");
             });
@@ -247,18 +268,18 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         // Get if shifting
         bool shifting = ImGui.GetIO().KeyShift;
         var groups = DragDrop.Nodes.OfType<DynamicFolderGroup<Sundesmo>>();
-        var folders = DragDrop.Nodes.OfType<DynamicFolder<Sundesmo>>();
+        var folders = DragDrop.Nodes.OfType<GroupFolder>();
 
         // If the target is a folder
-        if (target is DynamicFolder<Sundesmo> folderTarget)
+        if (target is GroupFolder folderTarget)
         {
             // Merge in folders if only moving folders and shifting.
             if (DragDrop.OnlyFolders && shifting)
             {
                 foreach (var f in folders)
                 {
-                    if (_groups.TryMergeFolder(f.Name, folderTarget.Name))
-                        DrawSystem.Delete(f);
+                    _groups.MergeGroups(f.Group, folderTarget.Group);
+                    DrawSystem.Delete(f);
                 }
                 DrawSystem.UpdateFolder(folderTarget);
             }
@@ -306,19 +327,31 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
             DrawFolderRow(gf, width, flags, selected);
         else
         {
-            using (ImRaii.Group())
+            if (_editorKind is EditorKind.Settings)
             {
-                DrawFolderRowEditing(gf, width, flags, selected);
-                DrawFolderEditor(gf, width, flags, editing);
+                using (ImRaii.Group())
+                {
+                    DrawFolderRowEditing(gf, width, flags, selected);
+                    DrawFolderEditor(gf, width);
+                }
+                ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
             }
-            ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
+            else if (_editorKind is EditorKind.Location)
+            {
+                using (ImRaii.Group())
+                {
+                    DrawFolderRow(gf, width, flags, selected);
+                    DrawLocationEditor(gf, width);
+                }
+                ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
+            }
         }
     }
 
     private void DrawFolderRow(GroupFolder folder, float width, DynamicFlags flags, bool selected)
     {
         // We could likely reduce this by a lot if we had a override for this clipped draw within the dynamic draw system.
-        var rWidth = CkGui.IconButtonSize(FAI.Cog).X;
+        var rWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconButtonSize(FAI.MapPin).X;
         var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : folder.BgColor;
         // Display a framed child with stylizations based on the folders preferences.
         using var _ = CkRaii.FramedChildPaddedW(Label + folder.ID, width, ImUtf8.FrameHeight, bgCol, folder.BorderColor, 5f, 1f);
@@ -356,8 +389,8 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         if (_iconSelector.Draw("IconSel", folder.Icon, 10))
         {
             // Update the icon within the group manager.
-            if (_groups.TrySetIcon(folder.Name, _iconSelector.Current, folder.IconColor))
-                folder.ApplyLatestStyle();
+            _groups.SetIcon(folder.Group, _iconSelector.Current, folder.IconColor);
+            folder.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Edit the icon for your group.");
 
@@ -365,7 +398,7 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         ImGui.SetNextItemWidth((ImGui.GetContentRegionAvail().X - rWidth) / 2);
         var nameTmp = folder.Name;
         ImGui.InputTextWithHint("##GroupNameEdit", "Set Name..", ref _nameEditTmp, 40);
-        if (ImGui.IsItemDeactivatedAfterEdit() && _groups.TryRename(folder.Name, _nameEditTmp))
+        if (ImGui.IsItemDeactivatedAfterEdit() && _groups.TryRename(folder.Group, _nameEditTmp))
         {
             DrawSystem.Rename(folder, _nameEditTmp);
             FilterCache.MarkForReload(folder.Parent);
@@ -376,7 +409,7 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         DrawFolderOptions(folder);
     }
 
-    private void DrawFolderEditor(GroupFolder f, float width, DynamicFlags flags, bool editing)
+    private void DrawFolderEditor(GroupFolder f, float width)
     {
         var bgCol = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f);
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
@@ -384,9 +417,7 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
             .Push(ImGuiStyleVar.WindowPadding, new Vector2(4f));
         using var child = CkRaii.ChildPaddedW("FolderEditView", width, CkStyle.TwoRowHeight(), bgCol, 5f);
         using var _ = ImRaii.Table("FolderEditTable", 3, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersInnerV);
-
-        if (!_)
-            return;
+        if (!_) return;
 
         ImGui.TableSetupColumn("Colors");
         ImGui.TableSetupColumn("Flags");
@@ -396,9 +427,8 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         var iconCol = ImGui.ColorConvertU32ToFloat4(f.IconColor);
         if (ImGui.ColorEdit4("Icon", ref iconCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
         {
-
-            if (_groups.TrySetStyle(f.Name, ImGui.ColorConvertFloat4ToU32(iconCol), f.NameColor, f.BorderColor, f.GradientColor))
-                f.ApplyLatestStyle();
+            _groups.SetStyle(f.Group, ImGui.ColorConvertFloat4ToU32(iconCol), f.NameColor, f.BorderColor, f.GradientColor);
+            f.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Change the color of the folder icon.");
 
@@ -406,8 +436,8 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         var labelCol = ImGui.ColorConvertU32ToFloat4(f.NameColor);
         if (ImGui.ColorEdit4("Label", ref labelCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
         {
-            if (_groups.TrySetStyle(f.Name, f.IconColor, ImGui.ColorConvertFloat4ToU32(labelCol), f.BorderColor, f.GradientColor))
-                f.ApplyLatestStyle();
+            _groups.SetStyle(f.Group, f.IconColor, ImGui.ColorConvertFloat4ToU32(labelCol), f.BorderColor, f.GradientColor);
+            f.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Change the color of the folder label.");
 
@@ -416,16 +446,16 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         var borderCol = ImGui.ColorConvertU32ToFloat4(f.BorderColor);
         if (ImGui.ColorEdit4("Border", ref borderCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
         {
-            if (_groups.TrySetStyle(f.Name, f.IconColor, f.NameColor, ImGui.ColorConvertFloat4ToU32(borderCol), f.GradientColor))
-                f.ApplyLatestStyle();
+            _groups.SetStyle(f.Group, f.IconColor, f.NameColor, ImGui.ColorConvertFloat4ToU32(borderCol), f.GradientColor);
+            f.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Change the color of the folder border.");
 
         var gradCol = ImGui.ColorConvertU32ToFloat4(f.GradientColor);
         if (ImGui.ColorEdit4("Gradient", ref gradCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
         {
-            if (_groups.TrySetStyle(f.Name, f.IconColor, f.NameColor, f.BorderColor, ImGui.ColorConvertFloat4ToU32(gradCol)))
-                f.ApplyLatestStyle();
+            _groups.SetStyle(f.Group, f.IconColor, f.NameColor, f.BorderColor, ImGui.ColorConvertFloat4ToU32(gradCol));
+            f.ApplyLatestStyle();
         }
         CkGui.AttachToolTip("Change the color of the folder gradient.");
 
@@ -433,38 +463,234 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         var showOffline = f.ShowOffline;
         if (CheckboxOffline.Draw("Show Offline"u8, ref showOffline))
         {
-            if (_groups.TrySetState(f.Name, showOffline, f.ShowIfEmpty))
-            {
-                // Update the folder within the file system and mark things for a reload.
-                DrawSystem.UpdateFolder(f);
-                FilterCache.MarkForReload(f);
-            }
+            _groups.SetState(f.Group, showOffline);
+            // Update the folder within the file system and mark things for a reload.
+            DrawSystem.UpdateFolder(f);
+            FilterCache.MarkForReload(f);
         }
         CkGui.AttachToolTip("Show offline pairs in this folder.");
 
-        var showIfEmpty = f.Flags.HasAny(FolderFlags.ShowIfEmpty);
-        if (CheckboxShowEmpty.Draw("Show Empty"u8, ref showIfEmpty))
+        var areaBound = f.Group.AreaBound;
+        if (CheckboxPin.Draw("Location Sorting"u8, ref areaBound))
         {
-            DrawSystem.SetShowIfEmpty(f, showIfEmpty);
-            if (_groups.TrySetState(f.Name, f.ShowOffline, f.ShowIfEmpty))
-                FilterCache.MarkForReload(f);
+            f.Group.AreaBound = areaBound;
+            FilterCache.MarkForReload(f);
         }
-        CkGui.AttachToolTip("Folder is shown even with 0 items are filtered");
+        CkGui.AttachToolTip("If others rendered in a location's scope are added to the group.");
+    }
+
+    private void DrawLocationEditor(GroupFolder f, float width)
+    {
+        var bgCol = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f);
+        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(4f));
+        using var _ = CkRaii.ChildPaddedW("FolderEditView", width, CkStyle.GetFrameRowsHeight(4), bgCol, 5f);
+
+        if (f.Group.Location is not { } location)
+            return;
+
+        // Idealy try and avoid these _groups.Save(),
+        // rather adding internal helpers, but can figure this out later.
+        CkGui.FramedIconText(FAI.Bullseye);
+        CkGui.AttachToolTip("The scope of the location");
+
+        var comboW = _.InnerRegion.X - CkGui.IconButtonSize(FAI.MapMarked).X - ImUtf8.FrameHeight - ImUtf8.ItemInnerSpacing.X * 2;
+        ImUtf8.SameLineInner();
+        if (CkGuiUtils.EnumCombo("##scope", comboW, f.Group.Scope, out var newScope))
+        {
+            f.Group.Scope = newScope;
+            _groups.Save();
+        }
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+        {
+            f.Group.Scope = LocationScope.None;
+            _groups.Save();
+        }
+        CkGui.AttachToolTip("The scope of the location");
+
+        ImUtf8.SameLineInner();
+        if (CkGui.IconButton(FAI.MapMarked))
+        {
+            f.Group.Location = LocationSvc.Current.Clone();
+            _groups.Save();
+        }
+        CkGui.AttachToolTip("Set location data to current location.");
+
+        // If it is none, return.
+        var scope = f.Group.Scope;
+        if (scope is LocationScope.None)
+            return;
+
+        var fullWidth = _.InnerRegion.X - ImUtf8.FrameHeight - ImUtf8.ItemInnerSpacing.X;
+        var halfWidth = (fullWidth - ImUtf8.ItemInnerSpacing.X) / 2;
+        var triWidth = (fullWidth - ImUtf8.ItemInnerSpacing.X) / 2;
+
+        // Otherwise, show the dcCombo.
+        CkGui.FramedIconText(FAI.Globe);
+        ImUtf8.SameLineInner();
+        if (scope is LocationScope.DataCenter)
+        {
+            if (_dcCombo.Draw(location.DataCenterId, fullWidth, CFlags.NoArrowButton))
+            {
+                location.DataCenterId = _dcCombo.Current.Key;
+                _groups.Save();
+            }
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
+                location.DataCenterId = byte.MaxValue;
+                _groups.Save();
+            }
+            CkGui.AttachToolTip("The DataCenter required for a match.");
+        }
+        else
+        {
+            if (_dcCombo.Draw(location.DataCenterId, halfWidth, CFlags.NoArrowButton))
+            {
+                location.DataCenterId = _dcCombo.Current.Key;
+                _groups.Save();
+            }
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
+                location.DataCenterId = byte.MaxValue;
+                _groups.Save();
+            }
+            CkGui.AttachToolTip("The DataCenter required for a match.");
+            ImUtf8.SameLineInner();
+            if (_worldCombo.Draw(location.WorldId, halfWidth, CFlags.NoArrowButton))
+            {
+                location.WorldId = _worldCombo.Current.Key;
+                _groups.Save();
+            }
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
+                location.WorldId = ushort.MaxValue;
+                _groups.Save();
+            }
+            CkGui.AttachToolTip("The World required for a match.");
+        }
+
+        if (scope <= LocationScope.World)
+            return;
+
+        // 2nd Row is dependant on the type of scope.
+        if (scope <= LocationScope.Territory)
+        {
+            CkGui.FramedIconText(FAI.MapMarkedAlt);
+            ImUtf8.SameLineInner();
+            if (scope is LocationScope.IntendedUse)
+            {
+                // We are looking for territory based locations.
+                if (CkGuiUtils.EnumCombo("##intendedUse", fullWidth, location.IntendedUse, out var newUse))
+                {
+                    location.IntendedUse = newUse;
+                    _groups.Save();
+                }
+                CkGui.AttachToolTip("The required intended use area to match.");
+            }
+            else
+            {
+                // We are looking for territory based locations.
+                if (CkGuiUtils.EnumCombo("##intendedUse", fullWidth, location.IntendedUse, out var newUse))
+                {
+                    location.IntendedUse = newUse;
+                    _groups.Save();
+                }
+                CkGui.AttachToolTip("The required intended use area to match.");
+
+                CkGui.FramedIconText(FAI.MapMarkedAlt);
+                ImUtf8.SameLineInner();
+                if (_territoryCombo.Draw(location.TerritoryId, fullWidth))
+                {
+                    location.TerritoryId = _territoryCombo.Current.Key;
+                    _groups.Save();
+                }
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                {
+                    location.TerritoryId = ushort.MaxValue;
+                    _groups.Save();
+                }
+                CkGui.AttachToolTip("The required zone to match.");
+            }
+        }
+        // This is a housing district, handle that logic instead.
+        else
+        {
+            CkGui.FramedIconText(FAI.Map);
+            ImUtf8.SameLineInner();
+            if (scope is LocationScope.HousingDistrict)
+            {
+                if (CkGuiUtils.EnumCombo("##area", fullWidth, location.HousingArea, out var newVal,
+                a => LocationSvc.ResidentialNames.GetValueOrDefault(a) ?? a.ToString(), "Choose Area...", 0, CFlags.NoArrowButton))
+                {
+                    location.HousingArea = newVal;
+                    location.Ward = 0;
+                    location.Plot = 0;
+                    _groups.Save();
+                }
+                CkGui.AttachToolTip("The Housing District");
+            }
+            else
+            {
+                if (CkGuiUtils.EnumCombo("##area", halfWidth, location.HousingArea, out var newVal,
+                    a => LocationSvc.ResidentialNames.GetValueOrDefault(a) ?? a.ToString(), "Choose Area...", 0, CFlags.NoArrowButton))
+                {
+                    location.HousingArea = newVal;
+                    location.Ward = 0;
+                    location.Plot = 0;
+                    _groups.Save();
+                }
+                CkGui.AttachToolTip("The Housing District");
+
+                ImUtf8.SameLineInner();
+                ImGui.SetNextItemWidth(halfWidth);
+                var ward = location.Ward;
+                if (ImGui.DragSByte($"##ward", ref ward, .5f, 1, 30, "Ward %d"))
+                {
+                    location.Ward = ward;
+                    _groups.Save();
+                }
+                CkGui.AttachToolTip("The Ward.");
+            }
+
+            if (scope < LocationScope.HousingPlot)
+                return;
+
+            // Next row, draw out the plot.
+            CkGui.FramedIconText(FAI.Home);
+            ImUtf8.SameLineInner();
+            ImGui.SetNextItemWidth(fullWidth);
+            var plot = location.Plot;
+            if (ImGui.SliderSByte("##plot", ref plot, 1, 60, "Plot %d"))
+            {
+                location.Plot = plot;
+                _groups.Save();
+            }
+            CkGui.AttachToolTip($"The plot.");
+        }
+
     }
 
     private float DrawFolderOptions(GroupFolder folder)
     {
         var isFolderInEditor = _folderInEditor == folder;
-        var config = CkGui.IconButtonSize(FAI.Cog);
-        var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
-        var currentRightSide = windowEndX - config.X;
+        var endX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
 
-        ImGui.SameLine(currentRightSide);
-        ImGui.AlignTextToFramePadding();
+        endX -= CkGui.IconButtonSize(FAI.Cog).X;
+        ImGui.SameLine(endX);
         if (CkGui.IconButton(FAI.Cog, inPopup: !isFolderInEditor))
             ToggleEditor(folder);
         CkGui.AttachToolTip("Edit Group");
-        return currentRightSide;
+
+        if (folder.Group.AreaBound)
+        {
+            endX -= CkGui.IconButtonSize(FAI.Map).X;
+            ImGui.SameLine(endX);
+            if (CkGui.IconButton(FAI.Map, inPopup: !isFolderInEditor))
+                ToggleLocationEditor(folder);
+            CkGui.AttachToolTip("Edit Attached Location");
+        }
+
+        return endX;
     }
 
     private void ToggleEditor(GroupFolder folder)
@@ -472,12 +698,28 @@ public class GroupOrganizer : DynamicDrawer<Sundesmo>
         if (_folderInEditor == folder)
         {
             _folderInEditor = null;
+            _editorKind = EditorKind.None;
             _nameEditTmp = string.Empty;
         }
         else
         {
             _folderInEditor = folder;
+            _editorKind = EditorKind.Settings;
             _nameEditTmp = folder.Name;
+        }
+    }
+
+    private void ToggleLocationEditor(GroupFolder folder)
+    {
+        if (_folderInEditor == folder)
+        {
+            _folderInEditor = null;
+            _editorKind = EditorKind.None;
+        }
+        else
+        {
+            _folderInEditor = folder;
+            _editorKind = EditorKind.Location;
         }
     }
 }

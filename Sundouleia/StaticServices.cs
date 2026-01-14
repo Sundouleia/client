@@ -59,8 +59,9 @@ public class Svc
 public static class GameDataSvc
 {
     public static FrozenDictionary<uint, string> JobData { get; private set; } = null!;
+    public static FrozenDictionary<byte, string> DataCenterData { get; private set; } = null!;
     public static FrozenDictionary<ushort, string> WorldData { get; private set; } = null!;
-    public static FrozenDictionary<uint, string> TerritoryData { get; private set; } = null!;
+    public static FrozenDictionary<ushort, string> TerritoryData { get; private set; } = null!;
 
     public static bool IsZoning => Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51];
 
@@ -76,6 +77,11 @@ public static class GameDataSvc
             .ToDictionary(k => k.RowId, k => k.NameEnglish.ToString())
             .ToFrozenDictionary();
 
+        DataCenterData = Svc.Data.GetExcelSheet<WorldDCGroupType>(Svc.ClientState.ClientLanguage)!
+            .Where(dc => dc.Region != 0 && dc.Region < 5) // Exclude invalid/unused regions.
+            .ToDictionary(dc => (byte)dc.RowId, dc => dc.Name.ToString())
+            .ToFrozenDictionary();
+
         WorldData = Svc.Data.GetExcelSheet<World>(Svc.ClientState.ClientLanguage)!
             .Where(w => !w.Name.IsEmpty && w.DataCenter.RowId != 0 && (w.IsPublic || char.IsUpper(w.Name.ToString()[0])))
             .ToDictionary(w => (ushort)w.RowId, w => w.Name.ToString())
@@ -83,17 +89,27 @@ public static class GameDataSvc
 
         TerritoryData = Svc.Data.GetExcelSheet<TerritoryType>(Svc.ClientState.ClientLanguage)!
             .Where(w => w.RowId != 0)
-            .ToDictionary(w => w.RowId, w =>
+            .Select(w =>
             {
-                StringBuilder sb = new();
-                sb.Append(w.PlaceNameRegion.Value.Name);
-                if (w.PlaceName.ValueNullable != null)
+                var zoneName = w.PlaceName.ValueNullable?.Name.ToString();
+                if (string.IsNullOrWhiteSpace(zoneName))
+                    return null;
+
+                if (w.ContentFinderCondition.ValueNullable is { } cfc)
                 {
-                    sb.Append(" - ");
-                    sb.Append(w.PlaceName.Value.Name);
+                    var cfcStr = cfc.Name.ToString();
+                    if (!string.IsNullOrWhiteSpace(cfcStr))
+                        zoneName = $"{zoneName} ({cfcStr})";
                 }
-                return sb.ToString();
+
+                return new
+                {
+                    Id = (ushort)w.RowId,
+                    Name = zoneName
+                };
             })
+            .Where(x => x != null)
+            .ToDictionary(x => x!.Id, x => x!.Name)
             .ToFrozenDictionary();
 
         // Init other data we want here later.

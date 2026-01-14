@@ -41,13 +41,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private readonly SidePanelService _sidePanel;
     private readonly WhitelistDrawSystem _drawSystem;
 
-    // If the FilterRow is to be expanded.
-    private bool _configExpanded = false;
-
-    // private vars for renaming items.
-    private HashSet<IDynamicNode<Sundesmo>> _showingUID = new(); // Nodes in here show UID.
-    private IDynamicNode<Sundesmo>?         _renaming   = null;
-    private string                          _nameEditStr= string.Empty; // temp nick text.
+    private SundesmoCache _cache => (SundesmoCache)FilterCache;
 
     // Popout Tracking.
     private IDynamicNode? _hoveredTextNode;     // From last frame.
@@ -80,30 +74,30 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             FilterCache.Filter = tmp;
 
         // If the config is expanded, draw that.
-        if (_configExpanded)
+        if (_cache.FilterConfigOpen)
             DrawFilterConfig(width);
     }
 
     // Draws the grey line around the filtered content when expanded and stuff.
     protected override void PostSearchBar()
     {
-        if (_configExpanded)
+        if (_cache.FilterConfigOpen)
             ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
     }
 
     private void DrawButtons()
     {
-        if (CkGui.IconTextButton(FAI.Globe, "Basic", null, true, _configExpanded))
+        if (CkGui.IconTextButton(FAI.Globe, "Basic", null, true, _cache.FilterConfigOpen))
         {
-            _configExpanded = false;
+            _cache.FilterConfigOpen = false;
             _folderConfig.Current.ViewingGroups = true;
             _folderConfig.Save();
         }
         CkGui.AttachToolTip("Switch to Groups View");
 
         ImGui.SameLine(0, 0);
-        if (CkGui.IconButton(FAI.Cog, inPopup: !_configExpanded))
-            _configExpanded = !_configExpanded;
+        if (CkGui.IconButton(FAI.Cog, inPopup: !_cache.FilterConfigOpen))
+            _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
         CkGui.AttachToolTip("Configure preferences for default folders.");
     }
     #endregion Search
@@ -164,7 +158,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     {
         var cursorPos = ImGui.GetCursorPos();
         var size = new Vector2(CkGui.GetWindowContentRegionWidth() - cursorPos.X, ImUtf8.FrameHeight);
-        var editing = _renaming == leaf;
+        var editing = _cache.RenamingNode == leaf;
         var bgCol = (!editing && selected) ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
         using (var _ = CkRaii.Child(Label + leaf.Name, size, bgCol, 5f))
             DrawLeafInner(leaf, _.InnerRegion, flags, editing);
@@ -238,13 +232,13 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private void DrawNameEditor(IDynamicLeaf<Sundesmo> leaf, float width)
     {
         ImGui.SetNextItemWidth(width);
-        if (ImGui.InputTextWithHint($"##{leaf.FullPath}-nick", "Give a nickname..", ref _nameEditStr, 45, ImGuiInputTextFlags.EnterReturnsTrue))
+        if (ImGui.InputTextWithHint($"##{leaf.FullPath}-nick", "Give a nickname..", ref _cache.NameEditStr, 45, ImGuiInputTextFlags.EnterReturnsTrue))
         {
-            _nicks.SetNickname(leaf.Data.UserData.UID, _nameEditStr);
-            _renaming = null;
+            _nicks.SetNickname(leaf.Data.UserData.UID, _cache.NameEditStr);
+            _cache.RenamingNode = null;
         }
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            _renaming = null;
+            _cache.RenamingNode = null;
         // Helper tooltip.
         CkGui.AttachToolTip("--COL--[ENTER]--COL-- To save" +
             "--NL----COL--[R-CLICK]--COL-- Cancel edits.", ImGuiColors.DalamudOrange);
@@ -288,11 +282,11 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         // Assume we use mono font initially.
         var useMono = true;
         // Get if we are set to show the UID over the name.
-        var showUidOverName = _showingUID.Contains(s);
+        var showUidOverName = _cache.ShowingUID.Contains(s);
         // obtain the DisplayName (Player || Nick > Alias/UID).
         var dispName = string.Empty;
         // If we should be showing the uid, then set the display name to it.
-        if (_showingUID.Contains(s))
+        if (_cache.ShowingUID.Contains(s))
         {
             // Mono Font is enabled.
             dispName = s.Data.UserData.AliasOrUID;
@@ -326,8 +320,8 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             // Additional, SundesmoLeaf-Specific interaction handles.
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
-                if (!_showingUID.Remove(node))
-                    _showingUID.Add(node);
+                if (!_cache.ShowingUID.Remove(node))
+                    _cache.ShowingUID.Add(node);
             }
             else if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
             {
@@ -335,8 +329,8 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             }
             else if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
-                _renaming = node;
-                _nameEditStr = node.Data.GetNickname() ?? string.Empty;
+                _cache.RenamingNode = node;
+                _cache.NameEditStr = node.Data.GetNickname() ?? string.Empty;
             }
             else if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
@@ -359,13 +353,13 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     #region Utility
     private void DrawFilterConfig(float width)
     {
-        var bgCol = _configExpanded ? ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f) : 0;
+        var bgCol = _cache.FilterConfigOpen ? ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f) : 0;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
         using var s = ImRaii.PushStyle(ImGuiStyleVar.CellPadding, ImGui.GetStyle().CellPadding with { Y = 0 });
         using var child = CkRaii.ChildPaddedW("BasicExpandedChild", width, CkStyle.ThreeRowHeight(), bgCol, 5f);
+        
         using var _ = ImRaii.Table("BasicExpandedTable", 2, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.BordersInnerV);
-        if (!_)
-            return;
+        if (!_) return;
 
         ImGui.TableSetupColumn("Displays");
         ImGui.TableSetupColumn("Preferences");

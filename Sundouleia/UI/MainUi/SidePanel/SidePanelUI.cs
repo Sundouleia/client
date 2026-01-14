@@ -89,7 +89,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         switch (_service.DisplayCache)
         {
             case GroupOrganizerCache goc:
-                DrawGroupOrganizer(goc);
+                DrawGroupsPanel(goc);
                 return;
             case InteractionsCache ic:
                 DrawInteractionsPanel(ic);
@@ -100,11 +100,13 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         }
     }
 
-    private void DrawGroupOrganizer(GroupOrganizerCache cache)
+    private void DrawGroupsPanel(GroupOrganizerCache cache)
     {
         // Should be relatively simple to display this outside of some headers and stylizations.
         using var _ = CkRaii.Child("GroupOrganizer", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
+        
+        
         CkGui.FontTextCentered("Group Organizer", UiFontService.Default150Percent);
 
         _folderDrawer.DrawButtonHeader(width);
