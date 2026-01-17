@@ -119,9 +119,6 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
             anyCreated |= TryAddFolder(parent, group);
         }
 
-        // Dont forget to add the 'AllSundesmos' folder at the end, the WhitelistFolder.
-        anyCreated |= TryAddAllFolder();
-
         // Return true if any folders were created.
         return anyCreated;
     }
@@ -132,23 +129,36 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
     private bool FolderExists(string folderName)
         => FolderMap.ContainsKey(folderName);
 
-    // Public method that can be accessed for direct folder creation.
-    public bool TryAddGroup(SundesmoGroup newGroup)
-        => TryAddFolder(root, newGroup);
+    // Called upon by the GroupCreator. This Group is not yet validated in the group manager.
+    // Even if it is or isnt, we should try if we are attempting to add it.
+    public bool AddNewGroup(SundesmoGroup newGroup)
+    {
+        if (_groups.Groups.ContainsKey(newGroup.Label))
+            return false;
+        // Add the group in.
+        _groups.TryAddNewGroup(newGroup);
+        return TryAddFolder(root, newGroup);
+    }
 
-    public bool TryAddFolderGroup(string name)
-        => AddFolderGroup(name);
+    // Called upon by the GroupCreator. This Group is not yet validated in the group manager.
+    // Even if it is or isnt, we should try if we are attempting to add it.
+    public bool AddNewGroup(SundesmoGroup newGroup, DynamicFolderGroup<Sundesmo> parent)
+    {
+        if (_groups.Groups.ContainsKey(newGroup.Label))
+            return false;
+        // Add the group in.
+        _groups.TryAddNewGroup(newGroup);
+        return TryAddFolder(parent, newGroup);
+    }
+
+    public bool AddNewFolderGroup(string folderName, DynamicFolderGroup<Sundesmo>? parent = null)
+        => AddFolderGroup(folderName, parent ?? root);
 
     /// <summary>
     ///     Attempts to add a folder to the DrawSystem.
     /// </summary>
     private bool TryAddFolder(DynamicFolderGroup<Sundesmo> parent, SundesmoGroup group)
         => AddFolder(new GroupFolder(parent, idCounter + 1u, _sundesmos, group, FromGroup(group)));
-
-    // Special 'All Sundesmos' folder addition for the groups system.
-    private bool TryAddAllFolder()
-        => AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll,
-            uint.MaxValue, () => _sundesmos.DirectPairs, SorterExtensions.AllFolderSorter));
 
     /// <summary>
     ///     Parses out a DynamicSorter Constructor from a FolderGroup's SortOrder.

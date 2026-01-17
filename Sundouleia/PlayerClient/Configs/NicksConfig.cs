@@ -96,10 +96,16 @@ public class NicksConfig : IHybridSavable
     public void SetNickname(string uid, string nickname)
     {
         if (string.IsNullOrEmpty(uid))
-            return;
-
-        Current.Nicknames[uid] = nickname;
-        Save();
+        {
+            // Remove the nickname.
+            Current.Nicknames.Remove(uid);
+        }
+        else
+        {
+            // Set it and save.
+            Current.Nicknames[uid] = nickname;
+            Save();
+        }
     }
     #endregion Helpers
 }

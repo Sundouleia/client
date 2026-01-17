@@ -110,7 +110,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     {
         var pos = ImGui.GetCursorPos();
         if (ImGui.InvisibleButton($"folder_{folder.ID}", region))
-            HandleClick(folder, flags);
+            HandleLeftClick(folder, flags);
         HandleDetections(folder, flags);
 
         // Back to the start, then draw.
@@ -179,7 +179,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
 
             var pos = ImGui.GetCursorPos();
             if (ImGui.InvisibleButton($"node_{leaf.FullPath}", selectable.InnerRegion))
-                HandleClick(leaf, flags);
+                HandleLeftClick(leaf, flags);
             HandleDetections(leaf, flags);
             CkGui.AttachToolTip(TooltipText, ImGuiColors.DalamudOrange);
 
@@ -201,7 +201,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     }
 
     // We only ever do this for the unpaired leaves so it's ok to handle that logic here.
-    protected override void HandleClick(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
+    protected override void HandleLeftClick(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
     {
         // Send quick-request if shift is held.
         if (ImGui.GetIO().KeyShift && _inDrafter != node)

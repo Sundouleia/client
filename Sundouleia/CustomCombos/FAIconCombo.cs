@@ -23,7 +23,7 @@ public sealed class FAIconCombo : CkFilterComboGalleryCache<FAI>
     protected override bool DrawSelectable(int globalIdx, bool selected)
     {
         var icon = Items[globalIdx];
-        return CkGui.IconButton(icon, disabled: selected, inPopup: true);
+        return CkGui.IconButtonFramed(icon, disabled: selected, inPopup: true);
     }
 
     /// <summary> Simple draw invoke. </summary>

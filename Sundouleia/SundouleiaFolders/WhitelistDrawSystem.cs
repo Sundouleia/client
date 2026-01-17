@@ -15,6 +15,8 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
     private readonly SundesmoManager _sundesmos;
     private readonly HybridSaveService _hybridSaver;
 
+    private readonly object _folderUpdateLock = new();
+
     public SundouleiaMediator Mediator { get; init; }
 
     public WhitelistDrawSystem(ILogger<WhitelistDrawSystem> logger, SundouleiaMediator mediator,
@@ -29,8 +31,20 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         // Load the hierarchy and initialize the folders.
         LoadData();
 
-        Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => UpdateFolders());
-        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ => UpdateFolder(Constants.FolderTagVisible));
+        Mediator.Subscribe<FolderUpdateSundesmos>(this, _ =>
+        {
+            lock (_folderUpdateLock)
+            {
+                UpdateFolders();
+            }
+        });
+        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ =>
+        {
+            lock (_folderUpdateLock)
+            {
+                UpdateFolder(Constants.FolderTagVisible);
+            }
+        });
 
         // Subscribe to the changes (which is to change very, very soon, with overrides.
         DDSChanged += OnChange;

@@ -31,14 +31,14 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly AccountConfig _accounts;
     private readonly MainHub _hub;
     private readonly MainMenuTabs _tabMenu;
-    private readonly RequestsManager _requests;
-    private readonly SundesmoManager _sundesmos;
-    private readonly TutorialService _guides;
     private readonly HomeTab _homeTab;
-    private readonly WhitelistTab _whitelist;
+    private readonly WhitelistTabs _whitelist;
     private readonly RadarTab _radar;
     private readonly RadarChatTab _radarChat;
     private readonly RequestsTab _requestsTab;
+    private readonly RequestsManager _requests;
+    private readonly SundesmoManager _sundesmos;
+    private readonly TutorialService _guides;
     private readonly SidePanelService _stickyService;
 
     // Some temp values used for sending requests.
@@ -47,24 +47,24 @@ public class MainUI : WindowMediatorSubscriberBase
     public string _requestMessage   = string.Empty;
 
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
-        AccountConfig accounts, MainHub hub, MainMenuTabs tabMenu, RequestsManager requests,
-        SundesmoManager sundesmos, TutorialService guides, HomeTab homeTab, WhitelistTab whitelist,
-        RadarTab radar, RadarChatTab chat, RequestsTab requestsTab, SidePanelService stickyService)
+        AccountConfig accounts, MainHub hub, MainMenuTabs tabMenu, HomeTab homeTab,
+        RequestsTab requestsTab, WhitelistTabs whitelist, RadarTab radar, RadarChatTab chat, 
+        RequestsManager requests, SundesmoManager sundesmos, TutorialService guides, 
+        SidePanelService stickyService)
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
         _accounts = accounts;
         _hub = hub;
         _tabMenu = tabMenu;
-        _requests = requests;
-        _sundesmos = sundesmos;
-        _guides = guides;
-
         _homeTab = homeTab;
         _whitelist = whitelist;
         _radar = radar;
         _radarChat = chat;
         _requestsTab = requestsTab;
+        _requests = requests;
+        _sundesmos = sundesmos;
+        _guides = guides;
         _stickyService = stickyService;
 
         // display info about the folders
@@ -191,8 +191,11 @@ public class MainUI : WindowMediatorSubscriberBase
             case MainMenuTabs.SelectedTab.Requests:
                 _requestsTab.DrawSection();
                 break;
-            case MainMenuTabs.SelectedTab.Whitelist:
-                _whitelist.DrawSection();
+            case MainMenuTabs.SelectedTab.BasicWhitelist:
+                _whitelist.DrawBasicView();
+                break;
+            case MainMenuTabs.SelectedTab.GroupWhitelist:
+                _whitelist.DrawGroupsView();
                 break;
             case MainMenuTabs.SelectedTab.Radar:
                 _radar.DrawSection();

@@ -16,9 +16,11 @@ namespace Sundouleia.Gui.MainWindow;
 public enum SidePanelMode
 {
     None,
-    Interactions,
-    GroupEditor,
     IncomingRequests,
+    Interactions,
+    GroupCreator,
+    FolderCreator,
+    GroupEditor,
 }
 
 public interface ISidePanelCache
@@ -96,21 +98,115 @@ public class InteractionsCache : ISidePanelCache
     }
 }
 
-public class GroupOrganizerCache : ISidePanelCache
+// Idk build as we go, dont try to solve it all at once.
+public class NewGroupCache : ISidePanelCache
 {
-    public SidePanelMode Mode => SidePanelMode.GroupEditor;
+    public SidePanelMode Mode => SidePanelMode.GroupCreator;
+
+    private readonly ILogger _log;
+    private readonly GroupsDrawSystem _dds;
+    public NewGroupCache(ILogger log, GroupsDrawSystem dds)
+    {
+        _log = log;
+        _dds = dds;
+    }
+
     public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
     public bool IsValid => true;
+
+    public IDynamicFolderGroup<Sundesmo>? ParentNode = null;
+    public SundesmoGroup    NewGroup    { get; } = new SundesmoGroup();
+
+    public bool IsGroupValid()
+        => !string.IsNullOrWhiteSpace(NewGroup.Label) 
+        && NewGroup.Icon is not FAI.None;
+
+    public bool TryAddCreatedGroup()
+    {
+        if (!IsGroupValid())
+        {
+            _log.LogWarning("Tried to add invalid group, aborting.");
+            return false;
+        }
+
+        return ParentNode is null
+            ? _dds.AddNewGroup(NewGroup)
+            : _dds.AddNewGroup(NewGroup, (DynamicFolderGroup<Sundesmo>)ParentNode);
+    }
+}
+
+public class NewFolderGroupCache : ISidePanelCache
+{
+    public SidePanelMode Mode => SidePanelMode.FolderCreator;
+
+    private readonly GroupsDrawSystem _dds;
+    public NewFolderGroupCache(GroupsDrawSystem dds)
+        => _dds = dds;
+
+    public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
+    public bool IsValid => true;
+
+    public IDynamicFolderGroup<Sundesmo>? ParentNode = null;
+    public string NewFolderName = string.Empty;
+    public bool TryAddCreatedFolderGroup()
+    {
+        if (string.IsNullOrWhiteSpace(NewFolderName))
+            return false;
+
+        return ParentNode is null
+            ? _dds.AddNewFolderGroup(NewFolderName)
+            : _dds.AddNewFolderGroup(NewFolderName, (DynamicFolderGroup<Sundesmo>)ParentNode);
+    }
+}
+
+public class GroupEditorCache : ISidePanelCache, IDisposable
+{
+    public SidePanelMode Mode => SidePanelMode.GroupEditor;
+    
+    private readonly GroupsDrawer _drawerRef;
+    
+    private WhitelistCache _cache;
+    public GroupEditorCache(GroupsDrawer drawerRef, WhitelistCache cache)
+    {
+        _drawerRef = drawerRef;
+        _cache = cache;
+
+        GroupInEditor = new SundesmoGroup()
+        {
+            Icon = cache.GroupInEditor!.Group.Icon,
+            Label = cache.GroupInEditor.Group.Label,
+            IconColor = cache.GroupInEditor.Group.IconColor,
+            LabelColor = cache.GroupInEditor.Group.LabelColor,
+            BorderColor = cache.GroupInEditor.Group.BorderColor,
+            GradientColor = cache.GroupInEditor.Group.GradientColor,
+            ShowOffline = cache.GroupInEditor.Group.ShowOffline,
+            LinkedUids = cache.GroupInEditor.Group.LinkedUids,
+            SortOrder = cache.GroupInEditor.Group.SortOrder,
+            AreaBound = cache.GroupInEditor.Group.AreaBound,
+            Scope = cache.GroupInEditor.Group.Scope,
+            Location = cache.GroupInEditor.Group.Location?.Clone() ?? null!,
+        };
+    }
+
+    public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
+    public bool IsValid => true;
+
+    // Any changes made to the group are done in a copy, not the original. When saved, they are carried over.
+    public SundesmoGroup GroupInEditor;
+
+    // Make this disposable so that we can nullify our editor group on display cache clear.
+    public void Dispose()
+    {
+        _cache.GroupInEditor = null;
+    }
 }
 
 public class ResponseCache : ISidePanelCache
 {
     public SidePanelMode Mode => SidePanelMode.IncomingRequests;
-    private RequestCache? _cache;
     private DynamicSelections<RequestEntry>? _selections;
-    public ResponseCache(RequestCache cache, DynamicSelections<RequestEntry> selections)
+    public ResponseCache(DynamicSelections<RequestEntry> selections)
     {
-        _cache = cache;
         _selections = selections;
     }
 
@@ -143,21 +239,46 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
                     ClearDisplay();
                 return;
 
-            case SidePanelMode.GroupEditor:
             case SidePanelMode.Interactions:
-                if (newTab is not MainMenuTabs.SelectedTab.Whitelist)
+                if (newTab is not MainMenuTabs.SelectedTab.BasicWhitelist)
                     ClearDisplay();
                 return;
+            case SidePanelMode.GroupCreator:
+            case SidePanelMode.FolderCreator:
+            case SidePanelMode.GroupEditor: // This one can be a bit iffy because 
+                if (newTab is not MainMenuTabs.SelectedTab.GroupWhitelist)
+                    ClearDisplay();
+                return;
+
         }
     }
 
-    public ISidePanelCache? DisplayCache { get; private set; }
+    public ISidePanelCache? DisplayCache
+    {
+        get;
+        private set
+        {
+            if (ReferenceEquals(field, value))
+                return;
+
+            if (field is IDisposable disposable)
+                disposable.Dispose();
+
+            field = value;
+        }
+    }
 
     public SidePanelMode DisplayMode => DisplayCache?.Mode ?? SidePanelMode.None;
     public bool CanDraw => DisplayCache?.IsValid ?? false;
     public float DisplayWidth => DisplayCache?.DisplayWidth ?? 250f;
     public void ClearDisplay()
-        => DisplayCache = null;
+    {
+        // Before setting the display cache to null check if it is disposable, and if so, dispose it.
+        if (DisplayCache is IDisposable disp)
+            disp.Dispose();
+        // Clear it.
+        DisplayCache = null;
+    }
 
     // Opens, or toggles, or swaps current data for interactions.
     public void ForInteractions(Sundesmo sundesmo, bool forceOpen = false)
@@ -187,14 +308,29 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
         }
     }
 
-    public void ForOrganizer()
+    public void ForNewGroup(GroupsDrawSystem dds)
     {
-        // If the mode is already group editor, toggle off.
-        if (DisplayMode is SidePanelMode.GroupEditor)
+        if (DisplayMode is SidePanelMode.GroupCreator)
             ClearDisplay();
-        // Otherwise set to group editor.
         else
-            DisplayCache = new GroupOrganizerCache();
+            DisplayCache = new NewGroupCache(Logger, dds);
+    }
+
+    public void ForNewFolderGroup(GroupsDrawSystem dds)
+    {
+        if (DisplayMode is SidePanelMode.FolderCreator)
+            ClearDisplay();
+        else
+            DisplayCache = new NewFolderGroupCache(dds);
+    }
+
+    public void ForGroupEditor(WhitelistCache cache, GroupsDrawer drawer)
+    {
+        // If there is no folder placed in the editor, ignore it.
+        if (cache.GroupInEditor is not GroupFolder)
+            return;
+        // Obviously pass in the group we are editing and stuff.
+        DisplayCache = new GroupEditorCache(drawer, cache);
     }
 
     /// <summary>
@@ -206,6 +342,6 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
             return;
 
         // Update the display cache.
-        DisplayCache = new ResponseCache(cache, selections);
+        DisplayCache = new ResponseCache(selections);
     }
 }

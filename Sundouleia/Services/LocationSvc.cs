@@ -47,8 +47,8 @@ public class LocationEntry
     // Housing (This would be indoors if the scope was indoors)
     public HousingTerritoryType HousingType = HousingTerritoryType.None;
     public ResidentialArea HousingArea = ResidentialArea.None;
-    public sbyte Ward = -1; // Always -1 the actual plot value. (0 == ward 1)
-    public sbyte Plot = -1; // Always -1 the actual plot value. (0 == plot 1)
+    public sbyte Ward = 0; // Always -1 the actual plot value. (0 == ward 1)
+    public sbyte Plot = 0; // Always -1 the actual plot value. (0 == plot 1)
     // public short RoomNumber = -1;
     public byte ApartmentDivision = 0;
 

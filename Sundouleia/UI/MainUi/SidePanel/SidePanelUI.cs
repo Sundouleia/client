@@ -7,9 +7,11 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
+using System;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -18,26 +20,28 @@ namespace Sundouleia.Gui.MainWindow;
 // It would allow us to process the logic in the draw-loop like we want.
 public class SidePanelUI : WindowMediatorSubscriberBase
 {
-    private readonly InteractionTabs _sundesmoTabs;
-    private readonly GroupEditorTabs _groupTabs;
-    private readonly GroupOrganizer _folderDrawer; // Modify?
+    private readonly SundesmoTabs _sundesmoTabs;
     private readonly RequestsInDrawer _requestsDrawer;
-    private readonly SidePanelInteractions _interactions;
+    private readonly GroupsDrawer _groupsDrawer;
+    private readonly SidePanelInteractions _spInteractions;
+    private readonly SidePanelGroups _spGroups;
     private readonly SidePanelService _service;
 
+    // Likely phase this out when we find a better alternative or something, idk.
+    // Or instead revise it to be something better if searchable.
     private RequestsGroupSelector GroupSelector;
 
     public SidePanelUI(ILogger<SidePanelUI> logger, SundouleiaMediator mediator,
-        InteractionTabs actionTabs, GroupEditorTabs groupTabs, GroupOrganizer drawer, 
-        RequestsInDrawer requestsDrawer, SidePanelInteractions interactions,
-        SidePanelService service, GroupsDrawSystem groupsDDS)
+        SundesmoTabs sundesmoTabs, RequestsInDrawer requestsDrawer,
+        GroupsDrawer groupsDrawer, SidePanelInteractions interactions, 
+        SidePanelGroups groups, SidePanelService service, GroupsDrawSystem groupsDDS)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
-        _sundesmoTabs = actionTabs;
-        _groupTabs = groupTabs;
-        _folderDrawer = drawer;
-        _requestsDrawer = requestsDrawer;
-        _interactions = interactions;
+        _sundesmoTabs = sundesmoTabs;
+         _requestsDrawer = requestsDrawer;
+        _groupsDrawer = groupsDrawer;
+        _spInteractions = interactions;
+        _spGroups = groups;
         _service = service;
 
         GroupSelector = new(logger, groupsDDS);
@@ -88,49 +92,22 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         // Display the correct mode.
         switch (_service.DisplayCache)
         {
-            case GroupOrganizerCache goc:
-                DrawGroupsPanel(goc);
+            case ResponseCache irc:
+                DrawIncomingRequests(irc);
                 return;
             case InteractionsCache ic:
                 DrawInteractionsPanel(ic);
                 return;
-            case ResponseCache irc:
-                DrawIncomingRequests(irc);
+            case NewGroupCache ngc:
+                DrawNewGroupPanel(ngc);
+                return;
+            case NewFolderGroupCache nfgc:
+                DrawNewFolderGroupPanel(nfgc);
+                return;
+            case GroupEditorCache gec:
+                DrawGroupEditorPanel(gec);
                 return;
         }
-    }
-
-    private void DrawGroupsPanel(GroupOrganizerCache cache)
-    {
-        // Should be relatively simple to display this outside of some headers and stylizations.
-        using var _ = CkRaii.Child("GroupOrganizer", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-        var width = _.InnerRegion.X;
-        
-        
-        CkGui.FontTextCentered("Group Organizer", UiFontService.Default150Percent);
-
-        _folderDrawer.DrawButtonHeader(width);
-        ImGui.Separator();
-        _folderDrawer.DrawContents<GroupFolder>(width, DynamicFlags.SelectableDragDrop);
-    }
-
-    private void DrawInteractionsPanel(InteractionsCache ic)
-    {
-        using var _ = CkRaii.Child("SundesmoInteractions", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
-        var width = _.InnerRegion.X;
-        var dispName = ic.DisplayName;
-
-        if (ic.Sundesmo is not { } sundesmo)
-            return;
-
-        // Draw tabs
-        _sundesmoTabs.Draw(width);
-
-        // Draw content based on tab.
-        if (_sundesmoTabs.TabSelection is InteractionTabs.SelectedTab.Interactions)
-            _interactions.DrawInteractions(ic, sundesmo, dispName, width);
-        else
-            _interactions.DrawPermissions(ic, sundesmo, dispName, width);
     }
 
     // TODO: Update this so that it reflects the incoming requests folder format,
@@ -186,4 +163,82 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         CkGui.AttachToolTip("Reject all selected requests.");
     }
 
+    private void DrawInteractionsPanel(InteractionsCache ic)
+    {
+        using var _ = CkRaii.Child("SundesmoInteractions", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+        var dispName = ic.DisplayName;
+
+        if (ic.Sundesmo is not { } sundesmo)
+            return;
+
+        // Draw tabs
+        _sundesmoTabs.Draw(width);
+
+        // Draw content based on tab.
+        if (_sundesmoTabs.TabSelection is SundesmoTabs.SelectedTab.Interactions)
+            _spInteractions.DrawInteractions(ic, sundesmo, dispName, width);
+        else
+            _spInteractions.DrawPermissions(ic, sundesmo, dispName, width);
+    }
+
+    private void DrawNewGroupPanel(NewGroupCache  ngc)
+    {
+        using var _ = CkRaii.Child("GroupCreator", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+
+        CkGui.FontTextCentered($"Create New Group", UiFontService.Default150Percent);
+        _spGroups.DrawCreator(ngc, width);
+        ImGui.Separator();
+        // Draw the center button for creating.
+        CkGui.SetCursorXtoCenter(width * .5f);
+        if (CkGui.IconTextButtonCentered(FAI.FolderPlus, "Add New Group", width * .5f, disabled: !ngc.IsGroupValid()))
+        {
+            _logger.LogDebug($"Adding New Group [{ngc.NewGroup.Label}]");
+            if (ngc.TryAddCreatedGroup())
+            {
+                _logger.LogInformation($"Added New Group [{ngc.NewGroup.Label}]");
+                _service.ClearDisplay();
+            }
+        }
+    }
+
+    private void DrawNewFolderGroupPanel(NewFolderGroupCache nfgc)
+    {
+        using var _ = CkRaii.Child("FolderGroupCreator", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+
+        CkGui.FontTextCentered($"Create New Folder", UiFontService.Default150Percent);
+        _spGroups.DrawFolderCreator(nfgc, width);
+        ImGui.Separator();
+        // Draw the center button for creating.
+        CkGui.SetCursorXtoCenter(width * .5f);
+        if (CkGui.IconTextButtonCentered(FAI.FolderPlus, "Add New Folder", width * .5f))
+        {
+            _logger.LogDebug($"Adding New Folder [{nfgc.NewFolderName}]");
+            if (nfgc.TryAddCreatedFolderGroup())
+                _logger.LogInformation($"Added New Folder [{nfgc.NewFolderName}]");
+        }
+        CkGui.SetCursorXtoCenter(width * .5f);
+        if (CkGui.IconTextButtonCentered(FAI.Times, "Close Creator", width * .5f))
+            _service.ClearDisplay();
+    }
+
+    private void DrawGroupEditorPanel(GroupEditorCache gec)
+    {
+        using var _ = CkRaii.Child("GroupEditor", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
+        var width = _.InnerRegion.X;
+
+        if (gec.GroupInEditor is not SundesmoGroup)
+        {
+            CkGui.FontTextCentered("Error - No Editor Group", UiFontService.Default150Percent, ImGuiColors.DalamudRed);
+            return;
+        }
+
+        // Include the group name in the title.
+        CkGui.FontTextCentered($"Editing {gec.GroupInEditor.Label}", UiFontService.Default150Percent);
+        _spGroups.DrawFolderPreview(gec.GroupInEditor);
+        ImGui.Separator();
+        _spGroups.DrawGroupEditor(gec, width);
+    }
 }

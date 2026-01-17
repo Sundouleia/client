@@ -23,9 +23,8 @@ public class ConfigStorage
     [JsonIgnore] public string SMACacheFolder => Path.Combine(CacheFolder, Constants.SMAFolderName);
 
     // Tab Selection Memory
-    public MainMenuTabs.SelectedTab CurMainUiTab { get; set; } = MainMenuTabs.SelectedTab.Whitelist;
-    public InteractionTabs.SelectedTab CurInteractionsTab { get; set; } = InteractionTabs.SelectedTab.Interactions;
-    public GroupEditorTabs.SelectedTab CurGroupEditTab { get; set; } = GroupEditorTabs.SelectedTab.Arranger;
+    public MainMenuTabs.SelectedTab CurMainUiTab { get; set; } = MainMenuTabs.SelectedTab.BasicWhitelist;
+    public SundesmoTabs.SelectedTab CurInteractionsTab { get; set; } = SundesmoTabs.SelectedTab.Interactions;
     // General
     public bool OpenUiOnStartup { get; set; } = true;
     public bool ShowContextMenus { get; set; } = true;

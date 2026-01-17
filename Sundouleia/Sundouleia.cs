@@ -129,8 +129,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaLoc>()
 
         // Draw Systems
-        .AddSingleton<GroupOrganizer>()
-        .AddSingleton<WhitelistGroupsDrawer>()
+        .AddSingleton<GroupsDrawer>()
         .AddSingleton<RadarDrawer>()
         .AddSingleton<RequestsInDrawer>()
         .AddSingleton<RequestsOutDrawer>()
@@ -201,8 +200,8 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<RadarChatLog>()
         .AddSingleton<PopoutRadarChatlog>()
         .AddSingleton<MainMenuTabs>()
-        .AddSingleton<InteractionTabs>()
-        .AddSingleton<GroupEditorTabs>()
+        .AddSingleton<WhitelistTabs>()
+        .AddSingleton<SundesmoTabs>()
 
         // WebAPI (Server stuff)
         .AddSingleton<MainHub>()
@@ -268,10 +267,11 @@ public static class SundouleiaServiceExtensions
         .AddScoped<WindowMediatorSubscriberBase, SidePanelUI>()
         .AddScoped<HomeTab>()
         .AddScoped<RequestsTab>()
-        .AddScoped<WhitelistTab>()
+        .AddScoped<WhitelistTabs>()
         .AddScoped<RadarTab>()
         .AddScoped<RadarChatTab>()
         .AddScoped<SidePanelInteractions>()
+        .AddScoped<SidePanelGroups>()
 
         // Scoped Modules
         .AddScoped<WindowMediatorSubscriberBase, ActorOptimizerUI>()

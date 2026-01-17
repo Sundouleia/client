@@ -26,7 +26,7 @@ public class FolderStorage
     public bool TargetWithFocus { get; set; } = false;
 
     // Groups config options can be added here.
-    public bool StyleEditing { get; set; } = false;
+    public bool StyleEditing   { get; set; } = false;
     public bool FilterEditing { get; set; } = false;
     public bool LocationEditing { get; set; } = false;
 }
@@ -38,7 +38,7 @@ public class SundesmoGroup
     public uint IconColor { get; set; } = 0xFFFFFFFF;
     public uint LabelColor { get; set; } = 0xFFFFFFFF;
     public uint BorderColor { get; set; } = ImGui.GetColorU32(ImGuiCol.TextDisabled);
-    public uint GradientColor { get; set; } = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.TextDisabled), .9f);
+    public uint GradientColor { get; set; } = ImGui.GetColorU32(ImGuiCol.TextDisabled);
     public bool ShowOffline { get; set; } = true;
 
     // The UserUID's contained in this group.

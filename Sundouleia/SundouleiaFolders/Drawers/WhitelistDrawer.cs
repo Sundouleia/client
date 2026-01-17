@@ -22,26 +22,21 @@ namespace Sundouleia.DrawSystem;
 public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
 {
     // Static tooltips for leaves.
-    private static readonly string DragDropTooltip =
-        "--COL--[L-CLICK & DRAG]--COL-- Drag-Drop this User to another Folder." +
-        "--NL----COL--[CTRL + L-CLICK]--COL-- Single-Select this item for multi-select Drag-Drop" +
-        "--NL----COL--[SHIFT + L-CLICK]--COL-- Select/Deselect all from last selected";
-    private static readonly string NormalTooltip =
+    private static readonly string Tooltip =
         "--COL--[L-CLICK]--COL-- Swap Between Name/Nick/Alias & UID." +
         "--NL----COL--[M-CLICK]--COL-- Open Profile" +
-        "--NL----COL--[R-CLICK]--COL-- Edit Groups" +
-        "--NL----COL--[SHIFT + R-CLICK]--COL-- Edit Nickname";
+        "--NL----COL--[R-CLICK]--COL-- Open Context Menu";
 
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
-    private readonly FolderConfig _folderConfig;
-    private readonly FavoritesConfig _favoritesConfig;
+    private readonly FolderConfig _folders;
+    private readonly FavoritesConfig _favorites;
     private readonly NicksConfig _nicks;
     private readonly SundesmoManager _sundesmos;
     private readonly SidePanelService _sidePanel;
     private readonly WhitelistDrawSystem _drawSystem;
 
-    private SundesmoCache _cache => (SundesmoCache)FilterCache;
+    private WhitelistCache _cache => (WhitelistCache)FilterCache;
 
     // Popout Tracking.
     private IDynamicNode? _hoveredTextNode;     // From last frame.
@@ -52,12 +47,12 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     public WhitelistDrawer(SundouleiaMediator mediator,MainConfig config, FolderConfig folders, 
         FavoritesConfig favorites, NicksConfig nicks, SundesmoManager sundesmos,
         SidePanelService sidePanel, WhitelistDrawSystem ds)
-        : base("##WhitelistDrawer", Svc.Logger.Logger, ds, new SundesmoCache(ds))
+        : base("##WhitelistDrawer", Svc.Logger.Logger, ds, new WhitelistCache(ds))
     {
         _mediator = mediator;
         _config = config;
-        _folderConfig = folders;
-        _favoritesConfig = favorites;
+        _folders = folders;
+        _favorites = favorites;
         _nicks = nicks;
         _sundesmos = sundesmos;
         _sidePanel = sidePanel;
@@ -68,14 +63,20 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     protected override void DrawSearchBar(float width, int length)
     {
         var tmp = FilterCache.Filter;
-        var buttonsWidth = CkGui.IconButtonSize(FAI.Cog).X + CkGui.IconTextButtonSize(FAI.Globe, "Basic");
         // Update the search bar if things change, like normal.
-        if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
+        if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, CkGui.IconTextButtonSize(FAI.Cog, "Settings"), DrawButtons))
             FilterCache.Filter = tmp;
 
         // If the config is expanded, draw that.
         if (_cache.FilterConfigOpen)
             DrawFilterConfig(width);
+
+        void DrawButtons()
+        {
+            if (CkGui.IconTextButton(FAI.Cog, "Settings", isInPopup: !_cache.FilterConfigOpen))
+                _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
+            CkGui.AttachToolTip("Configure preferences for default folders.");
+        }
     }
 
     // Draws the grey line around the filtered content when expanded and stuff.
@@ -83,22 +84,6 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     {
         if (_cache.FilterConfigOpen)
             ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
-    }
-
-    private void DrawButtons()
-    {
-        if (CkGui.IconTextButton(FAI.Globe, "Basic", null, true, _cache.FilterConfigOpen))
-        {
-            _cache.FilterConfigOpen = false;
-            _folderConfig.Current.ViewingGroups = true;
-            _folderConfig.Save();
-        }
-        CkGui.AttachToolTip("Switch to Groups View");
-
-        ImGui.SameLine(0, 0);
-        if (CkGui.IconButton(FAI.Cog, inPopup: !_cache.FilterConfigOpen))
-            _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
-        CkGui.AttachToolTip("Configure preferences for default folders.");
     }
     #endregion Search
 
@@ -112,10 +97,18 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
                 _lastHoverTime = _newHoveredTextNode is null ? null : DateTime.UtcNow.AddSeconds(_config.Current.ProfileDelay);
             else
             {
+                Log.Information($"Current TextNode was {_hoveredTextNode?.Name ?? "UNK"}, new is {_newHoveredTextNode?.Name ?? "UNK"}");
                 _lastHoverTime = null;
                 _profileShown = false;
                 _mediator.Publish(new CloseProfilePopout());
             }
+        }
+
+        if (_hoveredNode != _newHoveredNode)
+        {
+            // Ignore the update if it was in a popup.
+            if (_newHoveredNode is null && _popupNodes.Contains(_hoveredNode))
+                _newHoveredNode = _hoveredNode;
         }
 
         // Update the hovered text node stuff.
@@ -137,7 +130,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     {
         var pos = ImGui.GetCursorPos();
         if (ImGui.InvisibleButton($"{Label}_node_{folder.ID}", region))
-            HandleClick(folder, flags);
+            HandleLeftClick(folder, flags);
         HandleDetections(folder, flags);
 
         // Back to the start, then draw.
@@ -161,7 +154,10 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         var editing = _cache.RenamingNode == leaf;
         var bgCol = (!editing && selected) ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
         using (var _ = CkRaii.Child(Label + leaf.Name, size, bgCol, 5f))
+        {
             DrawLeafInner(leaf, _.InnerRegion, flags, editing);
+            HandleContext(leaf);
+        }
 
         // Draw out the supporter icon after if needed.
         if (leaf.Data.UserData.Tier is not CkVanityTier.NoRole)
@@ -205,6 +201,15 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         CkGui.AttachToolTip(TooltipText(s));
         if (!flags.HasAny(DynamicFlags.DragDropLeaves) && s.IsRendered && ImGui.IsItemClicked())
             _mediator.Publish(new TargetSundesmoMessage(s));
+
+        string TooltipText(Sundesmo s)
+        {
+            var str = $"{s.GetNickAliasOrUid()} is ";
+            if (s.IsRendered) str += $"visible ({s.PlayerName})--SEP--Click to target this player";
+            else if (s.IsOnline) str += "online";
+            else str += "offline";
+            return str;
+        }
     }
 
     private float DrawRightButtons(IDynamicLeaf<Sundesmo> leaf, DynamicFlags flags)
@@ -225,7 +230,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         }
 
         ImGui.AlignTextToFramePadding();
-        SundouleiaEx.DrawFavoriteStar(_favoritesConfig, leaf.Data.UserData.UID, true);
+        SundouleiaEx.DrawFavoriteStar(_favorites, leaf.Data.UserData.UID, true);
         return currentRightSide;
     }
 
@@ -247,11 +252,10 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private void DrawNameDisplay(IDynamicLeaf<Sundesmo> leaf, Vector2 region, DynamicFlags flags)
     {
         // For handling Interactions.
-        var isDragDrop = flags.HasAny(DynamicFlags.DragDropLeaves);
         var pos = ImGui.GetCursorPos();
 
         if (ImGui.InvisibleButton($"{leaf.FullPath}-name-area", region))
-            HandleClick(leaf, flags);
+            HandleLeftClick(leaf, flags);
         HandleDetections(leaf, flags);
 
         // Then return to the start position and draw out the text.
@@ -259,15 +263,11 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
 
         // Push the monofont if we should show the UID, otherwise dont.
         DrawSundesmoName(leaf);
-        CkGui.AttachToolTip(isDragDrop ? DragDropTooltip : NormalTooltip, ImGuiColors.DalamudOrange);
-        if (isDragDrop)
-            return;
-
+        CkGui.AttachToolTip(Tooltip, ImGuiColors.DalamudOrange);
         // Handle hover state.
-        if (ImGui.IsItemHovered())
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.RectOnly | ImGuiHoveredFlags.NoNavOverride))
         {
             _newHoveredTextNode = leaf;
-
             // If we should show it, and it is not already shown, show it.
             if (!_profileShown && _lastHoverTime < DateTime.UtcNow && _config.Current.ShowProfiles)
             {
@@ -303,52 +303,60 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         using (ImRaii.PushFont(UiBuilder.MonoFont, useMono))
             CkGui.TextFrameAligned(dispName);
     }
+    #endregion SundesmoLeaf
 
+    #region Interaction
     protected override void HandleDetections(IDynamicLeaf<Sundesmo> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered())
             _newHoveredNode = node;
 
-        // Handle Drag and Drop.
-        if (flags.HasAny(DynamicFlags.DragDropLeaves))
+        // Additional, SundesmoLeaf-Specific interaction handles.
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
         {
-            AsDragDropSource(node);
-            AsDragDropTarget(node);
+            if (!_cache.ShowingUID.Remove(node))
+                _cache.ShowingUID.Add(node);
         }
-        else
-        {
-            // Additional, SundesmoLeaf-Specific interaction handles.
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            {
-                if (!_cache.ShowingUID.Remove(node))
-                    _cache.ShowingUID.Add(node);
-            }
-            else if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
-            {
-                _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
-            }
-            else if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            {
-                _cache.RenamingNode = node;
-                _cache.NameEditStr = node.Data.GetNickname() ?? string.Empty;
-            }
-            else if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            {
+        else if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
+            _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
 
-            }
-        }
+        // Handle Context Menus. (Maybe make a flag later. Would save on some drawtime.)
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            ImGui.OpenPopup(node.FullPath);
     }
 
-    private string TooltipText(Sundesmo s)
+    /// <summary>
+    ///     The Leaf Context Menu.
+    /// </summary>
+    protected override void DrawContextMenu(IDynamicLeaf<Sundesmo> leaf)
     {
-        var str = $"{s.GetNickAliasOrUid()} is ";
-        if (s.IsRendered) str += $"visible ({s.PlayerName})--SEP--Click to target this player";
-        else if (s.IsOnline) str += "online";
-        else str += "offline";
-        return str;
+        if (ImGui.MenuItem("Edit Nickname"))
+        {
+            _cache.RenamingNode = leaf;
+            _cache.NameEditStr = leaf.Data.GetNickname() ?? string.Empty;
+        }
+        if (ImGui.MenuItem("Open Profile"))
+        {
+            _mediator.Publish(new ProfileOpenMessage(leaf.Data.UserData));
+        }
+
+        if (_folders.Current.Groups.Count is not 0)
+        {
+            if (ImGui.BeginMenu("Add to Group.."))
+            {
+                ImGui.Text("I can be a checkbox list of groups or a multi-selectable list.");
+                ImGui.EndMenu();
+            }
+
+            if (ImGui.BeginMenu("Remove from Groups.."))
+            {
+                ImGui.Text("I can be a checkbox list of groups or a multi-selectable list.");
+                ImGui.EndMenu();
+            }
+        }
     }
 
-    #endregion SundesmoLeaf
+    #endregion Interaction
 
     #region Utility
     private void DrawFilterConfig(float width)
@@ -366,49 +374,49 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         ImGui.TableNextRow();
 
         ImGui.TableNextColumn();
-        var showVisible = _folderConfig.Current.VisibleFolder;
+        var showVisible = _folders.Current.VisibleFolder;
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.ShowVisibleSeparateLabel, ref showVisible))
         {
-            _folderConfig.Current.VisibleFolder = showVisible;
-            _folderConfig.Save();
+            _folders.Current.VisibleFolder = showVisible;
+            _folders.Save();
             Log.Information("Regenerating Basic Folders due to Visible Folder setting change.");
             // Update the folder structure to reflect this change.
             _drawSystem.UpdateVisibleFolderState(showVisible);
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.ShowVisibleSeparateTT);
 
-        var showOffline = _folderConfig.Current.OfflineFolder;
+        var showOffline = _folders.Current.OfflineFolder;
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.ShowOfflineSeparateLabel, ref showOffline))
         {
-            _folderConfig.Current.OfflineFolder = showOffline;
-            _folderConfig.Save();
+            _folders.Current.OfflineFolder = showOffline;
+            _folders.Save();
             _drawSystem.UpdateOfflineFolderState(showOffline);
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.ShowOfflineSeparateTT);
 
-        var favoritesFirst = _folderConfig.Current.FavoritesFirst;
+        var favoritesFirst = _folders.Current.FavoritesFirst;
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.FavoritesFirstLabel, ref favoritesFirst))
         {
-            _folderConfig.Current.FavoritesFirst = favoritesFirst;
-            _folderConfig.Save();
+            _folders.Current.FavoritesFirst = favoritesFirst;
+            _folders.Save();
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.FavoritesFirstTT);
 
         ImGui.TableNextColumn();
 
-        var nickOverName = _folderConfig.Current.NickOverPlayerName;
+        var nickOverName = _folders.Current.NickOverPlayerName;
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.PreferNicknamesLabel, ref nickOverName))
         {
-            _folderConfig.Current.NickOverPlayerName = nickOverName;
-            _folderConfig.Save();
+            _folders.Current.NickOverPlayerName = nickOverName;
+            _folders.Save();
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.PreferNicknamesTT);
 
-        var useFocusTarget = _folderConfig.Current.TargetWithFocus;
+        var useFocusTarget = _folders.Current.TargetWithFocus;
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.FocusTargetLabel, ref useFocusTarget))
         {
-            _folderConfig.Current.TargetWithFocus = useFocusTarget;
-            _folderConfig.Save();
+            _folders.Current.TargetWithFocus = useFocusTarget;
+            _folders.Save();
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.FocusTargetTT);
     }

@@ -5,7 +5,7 @@ using Sundouleia.Pairs;
 namespace Sundouleia.DrawSystem;
 
 // Cache for DDS's using Sundesmo items.
-public class SundesmoCache(DynamicDrawSystem<Sundesmo> parent) : DynamicFilterCache<Sundesmo>(parent)
+public class WhitelistCache(DynamicDrawSystem<Sundesmo> parent) : DynamicFilterCache<Sundesmo>(parent)
 {
     /// <summary>
     ///     If the config options under the filter bar should show.
@@ -27,10 +27,19 @@ public class SundesmoCache(DynamicDrawSystem<Sundesmo> parent) : DynamicFilterCa
     /// </summary>
     public string NameEditStr = string.Empty;
 
+    /// <summary>
+    ///     A folder or folderGroup currently being created or edited.
+    /// </summary>
+    public GroupFolder? GroupInEditor = null;
+
+
     protected override bool IsVisible(IDynamicNode<Sundesmo> node)
     {
         if (Filter.Length is 0)
             return true;
+
+        // If a folder, sort by name, but also run through a second kind of
+        // filter if show preferred folders is active or something.
 
         if (node is DynamicLeaf<Sundesmo> leaf)
             return leaf.Data.UserData.AliasOrUID.Contains(Filter, StringComparison.OrdinalIgnoreCase)

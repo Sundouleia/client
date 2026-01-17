@@ -95,7 +95,7 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
         if (!_) return;
 
         // Handle any main context interactions such as right-click menus and the like.
-        HandleMainContextActions();
+        HandleMainContext();
         // Update the cache to its latest state.
         FilterCache.UpdateCache();
 
@@ -190,7 +190,7 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
         ImGui.SameLine(posX);
         // Draw out the invisible button over the area to draw in.
         if (ImGui.InvisibleButton($"{leaf.FullPath}-hoverspace", new Vector2(rightSide - posX, region.Y)))
-            HandleClick(leaf, flags);
+            HandleLeftClick(leaf, flags);
         HandleDetections(leaf, flags);
         CkGui.AttachToolTip(ToolTip, ImGuiColors.DalamudOrange);
 

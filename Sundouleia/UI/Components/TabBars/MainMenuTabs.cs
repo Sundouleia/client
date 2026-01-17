@@ -19,7 +19,8 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
     {
         Homepage,
         Requests,
-        Whitelist,
+        BasicWhitelist,
+        GroupWhitelist,
         Radar,
         RadarChat,
     }
@@ -44,20 +45,22 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         TabSelection = _config.Current.CurMainUiTab;
 
         AddDrawButton(FontAwesomeIcon.Home, SelectedTab.Homepage, "Homepage",
-            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Homepage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.Whitelist));
+            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Homepage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.BasicWhitelist));
 
         AddDrawButton(FontAwesomeIcon.Inbox, SelectedTab.Requests, "Incoming / Outgoing Requests",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
         
-        AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.Whitelist, "User Whitelist", 
+        AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.BasicWhitelist, "Basic Whitelist", 
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Whitelist, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
+
+        AddDrawButton(FAI.PeopleGroup, SelectedTab.GroupWhitelist, "Whitelist Groups");
 
         AddDrawButton(FontAwesomeIcon.BroadcastTower, SelectedTab.Radar, "Connect easily with others!",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Radar, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.RadarChat));
 
         AddDrawButton(FontAwesomeIcon.Comments, SelectedTab.RadarChat, "Chat with others in similar areas!",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarChat, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
-
+         
         TabSelectionChanged += (oldTab, newTab) => _mediator.Publish(new MainWindowTabChangeMessage(newTab));
     }
 
