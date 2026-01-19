@@ -102,7 +102,11 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
 
         ImGui.SameLine(0, 0);
         if (CkGui.IconButton(FAI.LayerGroup, inPopup: !_cache.FilterConfigOpen))
+        {
             _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
+            if (!_cache.FilterConfigOpen)
+                Selector.ClearSelected();
+        }
         CkGui.AttachToolTip("Organizer Mode");
     }
     #endregion Search
