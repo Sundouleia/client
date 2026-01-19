@@ -11,8 +11,6 @@ public class WhitelistTabs
     private readonly WhitelistDrawer _defaultDrawer;
     private readonly GroupsDrawer _groupsDrawer;
 
-    private bool _organizerMode = false;
-
     public WhitelistTabs(FolderConfig config, WhitelistDrawer main, GroupsDrawer groups)
     {
         _config = config;
@@ -40,5 +38,5 @@ public class WhitelistTabs
     }
 
     private DynamicFlags DrawFlags 
-        => _organizerMode ? DynamicFlags.SelectableDragDrop : DynamicFlags.None;
+        => _groupsDrawer.OrganizerMode ? DynamicFlags.SelectableDragDrop : DynamicFlags.None;
 }

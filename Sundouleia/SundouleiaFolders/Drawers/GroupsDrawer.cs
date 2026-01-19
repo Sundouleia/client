@@ -15,6 +15,7 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem;
 
@@ -69,11 +70,13 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         _iconSelector = new FAIconCombo(logger);
     }
 
+    public bool OrganizerMode => _cache.FilterConfigOpen;
+
     #region Search
     protected override void DrawSearchBar(float width, int length)
     {
         var tmp = FilterCache.Filter;
-        var rWidth = CkGui.IconTextButtonSize(FAI.FolderPlus, "Group") + CkGui.IconTextButtonSize(FAI.FolderPlus, "Folder");
+        var rWidth = CkGui.IconTextButtonSize(FAI.FolderPlus, "Group") + CkGui.IconTextButtonSize(FAI.FolderPlus, "Folder") + CkGui.IconButtonSize(FAI.LayerGroup).X;
         // Update the search bar if things change, like normal.
         if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, rWidth, DrawButtons))
             FilterCache.Filter = tmp;
@@ -96,6 +99,11 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         if (CkGui.IconTextButton(FAI.FolderPlus, "Folder", null, true))
             _sidePanel.ForNewFolderGroup((GroupsDrawSystem)DrawSystem);
         CkGui.AttachToolTip("Create a new Folder to catagorize your groups.");
+
+        ImGui.SameLine(0, 0);
+        if (CkGui.IconButton(FAI.LayerGroup, inPopup: !_cache.FilterConfigOpen))
+            _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
+        CkGui.AttachToolTip("Organizer Mode");
     }
     #endregion Search
 
@@ -281,18 +289,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
         if (CkGui.IconButton(FAI.Edit, inPopup: !inEditor))
-        {
-            if (_cache.GroupInEditor == folder)
-            {
-                _cache.GroupInEditor = null;
-                _sidePanel.ClearDisplay();
-            }
-            else
-            {
-                _cache.GroupInEditor = folder;
-                _sidePanel.ForGroupEditor(_cache, this);
-            }
-        }
+            _sidePanel.ForGroupEditor(folder, _cache, this);
         CkGui.AttachToolTip("Edit Group");
 
         currentRightSide -= CkGui.IconButtonSize(FAI.Filter).X;

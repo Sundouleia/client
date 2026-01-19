@@ -208,14 +208,14 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         // For GPose actors.
         if (chara->ObjectIndex > 200 && GameMain.IsInGPose())
         {
-            Logger.LogDebug($"New GPose Character Rendered: {(nint)chara:X} - {chara->NameString}");
+            Logger.LogDebug($"New GPose Character Rendered: {(nint)chara:X} - {chara->NameString}", LoggerType.OwnedObjects);
             GPoseActors.Add(address);
             Mediator.Publish(new GPoseObjectCreated(address));
             return;
         }
 
         // Other Actors.
-        Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}");
+        Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}", LoggerType.OwnedObjects);
         if (address == OwnedObjects.PlayerAddress)
         {
             AddOwnedObject(OwnedObject.Player, address);
@@ -251,7 +251,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         // For GPose actors.
         if (GPoseActors.Remove(address))
         {
-            Logger.LogDebug($"GPose Character Removed: {(nint)chara:X} - {chara->NameString}");
+            Logger.LogDebug($"GPose Character Removed: {(nint)chara:X} - {chara->NameString}", LoggerType.OwnedObjects);
             // Include a snapshot of the data at time of destruction so we can properly get data
             // such as the namestring after destruction.
             Mediator.Publish(new GPoseObjectDestroyed(address, *chara));
@@ -259,7 +259,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         }
 
         // Other Actors.
-        Logger.LogDebug($"Character Removed: {(nint)chara:X} - {chara->GetName()}");
+        Logger.LogDebug($"Character Removed: {(nint)chara:X} - {chara->GetName()}", LoggerType.OwnedObjects);
         if (address == WatchedPlayerAddr)
         {
             RemoveOwnedObject(OwnedObject.Player, address);
@@ -290,7 +290,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
 
     private void AddOwnedObject(OwnedObject kind, nint address)
     {
-        Logger.LogDebug($"OwnedObject Rendered: {kind} - {address:X}");
+        Logger.LogDebug($"OwnedObject Rendered: {kind} - {address:X}", LoggerType.OwnedObjects);
         if (WatchedTypes.TryAdd(address, kind))
         {
             CurrentOwned.Add(address);
@@ -300,7 +300,7 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
 
     private void RemoveOwnedObject(OwnedObject kind, nint address)
     {
-        Logger.LogDebug($"OwnedObject Removed: {kind} - {address:X}");
+        Logger.LogDebug($"OwnedObject Removed: {kind} - {address:X}", LoggerType.OwnedObjects);
         if (WatchedTypes.TryRemove(address, out _))
         {
             CurrentOwned.Remove(address);

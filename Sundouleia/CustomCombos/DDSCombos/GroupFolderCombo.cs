@@ -13,11 +13,40 @@ namespace Sundouleia.CustomCombos.Editor;
 // A special combo for pairs, that must maintain its distinctness and update accordingly based on changes.
 public sealed class DDSFolderGroupCombo : CkFilterComboCache<IDynamicFolderGroup<Sundesmo>>
 {
-    private IDynamicFolderGroup<Sundesmo>? _current;
     public DDSFolderGroupCombo(ILogger log, GroupsDrawSystem dds)
         : base(() => [.. dds.FolderMap.Values.OfType<IDynamicFolderGroup<Sundesmo>>()], log)
     {
         SearchByParts = true;
+    }
+
+    private void UpdateCurrentSelection(IDynamicFolderGroup<Sundesmo>? current)
+    {
+        if (current == Current)
+            return;
+
+        Log.LogInformation($"Current is: {current?.Name ?? "null"}, But Interal Current is: {Current?.Name ?? "null"}");
+        Log.LogInformation($"DDSFolderGroupCombo: Updating current selection to {current?.Name ?? "null"}");
+
+        // Need to refresh.
+        var priorState = IsInitialized;
+        if (priorState)
+            Cleanup();
+
+        // Update the Idx from the cache.
+        CurrentSelectionIdx = Items.IndexOf(i => i.ID == current?.ID);
+        // if the index is a valid index, update the selection.
+        if (CurrentSelectionIdx >= 0)
+        {
+            UpdateSelection(Items[CurrentSelectionIdx]);
+        }
+        else
+        {
+            UpdateSelection(null);
+        }
+
+        // If we were not in a prior state by this point, go ahead and cleanup.
+        if (!priorState)
+            Cleanup();
     }
 
     // Can pull the update refresh function from pair combo if needed,
@@ -28,13 +57,6 @@ public sealed class DDSFolderGroupCombo : CkFilterComboCache<IDynamicFolderGroup
 
     protected override string ToString(IDynamicFolderGroup<Sundesmo> obj)
         => obj.Name;
-
-    protected override int UpdateCurrentSelected(int currentSelected)
-    {
-        CurrentSelectionIdx = Items.IndexOf(p => _current == p);
-        UpdateSelection(CurrentSelectionIdx >= 0 ? Items[CurrentSelectionIdx] : null);
-        return CurrentSelectionIdx;
-    }
 
     public void ClearSelected()
         => UpdateSelection(null);
@@ -47,12 +69,10 @@ public sealed class DDSFolderGroupCombo : CkFilterComboCache<IDynamicFolderGroup
 
     public bool Draw(IDynamicFolderGroup<Sundesmo>? current, float width, float innerScalar, CFlags flags, uint? searchBg = null)
     {
-        _current = current;
-
+        UpdateCurrentSelection(current);
         InnerWidth = width * innerScalar;
         var preview = Current?.Name ?? "Set Parent Folder.. (Optional)";
         var ret = Draw("##FolderGroupCombo", preview, string.Empty, width, ImUtf8.TextHeightSpacing, flags, searchBg);
-        _current = null;
         return ret;
     }
 

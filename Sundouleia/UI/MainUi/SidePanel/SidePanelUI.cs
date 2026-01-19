@@ -209,6 +209,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         var width = _.InnerRegion.X;
 
         CkGui.FontTextCentered($"Create New Folder", UiFontService.Default150Percent);
+        ImGui.Separator();
         _spGroups.DrawFolderCreator(nfgc, width);
         ImGui.Separator();
         // Draw the center button for creating.
@@ -219,9 +220,6 @@ public class SidePanelUI : WindowMediatorSubscriberBase
             if (nfgc.TryAddCreatedFolderGroup())
                 _logger.LogInformation($"Added New Folder [{nfgc.NewFolderName}]");
         }
-        CkGui.SetCursorXtoCenter(width * .5f);
-        if (CkGui.IconTextButtonCentered(FAI.Times, "Close Creator", width * .5f))
-            _service.ClearDisplay();
     }
 
     private void DrawGroupEditorPanel(GroupEditorCache gec)
@@ -229,15 +227,8 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         using var _ = CkRaii.Child("GroupEditor", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
 
-        if (gec.GroupInEditor is not SundesmoGroup)
-        {
-            CkGui.FontTextCentered("Error - No Editor Group", UiFontService.Default150Percent, ImGuiColors.DalamudRed);
-            return;
-        }
-
         // Include the group name in the title.
         CkGui.FontTextCentered($"Editing {gec.GroupInEditor.Label}", UiFontService.Default150Percent);
-        _spGroups.DrawFolderPreview(gec.GroupInEditor);
         ImGui.Separator();
         _spGroups.DrawGroupEditor(gec, width);
     }

@@ -1,6 +1,9 @@
 using CkCommons.DrawSystem;
 using CkCommons.DrawSystem.Selector;
+using Sundouleia.Localization;
 using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
+using System.Reflection.Metadata;
 
 namespace Sundouleia.DrawSystem;
 
@@ -32,6 +35,33 @@ public class WhitelistCache(DynamicDrawSystem<Sundesmo> parent) : DynamicFilterC
     /// </summary>
     public GroupFolder? GroupInEditor = null;
 
+    public void ChangeParentNode(IDynamicFolderGroup<Sundesmo>? newParent)
+    {
+        if (GroupInEditor is null)
+            return;
+
+        if (newParent is null || newParent.IsRoot)
+            parent.Move(GroupInEditor, (DynamicFolderGroup<Sundesmo>)parent.Root);
+        else
+            parent.Move(GroupInEditor!, (DynamicFolderGroup<Sundesmo>)newParent);
+    }
+
+    public void UpdateEditorGroupStyle() => GroupInEditor?.ApplyLatestStyle();
+
+    public bool TryRenameNode(GroupsManager groups, string newName)
+    {
+        if (GroupInEditor is null)
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(newName) && groups.TryRename(GroupInEditor.Group, newName))
+        {
+            parent.Rename(GroupInEditor, newName);
+            MarkForReload(GroupInEditor.Parent);
+            return true;
+        }
+
+        return false;
+    }
 
     protected override bool IsVisible(IDynamicNode<Sundesmo> node)
     {

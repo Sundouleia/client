@@ -1,13 +1,10 @@
 using CkCommons;
-using CkCommons.Classes;
 using CkCommons.Gui;
 using CkCommons.Gui.Utility;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Bindings.ImPlot;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
@@ -17,8 +14,6 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using System;
-using TerraFX.Interop.WinRT;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -130,10 +125,8 @@ public class SidePanelGroups
     public void DrawCreator(NewGroupCache cache, float width)
     {
         var drawHeight = ImGui.GetContentRegionAvail().Y - ImUtf8.FrameHeight - ImUtf8.ItemSpacing.Y * 2;
-        // The common methods below can be migrated later.
         using var _ = CkRaii.Child("GroupCreator", new(width, drawHeight), wFlags: WFlags.NoScrollbar);
 
-        // get the width of the cell.
         CkGui.FramedIconText(FAI.FolderTree);
         ImUtf8.SameLineInner();
         var cellWidth = ImGui.GetContentRegionAvail().X;
@@ -159,34 +152,113 @@ public class SidePanelGroups
             cache.NewGroup.Label = tmpName;
         CkGui.AttachToolTip("Set the name of the Group.");
 
+        DrawStylizations(cache.NewGroup, width);
+
+        ImGui.Separator();
+        DrawPreferences(cache.NewGroup, width);
+
+        ImGui.Separator();
+        DrawFolderPreview(cache.NewGroup);
+    }
+
+    public void DrawGroupEditor(GroupEditorCache cache, float width)
+    {
+        using var _ = CkRaii.Child("GroupEditor", new(width, ImGui.GetContentRegionAvail().Y), wFlags: WFlags.NoScrollbar);
+
+        CkGui.FramedIconText(FAI.FolderTree);
+        ImUtf8.SameLineInner();
+        var cellWidth = ImGui.GetContentRegionAvail().X;
+        if (_folderGroupCombo.Draw(cache.ParentNode, cellWidth, 1f))
+        {
+            _logger.LogInformation($"Setting new Parent node to: {_folderGroupCombo.Current?.Name ?? "UNK"}");
+            cache.ChangeParentNode(_folderGroupCombo.Current);
+        }
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+        {
+            _folderGroupCombo.ClearSelected();
+            cache.ChangeParentNode(null);
+        }
+
+        // The Icon
+        CkGui.FramedIconText(FAI.Tag);
+        ImUtf8.SameLineInner();
+        if (_icons.Draw("IconSelector", cache.GroupInEditor.Icon, 10))
+        {
+            // Update the icon within the group manager.
+            _groups.SetIcon(cache.GroupInEditor, _icons.Current, cache.GroupInEditor.IconColor);
+            cache.UpdateStyle();
+        }
+        CkGui.AttachToolTip("Edit the icon for your group.");
+
+        ImUtf8.SameLineInner();
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+        var tmpName = cache.GroupInEditor.Label;
+        if (ImGui.InputTextWithHint("##NewGroupLabel", "Group Name..", ref tmpName, 40))
+            cache.TryRenameNode(_groups, tmpName);
+        CkGui.AttachToolTip("Set the name of the Group.");
+
+        ImGui.Separator();
+        if (DrawStylizations(cache.GroupInEditor, width))
+            cache.UpdateStyle();
+
+        ImGui.Separator();
+        DrawPreferences(cache.GroupInEditor, width);
+
+        ImGui.Separator();
+        DrawFolderPreview(cache.GroupInEditor);
+    }
+
+
+    private bool DrawStylizations(SundesmoGroup group, float width)
+    {
+        bool changed = false;
         ImGui.Separator();
         CkGui.FontText("Stylization", UiFontService.Default150Percent);
 
-        var iconCol = ImGui.ColorConvertU32ToFloat4(cache.NewGroup.IconColor);
+        var iconCol = ImGui.ColorConvertU32ToFloat4(group.IconColor);
         if (ImGui.ColorEdit4("Icon", ref iconCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
-            cache.NewGroup.IconColor = ImGui.ColorConvertFloat4ToU32(iconCol);
+        {
+            group.IconColor = ImGui.ColorConvertFloat4ToU32(iconCol);
+            _groups.Save();
+            changed |= true;
+        }
         CkGui.AttachToolTip("Change the color of the folder icon.");
 
         ImGui.SameLine();
-        var labelCol = ImGui.ColorConvertU32ToFloat4(cache.NewGroup.LabelColor);
+        var labelCol = ImGui.ColorConvertU32ToFloat4(group.LabelColor);
         if (ImGui.ColorEdit4("Label", ref labelCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
-            cache.NewGroup.LabelColor = ImGui.ColorConvertFloat4ToU32(labelCol);
+        {
+            group.LabelColor = ImGui.ColorConvertFloat4ToU32(labelCol);
+            _groups.Save();
+            changed |= true;
+        }
         CkGui.AttachToolTip("Change the color of the folder label.");
 
         ImGui.SameLine();
-        var borderCol = ImGui.ColorConvertU32ToFloat4(cache.NewGroup.BorderColor);
+        var borderCol = ImGui.ColorConvertU32ToFloat4(group.BorderColor);
         if (ImGui.ColorEdit4("Border", ref borderCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
-            cache.NewGroup.BorderColor = ImGui.ColorConvertFloat4ToU32(borderCol);
+        {
+            group.BorderColor = ImGui.ColorConvertFloat4ToU32(borderCol);
+            _groups.Save();
+            changed |= true;
+        }
         CkGui.AttachToolTip("Change the color of the folder border.");
 
         ImGui.SameLine();
-        var gradCol = ImGui.ColorConvertU32ToFloat4(cache.NewGroup.GradientColor);
+        var gradCol = ImGui.ColorConvertU32ToFloat4(group.GradientColor);
         if (ImGui.ColorEdit4("Gradient", ref gradCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
-            cache.NewGroup.GradientColor = ImGui.ColorConvertFloat4ToU32(gradCol);
+        {
+            group.GradientColor = ImGui.ColorConvertFloat4ToU32(gradCol);
+            _groups.Save();
+            changed |= true;
+        }
         CkGui.AttachToolTip("Change the color of the folder gradient when expanded.");
 
+        return changed;
+    }
 
-        ImGui.Separator();
+    private void DrawPreferences(SundesmoGroup group, float width)
+    {
         CkGui.FontText("Preferences", UiFontService.Default150Percent);
 
         using (ImRaii.Group())
@@ -194,9 +266,9 @@ public class SidePanelGroups
             CkGui.FramedIconText(FAI.Unlink);
             CkGui.TextFrameAlignedInline("Include Offline");
             ImUtf8.SameLineInner();
-            var showOffline = cache.NewGroup.ShowOffline;
+            var showOffline = group.ShowOffline;
             if (ImGui.Checkbox("##showOffline", ref showOffline))
-                cache.NewGroup.ShowOffline = showOffline;
+                group.ShowOffline = showOffline;
         }
         CkGui.AttachToolTip("Show offline pairs in this folder.");
 
@@ -205,68 +277,66 @@ public class SidePanelGroups
             CkGui.FramedIconText(FAI.Bullseye);
             CkGui.TextFrameAlignedInline("Linked Location Scope");
             ImUtf8.SameLineInner();
-            if (CkGuiUtils.EnumCombo("##scope", ImGui.GetContentRegionAvail().X, cache.NewGroup.Scope, out var newScope))
+            if (CkGuiUtils.EnumCombo("##scope", ImGui.GetContentRegionAvail().X, group.Scope, out var newScope))
             {
                 if (newScope is not LocationScope.None)
-                    cache.NewGroup.AreaBound = true;
+                    group.AreaBound = true;
 
-                cache.NewGroup.Scope = newScope;
+                group.Scope = newScope;
             }
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
-                cache.NewGroup.Scope = LocationScope.None;
-                cache.NewGroup.AreaBound = false;
+                group.Scope = LocationScope.None;
+                group.AreaBound = false;
             }
         }
         CkGui.AttachToolTip("If others rendered in this scope are added.");
         // Attempt to draw the location area.
-        DrawGroupLocation(cache, width);
-
-        ImGui.Separator();
-        DrawFolderPreview(cache.NewGroup);
+        DrawGroupLocation(group, width);
     }
 
+    #region Location
     // All Rows are drawn, but only the ones for our scope are viewed.
-    private void DrawGroupLocation(NewGroupCache cache, float width)
+    private void DrawGroupLocation(SundesmoGroup group, float width)
     {
-        if (!cache.NewGroup.AreaBound || cache.NewGroup.Scope is LocationScope.None)
+        if (!group.AreaBound || group.Scope is LocationScope.None)
             return;
 
-        var height = CkStyle.GetFrameRowsHeight(GetScopeRows(cache.NewGroup.Scope));
+        var height = CkStyle.GetFrameRowsHeight(GetScopeRows(group.Scope));
 
         using var _ = CkRaii.FramedChildPaddedW("AreaChild", width, height, 0, uint.MaxValue, 5f, 1f);
 
         var rowWidth = _.InnerRegion.X - ImUtf8.FrameHeight - ImUtf8.ItemInnerSpacing.X;
-        switch (cache.NewGroup.Scope)
+        switch (group.Scope)
         {
             case LocationScope.DataCenter:
-                DCOnlyRow(cache.NewGroup, rowWidth);
+                DCOnlyRow(group, rowWidth);
                 return;
             case LocationScope.World:
-                DCWorldRow(cache.NewGroup, rowWidth);
+                DCWorldRow(group, rowWidth);
                 return;
             case LocationScope.IntendedUse:
-                DCWorldRow(cache.NewGroup, rowWidth);
-                IntendedUseRow(cache.NewGroup, rowWidth);
+                DCWorldRow(group, rowWidth);
+                IntendedUseRow(group, rowWidth);
                 return;
             case LocationScope.Territory:
-                DCWorldRow(cache.NewGroup, rowWidth);
-                IntendedUseRow(cache.NewGroup, rowWidth);
-                TerritoryRow(cache.NewGroup, rowWidth);
+                DCWorldRow(group, rowWidth);
+                IntendedUseRow(group, rowWidth);
+                TerritoryRow(group, rowWidth);
                 return;
             case LocationScope.HousingDistrict:
-                DCWorldRow(cache.NewGroup, rowWidth);
-                DistrictRow(cache.NewGroup, rowWidth);
+                DCWorldRow(group, rowWidth);
+                DistrictRow(group, rowWidth);
                 return;
             case LocationScope.HousingWard:
-                DCWorldRow(cache.NewGroup, rowWidth);
-                DistrictWardRow(cache.NewGroup, rowWidth);
+                DCWorldRow(group, rowWidth);
+                DistrictWardRow(group, rowWidth);
                 return;
             case LocationScope.HousingPlot:
             case LocationScope.Indoor:
-                DCWorldRow(cache.NewGroup, rowWidth);
-                DistrictWardRow(cache.NewGroup, rowWidth);
-                PlotRow(cache.NewGroup, rowWidth);
+                DCWorldRow(group, rowWidth);
+                DistrictWardRow(group, rowWidth);
+                PlotRow(group, rowWidth);
                 return;
         }
     }
@@ -369,11 +439,7 @@ public class SidePanelGroups
             group.Location.Plot = (sbyte)(plot - 1);
         CkGui.AttachToolTip($"The plot.");
     }
-
-    public void DrawGroupEditor(GroupEditorCache cache, float width)
-    {
-        ImGui.Text("Bwaaaa");
-    }
+    #endregion Location
 
     private int GetScopeRows(LocationScope scope) => scope switch
     {
@@ -383,7 +449,6 @@ public class SidePanelGroups
         LocationScope.HousingPlot or LocationScope.Indoor => 3,
         _ => 0
     };
-
 
     private string ToName(ResidentialArea area)
         => LocationSvc.ResidentialNames.GetValueOrDefault(area) ?? area.ToString();

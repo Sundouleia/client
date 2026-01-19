@@ -159,46 +159,39 @@ public class NewFolderGroupCache : ISidePanelCache
     }
 }
 
-public class GroupEditorCache : ISidePanelCache, IDisposable
+public class GroupEditorCache : ISidePanelCache
 {
     public SidePanelMode Mode => SidePanelMode.GroupEditor;
     
-    private readonly GroupsDrawer _drawerRef;
+    private readonly GroupsDrawer _drawer;
     
     private WhitelistCache _cache;
-    public GroupEditorCache(GroupsDrawer drawerRef, WhitelistCache cache)
+    public GroupEditorCache(GroupsDrawer drawer, WhitelistCache cache)
     {
-        _drawerRef = drawerRef;
+        _drawer = drawer;
         _cache = cache;
-
-        GroupInEditor = new SundesmoGroup()
-        {
-            Icon = cache.GroupInEditor!.Group.Icon,
-            Label = cache.GroupInEditor.Group.Label,
-            IconColor = cache.GroupInEditor.Group.IconColor,
-            LabelColor = cache.GroupInEditor.Group.LabelColor,
-            BorderColor = cache.GroupInEditor.Group.BorderColor,
-            GradientColor = cache.GroupInEditor.Group.GradientColor,
-            ShowOffline = cache.GroupInEditor.Group.ShowOffline,
-            LinkedUids = cache.GroupInEditor.Group.LinkedUids,
-            SortOrder = cache.GroupInEditor.Group.SortOrder,
-            AreaBound = cache.GroupInEditor.Group.AreaBound,
-            Scope = cache.GroupInEditor.Group.Scope,
-            Location = cache.GroupInEditor.Group.Location?.Clone() ?? null!,
-        };
     }
 
     public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
-    public bool IsValid => true;
+    public bool IsValid => _cache.GroupInEditor is not null;
 
-    // Any changes made to the group are done in a copy, not the original. When saved, they are carried over.
-    public SundesmoGroup GroupInEditor;
+    public IDynamicFolderGroup<Sundesmo>? ParentNode => _cache.GroupInEditor?.Parent ?? null;
+    public SundesmoGroup GroupInEditor => _cache.GroupInEditor!.Group;
 
-    // Make this disposable so that we can nullify our editor group on display cache clear.
-    public void Dispose()
+    public void ChangeParentNode(IDynamicFolderGroup<Sundesmo>? newNode)
     {
-        _cache.GroupInEditor = null;
+        if (!IsValid) return;
+        _cache.ChangeParentNode(newNode);
     }
+
+    public void UpdateStyle()
+    {
+        if (!IsValid) return;
+        _cache.UpdateEditorGroupStyle();
+    }
+
+    public bool TryRenameNode(GroupsManager groups, string newName)
+        => IsValid && _cache.TryRenameNode(groups, newName);
 }
 
 public class ResponseCache : ISidePanelCache
@@ -324,13 +317,34 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
             DisplayCache = new NewFolderGroupCache(dds);
     }
 
-    public void ForGroupEditor(WhitelistCache cache, GroupsDrawer drawer)
+    // Opens, or toggles, or swaps current data for interactions.
+    public void ForGroupEditor(GroupFolder group, WhitelistCache cache, GroupsDrawer drawer)
     {
-        // If there is no folder placed in the editor, ignore it.
-        if (cache.GroupInEditor is not GroupFolder)
-            return;
-        // Obviously pass in the group we are editing and stuff.
-        DisplayCache = new GroupEditorCache(drawer, cache);
+        // If the mode is already GroupEditorCache.
+        if (DisplayCache is GroupEditorCache pairCache)
+        {
+            // If the sundesmo is the same, toggle off.
+            if (cache.GroupInEditor == group)
+            {
+                Logger.LogDebug($"Closing GroupEditor for expanded group.");
+                // Close it.
+                ClearDisplay();
+                cache.GroupInEditor = null;
+            }
+            // Update the displayed data to show the new sundesmo.
+            else
+            {
+                Logger.LogDebug($"Switching GroupEditor to {group.Name}");
+                cache.GroupInEditor = group;
+            }
+        }
+        // Was displaying something else, so make sure we update and open.
+        else
+        {
+            Logger.LogDebug($"Opening GroupEditor for {group.Name}");
+            DisplayCache = new GroupEditorCache(drawer, cache);
+            cache.GroupInEditor = group;
+        }
     }
 
     /// <summary>
