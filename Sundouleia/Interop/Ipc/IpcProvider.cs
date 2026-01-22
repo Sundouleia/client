@@ -80,7 +80,7 @@ public class IpcProvider : DisposableMediatorSubscriberBase, IHostedService
             NotifyPairUnrendered(_.Address);
         });
 
-        Mediator.Subscribe<MoodleAccessPermsChanged>(this, _ =>
+        Mediator.Subscribe<MoodlePermsChanged>(this, _ =>
         {
             // Update the permission if they are rendered.
             if (!_.Sundesmo.IsRendered)

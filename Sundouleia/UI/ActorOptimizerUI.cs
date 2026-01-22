@@ -71,6 +71,8 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
+        CkGui.TextWrapped("Yes this is temporarily ripped from old mare code for the sake of allowing people to optimize actors.");
+        CkGui.TextWrapped("When I have the time, this UI, and its functionality, will be revised completely.");
         if (_conversionTask != null && !_conversionTask.IsCompleted)
         {
             _showModal = true;

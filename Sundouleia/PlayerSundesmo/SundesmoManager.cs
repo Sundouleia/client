@@ -351,6 +351,18 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     #endregion Manager Helpers
 
     #region Updates
+    /// <summary>
+    ///     Sets the new pause state for a sundesmo. Pausing and unpausing skips limbo timer. <para />
+    ///     While paused, updates are still recieved, but not processed.
+    /// </summary>
+    public void SetPauseState(UserData target, bool newPauseState)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+        Logger.LogTrace($"Setting pause state for {sundesmo.GetNickAliasOrUid()} to {newPauseState}!", LoggerType.Callbacks);
+        sundesmo.SetPauseState(newPauseState);
+    }
+    
     public void ReceiveMoodleData(UserData target, MoodleData newMoodleData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
@@ -395,7 +407,6 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (deleted) sundesmo.SharedData.Presets.Remove(preset.GUID);
         else sundesmo.SharedData.TryUpdatePreset(preset);
     }
-
 
     // Should happen only on initial loads.
     public void ReceiveIpcUpdateFull(UserData target, NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
@@ -449,7 +460,6 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
         // Log change and lazily recreate the pairlist.
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s GlobalPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
-        RecreateLazy();
     }
 
     public void PermChangeGlobal(UserData target, GlobalPerms newGlobals)
@@ -463,28 +473,6 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
         // Log change and recreate the pair list.
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s GlobalPerms updated in bulk]", LoggerType.PairDataTransfer);
-        RecreateLazy();
-    }
-
-    public void PermChangeUnique(UserData target, string permName, object newValue)
-    {
-        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
-
-        // If we need to cache the previous state of anything here do so.
-        var prevPause = sundesmo.OwnPerms.PauseVisuals;
-
-        // Perform change.
-        if (!PropertyChanger.TrySetProperty(sundesmo.OwnPerms, permName, newValue, out var finalVal) || finalVal is null)
-            throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
-
-        // Log change and recreate the pair list.
-        Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s OwnPairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
-        RecreateLazy();
-
-        // Clear profile is pause toggled.
-        if (prevPause != sundesmo.OwnPerms.PauseVisuals)
-            Mediator.Publish(new ClearProfileDataMessage(target));
     }
 
     public void PermChangeUniqueOther(UserData target, string permName, object newValue)
@@ -492,20 +480,39 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
-        // If we need to cache the previous state of anything here do so.
-        var prevPause = sundesmo.PairPerms.PauseVisuals;
-
         if (!PropertyChanger.TrySetProperty(sundesmo.PairPerms, permName, newValue, out var finalVal) || finalVal is null)
             throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
 
         // Inform of a permission change here for moodles!
-
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s PairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
-        RecreateLazy();
+        // Post permission change logic.
+        switch (permName)
+        {
+            // Could do pause state here to actually pause but instead just refresh profile.
+            case nameof(PairPerms.PauseVisuals):
+                Mediator.Publish(new ClearProfileDataMessage(target));
+                break;
 
-        // Toggle pausing if pausing changed.
-        if (prevPause != sundesmo.PairPerms.PauseVisuals)
-            Mediator.Publish(new ClearProfileDataMessage(target));
+            case nameof(PairPerms.ShareOwnMoodles):
+                // Clear Shared Info if cleared.
+                if (!sundesmo.PairPerms.ShareOwnMoodles)
+                {
+                    sundesmo.SharedData.Statuses.Clear();
+                    sundesmo.SharedData.Presets.Clear();
+                }
+                break;
+
+            case nameof(PairPerms.MoodleAccess):
+            case nameof(PairPerms.MaxMoodleTime):
+                Mediator.Publish(new MoodlePermsChanged(sundesmo));
+                break;
+        }
+        // Clear Moodles if share perms was turned off.
+        if (permName == nameof(PairPerms.ShareOwnMoodles) && !sundesmo.PairPerms.ShareOwnMoodles)
+        {
+            sundesmo.SharedData.Statuses.Clear();
+            sundesmo.SharedData.Presets.Clear();
+        }
     }
 
     public void PermBulkChangeUnique(UserData target, PairPerms newPerms)
@@ -514,16 +521,28 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
         // cache prev state and update them.
-        var prevPerms = sundesmo.OwnPerms with { };
-        sundesmo.UserPair.OwnPerms = newPerms;
+        var prevPerms = sundesmo.PairPerms with { };
 
-        // Log and recreate the pair list.
-        Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s OwnPerms updated in bulk.]", LoggerType.PairDataTransfer);
-        RecreateLazy();
+        Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s PairPerms updated in bulk.]", LoggerType.PairDataTransfer);
 
-        // Clear profile if pausing changed.
-        if (prevPerms.PauseVisuals != newPerms.PauseVisuals)
+        // Post permission change logic.
+        if (prevPerms.PauseVisuals != sundesmo.PairPerms.PauseVisuals)
+        {
             Mediator.Publish(new ClearProfileDataMessage(target));
+        }
+        else if (prevPerms.ShareOwnMoodles != sundesmo.PairPerms.ShareOwnMoodles)
+        {
+            if (!sundesmo.PairPerms.ShareOwnMoodles)
+            {
+                sundesmo.SharedData.Statuses.Clear();
+                sundesmo.SharedData.Presets.Clear();
+            }
+        }
+        else if (prevPerms.MoodleAccess != sundesmo.PairPerms.MoodleAccess
+            || prevPerms.MaxMoodleTime != sundesmo.PairPerms.MaxMoodleTime)
+        {
+            Mediator.Publish(new MoodlePermsChanged(sundesmo));
+        }
     }
 
     #endregion Updates

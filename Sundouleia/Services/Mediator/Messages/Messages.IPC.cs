@@ -25,9 +25,9 @@ public record PetNamesReady : MessageBase;
 public record PetNamesDataChanged(string NicknamesData) : MessageBase;
 
 public record MoodlesReady : MessageBase;
-public record MoodlesChanged(IntPtr Address) : MessageBase;
-// For Moodle PairAccess changes in permissions
-public record MoodleAccessPermsChanged(Sundesmo Sundesmo) : MessageBase;
+public record MoodlesSMChanged(IntPtr Address) : MessageBase;
+public record MoodleSharePermChanged(Sundesmo Sundesmo) : MessageBase; // Whenever we enable the moodle share permission for another user.
+public record MoodlePermsChanged(Sundesmo Sundesmo) : MessageBase; // The MoodleAccess changes for either side.
 public record MoodlesApplyStatusToPair(ApplyMoodleStatus ApplyStatusTupleDto) : MessageBase;
 
 

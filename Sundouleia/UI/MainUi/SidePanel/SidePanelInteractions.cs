@@ -3,6 +3,7 @@ using CkCommons.DrawSystem;
 using CkCommons.Gui;
 using CkCommons.Helpers;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui;
@@ -17,6 +18,7 @@ using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Util;
 using System.Collections.Immutable;
+using System.Drawing;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -68,30 +70,30 @@ public class SidePanelInteractions
         DrawApplyMoodleOther(cache, sundesmo, dispName, width);
     }
 
-    public void DrawPermissions(InteractionsCache cache, Sundesmo sundesmo, string dispName, float width)
+    public void DrawPermissions(InteractionsCache cache, Sundesmo s, string dispName, float width)
     {
         ImGuiUtil.Center($"Permissions for {dispName}");
         ImGui.Separator();
-        DrawHeader(sundesmo, dispName);
+        DrawHeader(s, dispName);
         ImGui.Separator();
 
         ImGui.Text("Data Syncronization");
-        DrawPermRow(sundesmo, dispName, width, SIID.DataSyncAnimations, nameof(PairPerms.AllowAnimations), sundesmo.OwnPerms.AllowAnimations);
-        DrawPermRow(sundesmo, dispName, width, SIID.DataSyncSounds, nameof(PairPerms.AllowSounds), sundesmo.OwnPerms.AllowSounds);
-        DrawPermRow(sundesmo, dispName, width, SIID.DataSyncVfx, nameof(PairPerms.AllowVfx), sundesmo.OwnPerms.AllowVfx);
+        DrawPermRow(s, dispName, width, SIID.DataSyncAnimations, nameof(PairPerms.AllowAnimations), s.OwnPerms.AllowAnimations);
+        DrawPermRow(s, dispName, width, SIID.DataSyncSounds, nameof(PairPerms.AllowSounds), s.OwnPerms.AllowSounds);
+        DrawPermRow(s, dispName, width, SIID.DataSyncVfx, nameof(PairPerms.AllowVfx), s.OwnPerms.AllowVfx);
         ImGui.Separator();
 
         ImGui.Text("Moodles Permissions");
-        DrawPermRow(sundesmo, dispName, width, SIID.ShareMoodles, nameof(PairPerms.ShareOwnMoodles), sundesmo.OwnPerms.ShareOwnMoodles);
-        DrawPermRow(sundesmo, dispName, width, SIID.AllowPositve, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.Positive);
-        DrawPermRow(sundesmo, dispName, width, SIID.AllowNegative, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.Negative);
-        DrawPermRow(sundesmo, dispName, width, SIID.AllowSpecial, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.Special);
-        DrawPermRow(sundesmo, dispName, width, SIID.AllowOwnMoodles, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.AllowOwn);
-        DrawPermRow(sundesmo, dispName, width, SIID.AllowOtherMoodles, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.AllowOther);
-        DrawPermRow(sundesmo, dispName, width, SIID.MaxMoodleTime, nameof(PairPerms.MaxMoodleTime), sundesmo.OwnPerms.MaxMoodleTime);
-        DrawPermRow(sundesmo, dispName, width, SIID.AllowPermanent, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.Permanent);
-        DrawPermRow(sundesmo, dispName, width, SIID.RemoveApplied, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.RemoveApplied);
-        DrawPermRow(sundesmo, dispName, width, SIID.RemoveAny, sundesmo.OwnPerms.MoodleAccess, MoodleAccess.RemoveAny);
+        DrawPermRow(s, dispName, width, SIID.ShareMoodles, nameof(PairPerms.ShareOwnMoodles), s.OwnPerms.ShareOwnMoodles, () => _mediator.Publish(new MoodleSharePermChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowPositve, s.OwnPerms.MoodleAccess, MoodleAccess.Positive, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowNegative, s.OwnPerms.MoodleAccess, MoodleAccess.Negative, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowSpecial, s.OwnPerms.MoodleAccess, MoodleAccess.Special, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowOwnMoodles, s.OwnPerms.MoodleAccess, MoodleAccess.AllowOwn, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowOtherMoodles, s.OwnPerms.MoodleAccess, MoodleAccess.AllowOther, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.MaxMoodleTime, nameof(PairPerms.MaxMoodleTime), s.OwnPerms.MaxMoodleTime, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowPermanent, s.OwnPerms.MoodleAccess, MoodleAccess.Permanent, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.RemoveApplied, s.OwnPerms.MoodleAccess, MoodleAccess.RemoveApplied, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.RemoveAny, s.OwnPerms.MoodleAccess, MoodleAccess.RemoveAny, () => _mediator.Publish(new MoodlePermsChanged(s)));
     }
 
     private void DrawHeader(Sundesmo s, string dispName)
@@ -186,8 +188,8 @@ public class SidePanelInteractions
             CkGui.AttachToolTip($"Snapshot {dispName}'s Profile and make a report with its state.");
         }
 
-        DrawPermRow(s, dispName, width, SIID.PauseVisuals, nameof(PairPerms.PauseVisuals), isPaused, false, true);
-        CkGui.AttachToolTip($"{(!isPaused ? "Pause" : "Resume")} the rendering of {dispName}'s modded appearance.");
+        // Pausing (Special due to inverted nature. If more occur in the future, add an invert logic bool to the draw perm row method.
+        DrawPauseRow(s, dispName, width, isPaused);
 
         if (s.IsTemporary)
         {
@@ -227,6 +229,39 @@ public class SidePanelInteractions
                 }
             });
         CkGui.AttachToolTip($"Must hold --COL--CTRL & SHIFT to remove.", color: ImGuiColors.DalamudRed);
+    }
+
+    private void DrawPauseRow(Sundesmo s, string dispName, float width, bool isPaused)
+    {
+        using var dis = ImRaii.PushStyle(ImGuiStyleVar.Alpha, 0.5f, UiService.DisableUI);
+        using var col = ImRaii.PushColor(ImGuiCol.Button, 0);
+
+        var pos = ImGui.GetCursorScreenPos();
+
+        if (ImGui.Button("##pauseStatePerm", new Vector2(width, ImUtf8.FrameHeight)) && !UiService.DisableUI)
+        {
+            UiService.SetUITask(async () =>
+            {
+                // Perform the change over the server. When it completes, determine the pause state.
+                if (await ChangeOwnUnique(s, nameof(PairPerms.PauseVisuals), !isPaused).ConfigureAwait(false))
+                {
+                    _logger.LogInformation($"[OwnPermChange] Permission 'IsPaused' is now '{!isPaused}' for {s.GetNickAliasOrUid()}.");
+                    _sundesmos.SetPauseState(s.UserData, !isPaused);
+                }
+            });
+        }
+        CkGui.AttachToolTip(isPaused ? $"Unpause {dispName}, restoring their Modded Appearance" : $"Pause {dispName}, reverting them to game state.");
+        // Show the text overlay.
+        ImGui.SetCursorScreenPos(pos);
+
+        using var _ = ImRaii.Group();
+        CkGui.FramedIconText(isPaused ? FAI.EyeSlash : FAI.Eye);
+        ImGui.SameLine(0, 0);
+        CkGui.TextFrameAligned($" {dispName} is ");
+        ImGui.SameLine(0, 0);
+        CkGui.ColorTextFrameAligned(isPaused ? "Paused" : "Unpaused", isPaused ? CkColor.TriStateCross.Uint() : CkColor.TriStateCheck.Uint());
+        ImGui.SameLine(0, 0);
+        ImGui.Text(".");
     }
 
     private void DrawApplyMoodleOwn(InteractionsCache cache, Sundesmo s, string dispName, float width)
@@ -318,13 +353,13 @@ public class SidePanelInteractions
         }
     }
 
-    private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, MoodleAccess curState, MoodleAccess option)
-        => DrawPermInternal(sundesmo, dispName, width, id, nameof(PairPerms.MoodleAccess), curState.HasAny(option), () => curState ^ option);
+    private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, MoodleAccess curState, MoodleAccess option, Action? onChange = null)
+        => DrawPermInternal(sundesmo, dispName, width, id, nameof(PairPerms.MoodleAccess), curState.HasAny(option), () => curState ^ option, onChange);
 
-    private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, string permName, bool current, bool defaultTT = true, bool invertColors = false)
-        => DrawPermInternal(sundesmo, dispName, width, id, permName, current, () => !current, defaultTT, invertColors);
+    private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, string permName, bool current, Action? onChange = null)
+        => DrawPermInternal(sundesmo, dispName, width, id, permName, current, () => !current, onChange);
 
-    private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, string permname, TimeSpan current)
+    private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, string permname, TimeSpan current, Action? onChange = null)
     {
         var inputTxtWidth = width * .4f;
         var str = _timespanCache.TryGetValue(id, out var value) ? value : current.ToTimeSpanStr();
@@ -336,21 +371,18 @@ public class SidePanelInteractions
             {
                 var ticks = (ulong)newTime.Ticks;
                 _logger.LogInformation($"Attempting to change {dispName}'s {permname} to {ticks} ticks.", LoggerType.PairDataTransfer);
-                UiService.SetUITask(async () => await ChangeOwnUnique(sundesmo, permname, ticks));
+                UiService.SetUITask(async () => await ChangeOwnUnique(sundesmo, permname, ticks, onChange));
             }
             _timespanCache.Remove(id);
         }
         CkGui.AttachToolTip($"The Maximum Time {dispName} can apply a moodle on you for.");
     }
 
-    private void DrawPermInternal<T>(Sundesmo sundesmo, string dispName, float width, SIID id, string permName, bool current, Func<T> toNewState, bool defaultTT = true, bool invertColors = false)
+    private void DrawPermInternal<T>(Sundesmo sundesmo, string dispName, float width, SIID id, string permName, bool current, Func<T> toNewState, Action? onChange = null)
     {
         using var col = ImRaii.PushColor(ImGuiCol.Button, 0);
         var txtData = PermissionData[id];
         var pos = ImGui.GetCursorScreenPos();
-        var trueCol = invertColors ? CkColor.TriStateCross.Uint() : CkColor.TriStateCheck.Uint();
-        var falseCol = invertColors ? CkColor.TriStateCheck.Uint() : CkColor.TriStateCross.Uint();
-
         if (ImGuiUtil.DrawDisabledButton($"##pairperm{id}", new Vector2(width, ImGui.GetFrameHeight()), string.Empty, UiService.DisableUI))
         {
             if (string.IsNullOrEmpty(permName))
@@ -362,18 +394,17 @@ public class SidePanelInteractions
                 if (newState is null)
                     return;
 
-                if (await ChangeOwnUnique(sundesmo, permName, newState).ConfigureAwait(false))
+                if (await ChangeOwnUnique(sundesmo, permName, newState, onChange).ConfigureAwait(false))
                     _logger.LogInformation($"Successfully changed own permission {permName} to {newState} for {sundesmo.GetNickAliasOrUid()}.");
             });
         }
 
         ImGui.SetCursorScreenPos(pos);
-        PrintButtonRichText(txtData, dispName, current, trueCol, falseCol);
-        if (defaultTT)
-            CkGui.AttachToolTip($"Toggle this preference for {dispName}.");
+        PrintButtonRichText(txtData, dispName, current);
+        CkGui.AttachToolTip($"Toggle this preference for {dispName}.");
     }
 
-    private void PrintButtonRichText(PermInfo pdp, string dispName, bool current, uint trueCol, uint falseCol)
+    private void PrintButtonRichText(PermInfo pdp, string dispName, bool current)
     {
         using var _ = ImRaii.Group();
         CkGui.FramedIconText(current ? pdp.TrueFAI : pdp.FalseFAI);
@@ -384,13 +415,13 @@ public class SidePanelInteractions
             ImGui.SameLine(0, 0);
             ImGui.Text($" {pdp.Suffix} ");
             ImGui.SameLine(0, 0);
-            CkGui.ColorTextFrameAligned(current ? pdp.CondTrue : pdp.CondFalse, current ? trueCol : falseCol);
+            CkGui.ColorTextFrameAligned(current ? pdp.CondTrue : pdp.CondFalse, current ? CkColor.TriStateCheck.Uint() : CkColor.TriStateCross.Uint());
             ImGui.SameLine(0, 0);
             ImGui.Text(".");
         }
         else
         {
-            CkGui.ColorTextFrameAligned($" {(current ? pdp.CondTrue : pdp.CondFalse)} ", current ? trueCol : falseCol);
+            CkGui.ColorTextFrameAligned($" {(current ? pdp.CondTrue : pdp.CondFalse)} ", current ? CkColor.TriStateCheck.Uint() : CkColor.TriStateCross.Uint());
             ImGui.SameLine(0, 0);
             ImGui.Text(pdp.Label);
             ImGui.SameLine(0, 0);
@@ -400,7 +431,6 @@ public class SidePanelInteractions
 
     private enum SIID : byte
     {
-        PauseVisuals,
         DataSyncAnimations,
         DataSyncSounds,
         DataSyncVfx,
@@ -421,7 +451,6 @@ public class SidePanelInteractions
     private record PermInfo(FAI TrueFAI, FAI FalseFAI, string CondTrue, string CondFalse, string Label, bool CondAfterLabel, string Suffix = "");
 
     private readonly ImmutableDictionary<SIID, PermInfo> PermissionData = ImmutableDictionary<SIID, PermInfo>.Empty
-        .Add(SIID.PauseVisuals,         new PermInfo(FAI.Eye,                   FAI.EyeSlash,   "Paused",   "Unpaused",     "",                     true, "is"))
         .Add(SIID.DataSyncAnimations,   new PermInfo(FAI.Running,               FAI.Ban,        "Allowing", "Preventing",   "animations from",      false))
         .Add(SIID.DataSyncSounds,       new PermInfo(FAI.VolumeUp,              FAI.VolumeMute, "Allowing", "Preventing",   "sounds from",          false))
         .Add(SIID.DataSyncVfx,          new PermInfo(FAI.PersonBurst,           FAI.Ban,        "Allowing", "Preventing",   "VFX from",             false))
@@ -443,7 +472,7 @@ public class SidePanelInteractions
     ///     After the client-side change is made, it requests the change server side.
     ///     If any error occurs from the server-call, the value is reverted to its state before the change.
     /// </summary>
-    public async Task<bool> ChangeOwnUnique(Sundesmo sundesmo, string propertyName, object newValue)
+    public async Task<bool> ChangeOwnUnique(Sundesmo sundesmo, string propertyName, object newValue, Action? onChange = null)
     {
         if (sundesmo is null) return false;
 
@@ -465,15 +494,13 @@ public class SidePanelInteractions
                 throw new InvalidOperationException($"Property {propertyName} in PairPerms, has the finalValue was null, which is not allowed.");
 
             // Now that it is updated client-side, attempt to make the change on the server, and get the hub response.
-            HubResponse response = await _hub.ChangeUniquePerm(sundesmo.UserData, propertyName, newValue);
+            var response = await _hub.ChangeUniquePerm(sundesmo.UserData, propertyName, newValue);
 
             if (response.ErrorCode is not SundouleiaApiEc.Success)
                 throw new InvalidOperationException($"Failed to change {propertyName} to {finalVal} for self. Reason: {response.ErrorCode}");
 
-            // If it was a moodle access change, inform Moodles.
-            if (propertyName == nameof(PairPerms.MoodleAccess))
-                _mediator.Publish(new MoodleAccessPermsChanged(sundesmo));
-
+            // Trigger what to do after the change occurs.
+            onChange?.Invoke();
         }
         catch (InvalidOperationException ex)
         {

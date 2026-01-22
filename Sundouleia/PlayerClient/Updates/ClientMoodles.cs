@@ -38,6 +38,8 @@ public class ClientMoodles : DisposableMediatorSubscriberBase
         // This lets us account for the case where we load before Moodles does.
         if (IpcCallerMoodles.APIAvailable)
             OnMoodlesReady();
+
+        Mediator.Subscribe<MoodleSharePermChanged>(this, _ => MoodleSharePermUpdate(_.Sundesmo));
     }
 
     protected override void Dispose(bool disposing)
@@ -46,6 +48,15 @@ public class ClientMoodles : DisposableMediatorSubscriberBase
         _ipc.OnStatusManagerModified.Unsubscribe(OnStatusManagerModified);
         _ipc.OnStatusUpdated.Unsubscribe((id, deleted) => _ = OnStatusModified(id, deleted));
         _ipc.OnPresetUpdated.Unsubscribe((id, deleted) => _ = OnPresetModified(id, deleted));
+    }
+
+    private async void MoodleSharePermUpdate(Sundesmo sundesmo)
+    {
+        // Only send when true.
+        if (!sundesmo.OwnPerms.ShareOwnMoodles)
+            return;
+        // Push all data to them.
+        await _distributor.PushMoodlesData([sundesmo.UserData]).ConfigureAwait(false);
     }
 
     /// <summary> 
@@ -73,7 +84,7 @@ public class ClientMoodles : DisposableMediatorSubscriberBase
 
         // We had an update for ourselves, fetch latest data and then push to visible immediatly.
         Data.UpdateDataInfo(await _ipc.GetOwnDataInfo().ConfigureAwait(false));
-        Mediator.Publish(new MoodlesChanged(addr));
+        Mediator.Publish(new MoodlesSMChanged(addr));
         Svc.Logger.Debug($"Client Status manager modified", LoggerType.IpcMoodles);
     }
 

@@ -124,6 +124,11 @@ public sealed class Sundesmo : IComparable<Sundesmo>
             PairPerms.MoodleAccess, (long)PairPerms.MaxMoodleTime.TotalMilliseconds);
     }
 
+    public void SetPauseState(bool newPauseState)
+    {
+        _logger.LogWarning("I would be setting the new pause state here and handling logic!");
+    }
+
     public void SetMoodleData(MoodleData newData)
         => SharedData = newData;
 
