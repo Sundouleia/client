@@ -143,7 +143,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         foreach (var sundesmo in _allSundesmos.Values)
             sundesmo.DisposeData();
         _allSundesmos.Clear();
-        Logger.LogDebug($"Disposed {pairCount} Sundesmos.", LoggerType.PairManagement);
+        Logger.LogInformation($"Disposed {pairCount} Sundesmos.", LoggerType.PairManagement);
         RecreateLazy();
     }
 
@@ -239,11 +239,11 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     /// </summary>
     public void MarkSundesmoForUnload(UserData user)
     {
-        if (_allSundesmos.TryGetValue(user, out var pair))
-        {
-            Logger.LogTrace($"Marked {pair.PlayerName}({pair.GetNickAliasOrUid()}) as reloading", LoggerType.PairManagement);
-            pair.MarkForUnload();
-        }
+        if (!_allSundesmos.TryGetValue(user, out var sundesmo))
+            throw new InvalidOperationException($"No user found [{user.AliasOrUID}]");
+        
+        Logger.LogTrace($"Marked {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()}) as reloading", LoggerType.PairManagement);
+        sundesmo.MarkForUnload();
     }
 
     /// <summary>
@@ -252,14 +252,18 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     /// </summary>
     public void MarkSundesmoOffline(UserData user)
     {
-        if (_allSundesmos.TryGetValue(user, out var pair))
-        {
-            Logger.LogTrace($"Marked {pair.PlayerName}({pair.GetNickAliasOrUid()}) as offline", LoggerType.PairManagement);
-            Mediator.Publish(new ClearProfileDataMessage(pair.UserData));
-            pair.MarkOffline();
-            RecreateLazy();
+        if (!_allSundesmos.TryGetValue(user, out var sundesmo))
+            throw new InvalidOperationException($"No user found [{user.AliasOrUID}]");
+        
+        Logger.LogTrace($"Marked {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()}) as offline", LoggerType.PairManagement);
+        Mediator.Publish(new ClearProfileDataMessage(sundesmo.UserData));
 
-        }
+        // Performs an immidiate revert if they were marked for a paused state.
+        // How does this not cause race conditions with UserChangeUniqueSingle?
+        //  - When called by the client. (The Client paused this Sundesmo), we set the new value before making the call.
+        //  - When called by the sundesmo, the permission update is returned before the Offline call, so it will be set.
+        sundesmo.MarkOffline(sundesmo.OwnPerms.PauseVisuals);
+        RecreateLazy();
     }
 
     /// <summary>
@@ -350,19 +354,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
 
     #endregion Manager Helpers
 
-    #region Updates
-    /// <summary>
-    ///     Sets the new pause state for a sundesmo. Pausing and unpausing skips limbo timer. <para />
-    ///     While paused, updates are still recieved, but not processed.
-    /// </summary>
-    public void SetPauseState(UserData target, bool newPauseState)
-    {
-        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
-        Logger.LogTrace($"Setting pause state for {sundesmo.GetNickAliasOrUid()} to {newPauseState}!", LoggerType.Callbacks);
-        sundesmo.SetPauseState(newPauseState);
-    }
-    
+    #region Updates    
     public void ReceiveMoodleData(UserData target, MoodleData newMoodleData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))

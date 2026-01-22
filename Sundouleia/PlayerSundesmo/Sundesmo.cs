@@ -124,11 +124,6 @@ public sealed class Sundesmo : IComparable<Sundesmo>
             PairPerms.MoodleAccess, (long)PairPerms.MaxMoodleTime.TotalMilliseconds);
     }
 
-    public void SetPauseState(bool newPauseState)
-    {
-        _logger.LogWarning("I would be setting the new pause state here and handling logic!");
-    }
-
     public void SetMoodleData(MoodleData newData)
         => SharedData = newData;
 
@@ -250,7 +245,9 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         if (IsReloading || immidiateRevert)
         {
             await RevertRenderedAlterations().ConfigureAwait(false);
-            await ClearAllAlterationData().ConfigureAwait(false);
+            // Clear if we are reloading only.
+            if (IsReloading)
+                await ClearAllAlterationData().ConfigureAwait(false);
         }
         // If they are rendered, we should place them into a timeout.
         else if (IsRendered)
@@ -277,7 +274,6 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     /// </summary>
     public bool ExitLimboState()
         => _limboManager.CancelLimbo(UserData);
-
 
     /// <summary>
     ///     Reapply cached Alterations to all visible OwnedObjects.

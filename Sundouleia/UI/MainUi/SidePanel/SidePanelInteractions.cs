@@ -244,10 +244,7 @@ public class SidePanelInteractions
             {
                 // Perform the change over the server. When it completes, determine the pause state.
                 if (await ChangeOwnUnique(s, nameof(PairPerms.PauseVisuals), !isPaused).ConfigureAwait(false))
-                {
                     _logger.LogInformation($"[OwnPermChange] Permission 'IsPaused' is now '{!isPaused}' for {s.GetNickAliasOrUid()}.");
-                    _sundesmos.SetPauseState(s.UserData, !isPaused);
-                }
             });
         }
         CkGui.AttachToolTip(isPaused ? $"Unpause {dispName}, restoring their Modded Appearance" : $"Pause {dispName}, reverting them to game state.");
