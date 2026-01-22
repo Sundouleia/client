@@ -1,6 +1,3 @@
-using CkCommons.Gui;
-using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Colors;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -14,38 +11,45 @@ namespace Sundouleia.Radar;
 ///     Holds data about their Character* and common visibility logic.
 ///     Concrete subclasses provide display/UID and filter behavior.
 /// </summary>
-public unsafe abstract class RadarUser
+public unsafe class RadarUser
 {
-    protected Character* _player;
+    private readonly SundesmoManager _sundesmos;
 
-    // Remember that the hashed Ident is dependent on radar user setting, not pair setting.
-    // Someone can be paired and have their ident hidden, even if in the sundesmo.
-    protected RadarUser(string hashedIdent, IntPtr address)
+    private Character* _player;
+    private UserData _user;
+    private Sundesmo? _sundesmo;
+
+    // Find a way to phase out the manager if possible, perhaps with a function
+    public RadarUser(SundesmoManager manager, OnlineUser onlineUser, IntPtr address)
     {
-        HashedIdent = hashedIdent;
+        _sundesmos = manager;
+        _user = onlineUser.User;
+        HashedIdent = onlineUser.Ident;
         _player = address != IntPtr.Zero ? (Character*)address : null;
+        RefreshSundesmo();
     }
 
-    public string HashedIdent { get; protected set; }
+    public string HashedIdent { get; private set; }
 
-    // Used for comparisons and the like. 
-    public abstract string UID { get; }
-    public abstract string AnonTag { get; }
-    public abstract string DisplayName { get; }
+    public string UID         => _sundesmo?.UserData.UID        ?? _user.UID;
+    public string AnonTag     => _sundesmo?.UserData.AnonTag    ?? _user.AnonTag;
+    public string DisplayName => _sundesmo?.GetNickAliasOrUid() ?? _user.AnonName;
 
-    public bool IsValid => _player is not null;
-    public virtual bool CanSendRequests => HashedIdent.Length is not 0;
-     
+    public bool IsPaired        => _sundesmo is not null;
+    public bool CanSendRequests => !IsPaired && HashedIdent.Length != 0;
 
-    // All of the below only works if valid.
+    // Visibility.
+    public bool   IsValid        => _player is not null;     
     public IntPtr Address        => (nint)_player;
-    public ushort ObjIndex       => _player->ObjectIndex;
-    public ulong  EntityId       => _player->EntityId;
-    public ulong  PlayerObjectId => _player->GetGameObjectId().Id;
+    public ushort ObjIndex       => IsValid ? _player->ObjectIndex : ushort.MaxValue;
+    public ulong  EntityId       => IsValid ? _player->EntityId : ulong.MaxValue;
+    public ulong  PlayerObjectId => IsValid ? _player->GetGameObjectId().Id : ulong.MaxValue;
+
+    public void RefreshSundesmo()
+        => _sundesmo = _sundesmos.GetUserOrDefault(_user);
 
     /// <summary>
-    ///     Update the hashedId for this radar user. It will 
-    ///     determine resulting visibility status.
+    ///     Update the hashedId for this radar user. Determines visibility status.
     /// </summary>
     public void UpdateOnlineUser(OnlineUser newState)
     {
@@ -66,53 +70,15 @@ public unsafe abstract class RadarUser
     }
 
     // For simplifying a filter check against a radar user.
-    public abstract bool MatchesFilter(string filter);
-}
-
-/// <summary>
-///     Model representing a valid visible radar user. <para />
-///     Holds data about their Character* on top of the OnlineUser.
-/// </summary>
-public sealed class PairedRadarUser : RadarUser
-{
-    private Sundesmo _sundesmo;
-    public unsafe PairedRadarUser(Sundesmo sundesmo, OnlineUser identState, IntPtr address)
-        : base(identState.Ident, address)
+    public bool MatchesFilter(string filter)
     {
-        _sundesmo = sundesmo;
+        if (filter.Length is 0)
+            return true;
+
+        if (_sundesmo is not null)
+            return _sundesmo.UserData.AliasOrUID.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || (_sundesmo.GetNickname()?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
+
+        return _user.AnonName.Contains(filter, StringComparison.OrdinalIgnoreCase);
     }
-
-    // Primarily for debugging.
-    public override string UID => _sundesmo.UserData.UID;
-    public override string AnonTag => _sundesmo.UserData.AnonTag;
-    public override string DisplayName => _sundesmo.GetNickAliasOrUid();
-    public override bool CanSendRequests => false;
-
-    public override bool MatchesFilter(string filter)
-        => filter.Length is 0 ? true
-        : _sundesmo.UserData.AliasOrUID.Contains(filter, StringComparison.OrdinalIgnoreCase)
-          || (_sundesmo.GetNickname()?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
-}
-
-/// <summary>
-///     Concrete radar user for unpaired / anonymous users. Keeps base/default behaviour,
-///     but explicitly marks IsPair = false and provides a focused MatchesFilter.
-/// </summary>
-public sealed class UnpairedRadarUser : RadarUser
-{
-    private readonly RequestsManager _requests;
-    private UserData _user;
-    public UnpairedRadarUser(RequestsManager requests, OnlineUser radarUser, IntPtr address)
-        : base(radarUser.Ident, address)
-    {
-        _requests = requests;
-        _user = radarUser.User;
-    }
-
-    public override string UID => _user.UID;
-    public override bool CanSendRequests => true;
-    public override string AnonTag => _user.AnonTag;
-    public override string DisplayName => _user.AnonName;
-    public override bool MatchesFilter(string filter)
-        => filter.Length is 0 ? true : _user.AnonName.Contains(filter, StringComparison.OrdinalIgnoreCase);
 }

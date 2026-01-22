@@ -1,4 +1,3 @@
-using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.Services.Mediator;

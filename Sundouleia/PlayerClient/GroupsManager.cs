@@ -1,4 +1,3 @@
-using FFXIVClientStructs.FFXIV.Client.UI;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;

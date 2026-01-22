@@ -6,7 +6,6 @@ using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Permissions;

@@ -10,7 +10,6 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using Sundouleia.Services.Textures;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;

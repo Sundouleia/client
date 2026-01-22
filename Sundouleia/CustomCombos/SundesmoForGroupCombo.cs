@@ -1,6 +1,5 @@
 using Dalamud.Bindings.ImGui;
 using OtterGui.Classes;
-using OtterGui.Extensions;
 using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;

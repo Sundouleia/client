@@ -1,8 +1,3 @@
-using Dalamud.Interface.Textures.TextureWraps;
-using FFXIVClientStructs.FFXIV.Client.Game.Control;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using Microsoft.Extensions.FileSystemGlobbing;
-using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 

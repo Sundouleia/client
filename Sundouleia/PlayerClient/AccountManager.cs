@@ -1,5 +1,4 @@
 using CkCommons;
-using Microsoft.Extensions.FileProviders;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Network;

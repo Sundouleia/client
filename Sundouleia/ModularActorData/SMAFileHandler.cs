@@ -3,9 +3,6 @@ using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Watchers;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModularActor;
 

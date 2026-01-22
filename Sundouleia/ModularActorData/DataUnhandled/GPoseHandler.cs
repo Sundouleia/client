@@ -3,12 +3,9 @@ using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
-using Sundouleia.ModularActor;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
-using System.Diagnostics.CodeAnalysis;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.ModularActor;
 

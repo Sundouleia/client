@@ -1,11 +1,9 @@
 using CkCommons;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 using GagspeakAPI.Data;
 using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.PlayerClient;
 

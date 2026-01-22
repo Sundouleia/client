@@ -1,7 +1,6 @@
 using System.Net.Http.Headers;
 using System.Reflection;
 using CkCommons;
-using CkCommons.DrawSystem;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;

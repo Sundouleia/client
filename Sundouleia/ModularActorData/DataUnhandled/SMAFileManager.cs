@@ -1,5 +1,3 @@
-using Dalamud.Interface.Textures.TextureWraps;
-using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Utils;
 

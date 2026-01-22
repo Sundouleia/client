@@ -1,4 +1,3 @@
-using CkCommons.DrawSystem;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
@@ -7,11 +6,9 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
-using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
-using System;
 
 namespace Sundouleia.Gui.MainWindow;
 

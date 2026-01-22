@@ -16,7 +16,6 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
-using System.Runtime.CompilerServices;
 
 namespace Sundouleia.DrawSystem;
 

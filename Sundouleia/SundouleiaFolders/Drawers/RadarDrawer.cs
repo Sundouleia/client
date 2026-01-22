@@ -128,18 +128,13 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     protected override void DrawLeaf(IDynamicLeaf<RadarUser> leaf, DynamicFlags flags, bool selected)
     {
         // Draw out the leaf, based on it's data type.
-        if (leaf.Data is PairedRadarUser pru)
-            DrawPairedUser(leaf, pru, flags, selected);
-        else if (leaf.Data is UnpairedRadarUser uru)
-            DrawUnpairedUser(leaf, uru, flags, selected);
+        if (leaf.Data.IsPaired)
+            DrawPairedUser(leaf, flags, selected);
         else
-        {
-            using (var _ = CkRaii.Child(Label + leaf.Name, new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImUtf8.FrameHeight)))
-                ImGui.TextUnformatted($"Unknown Radar User Type: {leaf.Data.GetType().FullName}");
-        }
+            DrawUnpairedUser(leaf, flags, selected);
     }
 
-    private void DrawPairedUser(IDynamicLeaf<RadarUser> leaf, PairedRadarUser pru, DynamicFlags flags, bool selected)
+    private void DrawPairedUser(IDynamicLeaf<RadarUser> leaf, DynamicFlags flags, bool selected)
     {
         var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImUtf8.FrameHeight);
         var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
@@ -156,11 +151,11 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
 
         // Go back and draw the name.
         ImGui.SameLine(pos.X);
-        CkGui.TextFrameAligned(pru.DisplayName);
-        CkGui.ColorTextFrameAlignedInline($"({pru.AnonTag})", ImGuiColors.DalamudGrey2);
+        CkGui.TextFrameAligned(leaf.Data.DisplayName);
+        CkGui.ColorTextFrameAlignedInline($"({leaf.Data.AnonTag})", ImGuiColors.DalamudGrey2);
     }
 
-    private void DrawUnpairedUser(IDynamicLeaf<RadarUser> leaf, UnpairedRadarUser uru, DynamicFlags flags, bool selected)
+    private void DrawUnpairedUser(IDynamicLeaf<RadarUser> leaf, DynamicFlags flags, bool selected)
     {
         bool drafting = _inDrafter == leaf;
         var height = drafting ? CkStyle.GetFrameRowsHeight(2) : ImUtf8.FrameHeight;
@@ -181,11 +176,16 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             if (ImGui.InvisibleButton($"node_{leaf.FullPath}", selectable.InnerRegion))
                 HandleLeftClick(leaf, flags);
             HandleDetections(leaf, flags);
-            CkGui.AttachToolTip(TooltipText, ImGuiColors.DalamudOrange);
+            if (leaf.Data.CanSendRequests)
+            {
+                CkGui.AttachToolTip(_requests.ExistsFor(leaf.Data.UID)
+                    ? "A pending/incoming request including this User exists."
+                    : TooltipText, ImGuiColors.DalamudOrange);
+            }
 
             // Go back and draw the name.
             ImGui.SameLine(pos.X);
-            CkGui.TextFrameAligned(uru.DisplayName);
+            CkGui.TextFrameAligned(leaf.Data.DisplayName);
         }
 
         // Draw the drafter afterwards.
@@ -203,14 +203,19 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     // We only ever do this for the unpaired leaves so it's ok to handle that logic here.
     protected override void HandleLeftClick(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
     {
+        if (!node.Data.CanSendRequests || _requests.ExistsFor(node.Data.UID))
+            return;
+
         // Send quick-request if shift is held.
         if (ImGui.GetIO().KeyShift && _inDrafter != node)
-            SendRequest(node, _defaultGroups.Select(g => g.Label).ToList());
+            SendRequest(node, []);
         // Otherwise just set the drafter to this node and clear all drafter variables.
         else
         {
+            // If in drafter for this node, close it.
             if (_inDrafter == node)
                 _inDrafter = null;
+            // Otherwise, open it, but not if the node is in any requests.
             else
             {
                 _inDrafter = node;
@@ -263,7 +268,9 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
                 _groupsToJoinOnAccept = _defaultGroups.Select(g => g.Label).ToList();
                 _asTemporary = _defaultIsTemporary;
                 _requestMsg = string.Empty;
-                // primitively add this user to all of these groups as users, or place them in some hidden pending list.
+                // Exit the drafter.
+                _inDrafter = null;
+                // If we wanted to pre-add them to groups, do that below before the return.
                 return;
             }
             // Notify failure.

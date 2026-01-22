@@ -1,6 +1,4 @@
-﻿using CkCommons;
-using Lumina.Data.Files;
-using Sundouleia.Services.Mediator;
+﻿using Lumina.Data.Files;
 
 namespace Sundouleia.ModFiles;
 

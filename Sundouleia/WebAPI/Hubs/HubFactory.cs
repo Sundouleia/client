@@ -3,7 +3,6 @@ using MessagePack.Resolvers;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using SundouleiaAPI.Hub;

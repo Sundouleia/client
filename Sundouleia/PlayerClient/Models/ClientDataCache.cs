@@ -1,6 +1,5 @@
 using Sundouleia.ModFiles;
 using SundouleiaAPI.Data;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.PlayerClient;
 

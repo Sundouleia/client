@@ -1,11 +1,3 @@
-using CkCommons;
-using Dalamud.Interface.Textures.TextureWraps;
-using Microsoft.IdentityModel.Tokens;
-using Sundouleia.ModFiles;
-using Sundouleia.PlayerClient;
-using Sundouleia.Services.Textures;
-using TerraFX.Interop.Windows;
-
 namespace Sundouleia.ModularActor;
 
 public abstract class FileDataSummary

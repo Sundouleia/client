@@ -3,8 +3,6 @@ using CkCommons.DrawSystem;
 using CkCommons.DrawSystem.Selector;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
-using FFXIVClientStructs.FFXIV.Client.Game.Group;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
@@ -234,15 +232,29 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly FolderConfig _config;
+    private readonly SundesmoManager _sundesmos;
     public SidePanelService(ILogger<SidePanelService> logger, SundouleiaMediator mediator,
-        MainHub hub, FolderConfig config)
+        MainHub hub, FolderConfig config, SundesmoManager sundesmos)
         : base(logger, mediator)
     {
         _hub = hub;
         _config = config;
+        _sundesmos = sundesmos;
+
         Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearDisplay());
         Mediator.Subscribe<MainWindowTabChangeMessage>(this, _ => UpdateForNewTab(_.NewTab));
         Mediator.Subscribe<OpenSundesmoSidePanel>(this, _ => ForInteractions(_.Sundesmo, _.ForceOpen));
+        // Whenever the sundesmo folder updates, it is possible that our pair was removed so we need to validate it.
+        Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => EnsureValidInteractions());
+    }
+
+    private void EnsureValidInteractions()
+    {
+        if (DisplayCache is not InteractionsCache pairCache || !pairCache.IsValid)
+            return;
+        // Clear display if the sundesmo no longer exists.
+        if (!_sundesmos.ContainsSundesmo(pairCache.Sundesmo.UserData.UID))
+            ClearDisplay();
     }
 
     private void UpdateForNewTab(MainMenuTabs.SelectedTab newTab)

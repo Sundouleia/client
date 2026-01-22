@@ -2,14 +2,12 @@ using CkCommons;
 using Dalamud.Hooking;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using System.Diagnostics.CodeAnalysis;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Watchers;
 

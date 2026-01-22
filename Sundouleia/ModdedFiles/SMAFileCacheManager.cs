@@ -1,5 +1,4 @@
-﻿using Dalamud.Interface.ImGuiNotification;
-using K4os.Compression.LZ4.Legacy;
+﻿using K4os.Compression.LZ4.Legacy;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;
 using Sundouleia.PlayerClient;

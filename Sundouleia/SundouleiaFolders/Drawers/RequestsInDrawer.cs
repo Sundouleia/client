@@ -16,7 +16,6 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
-using System.Drawing;
 
 namespace Sundouleia.DrawSystem;
 

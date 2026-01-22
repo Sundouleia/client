@@ -1,6 +1,4 @@
 using Sundouleia.Services.Mediator;
-using SundouleiaAPI.Data;
-using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Network;
 
 namespace Sundouleia.PlayerClient;
@@ -39,6 +37,10 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
     // Expose the Request Entries.
     public List<RequestEntry> Incoming => _incomingInternal.Value;
     public List<RequestEntry> Outgoing => _outgoingInternal.Value;
+
+    public bool ExistsFor(string uid)
+        => _incomingInternal.Value.Any(r => r.SenderUID == uid) 
+        || _outgoingInternal.Value.Any(r => r.RecipientUID == uid);
 
     public void AddNewRequest(SundesmoRequest newRequest)
     {

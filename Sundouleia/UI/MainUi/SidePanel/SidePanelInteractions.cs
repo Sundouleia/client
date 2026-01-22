@@ -2,7 +2,6 @@ using CkCommons;
 using CkCommons.DrawSystem;
 using CkCommons.Gui;
 using CkCommons.Helpers;
-using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
@@ -10,6 +9,7 @@ using OtterGui;
 using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.WebAPI;
@@ -37,18 +37,20 @@ public class SidePanelInteractions
     private readonly SundouleiaMediator _mediator;
     private readonly MainHub _hub;
     private readonly SundesmoManager _sundesmos;
+    private readonly RadarManager _radar;
     private readonly SidePanelService _service;
 
     // internal storage.
     private Dictionary<SIID, string> _timespanCache = new();
 
     public SidePanelInteractions(ILogger<SidePanelInteractions> logger, SundouleiaMediator mediator,
-        MainHub hub, SundesmoManager sundesmos, SidePanelService service)
+        MainHub hub, SundesmoManager sundesmos, RadarManager radar, SidePanelService service)
     {
         _logger = logger;
         _mediator = mediator;
         _hub = hub;
         _sundesmos = sundesmos;
+        _radar = radar;
         _service = service;
     }
 
@@ -219,7 +221,9 @@ public class SidePanelInteractions
                 else
                 {
                     _logger.LogInformation($"Successfully removed pair {dispName}.");
-                    ImGui.CloseCurrentPopup();
+                    _sundesmos.RemoveSundesmo(new(s.UserData));
+                    _radar.RefreshUser(s.UserData);
+                    _service.ClearDisplay();
                 }
             });
         CkGui.AttachToolTip($"Must hold --COL--CTRL & SHIFT to remove.", color: ImGuiColors.DalamudRed);

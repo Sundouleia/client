@@ -104,7 +104,11 @@ public partial class MainHub
     public Task Callback_AddPair(UserPair dto)
     {
         Logger.LogDebug($"Callback_AddPair: {dto}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.AddSundesmo(dto));
+        Generic.Safe(() =>
+        {
+            _sundesmos.AddSundesmo(dto);
+            _radar.RefreshUser(dto.User);
+        });
         return Task.CompletedTask;
     }
 
@@ -114,7 +118,11 @@ public partial class MainHub
     public Task Callback_RemovePair(UserDto dto)
     {
         Logger.LogDebug($"Callback_RemovePair: {dto}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.RemoveSundesmo(dto));
+        Generic.Safe(() =>
+        {
+            _sundesmos.RemoveSundesmo(dto);
+            _radar.RefreshUser(dto.User);
+        });
         return Task.CompletedTask;
     }
 

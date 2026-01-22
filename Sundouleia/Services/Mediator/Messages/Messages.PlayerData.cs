@@ -7,14 +7,16 @@ using SundouleiaAPI.Data;
 namespace Sundouleia.Services.Mediator;
 
 // Sundesmo Management, and visibility handling.
-public record SundesmoOnline(Sundesmo Sundesmo) : MessageBase; // Revise
+public record SundesmoOnline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoOffline(Sundesmo Sundesmo) : MessageBase;
 public record SundesmoPlayerRendered(PlayerHandler Handler, Sundesmo Sundesmo) : SameThreadMessage; // Effectively "becoming visible"
 public record SundesmoPlayerUnrendered(IntPtr Address) : SameThreadMessage; // Effectively "becoming invisible"
 public record SundesmoEnteredLimbo(Sundesmo Sundesmo) : MessageBase; // Alteration Timeout Begin.
 public record SundesmoLeftLimbo(Sundesmo Sundesmo) : MessageBase; // Alteration Timeout End.
+
 public record TargetSundesmoMessage(Sundesmo Sundesmo) : MessageBase; // when desiring to target a sundesmo.
 public record SendTempRequestMessage(UserData TargetUser) : MessageBase; // for examine-based sends. Not sends handled via UI.
+
 public record DownloadLimitChangedMessage : SameThreadMessage;
 public record FilesUploading(PlayerHandler Player) : MessageBase;
 public record FilesUploaded(PlayerHandler Player) : MessageBase;

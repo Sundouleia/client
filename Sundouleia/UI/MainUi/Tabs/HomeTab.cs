@@ -2,11 +2,9 @@ using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Client.Game;
 using OtterGui.Text;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Services;
@@ -16,7 +14,6 @@ using Sundouleia.Services.Textures;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.WebAPI;
 using System.Globalization;
-using System.Reflection;
 
 namespace Sundouleia.Gui.MainWindow;
 

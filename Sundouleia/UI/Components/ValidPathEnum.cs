@@ -1,11 +1,3 @@
-using CkCommons;
-using CkCommons.Gui;
-using CkCommons.Gui.Utility;
-using CkCommons.Raii;
-using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Colors;
-using OtterGui.Text;
-
 namespace Sundouleia.Gui;
 
 public enum FilePathValidation

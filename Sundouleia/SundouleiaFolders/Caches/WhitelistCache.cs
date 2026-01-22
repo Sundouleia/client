@@ -1,9 +1,7 @@
 using CkCommons.DrawSystem;
 using CkCommons.DrawSystem.Selector;
-using Sundouleia.Localization;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
-using System.Reflection.Metadata;
 
 namespace Sundouleia.DrawSystem;
 

@@ -2,7 +2,6 @@ using CkCommons.DrawSystem;
 using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Raii;
-using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
@@ -15,7 +14,6 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem;
 

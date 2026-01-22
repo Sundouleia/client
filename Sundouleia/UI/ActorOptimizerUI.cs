@@ -8,7 +8,6 @@ using Dalamud.Interface.Utility.Raii;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
-using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 

@@ -9,7 +9,6 @@ using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.Services.Tutorial;

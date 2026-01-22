@@ -2,7 +2,6 @@ using System.Reflection;
 using CkCommons;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Sundouleia.Gui;
 using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;

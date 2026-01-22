@@ -1,6 +1,5 @@
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
@@ -42,7 +41,8 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<WatchedObjectCreated>(this, _ => OnObjectCreated(_.Address));
         Mediator.Subscribe<WatchedObjectDestroyed>(this, _ => OnObjectDeleted(_.Address));
-        Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearUsers()); // Can maybe move over to the distributor.
+        Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearUsers());
+
         Svc.ContextMenu.OnMenuOpened += OnRadarContextMenu;
 
 #if DEBUG
@@ -51,7 +51,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         {
             for (int i = 0; i < 5; i++)
             {
-                var toAdd = new UnpairedRadarUser(_requests, new(new($"Dummy Sender {i}"), $"RandomIdent{i}"), IntPtr.Zero);
+                var toAdd = new RadarUser(_sundesmos, new(new($"Dummy Sender {i}"), $"RandomIdent{i}"), IntPtr.Zero);
                 _allRadarUsers.TryAdd(new($"Dummy Sender {i}"), toAdd);
             }
             RecreateLazy();
@@ -148,12 +148,14 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         if (user.User.UID == MainHub.UID)
             return; // Ignore Self.
 
-        Logger.LogDebug($"Adding radar user {user.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
+        // For Updates
+        Logger.LogDebug($"Updating {user.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
         if (_allRadarUsers.TryGetValue(user.User, out var existing))
         {
             Logger.LogDebug($"Updating radar user {user.User.AnonName}.", LoggerType.RadarManagement);
             existing.UpdateOnlineUser(user);
         }
+        // For Adding
         else
         {
             Logger.LogDebug($"Creating new radar user {user.User.AnonName}.", LoggerType.RadarManagement);
@@ -161,11 +163,8 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
             if (address == IntPtr.Zero && !string.IsNullOrEmpty(user.Ident))
                 _watcher.TryGetExisting(user.Ident, out address);
 
-            // Add the user based on if they are a pair or not a pair.
-            if (_sundesmos.GetUserOrDefault(user.User) is { } match)
-                _allRadarUsers.TryAdd(user.User, new PairedRadarUser(match, user, address));
-            else
-                _allRadarUsers.TryAdd(user.User, new UnpairedRadarUser(_requests, user, address));
+            // Attempt to add the user. If it was successful, try updating the sundesmo.
+            _allRadarUsers.TryAdd(user.User, new RadarUser(_sundesmos, user, address));
         }
         // Could have removed hashedIdent from the User, so we should remove them from the list.
         RecreateLazy();
@@ -186,6 +185,21 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     {
         Logger.LogDebug($"(Radar) A user was removed.", LoggerType.RadarManagement);
         _allRadarUsers.TryRemove(user, out _);
+        RecreateLazy();
+    }
+
+    public void RefreshUser(UserData user)
+    {
+        if (!_allRadarUsers.TryGetValue(user, out var existing))
+            return;
+        existing.RefreshSundesmo();
+        RecreateLazy();
+    }
+
+    public void RefreshUsers()
+    {
+        foreach (var radarUser in _allRadarUsers.Values)
+            radarUser.RefreshSundesmo();
         RecreateLazy();
     }
 

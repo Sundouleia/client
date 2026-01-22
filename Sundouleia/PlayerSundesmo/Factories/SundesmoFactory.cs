@@ -1,5 +1,4 @@
 using Sundouleia.PlayerClient;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using SundouleiaAPI.Network;

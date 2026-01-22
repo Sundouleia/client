@@ -36,12 +36,14 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         }
     }
 
-    private readonly MainConfig _config;
     private readonly SundouleiaMediator _mediator;
-    public MainMenuTabs(SundouleiaMediator mediator, MainConfig config, TutorialService guides)
+    private readonly MainConfig _config;
+    private readonly RequestsManager _requests;
+    public MainMenuTabs(SundouleiaMediator mediator, MainConfig config, RequestsManager requests, TutorialService guides)
     {
         _mediator = mediator;
         _config = config;
+        _requests = requests;
         TabSelection = _config.Current.CurMainUiTab;
 
         AddDrawButton(FontAwesomeIcon.Home, SelectedTab.Homepage, "Homepage",
@@ -113,8 +115,14 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
                     ImGui.GetColorU32(ImGuiCol.Separator), 2f);
             }
 
-            // Handle special cases for notification badges. (Occurs for Requests & RadarChat)
-            if (tab.TargetTab is SelectedTab.RadarChat && _config.Current.RadarShowUnreadBubble)
+            if (tab.TargetTab is SelectedTab.Requests && _requests.Incoming.Count > 0)
+            {
+                var newMsgTxtPos = new Vector2(x.X + buttonSize.X * .65f, x.Y - spacing.Y);
+                var newMsgTxt = _requests.Incoming.Count > 99 ? "99+" : _requests.Incoming.Count.ToString();
+                drawList.OutlinedFont(newMsgTxt, newMsgTxtPos, ImGuiColors.TankBlue.ToUint(), 0xFF000000, 1);
+            }
+            // For Radar Chat.
+            else if (tab.TargetTab is SelectedTab.RadarChat && _config.Current.RadarShowUnreadBubble)
             {
                 if (RadarChatLog.NewMsgCount > 0)
                 {
