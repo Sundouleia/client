@@ -162,15 +162,15 @@ public class SidePanelUI : WindowMediatorSubscriberBase
 
     private void DrawInteractionsPanel(InteractionsCache ic)
     {
+        // Draw tabs
+        _sundesmoTabs.Draw(ImGui.GetContentRegionAvail().X);
+
         using var _ = CkRaii.Child("SundesmoInteractions", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
         var dispName = ic.DisplayName;
 
         if (ic.Sundesmo is not { } sundesmo)
             return;
-
-        // Draw tabs
-        _sundesmoTabs.Draw(width);
 
         // Draw content based on tab.
         if (_sundesmoTabs.TabSelection is SundesmoTabs.SelectedTab.Interactions)
