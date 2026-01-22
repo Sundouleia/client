@@ -49,7 +49,7 @@ public sealed class SundesmoStatusCombo : MoodleComboBase<MoodlesStatusInfo>
         MoodleIcon.DrawMoodleIcon(myStatus.IconID, myStatus.Stacks, IconSize);
         myStatus.AttachTooltip(_sundesmo.SharedData.StatusList);
 
-        ImUtf8.SameLineInner();        
+        ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + adjust);
         CkRichText.Text(titleSpace, myStatus.Title);

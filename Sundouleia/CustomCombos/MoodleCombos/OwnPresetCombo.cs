@@ -64,7 +64,7 @@ public sealed class OwnPresetCombo : MoodleComboBase<MoodlePresetInfo>
             }
         }
 
-        ImUtf8.SameLineInner();
+        ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + adjust);
         CkRichText.Text(titleSpace, moodlePreset.Title);

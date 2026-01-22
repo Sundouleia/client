@@ -1,3 +1,4 @@
+using CkCommons.Gui;
 using CkCommons.Helpers;
 using CkCommons.RichText;
 using CkCommons.Textures;
@@ -52,7 +53,7 @@ public sealed class OwnStatusCombo : MoodleComboBase<MoodlesStatusInfo>
         MoodleIcon.DrawMoodleIcon(myStatus.IconID, myStatus.Stacks, IconSize);
         myStatus.AttachTooltip(ClientMoodles.Data.StatusList);
 
-        ImUtf8.SameLineInner();
+        ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + adjust);
         CkRichText.Text(titleSpace, myStatus.Title);
