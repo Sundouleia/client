@@ -318,6 +318,11 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public List<UserData> GetVisibleConnected() => _allSundesmos.Where(p => p.Value.IsRendered && p.Value.IsOnline).Select(p => p.Key).ToList();
 
     /// <summary>
+    ///     Gets the MoodlesTrusted sundesmos to share off moodle data to.
+    /// </summary>
+    public List<UserData> GetMoodleTrusted(IEnumerable<UserData> users) => users.Where(u => _allSundesmos.TryGetValue(u, out var s) && s.OwnPerms.ShareOwnMoodles).ToList();
+
+    /// <summary>
     ///     If a Sundesmo exists given their UID.
     /// </summary>
     public bool ContainsSundesmo(string uid) => _allSundesmos.ContainsKey(new(uid));

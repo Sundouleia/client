@@ -24,6 +24,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     private readonly FileUploader _fileUploader;
     private readonly LimboStateManager _limbo;
     private readonly ModdedStateManager _moddedState;
+    private readonly SundesmoManager _sundesmos;
     private readonly CharaObjectWatcher _watcher;
     private readonly ClientUpdateService _updater;
 
@@ -34,8 +35,8 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
 
     public ClientDistributor(ILogger<ClientDistributor> logger, SundouleiaMediator mediator,
         MainHub hub, MainConfig config, IpcManager ipc, FileUploader fileUploader,
-        LimboStateManager limbo, ModdedStateManager moddedState, CharaObjectWatcher watcher, 
-        ClientUpdateService updater)
+        LimboStateManager limbo, ModdedStateManager moddedState, SundesmoManager sundesmos,
+        CharaObjectWatcher watcher, ClientUpdateService updater)
         : base(logger, mediator)
     {
         _hub = hub;
@@ -44,6 +45,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         _fileUploader = fileUploader;
         _limbo = limbo;
         _moddedState = moddedState;
+        _sundesmos = sundesmos;
         _watcher = watcher;
         _updater = updater;
 
@@ -193,6 +195,13 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             // Handle any missing mods after.
             if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
                 _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
+
+            // If the IPC had moodles in it, send that too.
+            if (_sundesmos.GetMoodleTrusted(recipients) is { } moodleUsers && moodleUsers.Count > 0)
+            {
+                Logger.LogDebug($"(ResendAll) Pushing MoodlesData to {moodleUsers.Count} trusted users.", LoggerType.DataDistributor);
+                await PushMoodlesData(moodleUsers).ConfigureAwait(false);
+            }
         });
     }
 
@@ -211,7 +220,6 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
                 return;
 
             var recipients = _updater.UsersForUpdatePush;
-
             // Send off the update.
             await _hub.UserPushIpcSingle(new(recipients, obj, type, newData)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcSingle to {recipients.Count} users.", LoggerType.DataDistributor);
