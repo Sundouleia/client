@@ -8,7 +8,7 @@ using System.Reflection.Metadata;
 namespace Sundouleia.DrawSystem;
 
 // Cache for DDS's using Sundesmo items.
-public class WhitelistCache(DynamicDrawSystem<Sundesmo> parent) : DynamicFilterCache<Sundesmo>(parent)
+public class WhitelistCache(DynamicDrawSystem<Sundesmo> dds) : DynamicFilterCache<Sundesmo>(dds)
 {
     /// <summary>
     ///     If the config options under the filter bar should show.
@@ -41,26 +41,45 @@ public class WhitelistCache(DynamicDrawSystem<Sundesmo> parent) : DynamicFilterC
             return;
 
         if (newParent is null || newParent.IsRoot)
-            parent.Move(GroupInEditor, (DynamicFolderGroup<Sundesmo>)parent.Root);
+            dds.Move(GroupInEditor, (DynamicFolderGroup<Sundesmo>)dds.Root);
         else
-            parent.Move(GroupInEditor!, (DynamicFolderGroup<Sundesmo>)newParent);
+            dds.Move(GroupInEditor!, (DynamicFolderGroup<Sundesmo>)newParent);
     }
 
     public void UpdateEditorGroupStyle() => GroupInEditor?.ApplyLatestStyle();
+
+    public void UpdateEditorGroupState()
+    {
+        if (GroupInEditor is null)
+            return;
+
+        dds.UpdateFolder(GroupInEditor);
+        MarkForReload(GroupInEditor, true);
+    }
 
     public bool TryRenameNode(GroupsManager groups, string newName)
     {
         if (GroupInEditor is null)
             return false;
 
-        if (!string.IsNullOrWhiteSpace(newName) && groups.TryRename(GroupInEditor.Group, newName))
+        // Clear renaming node regardless.
+        RenamingNode = null;
+        // Do nothing for empty names.
+        if (string.IsNullOrWhiteSpace(newName))
+            return false;
+        // If this is caught, then another item with the same name exists, and we should not process it.
+        try
         {
-            parent.Rename(GroupInEditor, newName);
-            MarkForReload(GroupInEditor.Parent);
-            return true;
+            dds.Rename(GroupInEditor, newName);
         }
-
-        return false;
+        catch (Bagagwa)
+        {
+            Svc.Logger.Warning($"Another Group or Folder already has the name '{newName}'");
+        }
+        // Was successful, so rename the group, and mark the filtercache for reload.
+        groups.TryRename(GroupInEditor.Group, newName);
+        MarkForReload(GroupInEditor, true);
+        return true;
     }
 
     protected override bool IsVisible(IDynamicNode<Sundesmo> node)

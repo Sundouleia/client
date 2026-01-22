@@ -165,11 +165,16 @@ public class HomeTab
                 _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
             CkGui.AttachToolTip("Inspect data of owned actors!");
 
-            if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", buttonWidth, false))
+            var noSMA = true;
+#if DEBUG
+            noSMA = false;
+#endif
+
+            if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", buttonWidth, noSMA))
                 _mediator.Publish(new UiToggleMessage(typeof(SMAManagerUI)));
             CkGui.AttachToolTip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
 
-            if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", buttonWidth, false))
+            if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", buttonWidth, noSMA))
                 _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
             CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
                 "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
@@ -211,14 +216,18 @@ public class HomeTab
     private void DrawButtonList(Vector2 region)
     {
         if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", region.X, false))
-            _mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
+            _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
         CkGui.AttachToolTip("Inspect data of owned actors!");
 
-        if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", region.X, false))
+        var noSMA = true;
+#if DEBUG
+        noSMA = false;
+#endif
+        if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", region.X, noSMA))
             _mediator.Publish(new UiToggleMessage(typeof(SMAManagerUI)));
         CkGui.AttachToolTip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
 
-        if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", region.X, false))
+        if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", region.X, noSMA))
             _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
         CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
             "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);

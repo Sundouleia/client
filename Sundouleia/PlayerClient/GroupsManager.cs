@@ -1,3 +1,4 @@
+using FFXIVClientStructs.FFXIV.Client.UI;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -33,6 +34,9 @@ public class GroupsManager : DisposableMediatorSubscriberBase
     public FolderStorage Config => _config.Current;
     public Dictionary<string, SundesmoGroup> Groups => _config.Current.Groups;
     public List<SundesmoGroup> GroupsList => _config.Current.Groups.Values.ToList();
+
+    // Some kind of dynamic here of pairs <-> Groups. Should be maybe managed by the sundesmo manager?
+    // Can do this later when we want to optimize more.
 
     public void LinkByMatchingLocation()
     {
@@ -85,7 +89,7 @@ public class GroupsManager : DisposableMediatorSubscriberBase
             
             Logger.LogInformation($"[{group.Label}] Matches Loc. Scope ({group.Scope}) for {sundesmo.GetDisplayName()}.");
             LinkToGroup(uid, group);
-            Mediator.Publish(new FolderUpdateGroups());
+            Mediator.Publish(new FolderUpdateGroup(group.Label));
         }
     }
 
@@ -168,21 +172,6 @@ public class GroupsManager : DisposableMediatorSubscriberBase
     {
         group.Icon = newIcon;
         group.IconColor = newColor;
-        _config.Save();
-    }
-
-    public void SetStyle(SundesmoGroup group, uint icon, uint label, uint border, uint gradient)
-    {
-        group.IconColor = icon;
-        group.LabelColor = label;
-        group.BorderColor = border;
-        group.GradientColor = gradient;
-        _config.Save();
-    }
-
-    public void SetState(SundesmoGroup group, bool showOffline)
-    {
-        group.ShowOffline = showOffline;
         _config.Save();
     }
 

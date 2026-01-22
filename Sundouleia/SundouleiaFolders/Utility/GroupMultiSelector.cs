@@ -8,17 +8,11 @@ using Sundouleia.Pairs;
 
 namespace Sundouleia.DrawSystem;
 
-// TODO:
-// First, try to do this with a selected pair, using context menu access.
-// Will likely run into problems. If so, do the following:
-//
-// Revise this to work instead inside of a draw system dependancy.
-// We should only do this because for pairs when we want to add or remove them from groups,
-// we will need to track which folders should be visible, or which folders are applied.
+// This temporarily works for our purposes, but may be wise to revise it later.
 public class RequestsGroupSelector : GroupMultiSelector
 {
-    public RequestsGroupSelector(ILogger logger, GroupsDrawSystem ds)
-        : base(logger, ds)
+    public RequestsGroupSelector(ILogger logger, GroupsDrawSystem dds)
+        : base(logger, dds)
     {
         // Bagagwa
     }
@@ -35,7 +29,7 @@ public class RequestsGroupSelector : GroupMultiSelector
         // Inside of the combo, draw the interactions.
         ImGui.Dummy(new(innerWidth, 0f));
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
-        DrawInternal(id, innerWidth);
+        Draw(id, innerWidth);
     }
 
     public void DrawSelectedList(string id, float width)
@@ -72,6 +66,13 @@ public class RequestsGroupSelector : GroupMultiSelector
     }
 }
 
+// Find some way to better modularize this later, but for now do not care.
+public abstract class MultiSelector
+{
+
+    
+}
+
 /// <summary>
 ///     For selecting desired group and FolderGroups with checkboxes. <para />
 ///     Other elements can override what occurs on selection / deselection.
@@ -91,7 +92,7 @@ public abstract class GroupMultiSelector
     }
 
     // Maybe revise, idfk.
-    protected void DrawInternal(string id, float width, float height = -1)
+    protected virtual void Draw(string id, float width)
     {
         using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One);
         var rootFolder = _drawSystem.Root;

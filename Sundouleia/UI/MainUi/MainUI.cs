@@ -75,7 +75,6 @@ public class MainUI : WindowMediatorSubscriberBase
         this.PinningClickthroughFalse();
         this.SetBoundaries(new(380, 500), new(380, 2000));
         TitleBarButtons = new TitleBarButtonBuilder()
-            .Add(FAI.Book, "Changelog", () => Mediator.Publish(new UiToggleMessage(typeof(ChangelogUI))))
             .Add(FAI.Cog, "Settings", () => Mediator.Publish(new UiToggleMessage(typeof(SettingsUi))))
             .AddTutorial(_guides, TutorialType.MainUi)
             .Build();

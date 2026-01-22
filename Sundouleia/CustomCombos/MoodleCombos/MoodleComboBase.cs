@@ -1,10 +1,7 @@
 using CkCommons.Gui;
 using CkCommons.Textures;
-using Dalamud.Bindings.ImGui;
 using OtterGui.Text;
-using Sundouleia.Gui;
 using Sundouleia.Pairs;
-using Sundouleia.Services;
 using Sundouleia.WebAPI;
 
 namespace Sundouleia.CustomCombos;

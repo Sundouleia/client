@@ -122,7 +122,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
                 Logger?.LogInformation("Version was different, displaying UI");
                 _config.Current.LastRunVersion = Assembly.GetExecutingAssembly().GetName().Version!;
                 _config.Save();
-                Mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
+                // Mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
             }
 
             // if the client does not have a valid setup or config, switch to the intro ui

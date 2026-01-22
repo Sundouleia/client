@@ -13,9 +13,11 @@ namespace Sundouleia.CustomCombos.Editor;
 // A special combo for pairs, that must maintain its distinctness and update accordingly based on changes.
 public sealed class DDSFolderGroupCombo : CkFilterComboCache<IDynamicFolderGroup<Sundesmo>>
 {
+    private readonly GroupsDrawSystem _dds;
     public DDSFolderGroupCombo(ILogger log, GroupsDrawSystem dds)
         : base(() => [.. dds.FolderMap.Values.OfType<IDynamicFolderGroup<Sundesmo>>()], log)
     {
+        _dds = dds;
         SearchByParts = true;
     }
 
@@ -24,8 +26,8 @@ public sealed class DDSFolderGroupCombo : CkFilterComboCache<IDynamicFolderGroup
         if (current == Current)
             return;
 
-        Log.LogInformation($"Current is: {current?.Name ?? "null"}, But Interal Current is: {Current?.Name ?? "null"}");
-        Log.LogInformation($"DDSFolderGroupCombo: Updating current selection to {current?.Name ?? "null"}");
+        if (current == _dds.Root && Current is null)
+            return;
 
         // Need to refresh.
         var priorState = IsInitialized;

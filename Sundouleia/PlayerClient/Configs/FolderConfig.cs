@@ -41,6 +41,9 @@ public class SundesmoGroup
     public uint GradientColor { get; set; } = ImGui.GetColorU32(ImGuiCol.TextDisabled);
     public bool ShowOffline { get; set; } = true;
 
+    // Could move elsewhere later but here seems best for now.
+    public bool InBasicView { get; set; } = false;
+
     // The UserUID's contained in this group.
     public HashSet<string> LinkedUids { get; set; } = new();
 

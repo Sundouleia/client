@@ -12,6 +12,7 @@ public static class SundouleiaSecurity
     private static readonly Dictionary<(string, ushort), string> _hashListPlayersSHA256 = new();
     private static readonly Dictionary<string, string> _hashListSHA256 = new(StringComparer.Ordinal);
     private static readonly SHA256 _sha256CryptoProvider = SHA256.Create();
+    private static readonly object _shaLock = new(); // Temp until we find a way to allow concurrent access.
 
     /// <summary>
     ///     Obtain the BLAKE3 hash of a file.
@@ -52,17 +53,28 @@ public static class SundouleiaSecurity
         if (_hashListSHA256.TryGetValue(filePath, out var hash))
             return hash;
 
-        return _hashListSHA256[filePath] =
-            BitConverter.ToString(_sha256CryptoProvider.ComputeHash(dataToHash)).Replace("-", "", StringComparison.Ordinal);
+        // Ensure no concurrent access.
+        lock (_shaLock)
+        {
+            _hashListSHA256[filePath] =
+                BitConverter.ToString(_sha256CryptoProvider.ComputeHash(dataToHash)).Replace("-", "", StringComparison.Ordinal);
+        }
+        // Return result.
+        return _hashListSHA256[filePath];
     }
 
     private static string GetOrComputeHashSHA256(string stringToCompute)
     {
         if (_hashListSHA256.TryGetValue(stringToCompute, out var hash))
             return hash;
-
-        return _hashListSHA256[stringToCompute] =
-            BitConverter.ToString(_sha256CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
+        // Ensure no concurrent access.
+        lock (_shaLock)
+        {
+            _hashListSHA256[stringToCompute] =
+                BitConverter.ToString(_sha256CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
+        }
+        // Return result.
+        return _hashListSHA256[stringToCompute];
     }
 }
 

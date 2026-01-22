@@ -31,6 +31,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         // Load the hierarchy and initialize the folders.
         LoadData();
 
+        // These can possibly occur at the same time and must be accounted for.
         Mediator.Subscribe<FolderUpdateSundesmos>(this, _ =>
         {
             lock (_folderUpdateLock)

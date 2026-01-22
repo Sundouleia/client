@@ -15,20 +15,18 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.DrawSystem;
 
-public class GroupsDrawer : DynamicDrawer<Sundesmo>
+// Because this is a seperate drawer, we need to ensure that the FilterValue
+// remains up to date with whitelist drawer.
+public class BasicGroupsDrawer : DynamicDrawer<Sundesmo>
 {
     private static readonly string Tooltip =
         "--COL--[L-CLICK]--COL-- Swap Between Name/Nick/Alias & UID." +
         "--NL----COL--[M-CLICK]--COL-- Open Profile" +
         "--NL----COL--[SHIFT + R-CLICK]--COL-- Edit Nickname";
-
-    private static readonly string FolderDDTooltip =
-        "--COL--[DRAG]:--COL-- Move the folder around, re-ordering it.--NL--" +
-        "--COL--[L-CLICK]:--COL-- Add / Remove DragDrop selection.--NL--" +
-        "--COL--[SHIFT + L-CLICK]: --COL-- Bulk Select/Deselect between last & current.";
 
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
@@ -41,13 +39,9 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
 
     // Widgets
     private GroupFilterEditor _filterEditor;
-    private FAIconCombo       _iconSelector; // For Internal Renames
+    private FAIconCombo       _iconSelector;
 
-    // For Managing a users group. Currently only add and only remove are not
-    // individually represented. We can change this as time goes on but keep like this for now.
-
-
-    private WhitelistCache _cache => (WhitelistCache)FilterCache;
+    private BasicGroupCache _cache => (BasicGroupCache)FilterCache;
 
     // Popout Tracking.
     private IDynamicNode? _hoveredTextNode;     // From last frame.
@@ -55,10 +49,10 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     private bool _profileShown = false;         // If currently displaying a popout profile.
     private DateTime? _lastHoverTime;           // time until we should show the profile.
 
-    public GroupsDrawer(ILogger<GroupsDrawer> logger, SundouleiaMediator mediator,
+    public BasicGroupsDrawer(ILogger<GroupsDrawer> logger, SundouleiaMediator mediator,
         MainConfig config, FolderConfig folders, FavoritesConfig favorites, NicksConfig nicks,
         GroupsManager groups, SundesmoManager sundesmos, SidePanelService sp, GroupsDrawSystem ds)
-        : base("##GroupsDrawer", Svc.Logger.Logger, ds, new WhitelistCache(ds))
+        : base("##BasicGroupsDrawer", Svc.Logger.Logger, ds, new BasicGroupCache(ds))
     {
         _mediator = mediator;
         _config = config;
@@ -72,49 +66,15 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         _filterEditor = new GroupFilterEditor(groups);
         _iconSelector = new FAIconCombo(logger);
     }
+    public void UpdateFilter(string newStr)
+        => FilterCache.Filter = newStr;
 
-    public bool OrganizerMode => _cache.FilterConfigOpen;
-
-    #region Search
-    protected override void DrawSearchBar(float width, int length)
+    public void DrawFoldersOnly(float width, DynamicFlags flags = DynamicFlags.None)
     {
-        var tmp = FilterCache.Filter;
-        var rWidth = CkGui.IconTextButtonSize(FAI.FolderPlus, "Group") + CkGui.IconTextButtonSize(FAI.FolderPlus, "Folder") + CkGui.IconButtonSize(FAI.LayerGroup).X;
-        // Update the search bar if things change, like normal.
-        if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, rWidth, DrawButtons))
-            FilterCache.Filter = tmp;
+        FilterCache.UpdateCache();
+        DrawFolderGroupChildren(FilterCache.RootCache, ImUtf8.FrameHeight * .65f, ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X, flags);
+        PostDraw();
     }
-
-    // Draws the grey line around the filtered content when expanded and stuff.
-    protected override void PostSearchBar()
-    {
-        if (_cache.FilterConfigOpen)
-            ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
-    }
-
-    private void DrawButtons()
-    {
-        if (CkGui.IconTextButton(FAI.FolderPlus, "Group", null, true))
-            _sidePanel.ForNewGroup((GroupsDrawSystem)DrawSystem);
-        CkGui.AttachToolTip("Create a new Group");
-
-        ImGui.SameLine(0, 0);
-        if (CkGui.IconTextButton(FAI.FolderPlus, "Folder", null, true))
-            _sidePanel.ForNewFolderGroup((GroupsDrawSystem)DrawSystem);
-        CkGui.AttachToolTip("Create a new Folder to catagorize your groups.");
-
-        ImGui.SameLine(0, 0);
-        if (CkGui.IconButton(FAI.LayerGroup, inPopup: !_cache.FilterConfigOpen))
-        {
-            _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
-            if (!_cache.FilterConfigOpen)
-                Selector.ClearSelected();
-            else
-                _sidePanel.ClearDisplay();
-        }
-        CkGui.AttachToolTip("Organizer Mode");
-    }
-    #endregion Search
 
     // Override to detect hover changes on text nodes in addition to selections.
     protected override void UpdateHoverNode()
@@ -142,77 +102,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         _newHoveredNode = null;
     }
 
-    #region FolderGroups
-    // Overrides are nessisary to draw either the Renaming node or the actual node.
-    protected override void DrawFolderGroupBanner(IDynamicFolderGroup<Sundesmo> fg, DynamicFlags flags, bool selected)
-    {
-        var width = CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX();
-        if (_cache.RenamingNode == fg)
-            FolderGroupBannerEditor(fg, width, flags);
-        else
-            FolderGroupBanner(fg, width, flags, selected);
-    }
-
-    // Normal FolderGroup
-    private void FolderGroupBanner(IDynamicFolderGroup<Sundesmo> fg, float width, DynamicFlags flags, bool selected)
-    {
-        var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : fg.BgColor;
-        using var _ = CkRaii.FramedChildPaddedW($"dfg_{Label}_{fg.ID}", width, ImUtf8.FrameHeight, bgCol, fg.BorderColor, 5f, 1f);
-        DrawFolderGroupBanner(fg, _.InnerRegion, flags);
-        HandleContext(fg);
-    }
-
-    // Editing FolderGroup
-    private void FolderGroupBannerEditor(IDynamicFolderGroup<Sundesmo> fg, float width, DynamicFlags flags)
-    {
-        using var _ = CkRaii.FramedChildPaddedW($"dfg_{Label}_{fg.ID}", width, ImUtf8.FrameHeight, fg.BgColor, fg.BorderColor, 5f, 1f);        
-
-        CkGui.FramedIconText(fg.IsOpen ? fg.IconOpen : fg.Icon);
-        ImUtf8.SameLineInner();
-        // Renamer (See if we can port this to the other types).
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-        var nameTmp = fg.Name;
-        ImGui.InputTextWithHint("##GroupsRename", "Set Name..", ref nameTmp, 40);
-        if (ImGui.IsItemDeactivatedAfterEdit())
-        {
-            AddPostDrawLogic(() =>
-            {
-                if (!string.IsNullOrWhiteSpace(nameTmp))
-                {
-                    DrawSystem.Rename(fg, nameTmp);
-                    FilterCache.MarkForReload(fg, true);
-                }
-                // Clear renaming node regardless.
-                _cache.RenamingNode = null;
-            });
-        }
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            _cache.RenamingNode = null;
-        // Helper tooltip.
-        CkGui.AttachToolTip("--COL--[ENTER]--COL-- To save" +
-            "--NL----COL--[R-CLICK]--COL-- Cancel edits.", ImGuiColors.DalamudOrange);
-    }
-
-    protected override void DrawContextMenu(IDynamicFolderGroup<Sundesmo> node)
-    {
-        if (ImGui.MenuItem("Rename Folder"))
-        {
-            // Initiate the renaming field for the node.
-            _cache.RenamingNode = node;
-            _cache.NameEditStr = node.Name;
-        }
-
-        // Maybe add a "Set Parent" here or something.
-        //
-        //
-
-        // Then draw the rest of the options.
-        base.DrawContextMenu(node);
-    }
-    #endregion FolderGroups
-
     #region Folders
-
     // Will always only ever be the groups.
     protected override void DrawFolderBanner(IDynamicFolder<Sundesmo> f, DynamicFlags flags, bool selected)
     {
@@ -233,15 +123,13 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     {
         var isDragDrop = flags.HasAny(DynamicFlags.DragDropFolders);
         var pos = ImGui.GetCursorPos();
-        if (ImGui.InvisibleButton($"{Label}_node_{f.ID}", new(width - (isDragDrop ? 0 : rWidth), ImUtf8.FrameHeight)))
+        if (ImGui.InvisibleButton($"{Label}_node_{f.ID}", new(width - rWidth, ImUtf8.FrameHeight)))
             HandleLeftClick(f, flags);
         HandleDetections(f, flags);
-        CkGui.AttachToolTip(FolderDDTooltip, IsDragging || !isDragDrop, ImGuiColors.DalamudOrange);
         
         // Back to the start, then draw.
         ImGui.SameLine(pos.X);
-        if (isDragDrop) CkGui.FramedIconText(FAI.GripLines, f.BorderColor);
-        else CkGui.FramedIconText(f.IsOpen ? FAI.CaretDown : FAI.CaretRight);
+        CkGui.FramedIconText(f.IsOpen ? FAI.CaretDown : FAI.CaretRight);
         
         ImGui.SameLine();
         CkGui.IconTextAligned(f.Icon, f.IconColor);
@@ -276,23 +164,26 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         ImGui.InputTextWithHint("##GroupNameEdit", "Set Name..", ref nameTmp, 30);
         if (ImGui.IsItemDeactivatedAfterEdit())
         {
-            // Clear renaming node regardless.
-            _cache.RenamingNode = null;
-            // Do nothing for empty names.
-            if (string.IsNullOrWhiteSpace(nameTmp))
-                return;
-            // If this is caught, then another item with the same name exists, and we should not process it.
-            try
+            AddPostDrawLogic(() =>
             {
-                DrawSystem.Rename(f, nameTmp);
-            }
-            catch (Bagagwa)
-            {
-                Log.Warning($"Another Group or Folder already has the name '{nameTmp}'");
-            }
-            // Was successful, so rename the group, and mark the filtercache for reload.
-            _groups.TryRename(f.Group, nameTmp);
-            FilterCache.MarkForReload(f, true);
+                // Clear renaming node regardless.
+                _cache.RenamingNode = null;                
+                // Do nothing for empty names.
+                if (string.IsNullOrWhiteSpace(nameTmp))
+                    return;
+                // If this is caught, then another item with the same name exists, and we should not process it.
+                try
+                {
+                    DrawSystem.Rename(f, nameTmp);
+                }
+                catch (Bagagwa)
+                {
+                    Log.Warning($"Another Group or Folder already has the name '{nameTmp}'");
+                }
+                // Was successful, so rename the group, and mark the filtercache for reload.
+                _groups.TryRename(f.Group, nameTmp);
+                FilterCache.MarkForReload(f, true);
+            });
         }
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             _cache.RenamingNode = null;
@@ -300,12 +191,13 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             "--NL----COL--[R-CLICK]--COL-- Cancel edits.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
-        var currentRightSide = windowEndX - CkGui.IconButtonSize(FAI.Edit).X;
-        ImGui.SameLine(currentRightSide);
+        var endX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
+        endX -= CkGui.IconButtonSize(FAI.Edit).X;
+        ImGui.SameLine(endX);
         CkGui.IconButton(FAI.Edit, disabled: true, inPopup: true);
-        currentRightSide -= CkGui.IconButtonSize(FAI.Filter).X;
-        ImGui.SameLine(currentRightSide);
+
+        endX -= CkGui.IconButtonSize(FAI.Filter).X;
+        ImGui.SameLine(endX);
         CkGui.IconButton(FAI.Filter, id: f.ID.ToString(), disabled: true, inPopup: true);
     }
 
@@ -362,32 +254,24 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             _cache.NameEditStr = node.Name;
         }
 
-        if (!groupFolder.Group.InBasicView && ImGui.MenuItem("Add to Basic View"))
-        {
-            AddPostDrawLogic(() =>
-            {
-                groupFolder.Group.InBasicView = true;
-                _folders.Save();
-                DrawSystem.UpdateFolder(groupFolder); // Updates across both basic and group drawers.
-            });
-        }
-        else if (groupFolder.Group.InBasicView && ImGui.MenuItem("Remove from Basic View"))
+        if (groupFolder.Group.InBasicView && ImGui.MenuItem("Remove from Basic View"))
         {
             AddPostDrawLogic(() =>
             {
                 groupFolder.Group.InBasicView = false;
                 _folders.Save();
-                DrawSystem.UpdateFolder(groupFolder); // Updates across both basic and group drawers.
+                _cache.MarkCacheDirty();
             });
         }
 
+        // Add / Remove from Basic view button.  
         if (ImGui.MenuItem("Delete Group", enabled: ImGui.GetIO().KeyShift))
         {
             if (node is not GroupFolder)
                 return;
             AddPostDrawLogic(() =>
             {
-                _groups.DeleteGroup(groupFolder.Group);
+                _groups.DeleteGroup(((GroupFolder)node).Group);
                 DrawSystem.Delete(node);
             });
         }
@@ -395,44 +279,14 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             "--SEP----COL--Must hold SHIFT to delete.--COL--", ImGuiColors.DalamudYellow);
     }
 
-    protected override void HandleLeftClick(IDynamicCollection<Sundesmo> folder, DynamicFlags flags)
-    {
-        // Handle based on organizer state.
-        if (!_cache.FilterConfigOpen)
-        {
-            base.HandleLeftClick(folder, flags);
-        }
-        else
-        {
-            bool isGroup = folder is DynamicFolderGroup<Sundesmo>;
-            bool canSelect = flags.HasAny(DynamicFlags.SelectableFolders);
-            bool ctrlPressed = ImGui.GetIO().KeyCtrl;
-
-            // Handle based on organizer state.
-            if (isGroup && !ctrlPressed)
-                DrawSystem.SetOpenState(folder, !folder.IsOpen);
-
-            if (canSelect && (!isGroup || ctrlPressed))
-                Selector.SelectItem(folder, flags.HasFlag(DynamicFlags.MultiSelect), flags.HasFlag(DynamicFlags.RangeSelect));
-        }
-    }
-
     protected override void HandleDetections(IDynamicCollection<Sundesmo> node, DynamicFlags flags)
     {
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.RectOnly))
             _newHoveredNode = node;
 
-        // Handle Drag and Drop. (Handle targets externally)
-        if (flags.HasAny(DynamicFlags.DragDropFolders))
-            AsDragDropSource(node);
-        else
-        {
-            // Handle Context Menus. (Maybe make a flag later. Would save on some drawtime.)
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-                ImGui.OpenPopup(node.FullPath);
-        }
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            ImGui.OpenPopup(node.FullPath);
     }
-
     #endregion Folders
 
     #region Leaves
@@ -573,29 +427,20 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         if (ImGui.IsItemHovered())
             _newHoveredNode = node;
 
-        // Handle Drag and Drop.
-        if (flags.HasAny(DynamicFlags.DragDropLeaves))
+        // Additional, SundesmoLeaf-Specific interaction handles.
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
         {
-            AsDragDropSource(node);
-            AsDragDropTarget(node);
+            if (!_cache.ShowingUID.Remove(node))
+                _cache.ShowingUID.Add(node);
         }
-        else
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
         {
-            // Additional, SundesmoLeaf-Specific interaction handles.
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            {
-                if (!_cache.ShowingUID.Remove(node))
-                    _cache.ShowingUID.Add(node);
-            }
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
-            {
-                _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
-            }
-            if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            {
-                _cache.RenamingNode = node;
-                _cache.NameEditStr = node.Data.GetNickname() ?? string.Empty;
-            }
+            _mediator.Publish(new ProfileOpenMessage(node.Data.UserData));
+        }
+        if (ImGui.GetIO().KeyShift && ImGui.IsItemClicked(ImGuiMouseButton.Right))
+        {
+            _cache.RenamingNode = node;
+            _cache.NameEditStr = node.Data.GetNickname() ?? string.Empty;
         }
     }
 
@@ -618,6 +463,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         {
             if (ImGui.MenuItem("Remove from Group"))
             {
+
                 _groups.UnlinkFromGroup(leaf.Data.UserData.UID, groupFolder.Group);
                 FilterCache.MarkForReload(groupFolder);
             }
@@ -652,99 +498,4 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             CkGui.TextFrameAligned(dispName);
     }
     #endregion Leaves
-
-    #region DragDrop Helpers
-    protected override void PostDragSourceText(IDynamicNode<Sundesmo> entity)
-    {
-        if (entity is not IDynamicCollection<Sundesmo> || !IsDragging || _hoveredNode == entity)
-            return;
-
-        if (_hoveredNode is not { } target)
-            return;
-        
-        // Remember that [entity] is always the node being dragged.
-        // The TARGET will always be the _hoveredNode (or root, if none)
-        CkGui.Separator(uint.MaxValue);
-        // Get if merging or moving.
-        var shiftHeld = ImGui.GetIO().KeyShift;
-        // Message depends on various use cases.
-        string message = DragDrop switch
-        {
-            // CASE 1: Both FolderGroups and Folders
-            { OnlyCollections: true, OnlyFolders: false, OnlyFolderGroups: false } =>
-                $"Dropping collections into [{target.Name}]",
-
-            // CASE 2: Target is FolderGroup, Moves items were only Folders
-            { OnlyFolders: true } when target is IDynamicFolderGroup<Sundesmo> fg =>
-                $"Dropping groups into: {fg.Name}",
-
-            // CASE 3: Target is FolderGroup, we are moving only FolderGroups
-            { OnlyFolderGroups: true } when target is IDynamicFolderGroup<Sundesmo> fg =>
-                       shiftHeld
-                    ? $"Merging folders into: {fg.Name}"
-                    : $"Dropping folders into: {fg.Parent.Name}",
-
-            // CASE 3: Target is Folder, and moving only Folders.
-            { OnlyFolders: true } when target is IDynamicFolder<Sundesmo> f =>
-                shiftHeld
-                    ? $"Merging all pairs from selected into: {f.Name}"
-                    : $"Dropping groups into: {f.Parent.Name}",
-
-            // CASE 4: Target is Folder, and moving only FolderGroups.
-            { OnlyFolders: false } when target is IDynamicFolder<Sundesmo> f =>
-                $"Dropping groups into: {f.Parent.Name}",
-
-            _ => string.Empty
-        };
-        CkGui.ColorTextFrameAligned(message, ImGuiColors.DalamudYellow);
-    }
-
-    protected override void PerformDrop(IDynamicNode<Sundesmo> target)
-    {
-        // Get if shifting
-        bool shifting = ImGui.GetIO().KeyShift;
-        var groups = DragDrop.Nodes.OfType<DynamicFolderGroup<Sundesmo>>();
-        var folders = DragDrop.Nodes.OfType<GroupFolder>();
-
-        // If the target is a folder
-        if (target is GroupFolder folderTarget)
-        {
-            // Merge in folders if only moving folders and shifting.
-            if (DragDrop.OnlyFolders && shifting)
-            {
-                foreach (var f in folders)
-                {
-                    _groups.MergeGroups(f.Group, folderTarget.Group);
-                    DrawSystem.Delete(f);
-                }
-                DrawSystem.UpdateFolder(folderTarget);
-            }
-            // Mark the new target as the parent of the target folder, and migrate everything into there.
-            else
-            {
-                // Move all of these into the target folder's parent.
-                var toMove = DragDrop.Nodes.OfType<IDynamicCollection<Sundesmo>>();
-                DrawSystem.BulkMove(toMove, folderTarget.Parent, folderTarget);
-            }
-        }
-        // For FolderGroups, handle things slightly differently.
-        else if (target is DynamicFolderGroup<Sundesmo> folderGroupTarget)
-        {
-            // If we were holding shift and only had FolderGroups, merge them.
-            if (DragDrop.OnlyFolderGroups && shifting)
-            {
-                foreach (var g in groups)
-                    DrawSystem.Merge(g, folderGroupTarget);
-            }
-            else
-            {
-                var toMove = shifting ? groups.SelectMany(g => g.GetChildren()) : groups;
-                // Concat this with all of our folders.
-                toMove = toMove.Concat(folders);
-                // Perform a bulk move to the new location.
-                DrawSystem.BulkMove(toMove, folderGroupTarget);
-            }
-        }
-    }
-    #endregion DragDrop Helpers
 }

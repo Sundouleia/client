@@ -16,6 +16,7 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
+using System.Runtime.CompilerServices;
 
 namespace Sundouleia.DrawSystem;
 
@@ -32,6 +33,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private readonly FolderConfig _folders;
     private readonly FavoritesConfig _favorites;
     private readonly NicksConfig _nicks;
+    private readonly GroupsManager _groups;
     private readonly SundesmoManager _sundesmos;
     private readonly SidePanelService _sidePanel;
     private readonly WhitelistDrawSystem _drawSystem;
@@ -45,8 +47,8 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private DateTime?     _lastHoverTime;       // time until we should show the profile.
 
     public WhitelistDrawer(SundouleiaMediator mediator,MainConfig config, FolderConfig folders, 
-        FavoritesConfig favorites, NicksConfig nicks, SundesmoManager sundesmos,
-        SidePanelService sidePanel, WhitelistDrawSystem ds)
+        FavoritesConfig favorites, NicksConfig nicks, GroupsManager groups, 
+        SundesmoManager sundesmos, SidePanelService sidePanel, WhitelistDrawSystem ds)
         : base("##WhitelistDrawer", Svc.Logger.Logger, ds, new WhitelistCache(ds))
     {
         _mediator = mediator;
@@ -54,9 +56,20 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         _folders = folders;
         _favorites = favorites;
         _nicks = nicks;
+        _groups = groups;
         _sundesmos = sundesmos;
         _sidePanel = sidePanel;
         _drawSystem = ds;
+    }
+
+    public string SearchFilter => FilterCache.Filter;
+
+    public void DrawFoldersOnly(float width, DynamicFlags flags = DynamicFlags.None)
+    {
+        HandleMainContext();
+        FilterCache.UpdateCache();
+        DrawFolderGroupChildren(FilterCache.RootCache, ImUtf8.FrameHeight * .65f, ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X, flags);
+        PostDraw();
     }
 
     #region Search
@@ -340,17 +353,50 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             _mediator.Publish(new ProfileOpenMessage(leaf.Data.UserData));
         }
 
-        if (_folders.Current.Groups.Count is not 0)
+        if (_groups.Groups.Count is 0)
+            return;
+
+        // Obtain the list of groups (Maybe find a better way to handle this later, but for now this works)
+        var groups = _groups.GroupsList;
+        var inGroups = groups.Where(g => g.LinkedUids.Contains(leaf.Data.UserData.UID)).ToList();
+        var notInGroups = groups.Except(inGroups).ToList();
+
+        if (notInGroups.Count is not 0)
         {
-            if (ImGui.BeginMenu("Add to Group.."))
+            if (ImGui.BeginMenu("Add to Group"))
             {
-                ImGui.Text("I can be a checkbox list of groups or a multi-selectable list.");
+                foreach (var g in notInGroups)
+                {
+                    var ret = ImGui.Selectable($"##{g.Label}", false);
+                    ImGui.SameLine(0, ImUtf8.ItemInnerSpacing.X);
+                    CkGui.IconTextAligned(g.Icon, g.IconColor);
+                    CkGui.ColorTextFrameAlignedInline(g.Label, g.LabelColor);
+                    if (ret)
+                    {
+                        _groups.LinkToGroup(leaf.Data.UserData.UID, g);
+                        _mediator.Publish(new FolderUpdateGroup(g.Label));
+                    }
+                }
                 ImGui.EndMenu();
             }
+        }
 
-            if (ImGui.BeginMenu("Remove from Groups.."))
+        if (inGroups.Count is not 0)
+        {
+            if (ImGui.BeginMenu("Remove from Group"))
             {
-                ImGui.Text("I can be a checkbox list of groups or a multi-selectable list.");
+                foreach (var g in inGroups)
+                {
+                    var ret = ImGui.Selectable($"##{g.Label}", false);
+                    ImGui.SameLine(0, ImUtf8.ItemInnerSpacing.X);
+                    CkGui.IconTextAligned(g.Icon, g.IconColor);
+                    CkGui.ColorTextFrameAlignedInline(g.Label, g.LabelColor);
+                    if (ret)
+                    {
+                        _groups.UnlinkFromGroup(leaf.Data.UserData.UID, g);
+                        _mediator.Publish(new FolderUpdateGroup(g.Label));
+                    }
+                }
                 ImGui.EndMenu();
             }
         }

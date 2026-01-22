@@ -1,5 +1,7 @@
 using CkCommons.DrawSystem;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Sundouleia.DrawSystem;
 using Sundouleia.PlayerClient;
 
@@ -8,14 +10,17 @@ namespace Sundouleia.Gui.MainWindow;
 public class WhitelistTabs
 {
     private readonly FolderConfig _config;
-    private readonly WhitelistDrawer _defaultDrawer;
-    private readonly GroupsDrawer _groupsDrawer;
+    private readonly WhitelistDrawer _defaults;
+    private readonly BasicGroupsDrawer _basicGroups;
+    private readonly GroupsDrawer _groups;
 
-    public WhitelistTabs(FolderConfig config, WhitelistDrawer main, GroupsDrawer groups)
+    public WhitelistTabs(FolderConfig config, WhitelistDrawer main,
+        BasicGroupsDrawer basicGroups, GroupsDrawer groups)
     {
         _config = config;
-        _defaultDrawer = main;
-        _groupsDrawer = groups;
+        _defaults = main;
+        _basicGroups = basicGroups;
+        _groups = groups;
     }
 
     // Obviously will do more here to ensure that we can
@@ -26,17 +31,34 @@ public class WhitelistTabs
     public void DrawBasicView()
     {
         var width = ImGui.GetContentRegionAvail().X;
-        _defaultDrawer.DrawFilterRow(width, 64);
-        _defaultDrawer.DrawContents(width);
+        if(_defaults.DrawFilterRow(width, 64))
+            _basicGroups.UpdateFilter(_defaults.SearchFilter);
+
+        // Prefer to not need to do this if there is some better way but this does work for now.
+        DrawBasicViewContents(width);
     }
 
     public void DrawGroupsView()
     {
         var width = ImGui.GetContentRegionAvail().X;
-        _groupsDrawer.DrawFilterRow(width, 64);
-        _groupsDrawer.DrawContents(width, DrawFlags);
+        _groups.DrawFilterRow(width, 64);
+        _groups.DrawContents(width, DrawFlags);
+    }
+
+    // Prefer to not need to do this if there is some better way but this does work for now.
+    private void DrawBasicViewContents(float width)
+    {
+        using var _ = ImRaii.Child("WhitelistContents", new Vector2(width, -1), false, WFlags.NoScrollbar);
+        if (!_) return;
+
+        ImGui.SetScrollX(0);
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
+             .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
+        
+        _basicGroups.DrawFoldersOnly(width);
+        _defaults.DrawFoldersOnly(width);
     }
 
     private DynamicFlags DrawFlags 
-        => _groupsDrawer.OrganizerMode ? DynamicFlags.SelectableDragDrop : DynamicFlags.None;
+        => _groups.OrganizerMode ? DynamicFlags.SelectableDragDrop : DynamicFlags.None;
 }

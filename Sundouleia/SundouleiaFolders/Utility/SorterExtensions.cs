@@ -49,7 +49,6 @@ public static class SorterExtensions
         = [ ByRendered, ByOnline, ByFavorite, ByPairName ];
 
     // Sort Helpers
-
     public struct Rendered : ISortMethod<DynamicLeaf<Sundesmo>>
     {
         public string Name => "Rendered";

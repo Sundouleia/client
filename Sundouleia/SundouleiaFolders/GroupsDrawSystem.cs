@@ -33,7 +33,7 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
 
         // Until the below is polished/fixed, every change from either of these sources will trigger 2x refresh!
 
-        // TODO: Revise this to listen for spesific group changes, and perform respective changes to those folders only.
+        Mediator.Subscribe<FolderUpdateGroup>(this, _ => UpdateFolder(_.GroupName));
         Mediator.Subscribe<FolderUpdateGroups>(this, _ => UpdateFolders());
         Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => UpdateFolders());
 

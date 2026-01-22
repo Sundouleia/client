@@ -130,6 +130,7 @@ public static class SundouleiaServiceExtensions
 
         // Draw Systems
         .AddSingleton<GroupsDrawer>()
+        .AddSingleton<BasicGroupsDrawer>()
         .AddSingleton<RadarDrawer>()
         .AddSingleton<RequestsInDrawer>()
         .AddSingleton<RequestsOutDrawer>()
@@ -296,7 +297,6 @@ public static class SundouleiaServiceExtensions
 
         // Scoped Standalones
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
-        .AddScoped<WindowMediatorSubscriberBase, ChangelogUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugStorageUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugPersonalDataUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugActiveStateUI>()

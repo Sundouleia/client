@@ -3,6 +3,8 @@ using CkCommons.DrawSystem;
 using CkCommons.DrawSystem.Selector;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
+using FFXIVClientStructs.FFXIV.Client.Game.Group;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using Sundouleia.CustomCombos;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
@@ -159,24 +161,31 @@ public class NewFolderGroupCache : ISidePanelCache
     }
 }
 
-public class GroupEditorCache : ISidePanelCache
+public class GroupEditorCache : ISidePanelCache, IDisposable
 {
     public SidePanelMode Mode => SidePanelMode.GroupEditor;
-    
-    private readonly GroupsDrawer _drawer;
-    
+
+    private GroupEditorTabs _tabs;
     private WhitelistCache _cache;
-    public GroupEditorCache(GroupsDrawer drawer, WhitelistCache cache)
+    public GroupEditorCache(WhitelistCache cache)
     {
-        _drawer = drawer;
         _cache = cache;
+        _tabs = new();
     }
 
     public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
     public bool IsValid => _cache.GroupInEditor is not null;
+    public GroupEditorTabs.SelectedTab CurrentTab => _tabs.TabSelection;
 
     public IDynamicFolderGroup<Sundesmo>? ParentNode => _cache.GroupInEditor?.Parent ?? null;
     public SundesmoGroup GroupInEditor => _cache.GroupInEditor!.Group;
+    public IReadOnlyList<DynamicLeaf<Sundesmo>> GroupChildren => _cache.GroupInEditor?.GetChildren() ?? [];
+    public HashSet<IDynamicNode<Sundesmo>> ShownUIDs => _cache.ShowingUID;
+
+    public void Dispose()
+    {
+        _cache.GroupInEditor = null;
+    }
 
     public void ChangeParentNode(IDynamicFolderGroup<Sundesmo>? newNode)
     {
@@ -190,8 +199,21 @@ public class GroupEditorCache : ISidePanelCache
         _cache.UpdateEditorGroupStyle();
     }
 
+    public void UpdateState()
+    {
+        if (!IsValid) return;
+        _cache.UpdateEditorGroupState();
+    }
+
     public bool TryRenameNode(GroupsManager groups, string newName)
         => IsValid && _cache.TryRenameNode(groups, newName);
+
+    public void DrawTabBar(float width)
+    {
+        if (!IsValid) return;
+        ImGuiHelpers.ScaledDummy(3f);
+        _tabs.Draw(width);
+    }
 }
 
 public class ResponseCache : ISidePanelCache
@@ -239,7 +261,7 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
             case SidePanelMode.GroupCreator:
             case SidePanelMode.FolderCreator:
             case SidePanelMode.GroupEditor: // This one can be a bit iffy because 
-                if (newTab is not MainMenuTabs.SelectedTab.GroupWhitelist)
+                if (newTab is not (MainMenuTabs.SelectedTab.GroupWhitelist))
                     ClearDisplay();
                 return;
 
@@ -318,7 +340,7 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
     }
 
     // Opens, or toggles, or swaps current data for interactions.
-    public void ForGroupEditor(GroupFolder group, WhitelistCache cache, GroupsDrawer drawer)
+    public void ForGroupEditor(GroupFolder group, WhitelistCache cache)
     {
         // If the mode is already GroupEditorCache.
         if (DisplayCache is GroupEditorCache pairCache)
@@ -342,7 +364,7 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
         else
         {
             Logger.LogDebug($"Opening GroupEditor for {group.Name}");
-            DisplayCache = new GroupEditorCache(drawer, cache);
+            DisplayCache = new GroupEditorCache(cache);
             cache.GroupInEditor = group;
         }
     }
