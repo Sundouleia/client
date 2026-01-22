@@ -66,22 +66,6 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
             LocationSvc.DebugArea(LocationSvc.Current);
             ImGui.TableNextRow();
         }
-        try
-        {
-            unsafe
-            {
-                ImGui.Text($"ConnectedToZone: {GameMain.Instance()->ConnectedToZone}");
-                ImGui.Text($"TerritoryLoadState: {GameMain.Instance()->TerritoryLoadState}");
-                ImGui.Text($"NextTerritoryTypeId: {GameMain.Instance()->NextTerritoryTypeId}");
-                ImGui.Text($"CurrentTerritoryTypeId: {GameMain.Instance()->CurrentTerritoryTypeId}");
-                ImGui.Text($"TransitionTerritoryTypeId: {GameMain.Instance()->TransitionTerritoryTypeId}");
-                ImGui.Text($"TerritoryTransitionState: {GameMain.Instance()->TerritoryTransitionState}");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error drawing GameMain info: {ex}");
-        }
     }
 
     private void DrawDataDistributor()
