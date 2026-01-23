@@ -9,12 +9,14 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using Downloader;
 using OtterGui.Text;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
 
 namespace Sundouleia.DrawSystem;
@@ -390,31 +392,19 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
         });
     }
 
-    private void AcceptRequests(IEnumerable<RequestEntry> requests)
-    {
-        // Process the TO BE ADDED Bulk accept server call, then handle responses accordingly.
-
-        // For now, do nothing.
-    }
-
     private void RejectRequest(RequestEntry request)
     {
+
         UiService.SetUITask(async () =>
         {
-            var res = await _hub.UserRejectRequest(new(new(request.RecipientUID))).ConfigureAwait(false);
+            var res = await _hub.UserRejectRequest(new(new(request.SenderUID))).ConfigureAwait(false);
             if (res.ErrorCode is SundouleiaApiEc.Success)
                 _manager.RemoveRequest(request);
             else
             {
-                Log.Warning($"Failed to reject request to {request.RecipientAnonName} ({request.RecipientUID}): {res.ErrorCode}");
+                Log.Warning($"Failed to reject request to {request.SenderAnonName} ({request.SenderUID}): {res.ErrorCode}");
             }
         });
-    }
-
-    private void RejectRequests(IEnumerable<RequestEntry> requests)
-    {
-        // Process the TO BE ADDED Bulk reject server call, then handle responses accordingly.
-        // For now, do nothing.
     }
 }
 

@@ -303,9 +303,9 @@ public partial class MainHub
     /// <summary>
     ///     Whenever one of our Sundesmo have updated a permission in their GlobalPerms.
     /// </summary>
-    public Task Callback_SingleChangeGlobal(SingleChangeGlobal dto)
+    public Task Callback_ChangeGlobalPerm(ChangeGlobalPerm dto)
     {
-        Logger.LogDebug($"Callback_SingleChangeGlobal: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Callback_ChangeGlobalPerm: {dto}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.PermChangeGlobal(dto.User, dto.PermName, dto.NewValue));
         return Task.CompletedTask;
     }
@@ -313,9 +313,9 @@ public partial class MainHub
     /// <summary>
     ///     Whenever one of our Sundesmo updated their GlobalPerms in bulk.
     /// </summary>
-    public Task Callback_BulkChangeGlobal(BulkChangeGlobal dto)
+    public Task Callback_ChangeAllGlobal(ChangeAllGlobal dto)
     {
-        Logger.LogDebug($"Callback_BulkChangeGlobal: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Callback_ChangeAllGlobal: {dto}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.PermChangeGlobal(dto.User, dto.NewPerms));
         return Task.CompletedTask;
     }
@@ -325,20 +325,27 @@ public partial class MainHub
     ///     Only ever called when a sundesmo changes their own permissions for our client. <para />
     ///     <b> THIS IS NOT CALLED WHEN WE CHANGE A PAIRPERM FOR A SUNDESMO. </b>
     /// </summary>
-    public Task Callback_SingleChangeUnique(SingleChangeUnique dto)
+    public Task Callback_ChangeUniquePerm(ChangeUniquePerm dto)
     {
-        Logger.LogDebug($"Callback_SingleChangeUnique: {dto}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.PermChangeUniqueOther(dto.User, dto.PermName, dto.NewValue));
+        Logger.LogDebug($"Callback_ChangeUniquePerm: {dto}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.PermChangeUnique(dto.User, dto.PermName, dto.NewValue));
+        return Task.CompletedTask;
+    }
+
+    public Task Callback_ChangeUniquePerms(ChangeUniquePerms dto)
+    {
+        Logger.LogDebug($"Callback_ChangeUniquePerms: {dto}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.PermChangeUnique(dto.User, dto.Changes));
         return Task.CompletedTask;
     }
 
     /// <summary>
     ///     Whenever one of our Sundesmo updated their PairPerms in bulk.
     /// </summary>
-    public Task Callback_BulkChangeUnique(BulkChangeUnique dto)
+    public Task Callback_ChangeAllUnique(ChangeAllUnique dto)
     {
-        Logger.LogDebug($"Callback_BulkChangeUnique: {dto}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.PermBulkChangeUnique(dto.User, dto.NewPerms));
+        Logger.LogDebug($"Callback_ChangeAllUnique: {dto}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.PermChangeUnique(dto.User, dto.NewPerms));
         return Task.CompletedTask;
     }
     #endregion Data Update Callbacks
@@ -570,28 +577,34 @@ public partial class MainHub
         _hubConnection!.On(nameof(Callback_IpcUpdateSingle), act);
     }
 
-    public void OnSingleChangeGlobal(Action<SingleChangeGlobal> act)
+    public void OnSingleChangeGlobal(Action<ChangeGlobalPerm> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_SingleChangeGlobal), act);
+        _hubConnection!.On(nameof(Callback_ChangeGlobalPerm), act);
     }
 
-    public void OnBulkChangeGlobal(Action<BulkChangeGlobal> act)
+    public void OnBulkChangeGlobal(Action<ChangeAllGlobal> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_BulkChangeGlobal), act);
+        _hubConnection!.On(nameof(Callback_ChangeAllGlobal), act);
     }
 
-    public void OnSingleChangeUnique(Action<SingleChangeUnique> act)
+    public void OnChangeUniquePerm(Action<ChangeUniquePerm> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_SingleChangeUnique), act);
+        _hubConnection!.On(nameof(Callback_ChangeUniquePerm), act);
     }
 
-    public void OnBulkChangeUnique(Action<BulkChangeUnique> act)
+    public void OnChangeUniquePerms(Action<ChangeUniquePerms> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_BulkChangeUnique), act);
+        _hubConnection!.On(nameof(Callback_ChangeUniquePerms), act);
+    }
+
+    public void OnChangeAllUnique(Action<ChangeAllUnique> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_ChangeAllUnique), act);
     }
 
     public void OnRadarAddUpdateUser(Action<OnlineUser> act)

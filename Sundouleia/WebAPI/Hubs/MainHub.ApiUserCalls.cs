@@ -104,10 +104,22 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserCancelRequest), dto).ConfigureAwait(false);
     }
 
+    public async Task<HubResponse> UserCancelRequests(UserListDto dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserCancelRequests), dto).ConfigureAwait(false);
+    }
+
     public async Task<HubResponse<AddedUserPair>> UserAcceptRequest(UserDto dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt<AddedUserPair>(SundouleiaApiEc.NetworkError); ;
         return await _hubConnection!.InvokeAsync<HubResponse<AddedUserPair>>(nameof(UserAcceptRequest), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse<List<AddedUserPair>>> UserAcceptRequests(UserListDto dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<List<AddedUserPair>>(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse<List<AddedUserPair>>>(nameof(UserAcceptRequests), dto).ConfigureAwait(false);
     }
 
     public async Task<HubResponse> UserRejectRequest(UserDto dto)
@@ -116,10 +128,22 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRejectRequest), dto).ConfigureAwait(false);
     }
 
+    public async Task<HubResponse> UserRejectRequests(UserListDto dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRejectRequests), dto).ConfigureAwait(false);
+    }
+
     public async Task<HubResponse> UserRemovePair(UserDto dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRemovePair), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserRemovePairs(UserListDto dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRemovePairs), dto).ConfigureAwait(false);
     }
 
     public async Task<HubResponse> UserPersistPair(UserDto dto)
@@ -168,31 +192,55 @@ public partial class MainHub
     public async Task<HubResponse> ChangeGlobalPerm(string propName, object newValue)
         => await UserChangeGlobalsSingle(new(OwnUserData, propName, newValue));
 
-    public async Task<HubResponse> UserChangeGlobalsSingle(SingleChangeGlobal dto)
+    public async Task<HubResponse> UserChangeGlobalsSingle(ChangeGlobalPerm dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeGlobalsSingle), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> UserChangeGlobalsBulk(GlobalPerms dto)
+    public async Task<HubResponse> UserChangeAllGlobals(GlobalPerms dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeGlobalsBulk), dto);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeAllGlobals), dto);
     }
 
     public async Task<HubResponse> ChangeUniquePerm(UserData user, string propName, object newValue)
-        => await UserChangeUniqueSingle(new(user, propName, newValue));
+        => await UserChangeUniquePerm(new(user, propName, newValue));
 
-    public async Task<HubResponse> UserChangeUniqueSingle(SingleChangeUnique dto)
+    public async Task<HubResponse> UserChangeUniquePerm(ChangeUniquePerm dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeUniqueSingle), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeUniquePerm), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> UserChangeUniqueBulk(BulkChangeUnique dto)
+    public async Task<HubResponse> UserChangeUniquePerms(ChangeUniquePerms dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeUniqueBulk), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeUniquePerms), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserChangeAllUnique(ChangeAllUnique dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserChangeAllUnique), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserBulkChangeUniquePerm(BulkChangeUniquePerm dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserBulkChangeUniquePerm), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserBulkChangeUniquePerms(BulkChangeUniquePerms dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserBulkChangeUniquePerms), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserBulkChangeAllUnique(BulkChangeAllUnique dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserBulkChangeAllUnique), dto).ConfigureAwait(false);
     }
 
 

@@ -15,6 +15,7 @@ using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
 
 namespace Sundouleia.DrawSystem;
@@ -252,16 +253,21 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
             if (res.ErrorCode is SundouleiaApiEc.Success)
                 _manager.RemoveRequest(request);
             else
-            {
                 Log.Warning($"Failed to cancel outgoing request to {request.RecipientAnonName} ({request.RecipientUID}): {res.ErrorCode}");
-            }
         });
     }
 
     private void CancelRequests(IEnumerable<RequestEntry> requests)
     {
-        // Process the TO BE ADDED Bulk cancel server call, then handle responses accordingly.
-        // For now, do nothing.
+        UiService.SetUITask(async () =>
+        {
+            Log.Information($"Bulk cancelling {requests.Count()} outgoing requests.");
+            var res = await _hub.UserCancelRequests(new(requests.Select(x => new UserData(x.RecipientUID)).ToList()));
+            if (res.ErrorCode is SundouleiaApiEc.Success)
+                _manager.RemoveRequests(requests);
+            else
+                Log.Warning($"Failed to bulk cancel outgoing requests: {res.ErrorCode}");
+        });
     }
 }
 

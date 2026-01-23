@@ -3,12 +3,19 @@ using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
+using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
+using Sundouleia.WebAPI;
+using SundouleiaAPI.Data;
+using SundouleiaAPI.Hub;
+using static System.ComponentModel.Design.ObjectSelectorEditor;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -17,11 +24,14 @@ namespace Sundouleia.Gui.MainWindow;
 // It would allow us to process the logic in the draw-loop like we want.
 public class SidePanelUI : WindowMediatorSubscriberBase
 {
+    private readonly MainHub _hub;
     private readonly SundesmoTabs _sundesmoTabs;
     private readonly RequestsInDrawer _requestsDrawer;
     private readonly GroupsDrawer _groupsDrawer;
     private readonly SidePanelInteractions _spInteractions;
     private readonly SidePanelGroups _spGroups;
+    private readonly RequestsManager _requests;
+    private readonly SundesmoManager _sundesmos;
     private readonly SidePanelService _service;
 
     // Likely phase this out when we find a better alternative or something, idk.
@@ -29,15 +39,19 @@ public class SidePanelUI : WindowMediatorSubscriberBase
     private RequestsGroupSelector GroupSelector;
 
     public SidePanelUI(ILogger<SidePanelUI> logger, SundouleiaMediator mediator,
-        SundesmoTabs sundesmoTabs, RequestsInDrawer requestsDrawer,
+        MainHub hub, SundesmoTabs sundesmoTabs, RequestsInDrawer requestsDrawer,
         GroupsDrawer groupsDrawer, SidePanelInteractions interactions, 
-        SidePanelGroups groups, SidePanelService service, GroupsDrawSystem groupsDDS)
+        SidePanelGroups groups, RequestsManager requests, SundesmoManager sundesmos, 
+        SidePanelService service, GroupsDrawSystem groupsDDS)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
+        _hub = hub;
         _sundesmoTabs = sundesmoTabs;
          _requestsDrawer = requestsDrawer;
         _groupsDrawer = groupsDrawer;
         _spInteractions = interactions;
+        _requests = requests;
+        _sundesmos = sundesmos;
         _spGroups = groups;
         _service = service;
 
@@ -149,14 +163,14 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         // Accept and reject all buttons.
         var halfW = (width - ImUtf8.ItemInnerSpacing.X) / 2;
         using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.HealerGreen))
-            if (CkGui.IconTextButtonCentered(FAI.Check, "Accept All", halfW))
-                _logger.LogInformation("Accepting all selected requests.");
+            if (CkGui.IconTextButtonCentered(FAI.Check, "Accept All", halfW, disabled: UiService.DisableUI))
+                AcceptRequests(irc.Selected.Select(x => x.Data));
         CkGui.AttachToolTip("Accept all selected requests.");
 
         ImUtf8.SameLineInner();
         using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DPSRed))
-            if (CkGui.IconTextButtonCentered(FAI.Times, "Reject All", halfW))
-                _logger.LogInformation("Rejecting all selected requests.");
+            if (CkGui.IconTextButtonCentered(FAI.Times, "Reject All", halfW, disabled: UiService.DisableUI))
+                RejectRequests(irc.Selected.Select(x => x.Data));
         CkGui.AttachToolTip("Reject all selected requests.");
     }
 
@@ -228,5 +242,52 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         CkGui.FontTextCentered($"Editing {gec.GroupInEditor.Label}", UiFontService.Default150Percent);
         ImGui.Separator();
         _spGroups.DrawGroupEditor(gec, width);
+    }
+
+    private void AcceptRequests(IEnumerable<RequestEntry> requests)
+    {
+        UiService.SetUITask(async () =>
+        {
+            // Wait for the response.
+            _logger.LogInformation($"Accepting requests from: {string.Join(", ", requests.Select(r => $"[{r.SenderAnonName} ({r.SenderUID})"))}]");
+            // Try to accept all requests. If it fails, do not do anything.
+            var res = await _hub.UserAcceptRequests(new(requests.Select(r => new UserData(r.SenderUID)).ToList())).ConfigureAwait(false);
+            if (res.ErrorCode is not SundouleiaApiEc.Success || res.Value is null)
+            {
+                _logger.LogWarning($"Failed to accept bulk requests: {res.ErrorCode}");
+                if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
+                    _requests.RemoveRequests(requests);
+                return;
+            }
+
+            // Remove all requests.
+            _requests.RemoveRequests(requests);
+
+            // Process each of the accepted pairs.
+            foreach (var addedPair in res.Value)
+            {
+                // Append them to the sundesmosManager
+                _sundesmos.AddSundesmo(addedPair.Pair);
+                // If online, mark online.
+                if (addedPair.OnlineInfo is { } onlineUser)
+                    _sundesmos.MarkSundesmoOnline(onlineUser);
+
+                // TODO: Preset groups can be applied here, along with a desired nick, if we add later.
+            }
+        });
+    }
+
+    private void RejectRequests(IEnumerable<RequestEntry> requests)
+    {
+        UiService.SetUITask(async () =>
+        {
+            _logger.LogInformation($"Bulk rejecting {requests.Count()} incoming requests.");
+            // Try to reject all requests. If it fails, do not do anything.
+            var res = await _hub.UserRejectRequests(new(requests.Select(x => new UserData(x.SenderUID)).ToList()));
+            if (res.ErrorCode is SundouleiaApiEc.Success)
+                _requests.RemoveRequests(requests);
+            else
+                _logger.LogWarning($"Failed to bulk cancel outgoing requests: {res.ErrorCode}");
+        });
     }
 }

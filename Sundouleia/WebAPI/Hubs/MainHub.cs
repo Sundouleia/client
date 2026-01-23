@@ -215,10 +215,11 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         OnIpcUpdateMods(dto => _ = Callback_IpcUpdateMods(dto));
         OnIpcUpdateOther(dto => _ = Callback_IpcUpdateOther(dto));
         OnIpcUpdateSingle(dto => _ = Callback_IpcUpdateSingle(dto));
-        OnSingleChangeGlobal(dto => _ = Callback_SingleChangeGlobal(dto));
-        OnBulkChangeGlobal(dto => _ = Callback_BulkChangeGlobal(dto));
-        OnSingleChangeUnique(dto => _ = Callback_SingleChangeUnique(dto));
-        OnBulkChangeUnique(dto => _ = Callback_BulkChangeUnique(dto));
+        OnSingleChangeGlobal(dto => _ = Callback_ChangeGlobalPerm(dto));
+        OnBulkChangeGlobal(dto => _ = Callback_ChangeAllGlobal(dto));
+        OnChangeUniquePerm(dto => _ = Callback_ChangeUniquePerm(dto));
+        OnChangeUniquePerms(dto => _ = Callback_ChangeUniquePerms(dto));
+        OnChangeAllUnique(dto => _ = Callback_ChangeAllUnique(dto));
 
         OnRadarAddUpdateUser(dto => _ = Callback_RadarAddUpdateUser(dto));
         OnRadarRemoveUser(dto => _ = Callback_RadarRemoveUser(dto));

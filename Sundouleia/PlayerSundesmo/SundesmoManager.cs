@@ -467,7 +467,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s GlobalPerms updated in bulk]", LoggerType.PairDataTransfer);
     }
 
-    public void PermChangeUniqueOther(UserData target, string permName, object newValue)
+    public void PermChangeUnique(UserData target, string permName, object newValue)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
@@ -507,7 +507,39 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         }
     }
 
-    public void PermBulkChangeUnique(UserData target, PairPerms newPerms)
+    public void PermChangeUnique(UserData target, Dictionary<string, object> changes)
+    {
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+
+        foreach (var (permName, newValue) in changes)
+        {
+            if (!PropertyChanger.TrySetProperty(sundesmo.PairPerms, permName, newValue, out var finalVal) || finalVal is null)
+                throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
+            // Inform of a permission change here for moodles!
+            Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s PairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
+        }
+
+        // Post permission change logic.
+        if (changes.ContainsKey(nameof(PairPerms.PauseVisuals)))
+        {
+            Mediator.Publish(new ClearProfileDataMessage(target));
+        }
+        else if (changes.ContainsKey(nameof(PairPerms.ShareOwnMoodles)))
+        {
+            if (!sundesmo.PairPerms.ShareOwnMoodles)
+            {
+                sundesmo.SharedData.Statuses.Clear();
+                sundesmo.SharedData.Presets.Clear();
+            }
+        }
+        else if (changes.ContainsKey(nameof(PairPerms.MoodleAccess)) || changes.ContainsKey(nameof(PairPerms.MaxMoodleTime)))
+        {
+            Mediator.Publish(new MoodlePermsChanged(sundesmo));
+        }
+    }
+
+    public void PermChangeUnique(UserData target, PairPerms newPerms)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");

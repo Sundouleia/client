@@ -77,6 +77,13 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
+    public void RemoveRequests(IEnumerable<RequestEntry> requestEntries)
+    {
+        _allRequests.ExceptWith(requestEntries);
+        Logger.LogDebug($"Removed {requestEntries.Count()} request entries from manager.", LoggerType.PairManagement);
+        RecreateLazy();
+    }
+
     // From server callback.
     public void RemoveRequest(SundesmoRequest requestEntry)
     {
