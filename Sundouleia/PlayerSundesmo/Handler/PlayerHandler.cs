@@ -299,6 +299,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await RevertAssignedAlterations();
              
             // If not visible, skip all but GlamourerByName, since they won't be valid.
+            // Additionally, outside of the framework unloading, one of the conditions where an address
+            // is not valid at time of unloading is when we logout, so we should also check if logged in.
             if (address == IntPtr.Zero)
             {
                 // Revert glamourer by name if possible.
@@ -307,18 +309,14 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 return;
             }
 
-            // Ensure we have a valid address before we process a revert.
-            // (Helps safegaurd cases where a Sundesmo is disposed of before its handlers are finished)
-            // (Can touch this up later)
-            if (!CharaObjectWatcher.RenderedCharas.Contains(Address))
-                return;
-
             // We can care about parallel execution here if we really want to but i dont care atm.
             await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
             await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
             await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
             await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
             await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
+
+            _ipc.Penumbra.RedrawGameObject(objIdx);
         }
         catch (OperationCanceledException)
         {
@@ -832,12 +830,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             return;
         }
 
+        var nickAliasOrUid = Sundesmo.GetNickAliasOrUid();
+        var name = NameString;
+
         // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
         // Everything in here, if it errors, should not crash the game as it is fire and forget.
         _ = Task.Run(async () =>
         {
-            var nickAliasOrUid = Sundesmo.GetNickAliasOrUid();
-            var name = NameString;
             try
             {
                 // Revert assigned alterations regardless of the conditional state.

@@ -303,7 +303,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     /// </summary>
     public async Task ClearAllAlterationData()
     {
-        _logger.LogDebug($"Clearing alteration data for [{PlayerName}] ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
+        _logger.LogDebug($"Clearing alteration data for {PlayerName} ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
         await _player.ClearAlterations().ConfigureAwait(false);
         await _mountMinion.ClearAlterations().ConfigureAwait(false);
         await _pet.ClearAlterations().ConfigureAwait(false);
@@ -317,7 +317,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     /// </summary>
     public void DisposeData()
     {
-        _logger.LogDebug($"Disposing data for [{PlayerName}] ({GetNickAliasOrUid()})", LoggerType.PairManagement);
+        _logger.LogDebug($"Disposing data for {PlayerName} ({GetNickAliasOrUid()})", LoggerType.PairManagement);
         // If online, just simply mark offline.
         if (IsOnline)
         {

@@ -136,7 +136,7 @@ public class ProfilesTab
         }
         if (ImGui.IsItemHovered())
         {
-            if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
                 _selectedProfileIdx = idx;
                 RecreateAuthLists();
@@ -237,6 +237,7 @@ public class ProfilesTab
         CkGui.ColorText($"Removing {chara.PlayerName} from {profile.UserUID}..", ImGuiColors.DalamudYellow);
     }
 
+    // revise
     private void DrawUnassignedCharacter(AccountProfile profile, CharaAuthentication chara, float width, uint bgCol)
     {
         using (CkRaii.FramedChildPaddedW($"unassigned-{chara.PlayerName}-{chara.ContentId}", width, ImUtf8.FrameHeight, bgCol, 0, FancyTabBar.RoundingInner))
@@ -307,6 +308,8 @@ public class ProfilesTab
 
         _logger.LogInformation($"I would have removed your chara from this profile! {item.Chara.PlayerName ?? "UNK"}");
         return;
+
+        _account.SetProfileForLoginAuth(item.Chara.ContentId, -1);
 
         //var prevIdx = item.Chara.ProfileIdx;
         //item.Chara.ProfileIdx = -1;

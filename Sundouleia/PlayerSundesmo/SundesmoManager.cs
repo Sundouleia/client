@@ -8,6 +8,7 @@ using GagspeakAPI.Data;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Watchers;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Comparer;
 using SundouleiaAPI.Data.Permissions;

@@ -83,7 +83,7 @@ public class HomeTab
 
             ProfileInfoRow(FAI.IdBadge, MainHub.UID, string.Empty);
             CkGui.AttachToolTip("Your Profile's UID.");
-            CkGui.CopyableDisplayText(MainHub.DisplayName);
+            CkGui.CopyableDisplayText(MainHub.UID);
 
             ProfileInfoRow(FAI.UserSecret, MainHub.OwnUserData.AnonName, "Your Anonymous name used in Requests / Chats.");
 
