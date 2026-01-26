@@ -213,10 +213,10 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         await _updater.RunOnDataUpdateSlim(async () =>
         {
             // Collect the latest data to send off.
-            var newData = await UpdateCacheSingleInternal(obj, type, _updater.LatestData).ConfigureAwait(false);
+            var (newData, changed) = await UpdateCacheSingleInternal(obj, type, _updater.LatestData).ConfigureAwait(false);
             
             // If no change occurred, do not push to others (our cache is still updated with the latest data)
-            if (string.IsNullOrEmpty(newData))
+            if (!changed)
                 return;
 
             var recipients = _updater.UsersForUpdatePush;
@@ -395,7 +395,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         if (toUpdate.HasAny(IpcKind.PetNames)) data.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
     }
 
-    private async Task<string?> UpdateCacheSingleInternal(OwnedObject obj, IpcKind type, ClientDataCache data)
+    private async Task<(string?, bool)> UpdateCacheSingleInternal(OwnedObject obj, IpcKind type, ClientDataCache data)
     {
         var dataStr = type switch
         {
@@ -408,7 +408,9 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             IpcKind.PetNames => _ipc.PetNames.GetPetNicknames(),
             _ => string.Empty,
         };
-        return data.ApplySingleIpc(obj, type, dataStr) ? dataStr : null;
+        var changed = data.ApplySingleIpc(obj, type, dataStr);
+        var result = changed ? dataStr : null;
+        return (result, changed);
     }
     #endregion Cache Updates
 }
