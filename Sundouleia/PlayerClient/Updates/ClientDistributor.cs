@@ -74,7 +74,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
 
     public async Task PushMoodlesData(List<UserData> trustedUsers)
     {
-        if (!MainHub.IsConnectionDataSynced) 
+        if (!MainHub.IsConnectionDataSynced)
             return;
         Logger.LogDebug($"Pushing MoodlesData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
         await _hub.UserPushMoodlesData(new(trustedUsers, ClientMoodles.Data));
@@ -167,7 +167,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         // Upload any missing files not yet present on the hub. (We could optionally send a isUploading here but idk)
         Logger.LogDebug($"Uploading {filesNeedingUpload.Count} missing files to server...", LoggerType.DataDistributor);
         var uploadedFiles = await _fileUploader.UploadFiles(filesNeedingUpload).ConfigureAwait(false);
-        
+
         Logger.LogDebug($"Uploaded {uploadedFiles.Count}/{filesNeedingUpload.Count} missing files.", LoggerType.DataDistributor);
         // Empty manip string for now, change later if this has problems!
         await _hub.UserPushIpcMods(new PushIpcMods(usersToPushDataTo, new(uploadedFiles, []), string.Empty)).ConfigureAwait(false);
@@ -214,7 +214,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         {
             // Collect the latest data to send off.
             var (newData, changed) = await UpdateCacheSingleInternal(obj, type, _updater.LatestData).ConfigureAwait(false);
-            
+
             // If no change occurred, do not push to others (our cache is still updated with the latest data)
             if (!changed)
                 return;
@@ -313,7 +313,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     {
         try
         {
-            var res = await _hub.UserPushIpcFull(new(recipients, modChanges, visualChanges, false)).ConfigureAwait(false);            
+            var res = await _hub.UserPushIpcFull(new(recipients, modChanges, visualChanges, false)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcFull to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading.", LoggerType.DataDistributor);
 
             // Handle any missing mods after.
@@ -333,7 +333,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             string manipStr = newManipulations ? _updater.LatestData.ModManips : string.Empty;
             var res = await _hub.UserPushIpcMods(new(recipients, modChanges, manipStr)).ConfigureAwait(false);
             Logger.LogDebug($"Sent PushIpcMods to {recipients.Count} users. {res.Value?.Count ?? 0} Files needed uploading. [HadManipChange?: {newManipulations}]", LoggerType.DataDistributor);
-            
+
             // Handle any missing mods after.
             if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
                 _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
@@ -388,14 +388,14 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
 
         // Special case, update regardless if the manips is an included change.
         if (toUpdate.HasAny(IpcKind.ModManips)) data.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
-        
+
         if (toUpdate.HasAny(IpcKind.Heels)) data.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Moodles)) data.Moodles = await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Honorific)) data.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.PetNames)) data.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
     }
 
-    private async Task<(string?, bool)> UpdateCacheSingleInternal(OwnedObject obj, IpcKind type, ClientDataCache data)
+    private async Task<(string, bool)> UpdateCacheSingleInternal(OwnedObject obj, IpcKind type, ClientDataCache data)
     {
         var dataStr = type switch
         {
@@ -409,7 +409,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             _ => string.Empty,
         };
         var changed = data.ApplySingleIpc(obj, type, dataStr);
-        var result = changed ? dataStr : null;
+        var result = changed ? dataStr : string.Empty;
         return (result, changed);
     }
     #endregion Cache Updates
