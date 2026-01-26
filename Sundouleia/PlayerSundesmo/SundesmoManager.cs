@@ -203,7 +203,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     {
         // Attempt to get the sundesmo via the UserData.
         if (!_allSundesmos.TryGetValue(dto.User, out var sundesmo))
-            throw new InvalidOperationException($"No user found [{dto}]");
+            throw new InvalidOperationException($"No user found [{dto.User.AliasOrUID}]\n" +
+                $"Existing Users were: [{string.Join(",",_allSundesmos.Keys.Select(k => k.UID))}]");
 
         // They were found, so refresh any existing profile data.
         Mediator.Publish(new ClearProfileDataMessage(dto.User));

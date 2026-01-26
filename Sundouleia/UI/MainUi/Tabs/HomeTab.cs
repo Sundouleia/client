@@ -129,8 +129,7 @@ public class HomeTab
         ImGui.Spacing();
         using (ImRaii.Group())
         {
-            ImGui.AlignTextToFramePadding();
-            CkGui.IconText(icon);
+            CkGui.IconTextAligned(icon);
             CkGui.TextFrameAlignedInline(text);
         }
         CkGui.AttachToolTip(tooltip);
@@ -173,8 +172,9 @@ public class HomeTab
 
             if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", buttonWidth, noSMA))
                 _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
-            CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
-                "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
+            CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Files (WIP)");
+            //CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
+            //    "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
 
             if (CkGui.FancyButton(FAI.Trophy, "Achievements", buttonWidth, true))
             {
@@ -226,8 +226,9 @@ public class HomeTab
 
         if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", region.X, noSMA))
             _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
-        CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
-            "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
+        CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Files (WIP)");
+        //CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
+        //    "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
 
         if (CkGui.FancyButton(FAI.Trophy, "Achievements", region.X, true))
         {

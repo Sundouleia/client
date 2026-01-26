@@ -328,7 +328,7 @@ public class MainUI : WindowMediatorSubscriberBase
             var color = SundouleiaEx.ServerStateColor();
             var connectedIcon = SundouleiaEx.ServerStateIcon(MainHub.ServerStatus);
 
-            // we need to turn the button from the connected link to the disconnected link.
+            // TODO: Set this to various connection kinds, or make additional buttons for the top row thing.
             using (ImRaii.PushColor(ImGuiCol.Text, color))
             {
                 if (CkGui.IconButton(connectedIcon, disabled: MainHub.ServerStatus is ServerState.Reconnecting or ServerState.Disconnecting))
@@ -336,13 +336,13 @@ public class MainUI : WindowMediatorSubscriberBase
                     if (MainHub.IsConnected)
                     {
                         // If we are connected, we want to disconnect.
-                        _accounts.Current.FullPause = true;
+                        _accounts.Current.ConnectionKind = ConnectionKind.FullPause;
                         _accounts.Save();
                         _ = _hub.Disconnect(ServerState.Disconnected, DisconnectIntent.Normal);
                     }
                     else if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                     {
-                        _accounts.Current.FullPause = false;
+                        _accounts.Current.ConnectionKind = ConnectionKind.Normal;
                         _accounts.Save();
                         _ = _hub.Connect();
                     }

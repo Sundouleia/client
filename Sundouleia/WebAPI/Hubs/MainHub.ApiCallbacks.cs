@@ -1,6 +1,7 @@
 using CkCommons;
 using Dalamud.Interface.ImGuiNotification;
 using Microsoft.AspNetCore.SignalR.Client;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Network;
@@ -57,16 +58,16 @@ public partial class MainHub
             _ = Task.Run(async () =>
             {
                 // pause the server state
-                _accounts.Config.FullPause = true;
-                _accounts.SaveConfig();
+                _accounts.ConnectionKind = ConnectionKind.FullPause;
+                _accounts.Save();
                 _suppressNextNotification = true;
                 // If forcing a hard reconnect, fully unload the client & their sundesmos.
                 await Disconnect(ServerState.Disconnected, DisconnectIntent.Reload).ConfigureAwait(false);
                 // Clear our token cache between, incase we were banned.
                 _tokenProvider.ResetTokenCache();
                 // Revert full pause status and create a new connection.
-                _accounts.Config.FullPause = false;
-                _accounts.SaveConfig();
+                _accounts.ConnectionKind = ConnectionKind.Normal; // Can cause issues where it doesnt restore after... Maybe seperate intent?
+                _accounts.Save();
                 _suppressNextNotification = true;
 
                 await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
@@ -262,7 +263,14 @@ public partial class MainHub
     public Task Callback_IpcUpdateFull(IpcUpdateFull dto)
     {
         Logger.LogDebug($"Callback_IpcUpdateFull: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData, dto.IsInitialData));
+        try
+        {
+            _sundesmos.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData, dto.IsInitialData);
+        }
+        catch (Bagagwa ex)
+        {
+            Logger.LogError($"Error in Callback_IpcUpdateFull for {dto.User.AliasOrUID}: {ex}");
+        }
         return Task.CompletedTask;
     }
 

@@ -47,7 +47,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         Flags = WFlags.NoScrollbar;
         this.PinningClickthroughFalse();
-        this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
+        this.SetBoundaries(new(625, 420), ImGui.GetIO().DisplaySize);
 
         TitleBarButtons = new TitleBarButtonBuilder()
             .Add(FAI.Tshirt, "Open Active State Debugger", () => Mediator.Publish(new UiToggleMessage(typeof(DebugActiveStateUI))))
@@ -144,7 +144,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
             if (ImGui.BeginTabItem(CkLoc.Settings.TabAccounts))
             {
-                _accountsTab.DrawManager();
+                _accountsTab.DrawContent();
                 ImGui.EndTabItem();
             }
 

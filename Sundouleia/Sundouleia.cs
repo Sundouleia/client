@@ -202,6 +202,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<MainMenuTabs>()
         .AddSingleton<WhitelistTabs>()
         .AddSingleton<SundesmoTabs>()
+        .AddSingleton<RequestTabs>()
 
         // WebAPI (Server stuff)
         .AddSingleton<MainHub>()

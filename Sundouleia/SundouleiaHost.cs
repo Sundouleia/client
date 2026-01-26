@@ -125,9 +125,9 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
             }
 
             // if the client does not have a valid setup or config, switch to the intro ui
-            if (!_config.HasValidSetup() || !_accountConfig.HasValidSetup())
+            if (!_config.HasValidSetup() || !_accountConfig.IsConfigValid())
             {
-                Logger?.LogDebug("Has Valid Setup: {setup} Has Valid Config: {config}", _config.HasValidSetup(), _accountConfig.HasValidSetup());
+                Logger?.LogDebug("Has Valid Setup: {setup} Has Valid Config: {config}", _config.HasValidSetup(), _accountConfig.IsConfigValid());
                 // publish the switch to intro ui message to the mediator
                 _config.Current.ButtonUsed = false;
 

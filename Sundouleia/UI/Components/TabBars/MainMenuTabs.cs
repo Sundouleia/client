@@ -52,10 +52,10 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         AddDrawButton(FontAwesomeIcon.Inbox, SelectedTab.Requests, "Incoming / Outgoing Requests",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
         
-        AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.BasicWhitelist, "Basic Whitelist", 
+        AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.BasicWhitelist, "Whitelist", 
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Whitelist, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
 
-        AddDrawButton(FAI.PeopleGroup, SelectedTab.GroupWhitelist, "Whitelist Groups");
+        AddDrawButton(FAI.PeopleGroup, SelectedTab.GroupWhitelist, "Sundesmo Groups");
 
         AddDrawButton(FontAwesomeIcon.BroadcastTower, SelectedTab.Radar, "Connect easily with others!",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Radar, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.RadarChat));

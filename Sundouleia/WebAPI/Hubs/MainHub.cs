@@ -123,7 +123,6 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public static bool IsConnectionDataSynced => _serverStatus is ServerState.ConnectedDataSynced;
     public static bool IsConnected => _serverStatus is ServerState.Connected or ServerState.ConnectedDataSynced;
     public static bool IsServerAlive => _serverStatus is ServerState.ConnectedDataSynced or ServerState.Connected or ServerState.Unauthorized or ServerState.Disconnected;
-    public bool ClientHasConnectionPaused => _accounts.Config.FullPause;
 
     protected override void Dispose(bool disposing)
     {
@@ -145,7 +144,6 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         // Notify of unloading upon halting the plugin.
         await Disconnect(ServerState.Disconnected, DisconnectIntent.Shutdown).ConfigureAwait(false);
         _hubConnectionCTS.SafeCancel();
-        return;
     }
 
     private async void OnSendTempRequest(UserData user)

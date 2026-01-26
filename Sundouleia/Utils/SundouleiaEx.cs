@@ -56,6 +56,7 @@ public static class SundouleiaEx
         }
     }
 
+    // Can make this internal probably.
     public static bool HasValidSetup(this MainConfig config)
         => config.Current.AcknowledgementUnderstood;
 
@@ -70,9 +71,6 @@ public static class SundouleiaEx
 
     public static bool HasValidSMACache(this MainConfig config)
         => !string.IsNullOrEmpty(config.Current.CacheFolder) && Directory.Exists(config.Current.SMACacheFolder);
-
-    public static bool HasValidSetup(this AccountConfig config)
-        => config.Current.LoginAuths.Count is not 0 && config.Current.Profiles.Count is not 0;
 
     public static bool DrawFavoriteStar(this FavoritesConfig config, string uid, bool framed)
     {

@@ -11,9 +11,6 @@ public class FolderStorage
     // Renamed Groups should properly retain references.
     public Dictionary<string, SundesmoGroup> Groups { get; set; } = new();
 
-    // RequestFolder Config
-    public bool ViewingIncoming { get; set; } = true;
-
     // WhitelistFolder Swapper
     public bool ViewingGroups { get; set; } = false;
 

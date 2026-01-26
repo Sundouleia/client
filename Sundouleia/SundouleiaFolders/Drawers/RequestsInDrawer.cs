@@ -63,38 +63,8 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             _sidePanel.ForRequests(_cache, Selector);
 
         var tmp = FilterCache.Filter;
-        var buttonsWidth = CkGui.IconButtonSize(FAI.Wrench).X + CkGui.IconTextButtonSize(FAI.Envelope, "Incoming");
-        // Update the search bar if things change, like normal.
-        if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
+        if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length))
             FilterCache.Filter = tmp;
-        
-        // Draw the config if it is opened.
-        if (_cache.FilterConfigOpen)
-            DrawConfig(width);
-
-        void DrawButtons()
-        {
-            // For swapping which drawer is displayed. (Should also swap what is present in the service if multi-selecting.
-            if (CkGui.IconTextButton(FAI.Envelope, "Incoming", null, true, _cache.FilterConfigOpen))
-            {
-                _config.Current.ViewingIncoming = !_config.Current.ViewingIncoming;
-                _config.Save();
-                _sidePanel.ClearDisplay();
-            }
-            CkGui.AttachToolTip($"Switch to outgoing requests.");
-
-            ImGui.SameLine(0, 0);
-            if (CkGui.IconButton(FAI.Wrench, inPopup: !_cache.FilterConfigOpen))
-                _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
-            CkGui.AttachToolTip("Configure preferences for requests handling.");
-        }
-    }
-
-    // Draws the grey line around the filtered content when expanded and stuff.
-    protected override void PostSearchBar()
-    {
-        if (_cache.FilterConfigOpen)
-            ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
     }
     #endregion Search
 
@@ -347,18 +317,6 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
         return endX;
     }
 
-
-    private void DrawConfig(float width)
-    {
-        var bgCol = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f);
-        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
-        using var child = CkRaii.ChildPaddedW("IncReqConfig", width, CkStyle.TwoRowHeight(), bgCol, 5f);
-
-        // Maybe move the vars into a config so we can store them between plugin states.
-        CkGui.FramedIconText(FAI.PeopleGroup);
-        CkGui.TextFrameAlignedInline("Dummy Text");
-    }
-
     // Accepts a single request.
     private void AcceptRequest(RequestEntry request)
     {
@@ -394,7 +352,6 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
 
     private void RejectRequest(RequestEntry request)
     {
-
         UiService.SetUITask(async () =>
         {
             var res = await _hub.UserRejectRequest(new(new(request.SenderUID))).ConfigureAwait(false);

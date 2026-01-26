@@ -609,7 +609,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         // Next line to display the account UID.
         var uid = string.Empty;
         var key = string.Empty;
-        if (_accounts.TryGetMainProfile(out var profile))
+        if (_accounts.GetMainProfile() is { } profile)
         {
             uid = profile.UserUID;
             key = profile.Key;
@@ -685,15 +685,19 @@ public class IntroUi : WindowMediatorSubscriberBase
                 if (_accounts.HasValidProfile())
                     throw new InvalidOperationException("Cannot recover account when a valid profile already exists!");
                 // Set the new profile to add using the key.
-                var addedIdx = _accounts.AddProfileToAccount(new()
+                var newProfile = new AccountProfile()
                 {
                     ProfileLabel = $"Recovered Account Key - ({DateTime.Now:yyyy-MM-dd})",
                     Key = _recoveryKey,
                     IsPrimary = true,
-                });
+                };
 
-                // Set the CharacterAuth for this profile.
-                _accounts.SetProfileForLoginAuth(PlayerData.CID, addedIdx);
+                // Add this to the accounts and set the player profile to it.
+                if (!_accounts.Profiles.Add(newProfile))
+                    throw new InvalidOperationException("Failed to add the profile, as it already exists!");
+
+                // Link this profile to the current tracked player.
+                _accounts.LinkPlayerToProfile(PlayerData.CID, newProfile);
                 // Attempt an initialization connection test.
                 await TryConnectForInitialization();
             }
@@ -712,8 +716,8 @@ public class IntroUi : WindowMediatorSubscriberBase
             _config.Save();
             try
             {
-                if (!_accounts.CharaHasLoginAuth())
-                    _accounts.GenerateAuthForCurrentCharacter();
+                if (!_accounts.CharaIsTracked())
+                    _accounts.CreateTrackedPlayer();
 
                 // Begin by fetching the account details for the player. If this fails we will throw to the catch statement and perform an early return.
                 var accountDetails = await _hub.FetchFreshAccountDetails();
@@ -722,27 +726,31 @@ public class IntroUi : WindowMediatorSubscriberBase
                 // This means that we can not create the new authentication and validate our account as created.
                 _logger.LogInformation("Fetched Account Details, proceeding to create Primary Account authentication.");
                 // However, if an auth already exists for the current content ID, and we are trying to create a new primary account, this should not be possible, so early throw.
-                if (_accounts.CharaHasValidLoginAuth())
+                if (_accounts.CharaHasValidProfile())
                     throw new InvalidOperationException("Auth already exists, cannot create new Primary auth if one already exists!");
 
                 _logger.LogInformation("No existing authentication found, proceeding to create new Primary Account authentication.");
                 // set the key to that newly added authentication
-                var addedIdx = _accounts.AddProfileToAccount(new()
+                var newMainProfile = new AccountProfile()
                 {
                     ProfileLabel = $"Main Account Key - ({DateTime.Now:yyyy-MM-dd})",
                     UserUID = accountDetails.Item1,
                     Key = accountDetails.Item2,
                     IsPrimary = true,
                     HadValidConnection = true,
-                });
-                // create the new secret key object to store.
-                _logger.LogInformation("Setting Profile for Login Auth.");
-                _accounts.SetProfileForLoginAuth(PlayerData.CID, addedIdx);
-                _logger.LogInformation("Profile for Login Auth set successfully.");
+                };
+
+                // Add this to the accounts and set the player profile to it.
+                _logger.LogInformation("Storing MainProfile data.");
+                if (!_accounts.Profiles.Add(newMainProfile))
+                    throw new InvalidOperationException("Failed to add MainProfile, as it already exists!");
+
+                // Link this profile to the current tracked player.
+                _accounts.LinkPlayerToProfile(PlayerData.CID, newMainProfile);
+                _logger.LogInformation("MainProfile for Account stored successfully.");
                 _config.Save();
                 // Log the details.
-                _logger.LogInformation("UID: " + accountDetails.Item1);
-                _logger.LogInformation("Secret Key: " + accountDetails.Item2);
+                _logger.LogInformation($"MainProfile Details: [UID: {accountDetails.Item1}] [Key: {accountDetails.Item2}]");
                 _logger.LogInformation("Fetched Account Details Successfully and finished creating Primary Account.");
             }
             catch (Bagagwa ex)

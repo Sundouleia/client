@@ -214,11 +214,11 @@ namespace Sundouleia.Localization
     {
         public readonly string TabHomepage = Loc.Localize("Tabs_MenuTabHomepage", "Home");
         public readonly string TabWhitelist = Loc.Localize("Tabs_MenuTabWhitelist", "Whitelist");
-        public readonly string TabRequests = Loc.Localize("Tabs_MenuTabRequests", "Incoming / Outgoing Requests");
+        public readonly string TabRequests = Loc.Localize("Tabs_MenuTabRequests", "Requests");
         public readonly string TabRadar = Loc.Localize("Tabs_MenuTabRadar", "Radar Control");
         public readonly string TabChat = Loc.Localize("Tabs_MenuTabChat", "Localized Radar Chat");
         public readonly string TabAccount = Loc.Localize("Tabs_MenuTabAccount", "Account Control");
-    } 
+    }
 
     public class Settings
     {
@@ -397,6 +397,30 @@ namespace Sundouleia.Localization
 
     public class Accounts
     {
+        public readonly string PrimaryLabel = Loc.Localize("Accounts_PrimaryLabel", "Primary Profile");
+        public readonly string SecondaryLabel = Loc.Localize("Accounts_SecondaryLabel", "Secondary Profile");
+        public readonly string AltProfileTip = Loc.Localize("Accounts_AltProfileTip", "Alt profiles can be obtained after registering with the Sundoulia Discord bot!");
 
+        public readonly string ProfileKey = Loc.Localize("Accounts_ProfileKey", "The Secret Key for the profile.");
+
+        public readonly string AddProfile = Loc.Localize("Accounts_AddProfile", "Add New Profile");
+        public readonly string AddProfileTT = Loc.Localize("Accounts_AddProfileTT", "Adds a new profile to your account.");
+        public readonly string RemoveProfile = Loc.Localize("Accounts_RemoveProfile", "Delete Profile");
+        public readonly string RemoveProfileTT = Loc.Localize("Accounts_RemoveProfileTT", "Deletes this profile from your account!" +
+            "--NL----COL--WARNING:--COL--Once an profile is deleted, the secret key is invalidated." +
+            "--SEP--Must hold --COL--CTRL+SHIFT--COL--To delete this profile.");
+        public readonly string RemoveProfileProfileTT = Loc.Localize("Accounts_RemoveProfileProfileTT", "Deletes your main profile from your account!" +
+            "--SEP----COL--THIS WILL REMOVE YOUR ENTIRE ACCOUNT AND ALL OTHER PROFILES.--COL--" +
+            "--SEP--Must hold --COL--CTRL+SHIFT--COL--To delete this profile." +
+            "--NL--(A confirmation dialog will open upon clicking this button)");
+
+        public readonly string EditKeyTT = Loc.Localize("Accounts_EditKeyTT", "Toggle censors over the secret key");
+        public readonly string NoEditKeyTT = Loc.Localize("Accounts_NoEditKeyTT", "Cannot change key after validated.");
+        public readonly string CopyKeyTT = Loc.Localize("Accounts_CopyKeyTT", "Click to copy your secret key to clipboard");
+
+        // Maybe remove.
+        public readonly string RemoveAccountPrimaryWarning = Loc.Localize("Accounts_RemoveAccountPrimaryWarning", "By deleting your primary account, all secondary accounts will also be deleted.");
+        public readonly string RemoveAccountWarning = Loc.Localize("Accounts_RemoveAccountWarning", "Your UID will be removed from all pairing lists.\nYou will be unable to use this secret key.");
+        public readonly string RemoveAccountConfirm = Loc.Localize("Accounts_RemoveAccountConfirm", "Are you sure you want to delete this account?");
     }
 }

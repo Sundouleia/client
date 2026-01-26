@@ -246,13 +246,13 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
     /// <returns>the JWT identifier object for the token</returns>
     private JwtIdentifier? GetIdentifier()
     {
-        var tempLocalContentID = PlayerData.CID;
+        var tmpCID = PlayerData.CID;
         try
         {
             var secretKey = string.Empty;
             var expectingPrimary = false;
             // Attempt to get the secret key and isPrimary attributes as well.
-            if (_accounts.GetProfileForCharacter() is { } profile)
+            if (_accounts.GetCharaProfile() is { } profile)
             {
                 secretKey = profile.Key;
                 expectingPrimary = profile.IsPrimary;
@@ -264,17 +264,17 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
             // Example logic to decide which identifier to use.
             if (!string.IsNullOrEmpty(secretKey))
             {
-                // Logger.LogDebug("GetIdentifier: SecretKey {secretKey}", secretKey);
+                // Logger.LogDebug($"GetIdentifier: SecretKey {secretKey}");
                 // fired if the secret key exists, meaning we are registered
                 var newIdentifier = new SecretKeyJwtIdentifier(apiUrl, charaHash, secretKey, expectingPrimary);
                 _lastJwtIdentifier = newIdentifier; // Safeguarding the new identifier
                 return newIdentifier;
             }
-            else if (tempLocalContentID != 0)
+            else if (tmpCID != 0)
             {
-                // Logger.LogDebug("GetIdentifier: LocalContentID {localContentID}", tempLocalContentID);
+                // Logger.LogDebug($"GetIdentifier: LocalContentID {tmpCID}");
                 // fired if the local content ID is not 0, meaning we are not registered
-                var newIdentifier = new LocalContentIDJwtIdentifier(apiUrl, charaHash, tempLocalContentID.ToString());
+                var newIdentifier = new LocalContentIDJwtIdentifier(apiUrl, charaHash, tmpCID.ToString());
                 _lastJwtIdentifier = newIdentifier; // Safeguarding the new identifier
                 return newIdentifier;
             }
@@ -304,14 +304,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
         {
             Logger.LogError(ex, "Error creating JWT identifier. Exception: {Message}, StackTrace: {StackTrace}", ex.Message, ex.StackTrace);
             // Fallback to the last known good identifier if an exception occurs
-            if (_lastJwtIdentifier != null)
-            {
-                return _lastJwtIdentifier;
-            }
-            else
-            {
-                return null;
-            }
+            return _lastJwtIdentifier != null ? _lastJwtIdentifier : null;
         }
     }
 

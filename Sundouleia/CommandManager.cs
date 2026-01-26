@@ -41,7 +41,7 @@ public sealed class CommandManager : IDisposable
         if (splitArgs.Length == 0)
         {
             // Interpret this as toggling the UI
-            if (_config.HasValidSetup() && _accountConfig.HasValidSetup())
+            if (_config.HasValidSetup() && _accountConfig.IsConfigValid())
                 _mediator.Publish(new UiToggleMessage(typeof(MainUI)));
             else
                 _mediator.Publish(new UiToggleMessage(typeof(IntroUi)));

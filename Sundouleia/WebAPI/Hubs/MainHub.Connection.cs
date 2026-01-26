@@ -1,10 +1,11 @@
-using System.Net.WebSockets;
 using CkCommons;
 using Dalamud.Interface.ImGuiNotification;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Hub;
+using System.Net.WebSockets;
 
 namespace Sundouleia.WebAPI;
 /// <summary>
@@ -170,7 +171,7 @@ public partial class MainHub
             {
                 // Notify all online sundesmos that we are unloading upon our disconnect.
                 Logger.LogInformation("Disconnecting due to a hard-reconnect or plugin unload. Notifying online Sundesmos!");
-                await UserNotifyIsUnloading();
+                await UserNotifyIsUnloading().ConfigureAwait(false);
                 // Now we can actually disconnect with this taken care of.
             }
 
@@ -289,36 +290,36 @@ public partial class MainHub
         fetchedSecretKey = string.Empty;
 
         // if we are not logged in, we should not be able to connect.
-        if (PlayerData.IsLoggedIn is false)
+        if (!PlayerData.IsLoggedIn)
         {
             Logger.LogDebug("Attempted to connect while not logged in, this shouldnt be possible! Aborting!", LoggerType.ApiCore);
             return false;
         }
 
         // if we have not yet made an account, abort this connection.
-        if (_accounts.Config.LoginAuths.Count <= 0)
+        if (_accounts.TrackedPlayers.Count <= 0)
         {
             Logger.LogDebug("No Authentications created. No Primary Account or Alt Account to connect with. Aborting!", LoggerType.ApiCore);
             return false;
         }
 
         // If we do not have an auth made for this character, make one, but still reject.
-        if (!_accounts.CharaHasLoginAuth())
+        if (!_accounts.CharaIsTracked())
         {
-            _accounts.GenerateAuthForCurrentCharacter();
+            _accounts.CreateTrackedPlayer();
             Logger.LogDebug("New LoginAuth made for character, but no key is connected!", LoggerType.ApiCore);
             return false;
         }
 
         // If the client wishes to not be connected to the server, return.
-        if (ClientHasConnectionPaused)
+        if (_accounts.ConnectionKind is ConnectionKind.FullPause)
         {
             Logger.LogDebug("You have your connection to server paused. Stopping any attempt to connect!", LoggerType.ApiCore);
             return false;
         }
 
         // Obtain stored ServerKey for the current Character we are logged into.
-        var profileForChara = _accounts.GetProfileForCharacter();
+        var profileForChara = _accounts.GetCharaProfile();
         fetchedSecretKey = profileForChara?.Key ?? string.Empty;
         if (string.IsNullOrEmpty(fetchedSecretKey))
         {

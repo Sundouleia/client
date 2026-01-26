@@ -93,6 +93,12 @@ public class ConfigFileProvider : IConfigFileProvider
     // If this is not true, we should not be saving our configs anyways.
     public bool HasValidProfileConfigs { get; private set; } = false;
 
+    public void ClearUidConfigs()
+    {
+        HasValidProfileConfigs = false;
+        UpdateUserUID(null);
+    }
+
     // Updates the CurrentProfileDirectory to match the provided profile UID.
     public void UpdateConfigs(string profileUID)
     {
@@ -102,7 +108,7 @@ public class ConfigFileProvider : IConfigFileProvider
         {
             _logger.LogInformation($"Updating Configs for Profile UID [{profileUID}]");
             CurrentProfileUID = profileUID;
-            UpdateUidInConfig(profileUID);
+            UpdateUserUID(profileUID);
 
             // If the directory doesnt yet exist for this profile, create it.
             if (!Directory.Exists(CurrentProfileDirectory))
@@ -113,7 +119,7 @@ public class ConfigFileProvider : IConfigFileProvider
         }
     }
 
-    private void UpdateUidInConfig(string? uid)
+    private void UpdateUserUID(string? uid)
     {
         var uidFilePath = Path.Combine(SundouleiaDirectory, "config.json");
         if (!File.Exists(uidFilePath))

@@ -51,36 +51,8 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
     protected override void DrawSearchBar(float width, int length)
     {
         var tmp = FilterCache.Filter;
-        var buttonsWidth = CkGui.IconButtonSize(FAI.Wrench).X + CkGui.IconTextButtonSize(FAI.Stopwatch, "Outgoing");
-        // Update the search bar if things change, like normal.
-        if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length, buttonsWidth, DrawButtons))
+        if (FancySearchBar.Draw("Filter", width, ref tmp, "filter..", length))
             FilterCache.Filter = tmp;
-
-        // Draw the config if open.
-        if (_cache.FilterConfigOpen)
-            DrawConfig(width);
-
-        void DrawButtons()
-        {
-            if (CkGui.IconTextButton(FAI.Stopwatch, "Outgoing", null, true, _cache.FilterConfigOpen))
-            {
-                _config.Current.ViewingIncoming = !_config.Current.ViewingIncoming;
-                _config.Save();
-            }
-            CkGui.AttachToolTip($"Switch to incoming requests.");
-
-            ImGui.SameLine(0, 0);
-            if (CkGui.IconButton(FAI.Wrench, inPopup: !_cache.FilterConfigOpen))
-                _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
-            CkGui.AttachToolTip("Configure preferences for requests handling.");
-        }
-    }
-
-    // Draws the grey line around the filtered content when expanded and stuff.
-    protected override void PostSearchBar()
-    {
-        if (_cache.FilterConfigOpen)
-            ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
     }
     #endregion Search
 
@@ -232,16 +204,6 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
                 CancelRequest(leaf.Data);
         CkGui.AttachToolTip("Cancel this pending request.");
         return endX;
-    }
-
-    private void DrawConfig(float width)
-    {
-        var bgCol = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f);
-        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
-        using var child = CkRaii.ChildPaddedW("IncReqConfig", width, CkStyle.TwoRowHeight(), bgCol, 5f);
-
-        CkGui.FramedIconText(FAI.Question);
-        CkGui.TextFrameAlignedInline("Do we even need this? Or could it all be one??");
     }
 
     private void CancelRequest(RequestEntry request)

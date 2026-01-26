@@ -117,7 +117,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
     ///</summary>
     public void ToggleMainUi()
     {
-        if (_config.HasValidSetup() && _accountConfig.HasValidSetup())
+        if (_config.HasValidSetup() && _accountConfig.IsConfigValid())
             Mediator.Publish(new UiToggleMessage(typeof(MainUI)));
         else
             Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
@@ -129,7 +129,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
     /// </summary>
     public void ToggleUi()
     {
-        if (_config.HasValidSetup() && _accountConfig.HasValidSetup())
+        if (_config.HasValidSetup() && _accountConfig.IsConfigValid())
             Mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
         else
             Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));

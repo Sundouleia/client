@@ -3,22 +3,154 @@ using Sundouleia.Services.Configs;
 
 namespace Sundouleia.PlayerClient;
 
+public enum ConnectionKind
+{
+    /// <summary>
+    ///     You are connected normally, All data is sent and received.
+    /// </summary>
+    Normal,
+
+    /// <summary>
+    ///     Any changes you make are not sent to others, but you can still see others.
+    /// </summary>
+    TryOnMode,
+
+    /// <summary>
+    ///     Your Appearance is shared to others, but others will look vanilla.
+    /// </summary>
+    StreamerMode,
+
+    /// <summary>
+    ///     No data is sent or received. (Avoid Connection / Disconnect)
+    /// </summary>
+    FullPause
+}
+
+public class AccountStorage
+{
+    /// <summary>
+    ///     How we should behave when connected, or if we should at all. <para />
+    ///     Should maybe revise where this is stored. Perhaps MainConfig or just in MainHub as static. Unsure.
+    /// </summary>
+    public ConnectionKind ConnectionKind { get; set; } = ConnectionKind.Normal;
+
+    /// <summary>
+    ///     These are the 'profiles' of your account. An AccountProfile has UID and secret key. <para/>
+    ///     Profiles are identified by a GUID on creation, and used for serialization referencing.
+    /// </summary>
+    public HashSet<AccountProfile> Profiles { get; set; } = new();
+
+    /// <summary>
+    ///     The characters tracked by sundouleia. <br/>
+    ///     Each character is tracked via their content ID,
+    ///     with name and world being updatable if it changes.
+    /// </summary>
+    public Dictionary<ulong, TrackedPlayer> TrackedPlayers { get; set; } = [];
+}
+
+/// <summary>
+///     A profile contains a friendly label, the actual secret key, 
+///     and if we had a successful connection with it.
+/// </summary>
+public class AccountProfile
+{
+    /// <summary>
+    ///     Defined on Account Profile creation, and used in serialization and deserialization to link referenced profiles.
+    /// </summary>
+    public Guid Identifier { get; set; } = Guid.NewGuid();
+
+    /// <summary>
+    ///     The display name given to a profile, that is visible on the UI.
+    /// </summary>
+    public string ProfileLabel { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     The UserUID associated with this secret key. <para />
+    ///     This is recieved from the server upon the first valid connection with this key.
+    /// </summary>
+    public string UserUID { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     The secret key used to authenticate with the server and connect.
+    /// </summary>
+    public string Key { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     If this is the primary key, all other keys are removed when it is removed.
+    /// </summary>
+    public bool IsPrimary { get; set; } = false;
+
+    /// <summary>
+    ///     If a valid connection was established. This could easily be removed or replaced with if UserUID != string.Empty (?)
+    /// </summary>
+    public bool HadValidConnection { get; set; } = false;
+}
+
+
+/// <summary>
+///     An Authentication made by a logged in character. <para />
+///     Holds basic information about the player, and which key they are linked to.
+/// </summary>
+public record TrackedPlayer
+{
+    /// <summary>
+    ///     The unique value of this authentication. <para />
+    ///     A ContentID is a static value given to a character of a FFXIV Service Account. <br/>
+    ///     Persists through name and world changes.
+    /// </summary>
+    public ulong ContentId { get; set; } = 0;
+
+    /// <summary>
+    ///     The Character Name associated with this ContentID.
+    /// </summary>
+    public string PlayerName { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     The HomeWorld associated with this ContentID.
+    /// </summary>
+    public ushort WorldId { get; set; } = 0;
+
+    /// <summary>
+    ///     The linked account profile this character is connected to. <br/>
+    ///     If null, assume not set.
+    /// </summary>
+    public AccountProfile? LinkedProfile { get; set; } = null;
+
+    public bool IsLinked() => LinkedProfile is not null;
+}
 
 public class AccountConfig : IHybridSavable
 {
     private readonly ILogger<AccountConfig> _logger;
     private readonly HybridSaveService _saver;
     public DateTime LastWriteTimeUTC { get; private set; } = DateTime.MinValue;
-    public int ConfigVersion => 0;
+    public int ConfigVersion => 1;
     public HybridSaveType SaveType => HybridSaveType.Json;
     public string GetFileName(ConfigFileProvider files, out bool upa) => (upa = false, files.AccountConfig).Item2;
     public void WriteToStream(StreamWriter writer) => throw new NotImplementedException();
     public string JsonSerialize()
     {
-        return new JObject()
+        // Project TrackedPlayers so LinkedProfile is just the GUID
+        var trackedPlayersJObj = Current.TrackedPlayers.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new
+            {
+                kvp.Value.ContentId,
+                kvp.Value.PlayerName,
+                kvp.Value.WorldId,
+                LinkedProfile = kvp.Value.LinkedProfile?.Identifier
+            });
+
+        // Build the final JObject manually
+        return new JObject
         {
             ["Version"] = ConfigVersion,
-            ["AccountStorage"] = JObject.FromObject(Current),
+            ["AccountStorage"] = new JObject
+            {
+                ["ConnectionKind"] = (int)Current.ConnectionKind,
+                ["Profiles"] = JArray.FromObject(Current.Profiles),
+                ["TrackedPlayers"] = JObject.FromObject(trackedPlayersJObj)
+            }
         }.ToString(Formatting.Indented);
     }
     public AccountConfig(ILogger<AccountConfig> logger, HybridSaveService saver)
@@ -48,7 +180,10 @@ public class AccountConfig : IHybridSavable
         switch (version)
         {
             case 0:
-                LoadV0(jObject["AccountStorage"]);
+                MigrateAndLoadV0AsV1(jObject);
+                break;
+            case 1:
+                LoadV1(jObject);
                 break;
             default:
                 _logger.LogError("Invalid Version!");
@@ -57,63 +192,134 @@ public class AccountConfig : IHybridSavable
         Save();
     }
 
-    private void LoadV0(JToken? data)
+    public AccountStorage Current { get; set; } = new AccountStorage();
+
+    public bool IsConfigValid()
+        => Current.Profiles.Count > 0 && Current.TrackedPlayers.Any(c => c.Value.LinkedProfile is not null);
+
+    // Remove this after for open beta launch, the new format is all we need for that.
+    private void MigrateAndLoadV0AsV1(JObject root)
     {
-        if (data is not JObject storage)
-            return;
-        Current = storage.ToObject<AccountStorage>() ?? throw new Exception("Failed to load AccountStorage.");
+        // If it fails, good. Bomb them for all i care. I dont want to fuck up peoples passwords.
+        if (root["AccountStorage"] is not JObject oldStorage)
+            throw new Exception("Failed to load AccountStorage for migration.");
+
+        var newStorage = new AccountStorage()
+        {
+            ConnectionKind = (oldStorage["FullPause"]?.Value<bool>() ?? false) ? ConnectionKind.FullPause : ConnectionKind.Normal,
+            Profiles = new HashSet<AccountProfile>(),
+            TrackedPlayers = new Dictionary<ulong, TrackedPlayer>()
+        };
+
+        // Track the mainProfileIdx so we know which profiles to migrate to the main ID.
+        var mainProfiles = new HashSet<int>();
+        // Iterate through all of the account profiles first, so we can use them for the other things later.
+        if (oldStorage["Profiles"] is JObject profilesObj)
+        {
+            foreach (var (idx, profileInfo) in profilesObj)
+            {
+                if (profileInfo is null)
+                    continue;
+
+                // This should auto-generate a new profile for the account.
+                var newProfile = new AccountProfile()
+                {
+                    ProfileLabel = profileInfo["ProfileLabel"]?.Value<string>() ?? string.Empty,
+                    UserUID = profileInfo["UserUID"]?.Value<string>() ?? string.Empty,
+                    Key = profileInfo["Key"]?.Value<string>() ?? string.Empty,
+                    IsPrimary = profileInfo["IsPrimary"]?.Value<bool>() ?? false,
+                    HadValidConnection = profileInfo["HadValidConnection"]?.Value<bool>() ?? false,
+                };
+
+                if (newProfile.ProfileLabel.Length > 20)
+                    newProfile.ProfileLabel = newProfile.ProfileLabel[..20];
+
+                if (newProfile.IsPrimary)
+                    mainProfiles.Add(int.Parse(idx));
+
+                // Add it to the new storage.
+                newStorage.Profiles.Add(newProfile);
+            }
+        }
+
+        // get what is intended to be the 'main' profile.
+        var mainProfile = newStorage.Profiles.FirstOrDefault(p => p.IsPrimary);
+
+        // Now migrate all of the loginAuths to tracked players.
+        if (oldStorage["LoginAuths"] is JArray loginsArr)
+        {
+            foreach (var trackedPlayer in loginsArr)
+            {
+                if (trackedPlayer is null)
+                    continue;
+
+                ulong contentId = trackedPlayer["ContentId"]?.Value<ulong>() ?? 0;
+                string playerName = trackedPlayer["PlayerName"]?.ToString() ?? "";
+                ushort worldId = trackedPlayer["WorldId"]?.Value<ushort>() ?? 0;
+                int profileIdx = trackedPlayer["ProfileIdx"]?.Value<int>() ?? -1;
+
+                var tracked = new TrackedPlayer
+                {
+                    ContentId = contentId,
+                    PlayerName = playerName,
+                    WorldId = worldId,
+                    LinkedProfile = mainProfiles.Contains(profileIdx) ? mainProfile : null
+                };
+                // Add it to the storage.
+                newStorage.TrackedPlayers[contentId] = tracked;
+            }
+        }
+
+        // Return the migrated result.
+        Current = newStorage;
     }
 
-    public AccountStorage Current { get; set; } = new AccountStorage();
-}
-
-public class AccountStorage
-{
-    /// <summary>
-    ///     If we have disconnected from the server manually.
-    /// </summary>
-    public bool FullPause { get; set; } = false;
-
-    /// <summary>
-    ///     The characters that used Sundouleia on this account. <para />
-    ///     Do not confuse these with profiles, they are not the same. profiles are bound by key.
-    /// </summary>
-    public List<CharaAuthentication> LoginAuths { get; set; } = [];
-
-    /// <summary>
-    ///     These are the 'profiles' of your account.
-    ///     A profile can be bound to any CharacterAuths and switched between. <para />
-    ///     The order of these keys cannot be re-arranged, as they will mess up CharacterAuths.
-    /// </summary>
-    public Dictionary<int, AccountProfile> Profiles { get; set; } = new();
-}
+    private void LoadV1(JObject root)
+    {
+        // If it fails, good. Bomb them for all i care. I dont want to fuck up peoples passwords.
+        if (root["AccountStorage"] is not JObject storage)
+            throw new Exception("Failed to load AccountStorage for V1.");
 
 
-/// <summary>
-///     An Authentication made by a logged in character. <para />
-///     Holds basic information about the player, and which key they are linked to.
-/// </summary>
-public record CharaAuthentication
-{
-    public string PlayerName { get; set; } = string.Empty;
-    public ushort WorldId { get; set; } = 0;
-    public ulong ContentId { get; set; } = 0;
-    // Which profile the auth is linked to. Can be changed freely.
-    public int ProfileIdx { get; set; } = -1;
-}
+        // 1. Deserialize Profiles first
+        var profiles = storage["Profiles"]!.ToObject<HashSet<AccountProfile>>() ?? throw new Exception("Failed to parse account profiles.");
 
+        // Build a lookup by Guid.
+        var profilesByGuid = profiles.ToDictionary(p => p.Identifier, p => p);
 
-/// <summary>
-///     A profile contains a friendly label, the actual secret key, 
-///     and if we had a successful connection with it.
-/// </summary>
-public class AccountProfile
-{
-    public string ProfileLabel { get; set; } = string.Empty;
-    public string UserUID { get; set; } = string.Empty;
-    public string Key { get; set; } = string.Empty;
+        // Build the account storage as-is.
+        var accountStorage = new AccountStorage()
+        {
+            ConnectionKind = (ConnectionKind)(storage["ConnectionKind"]?.Value<int>() ?? 0),
+            Profiles = profiles,
+        };
 
-    // If this is the primary key, all other keys are removed when it is removed.
-    public bool IsPrimary { get; set; } = false;
-    public bool HadValidConnection { get; set; } = false;
+        // Correct any longer names.
+        foreach(var profile in accountStorage.Profiles)
+            if (profile.ProfileLabel.Length > 20)
+                profile.ProfileLabel = profile.ProfileLabel[..20];
+
+        // Iterate the tracked players, if any.
+        if (storage["TrackedPlayers"] is JObject trackedDictObj)
+        {
+            foreach (var (cid, playerInfo) in trackedDictObj)
+            {
+                if (playerInfo is not JObject infoObj)
+                    continue;
+
+                var linkedId = Guid.TryParse(infoObj["LinkedProfile"]?.Value<string>(), out var guid) ? guid : Guid.Empty;
+                var trackedPlayer = new TrackedPlayer()
+                {
+                    ContentId = infoObj["ContentId"]?.Value<ulong>() ?? 0,
+                    PlayerName = infoObj["PlayerName"]?.Value<string>() ?? string.Empty,
+                    WorldId = infoObj["WorldId"]?.Value<ushort>() ?? 0,
+                    LinkedProfile = profilesByGuid.GetValueOrDefault(linkedId),
+                };
+                // Add to storage
+                accountStorage.TrackedPlayers[trackedPlayer.ContentId] = trackedPlayer;
+            }
+        }
+        // Set the current account storage.
+        Current = accountStorage;
+    }
 }
