@@ -3,7 +3,6 @@ using CkCommons.Classes;
 using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
@@ -20,11 +19,6 @@ using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.WebAPI;
-using System.Drawing;
-using System.Security.Claims;
-using TerraFX.Interop.Windows;
-using TerraFX.Interop.WinRT;
-using static Penumbra.GameData.Data.GamePaths;
 
 namespace Sundouleia.Gui;
 
@@ -196,6 +190,8 @@ public class ProfilesTab
         using (CkRaii.Child("profiles", listSize, wFlags: WFlags.NoScrollbar))
         {
             var size = new Vector2(listSize.X, ImUtf8.FrameHeight + ImUtf8.TextHeightSpacing);
+
+            DrawAddUser(size);
             foreach (var profile in _account.Profiles)
             {
                 if (SelectableProfile(profile, size))
@@ -216,7 +212,22 @@ public class ProfilesTab
 
         // Draw the remove button.
         if (CkGui.FancyButton(FAI.Minus, CkLoc.Settings.Accounts.RemoveProfile, listSize.X, (!ImGui.GetIO().KeyCtrl || !ImGui.GetIO().KeyShift)))
-            ImGui.OpenPopup("Delete Account Confirmation");
+        {
+            if (_selected is not null)
+            {
+                if (_selected.HadValidConnection)
+                    ImGui.OpenPopup("Delete Account Confirmation");
+                else
+                {
+                    _postDrawActions.Enqueue(() =>
+                    {
+                        // We can just remove it plainly as it is not bound to any profile serverside.
+                        _account.Profiles.Remove(_selected);
+                        _account.Save();
+                    });
+                }
+            }
+        }
         CkGui.AttachToolTip(CkLoc.Settings.Accounts.RemoveProfileTT);
 
         // Fire if true.
@@ -260,6 +271,69 @@ public class ProfilesTab
     }
     #endregion DEBUGGER
 
+    private bool DrawAddUser(Vector2 size)
+    {
+        // Get the internal window directly.
+        var window = ImGuiInternal.GetCurrentWindow();
+        if (window.SkipItems)
+            return false;
+
+        // Aquire our ID for this new internal item
+        var id = ImGui.GetID("add-user");
+        var pos = window.DC.CursorPos;
+        var frameH = ImUtf8.FrameHeight;
+        var style = ImGui.GetStyle();
+
+        // Get the scaled versions of the border and shadow.
+        var shadowSize = ImGuiHelpers.ScaledVector2(1);
+        var styleOffset = ImGuiHelpers.ScaledVector2(2);
+        var buttonPadding = styleOffset = style.FramePadding;
+        var bend = size.Y * .5f;
+        var trueH = frameH + 2 * styleOffset.Y;
+
+        // Aquire a bounding box for our location.
+        var itemSize = new Vector2(size.X, trueH);
+        var hitbox = new ImRect(pos, pos + itemSize);
+
+        // Add the item into the ImGuiInternals
+        // (2nd paramater tells us how much from the outer edge to shift for text)
+        ImGuiInternal.ItemSize(itemSize, style.FramePadding.Y + buttonPadding.Y);
+        if (!ImGuiP.ItemAdd(hitbox, id, null))
+            return false;
+
+        // Process interaction with this 'button'
+        var hovered = false;
+        var active = false;
+        var clicked = ImGuiP.ButtonBehavior(hitbox, id, ref hovered, ref active);
+
+        // Render possible nav highlight space over the bounding box region.
+        ImGuiP.RenderNavHighlight(hitbox, id);
+
+        // Define our colors based on states.
+        uint shadowCol = 0x64000000;
+        uint borderCol = CkGui.ApplyAlpha(0xDCDCDCDC, active ? 0.7f : hovered ? 0.63f : 0.39f);
+        uint bgCol = CkGui.ApplyAlpha(0x64000000, active ? 0.19f : hovered ? 0.26f : 0.39f);
+
+        // Text computation.
+        var textSize = ImGui.CalcTextSize("Add User");
+        var iconTextWidth = frameH + textSize.X;
+        var iconPos = hitbox.Min + new Vector2((size.X - iconTextWidth) / 2f, (trueH - textSize.Y) / 2f);
+        var textPos = iconPos + new Vector2(frameH, 0);
+
+        // Outer Drop Shadow on bottom.
+        window.DrawList.AddRectFilled(hitbox.Min, hitbox.Max, shadowCol, bend, ImDrawFlags.RoundCornersRight);
+        // Draw over with inner border, greyish look.
+        window.DrawList.AddRectFilled(hitbox.Min + shadowSize, hitbox.Max - shadowSize, borderCol, bend, ImDrawFlags.RoundCornersRight);
+        // Draw over again with the bgColor.
+        window.DrawList.AddRectFilled(hitbox.Min + _styleOffset, hitbox.Max - _styleOffset, bgCol, bend, ImDrawFlags.RoundCornersRight);
+        // Then draw out the icon and text.
+        using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
+            window.DrawList.AddText(FAI.Plus.ToIconString(), iconPos, ImGui.GetColorU32(ImGuiCol.Text));
+        window.DrawList.AddText("Add User", textPos, ImGui.GetColorU32(ImGuiCol.Text));
+
+        return clicked;
+    }
+
     // Shift these stylizations to be calculated prior to our draws so we can use them throughout the drawframe without calculating every time.
     private bool SelectableProfile(AccountProfile profile, Vector2 size)
     {
@@ -275,6 +349,7 @@ public class ProfilesTab
 
         // Get the offsets and true height.
         var trueH = size.Y + _styleOffset.Y * 2;
+        var bend = size.Y * .5f;
 
         // Aquire a valid bounding box for this button interaction
         var itemSize = new Vector2(size.X, trueH);
@@ -298,13 +373,12 @@ public class ProfilesTab
         uint bgCol = CkGui.ApplyAlpha(0x64000000, active ? 0.19f : hovered ? 0.26f : 0.39f);
 
         // (Picture draw order like placing sticky notes on our monitor, stacking them towards us)
+        window.DrawList.AddRectFilled(hitbox.Min, hitbox.Max, shadowCol, bend, ImDrawFlags.RoundCornersRight);
+        // Draw over with inner border, greyish look.
+        window.DrawList.AddRectFilled(hitbox.Min + _shadowSize, hitbox.Max - _shadowSize, borderCol, bend, ImDrawFlags.RoundCornersRight);
+        // Draw over again with the bgColor.
+        window.DrawList.AddRectFilled(hitbox.Min + _styleOffset, hitbox.Max - _styleOffset, bgCol, bend, ImDrawFlags.RoundCornersRight);
 
-        // Outer Shadow
-        window.DrawList.AddRectFilled(hitbox.Min, hitbox.Max, shadowCol, _bendS, ImDrawFlags.RoundCornersAll);
-        // Inner Border
-        window.DrawList.AddRectFilled(hitbox.Min + _shadowSize, hitbox.Max - _shadowSize, borderCol, _bendS, ImDrawFlags.RoundCornersAll);
-        // Main BG
-        window.DrawList.AddRectFilled(hitbox.Min + _styleOffset, hitbox.Max - _styleOffset, bgCol, _bendS, ImDrawFlags.RoundCornersAll);
 
         // Allow for 'ImGui.IsItemHovered' to be reconized by this hitbox.
         ImGuiP.RenderNavHighlight(hitbox, id);

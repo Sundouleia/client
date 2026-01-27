@@ -210,7 +210,7 @@ public static class SundouleiaEx
             ServerState.Unauthorized => "Unauthorized",
             ServerState.VersionMisMatch => "Version mismatch",
             ServerState.Offline => "Unavailable",
-            ServerState.NoSecretKey => "No Secret Key",
+            ServerState.NoSecretKey => "Invalid / No Secret Key",
             ServerState.Connected => MainHub.DisplayName,
             ServerState.ConnectedDataSynced => MainHub.DisplayName,
             _ => string.Empty
