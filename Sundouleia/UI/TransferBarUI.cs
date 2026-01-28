@@ -195,6 +195,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         }
     }
 
+
     // Capable of preventing the window from being drawn.
     public override bool DrawConditions()
     {

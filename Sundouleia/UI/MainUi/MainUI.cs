@@ -1,14 +1,11 @@
 using CkCommons;
 using CkCommons.Classes;
 using CkCommons.Gui;
-using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using Dalamud.Plugin.Services;
-using NAudio.Gui;
 using OtterGui.Text;
 using OtterGuiInternal;
 using Sundouleia.Gui.Components;
@@ -20,13 +17,9 @@ using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
-using System.Drawing;
 using System.Globalization;
 using System.Reflection;
 using TerraFX.Interop.Windows;
-using static Lumina.Data.Parsing.Uld.NodeData;
-using static Penumbra.GameData.Data.GamePaths;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -147,17 +140,9 @@ public class MainUI : WindowMediatorSubscriberBase
         }
         else
         {
-            try
-            {
-                DrawTopBar();
-            }
-            catch (Bagagwa ex)
-            {
-                _logger.LogError($"{ex}");
-            }
+            DrawTopBar();
         }
 
-        ImGui.Separator();
         LastPos = ImGui.GetWindowPos();
         LastSize = ImGui.GetWindowSize();
         
@@ -239,7 +224,6 @@ public class MainUI : WindowMediatorSubscriberBase
         var winPtr = ImGuiInternal.GetCurrentWindow();
         // Expand the region of the topbar to cross the full width.
         var winPadding = ImGui.GetStyle().WindowPadding;
-        var minArea = ImGui.GetWindowContentRegionMin();
         // ImGui hides the actual possible clip-rect-min from going to 0,0.
         // This is because the ClipRect skips over the titlebar, so if WinPadding is 8,8
         // then the content region min returns 8,40
@@ -249,26 +233,26 @@ public class MainUI : WindowMediatorSubscriberBase
         var maxPos = winPtr.DrawList.GetClipRectMax() + new Vector2(winClipX, 0);
         // Expand the area for our custom header.
         winPtr.DrawList.PushClipRect(minPos, maxPos, false);
+
         // Get the expanded width
         var topBarWidth = maxPos.X - minPos.X;
-        var sideWidth = topBarWidth * .25f;
-        var height = CkGui.CalcFontTextSize("A", UiFontService.Default150Percent).Y;
-
         var offlineSize = CkGui.IconSize(FAI.Unlink);
         var tryonSize = CkGui.IconSize(FAI.Toilet);
         var streamerSize = CkGui.IconSize(FAI.BroadcastTower);
         var connectedSize = CkGui.IconSize(FAI.Link);
-
+        var sideWidth = offlineSize.X + tryonSize.X + streamerSize.X + connectedSize.X + ImUtf8.ItemSpacing.X * 5;
+        var height = CkGui.CalcFontTextSize("A", UiFontService.Default150Percent).Y;
+       
         if (DrawAddUser(winPtr, new Vector2(sideWidth, height), minPos))
             _creatingRequest = !_creatingRequest;
         CkGui.AttachToolTip("Add New User to Whitelist");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.AddingUsers, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => _creatingRequest = !_creatingRequest);
 
-        ImGui.SameLine(sideWidth);
-        DrawConnectedUsers(winPtr, new Vector2(sideWidth * 2, height));
+        ImGui.SetCursorScreenPos(minPos + new Vector2(sideWidth, 0));
+        DrawConnectedUsers(winPtr, new Vector2(topBarWidth - sideWidth * 2, height), topBarWidth);
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.InitialWelcome, WindowPos, WindowSize);
-
-        ImGui.SameLine(sideWidth * 3);
+        
+        ImGui.SameLine(topBarWidth - sideWidth);
         DrawConnectionState(winPtr, new Vector2(sideWidth, height));
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConnectionState, WindowPos, WindowSize);
 
@@ -283,12 +267,13 @@ public class MainUI : WindowMediatorSubscriberBase
         var id = ImGui.GetID("add-user");
         var style = ImGui.GetStyle();
         var shadowSize = ImGuiHelpers.ScaledVector2(1);
-        var styleOffset = ImGuiHelpers.ScaledVector2(2.5f);
+        var styleOffset = ImGuiHelpers.ScaledVector2(2f);
         var buttonPadding = styleOffset + ImUtf8.FramePadding;
         var bend = region.Y * .5f;
-        var hitbox = new ImRect(minPos, minPos + region);
+        var min = minPos;
+        var hitbox = new ImRect(min, min + region);
 
-        ImGuiInternal.ItemSize(region, style.FramePadding.Y + styleOffset.Y);
+        ImGuiInternal.ItemSize(region);
         if (!ImGuiP.ItemAdd(hitbox, id, null))
             return false;
 
@@ -305,15 +290,15 @@ public class MainUI : WindowMediatorSubscriberBase
         uint borderCol = CkGui.ApplyAlpha(0xDCDCDCDC, active ? 0.7f : hovered ? 0.63f : 0.39f);
         uint bgCol = CkGui.ApplyAlpha(0x64000000, active ? 0.19f : hovered ? 0.26f : 0.39f);
 
-        winPtr.DrawList.AddRectFilled(minPos, hitbox.Max, shadowCol, bend, ImDrawFlags.RoundCornersRight);
-        winPtr.DrawList.AddRectFilled(minPos + new Vector2(0, shadowSize.Y), hitbox.Max - shadowSize, borderCol, bend, ImDrawFlags.RoundCornersRight);
-        winPtr.DrawList.AddRectFilled(minPos + new Vector2(0, styleOffset.Y), hitbox.Max - styleOffset, bgCol, bend, ImDrawFlags.RoundCornersRight);
+        winPtr.DrawList.AddRectFilled(min, hitbox.Max, shadowCol, bend, ImDrawFlags.RoundCornersRight);
+        winPtr.DrawList.AddRectFilled(min + new Vector2(0, shadowSize.Y), hitbox.Max - shadowSize, borderCol, bend, ImDrawFlags.RoundCornersRight);
+        winPtr.DrawList.AddRectFilled(min + new Vector2(0, styleOffset.Y), hitbox.Max - styleOffset, bgCol, bend, ImDrawFlags.RoundCornersRight);
 
         // Text computation.
         var iconSize = CkGui.IconSize(FAI.Plus);
         var textSize = ImGui.CalcTextSize("Add User");
         var iconTextWidth = iconSize.X + style.ItemInnerSpacing.X + textSize.X;
-        var iconPos = minPos + new Vector2((region.X - iconTextWidth) / 2f, (region.Y - textSize.Y) / 2f);
+        var iconPos = min + new Vector2((region.X - iconTextWidth) / 2f, (region.Y - textSize.Y) / 2f);
         var textPos = iconPos + new Vector2(iconSize.X + style.ItemInnerSpacing.X, 0);
         // Then draw out the icon and text.
         using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
@@ -323,29 +308,29 @@ public class MainUI : WindowMediatorSubscriberBase
         return clicked;
     }
 
-    private void DrawConnectedUsers(ImGuiWindowPtr winPtr, Vector2 region)
+    private void DrawConnectedUsers(ImGuiWindowPtr winPtr, Vector2 region, float topBarWidth)
     {
-        using var _ = ImRaii.Group();
         using var font = UiFontService.Default150Percent.Push();
 
         var userCount = MainHub.OnlineUsers.ToString(CultureInfo.InvariantCulture);
-        var textSize = ImGui.CalcTextSize(MainHub.IsConnected ? $"{userCount} Users Online" : "Disconnected");
-        var offsetX = (ImGui.GetWindowContentRegionMax().X / 2) - textSize.X / 2;
+        var textSize = ImGui.CalcTextSize(MainHub.IsConnected ? $"{userCount}Online" : "Disconnected");
+        var offsetX = (topBarWidth - textSize.X - ImUtf8.ItemInnerSpacing.X) / 2;
 
         // Make two gradients from the left and right, based on region.
         var posMin = winPtr.DC.CursorPos;
         var posMax = posMin + region;
         var halfRegion = region with { X = region.X * .5f };
+        var innerCol = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.TextDisabled), .75f);
+        var outerCol = ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.TextDisabled), .99f);
 
-        //winPtr.DrawList.AddRect(posMin, posMin + halfRegion, ImGuiColors.DalamudRed.ToUint());
-        //winPtr.DrawList.AddRect(posMin with { X = posMin.X + halfRegion.X }, posMax, ImGuiColors.DalamudOrange.ToUint());
+        winPtr.DrawList.AddRectFilledMultiColor(posMin, posMin + halfRegion, outerCol, innerCol, innerCol, outerCol);
+        winPtr.DrawList.AddRectFilledMultiColor(posMin with { X = posMin.X + halfRegion.X }, posMax, innerCol, outerCol, outerCol, innerCol);
 
         ImGui.SetCursorPosX(offsetX);
-        ImGui.SetCursorPosY(region.Y / 2);
         if (MainHub.IsConnected)
         {
             CkGui.ColorText(userCount, ImGuiColors.ParsedGold);
-            CkGui.TextInline("Users Online");
+            CkGui.TextInline("Online");
         }
         else
         {
@@ -381,6 +366,7 @@ public class MainUI : WindowMediatorSubscriberBase
         var connectedSize = CkGui.IconSize(FAI.Link);
         var iconsWidth = offlineSize.X + tryonSize.X + streamerSize.X + connectedSize.X;
 
+        CkGui.InlineSpacingInner();
         if (DrawConnectionButton("offline", FAI.Unlink, CkColor.TriStateCross.Uint(), offlineSize, !MainHub.IsConnected))
         {
             _accounts.Current.ConnectionKind = ConnectionKind.FullPause;
