@@ -175,8 +175,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             // Reloads or logouts should revert and clear all sundesmos.
             case DisconnectIntent.Reload:
                 // Perform the same as the above, except with an immidiate revert.
-                Parallel.ForEach(_allSundesmos, s => s.Value.MarkOffline(true));
-                RecreateLazy();
+                DisposeSundesmos();
                 break;
 
             case DisconnectIntent.Logout:

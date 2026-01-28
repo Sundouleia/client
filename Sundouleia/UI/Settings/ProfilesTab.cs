@@ -190,8 +190,6 @@ public class ProfilesTab
         using (CkRaii.Child("profiles", listSize, wFlags: WFlags.NoScrollbar))
         {
             var size = new Vector2(listSize.X, ImUtf8.FrameHeight + ImUtf8.TextHeightSpacing);
-
-            DrawAddUser(size);
             foreach (var profile in _account.Profiles)
             {
                 if (SelectableProfile(profile, size))
@@ -349,7 +347,6 @@ public class ProfilesTab
 
         // Get the offsets and true height.
         var trueH = size.Y + _styleOffset.Y * 2;
-        var bend = size.Y * .5f;
 
         // Aquire a valid bounding box for this button interaction
         var itemSize = new Vector2(size.X, trueH);
@@ -373,11 +370,11 @@ public class ProfilesTab
         uint bgCol = CkGui.ApplyAlpha(0x64000000, active ? 0.19f : hovered ? 0.26f : 0.39f);
 
         // (Picture draw order like placing sticky notes on our monitor, stacking them towards us)
-        window.DrawList.AddRectFilled(hitbox.Min, hitbox.Max, shadowCol, bend, ImDrawFlags.RoundCornersRight);
+        window.DrawList.AddRectFilled(hitbox.Min, hitbox.Max, shadowCol, _bendM, ImDrawFlags.RoundCornersAll);
         // Draw over with inner border, greyish look.
-        window.DrawList.AddRectFilled(hitbox.Min + _shadowSize, hitbox.Max - _shadowSize, borderCol, bend, ImDrawFlags.RoundCornersRight);
+        window.DrawList.AddRectFilled(hitbox.Min + _shadowSize, hitbox.Max - _shadowSize, borderCol, _bendM, ImDrawFlags.RoundCornersAll);
         // Draw over again with the bgColor.
-        window.DrawList.AddRectFilled(hitbox.Min + _styleOffset, hitbox.Max - _styleOffset, bgCol, bend, ImDrawFlags.RoundCornersRight);
+        window.DrawList.AddRectFilled(hitbox.Min + _styleOffset, hitbox.Max - _styleOffset, bgCol, _bendM, ImDrawFlags.RoundCornersAll);
 
 
         // Allow for 'ImGui.IsItemHovered' to be reconized by this hitbox.
@@ -518,11 +515,11 @@ public class ProfilesTab
             if (ImGui.InputTextWithHint("##KeyEditor", "Paste SecretKey Here...", ref key, 64, ImGuiInputTextFlags.EnterReturnsTrue))
             {
                 key = key.Trim();
-                // Fail if the key already exists.
-                //if (_account.TryUpdateSecretKey(profile, key))
-                //    _logger.LogDebug($"Updated SecretKey for {profile.PlayerName}");
+                //Fail if the key already exists.
+                if (_account.TryUpdateSecretKey(profile, key))
+                    _logger.LogDebug($"Updated SecretKey for {profile.ProfileLabel}");
                 // exit edit mode.
-                _editingSecretKey = null;
+               _editingSecretKey = null;
             }
         }
         else
@@ -807,7 +804,7 @@ public class ProfilesTab
 
         // If we were logged into the moved player, we switched,
         if (movedClientPlayer && wasLoggedIntoMoved)
-            UiService.SetUITask(async () => await _hub.Reconnect().ConfigureAwait(false));
+            UiService.SetUITask(async () => await _hub.Reconnect(DisconnectIntent.Reload).ConfigureAwait(false));
     }
 
     private void UnlinkFromProfile()
@@ -833,7 +830,7 @@ public class ProfilesTab
 
         // Reconnect them, and clear the dragged node.
         if (loggedInCharaRemoved && removedClientPlayer)
-            UiService.SetUITask(async () => await _hub.Reconnect().ConfigureAwait(false));
+            UiService.SetUITask(async () => await _hub.Reconnect(DisconnectIntent.Reload).ConfigureAwait(false));
     }
 
     public void AccountDeletionPopup(AccountProfile? profile)

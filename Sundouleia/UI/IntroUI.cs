@@ -733,7 +733,7 @@ public class IntroUi : WindowMediatorSubscriberBase
                 // set the key to that newly added authentication
                 var newMainProfile = new AccountProfile()
                 {
-                    ProfileLabel = $"Main Account Key - ({DateTime.Now:yyyy-MM-dd})",
+                    ProfileLabel = $"Main Profile",
                     UserUID = accountDetails.Item1,
                     Key = accountDetails.Item2,
                     IsPrimary = true,
