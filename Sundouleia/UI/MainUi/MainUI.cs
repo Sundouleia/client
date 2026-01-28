@@ -247,7 +247,7 @@ public class MainUI : WindowMediatorSubscriberBase
         var connectedSize = CkGui.IconSize(FAI.Link);
         var sideWidth = offlineSize.X + tryonSize.X + streamerSize.X + connectedSize.X + ImUtf8.ItemSpacing.X * 5;
         var height = CkGui.CalcFontTextSize("A", UiFontService.Default150Percent).Y;
-       
+
         if (DrawAddUser(winPtr, new Vector2(sideWidth, height), minPos))
             _creatingRequest = !_creatingRequest;
         CkGui.AttachToolTip("Add New User to Whitelist");
@@ -256,7 +256,7 @@ public class MainUI : WindowMediatorSubscriberBase
         ImGui.SetCursorScreenPos(minPos + new Vector2(sideWidth, 0));
         DrawConnectedUsers(winPtr, new Vector2(topBarWidth - sideWidth * 2, height), topBarWidth);
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.InitialWelcome, WindowPos, WindowSize);
-        
+
         ImGui.SameLine(topBarWidth - sideWidth);
         using (ImRaii.Group()) // Grouping for tutorial formatting.
             DrawConnectionState(winPtr, new Vector2(sideWidth, height));
@@ -333,14 +333,17 @@ public class MainUI : WindowMediatorSubscriberBase
         winPtr.DrawList.AddRectFilledMultiColor(posMin with { X = posMin.X + halfRegion.X }, posMax, innerCol, outerCol, outerCol, innerCol);
 
         ImGui.SetCursorPosX(offsetX);
-        if (MainHub.IsConnected)
+        using (ImRaii.Group())
         {
-            CkGui.ColorText(userCount, ImGuiColors.ParsedGold);
-            CkGui.TextInline("Online");
-        }
-        else
-        {
-            CkGui.ColorText("Disconnected", ImGuiColors.DalamudRed);
+            if (MainHub.IsConnected)
+            {
+                CkGui.ColorText(userCount, ImGuiColors.ParsedGold);
+                CkGui.TextInline("Online");
+            }
+            else
+            {
+                CkGui.ColorText("Disconnected", ImGuiColors.DalamudRed);
+            }
         }
     }
 
