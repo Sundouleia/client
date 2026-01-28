@@ -58,15 +58,15 @@ public partial class MainHub
             _ = Task.Run(async () =>
             {
                 // pause the server state
+                var prevState = _accounts.ConnectionKind;
                 _accounts.ConnectionKind = ConnectionKind.FullPause;
-                _accounts.Save();
                 _suppressNextNotification = true;
                 // If forcing a hard reconnect, fully unload the client & their sundesmos.
                 await Disconnect(ServerState.Disconnected, DisconnectIntent.Reload).ConfigureAwait(false);
                 // Clear our token cache between, incase we were banned.
                 _tokenProvider.ResetTokenCache();
                 // Revert full pause status and create a new connection.
-                _accounts.ConnectionKind = ConnectionKind.Normal; // Can cause issues where it doesnt restore after... Maybe seperate intent?
+                _accounts.ConnectionKind = prevState; // Can cause issues where it doesnt restore after... Maybe seperate intent?
                 _accounts.Save();
                 _suppressNextNotification = true;
 

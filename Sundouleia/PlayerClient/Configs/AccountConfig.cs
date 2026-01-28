@@ -29,12 +29,6 @@ public enum ConnectionKind
 public class AccountStorage
 {
     /// <summary>
-    ///     How we should behave when connected, or if we should at all. <para />
-    ///     Should maybe revise where this is stored. Perhaps MainConfig or just in MainHub as static. Unsure.
-    /// </summary>
-    public ConnectionKind ConnectionKind { get; set; } = ConnectionKind.Normal;
-
-    /// <summary>
     ///     These are the 'profiles' of your account. An AccountProfile has UID and secret key. <para/>
     ///     Profiles are identified by a GUID on creation, and used for serialization referencing.
     /// </summary>
@@ -145,9 +139,9 @@ public class AccountConfig : IHybridSavable
         return new JObject
         {
             ["Version"] = ConfigVersion,
+            ["ConnectionKind"] = (int)ConnectionKind,
             ["AccountStorage"] = new JObject
             {
-                ["ConnectionKind"] = (int)Current.ConnectionKind,
                 ["Profiles"] = JArray.FromObject(Current.Profiles),
                 ["TrackedPlayers"] = JObject.FromObject(trackedPlayersJObj)
             }
@@ -192,6 +186,15 @@ public class AccountConfig : IHybridSavable
         Save();
     }
 
+    /// <summary>
+    ///     How we should behave when connected, or if we should at all. <para />
+    ///     May want to have a mediator fire on this being set or something, idk.
+    /// </summary>
+    public ConnectionKind ConnectionKind { get; set; } = ConnectionKind.Normal;
+
+    /// <summary>
+    ///     The detailed information about the current account.
+    /// </summary>
     public AccountStorage Current { get; set; } = new AccountStorage();
 
     public bool IsConfigValid()
@@ -204,9 +207,9 @@ public class AccountConfig : IHybridSavable
         if (root["AccountStorage"] is not JObject oldStorage)
             throw new Exception("Failed to load AccountStorage for migration.");
 
+        ConnectionKind = (oldStorage["FullPause"]?.Value<bool>() ?? false) ? ConnectionKind.FullPause : ConnectionKind.Normal;
         var newStorage = new AccountStorage()
         {
-            ConnectionKind = (oldStorage["FullPause"]?.Value<bool>() ?? false) ? ConnectionKind.FullPause : ConnectionKind.Normal,
             Profiles = new HashSet<AccountProfile>(),
             TrackedPlayers = new Dictionary<ulong, TrackedPlayer>()
         };
@@ -280,6 +283,8 @@ public class AccountConfig : IHybridSavable
         if (root["AccountStorage"] is not JObject storage)
             throw new Exception("Failed to load AccountStorage for V1.");
 
+        // Set ConnectionState.
+        ConnectionKind = (ConnectionKind)(root["ConnectionKind"]?.Value<int>() ?? 0);
 
         // 1. Deserialize Profiles first
         var profiles = storage["Profiles"]!.ToObject<HashSet<AccountProfile>>() ?? throw new Exception("Failed to parse account profiles.");
@@ -290,7 +295,6 @@ public class AccountConfig : IHybridSavable
         // Build the account storage as-is.
         var accountStorage = new AccountStorage()
         {
-            ConnectionKind = (ConnectionKind)(storage["ConnectionKind"]?.Value<int>() ?? 0),
             Profiles = profiles,
         };
 

@@ -20,6 +20,7 @@ using SundouleiaAPI.Hub;
 using System.Globalization;
 using System.Reflection;
 using TerraFX.Interop.Windows;
+using static Lumina.Data.Parsing.Uld.NodeData;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -32,7 +33,7 @@ public class MainUI : WindowMediatorSubscriberBase
     private bool THEME_PUSHED = false;
 
     private readonly MainConfig _config;
-    private readonly AccountConfig _accounts;
+    private readonly AccountManager _account;
     private readonly MainHub _hub;
     private readonly MainMenuTabs _tabMenu;
     private readonly HomeTab _homeTab;
@@ -51,14 +52,14 @@ public class MainUI : WindowMediatorSubscriberBase
     public string _requestMessage   = string.Empty;
 
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
-        AccountConfig accounts, MainHub hub, MainMenuTabs tabMenu, HomeTab homeTab,
+        AccountManager account, MainHub hub, MainMenuTabs tabMenu, HomeTab homeTab,
         RequestsTab requestsTab, WhitelistTabs whitelist, RadarTab radar, RadarChatTab chat,
         RequestsManager requests, SundesmoManager sundesmos, TutorialService guides,
         SidePanelService stickyService)
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
-        _accounts = accounts;
+        _account = account;
         _hub = hub;
         _tabMenu = tabMenu;
         _homeTab = homeTab;
@@ -376,50 +377,53 @@ public class MainUI : WindowMediatorSubscriberBase
         var iconsWidth = offlineSize.X + tryonSize.X + streamerSize.X + connectedSize.X;
 
         CkGui.InlineSpacingInner();
-        if (DrawConnectionButton("offline", FAI.Unlink, CkColor.TriStateCross.Uint(), offlineSize, !MainHub.IsConnected))
+        if (DrawConnectionButton(ConnectionKind.FullPause, FAI.Unlink, CkColor.TriStateCross.Uint(), offlineSize, !MainHub.IsConnected))
         {
-            _accounts.Current.ConnectionKind = ConnectionKind.FullPause;
-            _accounts.Save();
+            _account.ConnectionKind = ConnectionKind.FullPause;
             _ = _hub.Disconnect(ServerState.Disconnected, DisconnectIntent.Normal);
         }
-        CkGui.AttachToolTip($"Disconnect from the server.--SEP--Current Status: {MainHub.ServerStatus}", ImGuiColors.DalamudOrange);
+        CkGui.AttachToolTip($"--COL--[Disconnected]--COL--" +
+            $"--NL--Disconnected from Servers.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton("tryon", FAI.ToiletPortable, CkColor.TriStateCheck.Uint(), offlineSize, false))
+        if (DrawConnectionButton(ConnectionKind.TryOnMode, FAI.ToiletPortable, CkColor.TriStateCheck.Uint(), offlineSize, false))
         {
-            _accounts.Current.ConnectionKind = ConnectionKind.TryOnMode;
-            _accounts.Save();
+            _account.ConnectionKind = ConnectionKind.TryOnMode;
 
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();
         }
+        CkGui.AttachToolTip($"--COL--[Try Out Mode]--COL--" +
+            $"--NL--Changes you make are not pushed to others, but you still see others normally.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton("streamer", FAI.BroadcastTower, CkColor.TriStateCheck.Uint(), offlineSize, false))
+        if (DrawConnectionButton(ConnectionKind.StreamerMode, FAI.BroadcastTower, CkColor.TriStateCheck.Uint(), offlineSize, false))
         {
-            _accounts.Current.ConnectionKind = ConnectionKind.StreamerMode;
-            _accounts.Save();
+            _account.ConnectionKind = ConnectionKind.StreamerMode;
 
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();
         }
+        CkGui.AttachToolTip($"--COL--[Streamer Mode]--COL--" +
+            $"--NL--Appearance is sent to others, but others remain vanilla.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton("connected", FAI.Link, CkColor.TriStateCheck.Uint(), offlineSize, false))
+        if (DrawConnectionButton(ConnectionKind.Normal, FAI.Link, CkColor.TriStateCheck.Uint(), offlineSize, false))
         {
-            _accounts.Current.ConnectionKind = ConnectionKind.Normal;
-            _accounts.Save();
+            _account.ConnectionKind = ConnectionKind.Normal;
 
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();
         }
+        CkGui.AttachToolTip($"--COL--[Connected]--COL--" +
+            $"--NL--Normal/Default connection with the server.", ImGuiColors.DalamudOrange);
 
-        bool DrawConnectionButton(string identifier, FAI icon, uint color, Vector2 size, bool disabled)
+        bool DrawConnectionButton(ConnectionKind kind, FAI icon, uint color, Vector2 size, bool disabled)
         {
             if (winPtr.SkipItems)
                 return false;
 
-            var id = ImGui.GetID($"connection-{identifier}");
+            var id = ImGui.GetID($"connection-{kind}");
             var min = winPtr.DC.CursorPos + buttonPadding;
             var hitbox = new ImRect(min, min + size);
             // Add the item into the ImGuiInternals
@@ -435,11 +439,20 @@ public class MainUI : WindowMediatorSubscriberBase
             // Render possible nav highlight space over the bounding box region.
             ImGuiP.RenderNavHighlight(hitbox, id);
 
-            // Define our colors based on states.
-            var iconCol = CkGui.ApplyAlpha(color, disabled ? 0.27f : active ? 0.7f : hovered ? 0.63f : 0.39f);
-            using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-                winPtr.DrawList.AddText(icon.ToIconString(), min, iconCol);
-
+            // Draw based on current state.
+            if (_account.ConnectionKind == kind)
+            {
+                using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
+                    winPtr.DrawList.AddText(icon.ToIconString(), min, color);
+            }
+            else
+            {
+                // Define our colors based on states.
+                var iconCol = CkGui.ApplyAlpha(color, disabled ? .27f : active ? .9f : hovered ? .73f : .39f);
+                using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
+                    winPtr.DrawList.AddText(icon.ToIconString(), min, iconCol);
+            }
+            
             return clicked && !disabled;
         }
     }

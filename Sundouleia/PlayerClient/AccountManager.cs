@@ -32,10 +32,11 @@ public class AccountManager
 
     public ConnectionKind ConnectionKind
     {
-        get => _config.Current.ConnectionKind;
+        get => _config.ConnectionKind;
         set
         {
-            _config.Current.ConnectionKind = value;
+            _config.ConnectionKind = value;
+            _mediator.Publish(new ConnectionKindChanged(value));
             _config.Save();
         }
     }
@@ -128,6 +129,17 @@ public class AccountManager
             ProfileLabel = newName
         });
         _config.Save();
+    }
+
+    public bool TryUpdateSecretKey(AccountProfile profile, string newKey)
+    {
+        if (profile.HadValidConnection)
+            return false;
+
+        // Update the key and save.
+        profile.Key = newKey;
+        _config.Save();
+        return true;
     }
 
     public void LinkPlayerToProfile(ulong contentID, AccountProfile toLink)
