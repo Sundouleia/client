@@ -89,6 +89,8 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
                     Mediator.Publish(new ClearProfileDataMessage(MainHub.OwnUserData));
             });
         CkGui.AttachToolTip("Updates your stored profile with latest information");
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfileSaving, ImGui.GetWindowPos(), ImGui.GetWindowSize(),
+            () => Mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI), ToggleType.Hide)));
 
         // Post the image over to the right.
         drawList.AddDalamudImageRounded(profile.GetAvatarOrDefault(), pos, new(232f), 116f, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)));
@@ -167,6 +169,9 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
         if (CkGui.IconTextButton(FAI.Expand, "Preview Profile", ImGui.GetContentRegionAvail().X))
             Mediator.Publish(new ProfileOpenMessage(MainHub.OwnUserData));
         CkGui.AttachToolTip("Preview your profile in a separate window!");
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfilePreview, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => Mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor))));
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfilePreview, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => {
+            Mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor), ToggleType.Show));
+            Mediator.Publish(new UiToggleMessage(typeof(ProfileUI), ToggleType.Hide));
+        });
     }
 }

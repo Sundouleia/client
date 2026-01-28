@@ -10,6 +10,7 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Radar.Chat;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Gui.Components;
 
@@ -50,7 +51,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Homepage, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.BasicWhitelist));
 
         AddDrawButton(FontAwesomeIcon.Inbox, SelectedTab.Requests, "Incoming / Outgoing Requests",
-            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
+            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Requests, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.Radar));
         
         AddDrawButton(FontAwesomeIcon.PeopleArrows, SelectedTab.BasicWhitelist, "Whitelist", 
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Whitelist, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
@@ -58,7 +59,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
         AddDrawButton(FAI.PeopleGroup, SelectedTab.GroupWhitelist, "Sundesmo Groups");
 
         AddDrawButton(FontAwesomeIcon.BroadcastTower, SelectedTab.Radar, "Connect easily with others!",
-            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Radar, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => TabSelection = SelectedTab.RadarChat));
+            () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.Radar, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
 
         AddDrawButton(FontAwesomeIcon.Comments, SelectedTab.RadarChat, "Chat with others in similar areas!",
             () => guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarChat, ImGui.GetWindowPos(), ImGui.GetWindowSize()));
