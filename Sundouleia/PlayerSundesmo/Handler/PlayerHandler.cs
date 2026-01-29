@@ -14,6 +14,7 @@ using Sundouleia.Utils;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
+using ZstdSharp.Unsafe;
 
 namespace Sundouleia.Pairs;
 
@@ -24,9 +25,9 @@ namespace Sundouleia.Pairs;
 /// </summary>
 public class PlayerHandler : DisposableMediatorSubscriberBase
 {
+    private readonly AccountConfig _config;
     private readonly FileCacheManager _fileCache;
     private readonly FileDownloader _downloader;
-    private readonly AccountConfig _config;
     private readonly IpcManager _ipc;
     private readonly CharaObjectWatcher _watcher;
 
@@ -51,15 +52,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public bool _blockModApplication => _config.ConnectionKind is ConnectionKind.StreamerMode || !_hasReplacements;
 
     public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
-        FileCacheManager fileCache, FileDownloader downloads, AccountConfig config,
+        AccountConfig config, FileCacheManager fileCache, FileDownloader downloads,
         CharaObjectWatcher watcher, IpcManager ipc)
         : base(logger, mediator)
     {
         Sundesmo = sundesmo;
 
+        _config = config;
         _fileCache = fileCache;
         _downloader = downloads;
-        _config = config;
         _ipc = ipc;
         _watcher = watcher;
 
@@ -91,9 +92,21 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Mass revert when modes are switched to spesific values.
         Mediator.Subscribe<ConnectionKindChanged>(this, async _ =>
         {
-            // If the new kind is streamer mode, we want to revert alterations if rendered.
-            if (_.NewState is ConnectionKind.StreamerMode && IsRendered)
+            // We dont care if previous state was FullPause.
+            if (_.PrevState is ConnectionKind.FullPause) return;
+
+            // If we switched to StreamerMode, and we are rendered, revert alterations.
+            if (_.PrevState is not ConnectionKind.FullPause && _.NewState is ConnectionKind.StreamerMode && IsRendered)
+            {
+                Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) switching to reverting alterations after entering StreamerMode", LoggerType.PairHandler);
                 await RevertAlterations().ConfigureAwait(false);
+            }
+            // Otherwise if the previous state was Streamer Mode and the new state was not FullPause, Reapply the alterations if rendered.
+            else if (_.PrevState is ConnectionKind.StreamerMode && _.NewState is not ConnectionKind.FullPause && IsRendered)
+            {
+                Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) reapplying Alterations after switching off StreamerMode.", LoggerType.PairHandler);
+                await ReInitializeInternal().ConfigureAwait(false);
+            }
         });
 
         Mediator.Subscribe<WatchedObjectCreated>(this, msg => MarkVisibleForAddress(msg.Address));

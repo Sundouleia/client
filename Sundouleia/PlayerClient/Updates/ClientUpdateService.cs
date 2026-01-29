@@ -83,6 +83,12 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         NewVisibleUsers.Clear();
     }
 
+    public void ReloadVisible()
+    {
+        NewVisibleUsers.UnionWith(_sundesmos.GetVisibleConnected());
+        _distributionCTS = _distributionCTS.SafeCancelRecreate();
+    }
+
     // The debounce time increases based on what updates are pending currently.
     // This has some flaws due to how any additional updates that are not Mods
     // will still restart the timer by 1000ms, but we can change this up later,

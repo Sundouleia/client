@@ -70,10 +70,10 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             if (_.PrevState is ConnectionKind.FullPause)
                 return;
             // Otherwise, if the previous type was TryOn, and the new type is not FullPause, perform a reload and send.
-            if (_.PrevState is ConnectionKind.TryOnMode && _.NewState is not ConnectionKind.FullPause)
+            if (_.PrevState is ConnectionKind.WardrobeMode && _.NewState is not ConnectionKind.FullPause)
             {
                 Logger.LogInformation($"Switched off TryOnMode to another online state, reloading and sending full Cache!");
-                ReloadAndSendCache();
+                _updater.ReloadVisible();
             }
         });
 
@@ -193,6 +193,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     }
 
     #region Cache Updates
+    // Bypass TryOn block since this happens only for newly visible people, so they should see your latest tryon state.
     private async Task ResendAll()
     {
         await _updater.RunOnDataUpdateSlim(async () =>
@@ -233,8 +234,8 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             // Collect the latest data to send off.
             var (newData, changed) = await UpdateCacheSingleInternal(obj, type, _updater.LatestData).ConfigureAwait(false);
 
-            // If no change occurred, do not push to others (our cache is still updated with the latest data)
-            if (!changed)
+            // Do not push if no change occured or if we are in WardrobeMode
+            if (!changed || _account.ConnectionKind is ConnectionKind.WardrobeMode)
                 return;
 
             var recipients = _updater.UsersForUpdatePush;
@@ -300,7 +301,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             // Grab recipients. If there is nobody to send an update to, exit early.
             // We update the cache regardless so that NewVisibleUsers are given the correct latest data.
             var recipients = _updater.UsersForUpdatePush;
-            if (recipients.Count is 0)
+            if (recipients.Count is 0 || _account.ConnectionKind is ConnectionKind.WardrobeMode)
                 return;
 
             // MODS CONDITION - Flattened changes could be just Mods, or both but with a failed visual check.

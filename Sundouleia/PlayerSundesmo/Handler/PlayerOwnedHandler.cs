@@ -6,6 +6,7 @@ using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Sundouleia.Interop;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
@@ -24,6 +25,7 @@ namespace Sundouleia.Pairs;
 /// </summary>
 public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 {
+    private readonly AccountConfig _config;
     private readonly IpcManager _ipc;
     private readonly CharaObjectWatcher _watcher;
 
@@ -35,18 +37,42 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     private Guid _tempProfile = Guid.Empty;
     private IpcDataCache? _appearanceData = new();
 
+    private bool _hasAlterations => _appearanceData is not null;
+    private bool _blockApplication => !_hasAlterations || !IsRendered || _config.ConnectionKind is ConnectionKind.StreamerMode;
+
     public PlayerOwnedHandler(OwnedObject kind, Sundesmo sundesmo, ILogger<PlayerOwnedHandler> logger,
-        SundouleiaMediator mediator, IpcManager ipc, CharaObjectWatcher watcher)
+        SundouleiaMediator mediator, AccountConfig config, IpcManager ipc, CharaObjectWatcher watcher)
         : base(logger, mediator)
     {
         ObjectType = kind;
         Sundesmo = sundesmo;
 
+        _config = config;
         _ipc = ipc;
         _watcher = watcher;
 
         Mediator.Subscribe<WatchedObjectCreated>(this, msg => MarkVisibleForAddress(msg.Address));
         Mediator.Subscribe<WatchedObjectDestroyed>(this, msg => UnrenderObject(msg.Address));
+
+        // Mass revert when modes are switched to spesific values.
+        Mediator.Subscribe<ConnectionKindChanged>(this, async _ =>
+        {
+            // We dont care if previous state was FullPause.
+            if (_.PrevState is ConnectionKind.FullPause) return;
+
+            // If we switched to StreamerMode, and we are rendered, revert alterations.
+            if (_.PrevState is not ConnectionKind.FullPause && _.NewState is ConnectionKind.StreamerMode && IsRendered)
+            {
+                Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) switching to reverting alterations after entering StreamerMode", LoggerType.PairHandler);
+                await RevertAlterations().ConfigureAwait(false);
+            }
+            // Otherwise if the previous state was Streamer Mode and the new state was not FullPause, Reapply the alterations if rendered.
+            else if (_.PrevState is ConnectionKind.StreamerMode && _.NewState is not ConnectionKind.FullPause && IsRendered)
+            {
+                Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) reapplying Alterations after switching off StreamerMode.", LoggerType.PairHandler);
+                await ReapplyAlterations().ConfigureAwait(false);
+            }
+        });
     }
 
     // Public accessors.
@@ -63,7 +89,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
     public bool IsOwnerValid => Sundesmo.IsRendered;
     public unsafe bool IsRendered => _gameObject != null;
-    public bool HasAlterations => _appearanceData != null;
 
     #region Rendering
     // Initializes Rendering for this object if the address matches the OnlineUserIdent.
@@ -117,7 +142,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     private async Task ReInitializeInternal()
     {
         // If they are online and have alterations, reapply them. Otherwise, exit.
-        if (!Sundesmo.IsOnline || !HasAlterations)
+        if (!Sundesmo.IsOnline || !_hasAlterations)
             return;
 
         // Await until we know the player has absolutely finished loading in.
@@ -223,8 +248,10 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         if (visualDiff is IpcKind.None) 
             return;
         // Apply and redraw regardless (for now).
-        await ApplyVisuals(visualDiff).ConfigureAwait(false);
-        RedrawObject();
+        var needsRedraw = await ApplyVisuals(visualDiff).ConfigureAwait(false);
+        
+        if (needsRedraw)
+            RedrawObject();
     }
 
     public async Task UpdateAndApplyIpc(IpcKind kind, string newData)
@@ -232,15 +259,18 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         if (!UpdateDataIpc(kind, newData))
             return;
         // Apply and redraw regardless (for now).
-        await ApplyVisuals(kind).ConfigureAwait(false);
-        RedrawObject();
+        bool redraw = await ApplyVisuals(kind).ConfigureAwait(false);
+        
+        if (redraw)
+            RedrawObject();
     }
     public async Task ReapplyAlterations()
     {
         // Apply changes, then redraw if necessary.
-        await ReapplyVisuals().ConfigureAwait(false);
-        // redraw regardless for now i guess, idk.
-        RedrawObject();
+        bool redraw = await ReapplyVisuals().ConfigureAwait(false);
+        
+        if (redraw)
+            RedrawObject();
     }
     #endregion Altaration Control
 
@@ -266,23 +296,26 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             return;
 
         // If the visuals applied with redraw changes, redraw.
-        await ApplyVisuals(visualChanges).ConfigureAwait(false);
-        RedrawObject();
+        bool redraw = await ApplyVisuals(visualChanges).ConfigureAwait(false);
+        
+        if (redraw)
+            RedrawObject();
+
         Logger.LogInformation($"{Sundesmo.GetNickAliasOrUid()}'s {ObjectType} had alterations applied. (Changes: {visualChanges})", LoggerType.PairHandler);
     }
 
     // True if data was applied, false otherwise. (useful for redraw)
-    private async Task ApplyVisuals(IpcKind changes)
+    private async Task<bool> ApplyVisuals(IpcKind changes)
     {
-        if (!IsRendered || _appearanceData is null)
-            return;
+        if (_blockApplication)
+            return false;
 
         // Await for final render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
 
         // Sanity Check.
         if (_runtimeCTS.Token.IsCancellationRequested)
-            return;
+            return false;
 
         Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
         if (changes.HasAny(IpcKind.Glamourer))
@@ -291,12 +324,13 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             await ApplyCPlus().ConfigureAwait(false);
 
         Logger.LogInformation($"{Sundesmo.GetNickAliasOrUid()}'s {ObjectType} had their visuals reapplied.", LoggerType.PairHandler);
+        return changes.HasAny(IpcKind.Glamourer);
     }
 
     // Everything in owned objects should require a reapply.
     private async Task ApplyVisualsSingle(IpcKind kind)
     {
-        if (!IsRendered || _appearanceData is null)
+        if (_blockApplication)
             return;
 
         // Await for final render.
@@ -314,22 +348,23 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         Logger.LogInformation($"{Sundesmo.GetNickAliasOrUid()}'s {ObjectType} had a single IPC change ({kind})", LoggerType.PairHandler);
     }
 
-    private async Task ReapplyVisuals()
+    private async Task<bool> ReapplyVisuals()
     {
-        if (!IsRendered || _appearanceData is null)
-            return;
+        if (_blockApplication)
+            return false;
 
         await WaitUntilValidDrawObject().ConfigureAwait(false);
 
         if (_runtimeCTS.Token.IsCancellationRequested)
-            return;
+            return false;
 
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer]))
+        if (!string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.Glamourer]))
             await ApplyGlamourer().ConfigureAwait(false);
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))
             await ApplyCPlus().ConfigureAwait(false);
 
-        Logger.LogInformation($"{Sundesmo.GetNickAliasOrUid()}'s {ObjectType} had alterations reapplied.", LoggerType.PairHandler);
+        Logger.LogInformation($"{Sundesmo.GetNickAliasOrUid()}'s {ObjectType} reapplied alterations.", LoggerType.PairHandler);
+        return !string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer]);
     }
     #endregion Alteration Application
 
@@ -355,15 +390,16 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    public void RedrawObject()
+    // Revise this later, needs some tuning.
+    public async void RedrawObject()
     {
-        if (IsRendered)
-        {
-            Logger.LogDebug($"Redrawing ({Sundesmo.GetNickAliasOrUid()}'s {ObjectType}) due to alteration changes.", LoggerType.PairHandler);
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
-            // Use the below when we know how to distinguish what redraw operation to perform.
-            //_ipc.Glamourer.ReapplyActor(ObjIndex);
-        }
+        if (!IsRendered)
+            return;
+
+        Logger.LogDebug($"Redrawing ({Sundesmo.GetNickAliasOrUid()}'s {ObjectType}) due to alteration changes.", LoggerType.PairHandler);
+        _ipc.Penumbra.RedrawGameObject(ObjIndex);
+        // Use the below when we know how to distinguish what redraw operation to perform.
+        //_ipc.Glamourer.ReapplyActor(ObjIndex);
     }
     #endregion Ipc Helpers
 

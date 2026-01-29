@@ -386,9 +386,9 @@ public class MainUI : WindowMediatorSubscriberBase
             $"--NL--Disconnected from Servers.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton(ConnectionKind.TryOnMode, FAI.ToiletPortable, CkColor.TriStateCheck.Uint(), offlineSize, false))
+        if (DrawConnectionButton(ConnectionKind.WardrobeMode, FAI.ToiletPortable, CkColor.TriStateCheck.Uint(), offlineSize, false))
         {
-            _account.ConnectionKind = ConnectionKind.TryOnMode;
+            _account.ConnectionKind = ConnectionKind.WardrobeMode;
 
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();

@@ -13,7 +13,7 @@ public enum ConnectionKind
     /// <summary>
     ///     Any changes you make are not sent to others, but you can still see others.
     /// </summary>
-    TryOnMode,
+    WardrobeMode,
 
     /// <summary>
     ///     Your Appearance is shared to others, but others will look vanilla.
