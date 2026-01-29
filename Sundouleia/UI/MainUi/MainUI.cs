@@ -53,8 +53,8 @@ public class MainUI : WindowMediatorSubscriberBase
 
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
         AccountManager account, MainHub hub, MainMenuTabs tabMenu, HomeTab homeTab,
-        RequestsTab requestsTab, WhitelistTabs whitelist, RadarTab radar, RadarChatTab chat, 
-        RequestsManager requests, SundesmoManager sundesmos, TutorialService guides, 
+        RequestsTab requestsTab, WhitelistTabs whitelist, RadarTab radar, RadarChatTab chat,
+        RequestsManager requests, SundesmoManager sundesmos, TutorialService guides,
         SidePanelService stickyService)
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
@@ -83,9 +83,9 @@ public class MainUI : WindowMediatorSubscriberBase
             .Add(FAI.Cog, "Settings", () => Mediator.Publish(new UiToggleMessage(typeof(SettingsUi))))
             .AddTutorial(_guides, TutorialType.MainUi)
             .Build();
-        
+
         // Default to open if the user desires for it to be open.
-        if(_config.Current.OpenUiOnStartup)
+        if (_config.Current.OpenUiOnStartup)
             Toggle();
         // Update the tab menu selection.
         _tabMenu.TabSelection = _config.Current.CurMainUiTab;
@@ -146,7 +146,7 @@ public class MainUI : WindowMediatorSubscriberBase
 
         LastPos = ImGui.GetWindowPos();
         LastSize = ImGui.GetWindowSize();
-        
+
         // If we are not connected, then do not draw any further.
         if (!MainHub.IsConnected)
             return;
@@ -154,7 +154,7 @@ public class MainUI : WindowMediatorSubscriberBase
         // If we are creating a request to send to another user, draw this first.
         if (_creatingRequest)
             DrawRequestCreator(winContentWidth, ImGui.GetStyle().ItemInnerSpacing.X);
-        
+
         // draw the bottom tab bar
         _tabMenu.Draw(winContentWidth);
 
@@ -216,6 +216,11 @@ public class MainUI : WindowMediatorSubscriberBase
         // draw a attached message field as well if they want.
         ImGui.SetNextItemWidth(availableXWidth);
         ImGui.InputTextWithHint("##pairAddOptionalMessage", "Attach Msg to Request (Optional)", ref _requestMessage, 100);
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.AttachingMessages, LastPos, LastSize, () =>
+        {
+            _creatingRequest = !_creatingRequest;
+            _tabMenu.TabSelection = MainMenuTabs.SelectedTab.Requests;
+        });
         ImGui.Separator();
     }
 
@@ -243,7 +248,7 @@ public class MainUI : WindowMediatorSubscriberBase
         var connectedSize = CkGui.IconSize(FAI.Link);
         var sideWidth = offlineSize.X + tryonSize.X + streamerSize.X + connectedSize.X + ImUtf8.ItemSpacing.X * 5;
         var height = CkGui.CalcFontTextSize("A", UiFontService.Default150Percent).Y;
-       
+
         if (DrawAddUser(winPtr, new Vector2(sideWidth, height), minPos))
             _creatingRequest = !_creatingRequest;
         CkGui.AttachToolTip("Add New User to Whitelist");
@@ -252,10 +257,11 @@ public class MainUI : WindowMediatorSubscriberBase
         ImGui.SetCursorScreenPos(minPos + new Vector2(sideWidth, 0));
         DrawConnectedUsers(winPtr, new Vector2(topBarWidth - sideWidth * 2, height), topBarWidth);
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.InitialWelcome, WindowPos, WindowSize);
-        
+
         ImGui.SameLine(topBarWidth - sideWidth);
-        DrawConnectionState(winPtr, new Vector2(sideWidth, height));
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConnectionState, WindowPos, WindowSize);
+        using (ImRaii.Group()) // Grouping for tutorial formatting.
+            DrawConnectionState(winPtr, new Vector2(sideWidth, height));
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConnectionState, WindowPos, WindowSize, () => _tabMenu.TabSelection = MainMenuTabs.SelectedTab.Homepage);
 
         winPtr.DrawList.PopClipRect();
     }
@@ -328,14 +334,17 @@ public class MainUI : WindowMediatorSubscriberBase
         winPtr.DrawList.AddRectFilledMultiColor(posMin with { X = posMin.X + halfRegion.X }, posMax, innerCol, outerCol, outerCol, innerCol);
 
         ImGui.SetCursorPosX(offsetX);
-        if (MainHub.IsConnected)
+        using (ImRaii.Group())
         {
-            CkGui.ColorText(userCount, ImGuiColors.ParsedGold);
-            CkGui.TextInline("Online");
-        }
-        else
-        {
-            CkGui.ColorText("Disconnected", ImGuiColors.DalamudRed);
+            if (MainHub.IsConnected)
+            {
+                CkGui.ColorText(userCount, ImGuiColors.ParsedGold);
+                CkGui.TextInline("Online");
+            }
+            else
+            {
+                CkGui.ColorText("Disconnected", ImGuiColors.DalamudRed);
+            }
         }
     }
 
@@ -375,13 +384,12 @@ public class MainUI : WindowMediatorSubscriberBase
         }
         CkGui.AttachToolTip($"--COL--[Disconnected]--COL--" +
             $"--NL--Disconnected from Servers.", ImGuiColors.DalamudOrange);
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConnectionState, WindowPos, WindowSize);
 
         ImGui.SameLine();
         if (DrawConnectionButton(ConnectionKind.TryOnMode, FAI.ToiletPortable, CkColor.TriStateCheck.Uint(), offlineSize, false))
         {
             _account.ConnectionKind = ConnectionKind.TryOnMode;
-            
+
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();
         }

@@ -47,6 +47,9 @@ public class RadarChatTab
         // if not verified, show the chat, but disable it.
         _chat.SetDisabledStates(disable, disable);
         DrawChatContents();
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarChatRules, MainUI.LastPos, MainUI.LastSize);
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarChatPrivacy, MainUI.LastPos, MainUI.LastSize);
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatUserExamine, MainUI.LastPos, MainUI.LastSize, () => _tabMenu.TabSelection = MainMenuTabs.SelectedTab.Homepage);
 
         // If blocked, draw the warning.
         if (RadarChatLog.ChatBlocked)
@@ -72,7 +75,6 @@ public class RadarChatTab
         if (RadarChatLog.NotVerified)
             CkGui.AttachToolTip("Cannot use chat, your account is not verified!");
         // Attach tutorials.
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarChat, ImGui.GetWindowPos(), ImGui.GetWindowSize());
     }
 
     private void DrawChatUseBlockedWarning()

@@ -5,6 +5,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
+using Sundouleia.Gui.Components;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
@@ -15,13 +16,15 @@ public class RadarTab : DisposableMediatorSubscriberBase
 {
     private readonly RadarDrawer _drawer;
     private readonly TutorialService _guides;
+    private readonly MainMenuTabs _tabMenu;
 
     public RadarTab(ILogger<RadarTab> logger, SundouleiaMediator mediator, 
-        RadarDrawer drawer, TutorialService guides)
+        RadarDrawer drawer, TutorialService guides, MainMenuTabs tabMenu)
         : base(logger, mediator)
     {
         _drawer = drawer;
         _guides = guides;
+        _tabMenu = tabMenu;
     }
 
     public void DrawSection()
@@ -62,6 +65,7 @@ public class RadarTab : DisposableMediatorSubscriberBase
         ImGui.Spacing();
         _drawer.DrawFilterRow(width, 25);
         _drawer.DrawContents(width, DynamicFlags.None);
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarUsers, MainUI.LastPos, MainUI.LastSize, () => _tabMenu.TabSelection = MainMenuTabs.SelectedTab.RadarChat);
     }
 
     private void DrawUnverifiedOverlay()

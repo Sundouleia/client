@@ -11,6 +11,7 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using OtterGui.Text;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
+using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
@@ -210,14 +211,14 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
                 _emoteSelectionOpened = !_emoteSelectionOpened;
         }
         CkGui.AttachToolTip($"Toggles Quick-Emote selection.", disableInput);
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatEmotes, ImGui.GetWindowPos(), ImGui.GetWindowSize());
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatEmotes, MainUI.LastPos, MainUI.LastSize);
 
         // Toggle AutoScroll functionality
         ImUtf8.SameLineInner();
         if (CkGui.IconButton(scrollIcon, disabled: disableInput))
             DoAutoScroll = !DoAutoScroll;
         CkGui.AttachToolTip($"Toggles AutoScroll (Current: {(DoAutoScroll ? "Enabled" : "Disabled")})");
-        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatScroll, ImGui.GetWindowPos(), ImGui.GetWindowSize());
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatScroll, MainUI.LastPos, MainUI.LastSize);
 
         // draw the popout button
         ImUtf8.SameLineInner();

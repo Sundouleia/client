@@ -40,10 +40,6 @@ public class HomeTab
     private Vector2 EditIconPos => RectMin + ImGuiHelpers.ScaledVector2(179f, 11f);
     private Vector2 EditIconSize => ImGuiHelpers.ScaledVector2(30f);
 
-    // For tutorials.
-    private static Vector2 LastWinPos = Vector2.Zero;
-    private static Vector2 LastWinSize = Vector2.Zero;
-
     public void DrawSection()
     {
         var wdl = ImGui.GetWindowDrawList();
@@ -61,7 +57,9 @@ public class HomeTab
         
         using var _ = CkRaii.FramedChildPaddedWH("Account", size, 0, CkColor.VibrantPink.Uint(), CkStyle.ChildRounding(), wFlags: WFlags.NoScrollbar);
         
-        DrawProfileInfo(_.InnerRegion, profile);
+        using (ImRaii.Group())
+            DrawProfileInfo(_.InnerRegion, profile);
+        _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.AccountPage, MainUI.LastPos, MainUI.LastSize);
         ImGui.Spacing();
         DrawMenuOptions();
     }
@@ -84,6 +82,7 @@ public class HomeTab
             ProfileInfoRow(FAI.IdBadge, MainHub.UID, string.Empty);
             CkGui.AttachToolTip("Your Profile's UID.");
             CkGui.CopyableDisplayText(MainHub.UID);
+            _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.YourUID, MainUI.LastPos, MainUI.LastSize);
 
             ProfileInfoRow(FAI.UserSecret, MainHub.OwnUserData.AnonName, "Your Anonymous name used in Requests / Chats.");
 
@@ -115,6 +114,7 @@ public class HomeTab
             if (ImGui.InvisibleButton("##EditProfileButton", EditBorderSize))
                 _mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI)));
             CkGui.AttachToolTip("Open and Customize your Profile!");
+            _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfileEditing, MainUI.LastPos, MainUI.LastSize, () => _mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI), ToggleType.Show)));
 
             var bgCol = ImGui.IsItemHovered() ? 0xFF444444 : 0xFF000000;
             wdl.AddCircleFilled(EditBorderPos + EditBorderSize / 2, EditBorderSize.X / 2, bgCol);
@@ -189,6 +189,7 @@ public class HomeTab
             if (CkGui.FancyButton(FAI.Cog, "Open Settings", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
             CkGui.AttachToolTip("Opens the Settings UI.");
+            _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConfigSettings, MainUI.LastPos, MainUI.LastSize);
 
             if (CkGui.FancyButton(FAI.Bell, "Events Viewer", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(DataEventsUI)));
@@ -207,6 +208,7 @@ public class HomeTab
                 catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
             }
             CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
+            
         }
     }
 

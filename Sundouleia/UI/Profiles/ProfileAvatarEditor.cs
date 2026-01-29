@@ -10,6 +10,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
@@ -23,14 +24,18 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
     private readonly MainHub _hub;
     private readonly UiFileDialogService _fileDialog;
     private readonly ProfileService _service;
+    private readonly TutorialService _guides;
+    private readonly SundouleiaMediator _mediator;
 
     public ProfileAvatarEditor(ILogger<ProfileAvatarEditor> logger, SundouleiaMediator mediator,
-        MainHub hub, UiFileDialogService fileDialog, ProfileService service) 
+        MainHub hub, UiFileDialogService fileDialog, ProfileService service, TutorialService guides) 
         : base(logger, mediator, "Avatar Editor###KP_PFP_UI")
     {
         _hub = hub;
         _fileDialog = fileDialog;
         _service = service;
+        _mediator = mediator;
+        _guides = guides;
 
         Flags = WFlags.NoResize | WFlags.NoCollapse | WFlags.NoScrollbar;
         IsOpen = false;
@@ -107,6 +112,8 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
             if (CkGui.IconTextButton(FAI.FileUpload, "Upload new profile picture", width))
                 HandleFileDialog();
             CkGui.AttachToolTip("Select and upload a new profile picture");
+            _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfileImageEditor, ImGui.GetWindowPos(), ImGui.GetWindowSize(),
+                () => _mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor), ToggleType.Hide)));
 
             // let them clean their image too if they desire.
             if (CkGui.IconTextButton(FAI.Trash, "Clear uploaded profile picture", width, disabled: !KeyMonitor.ShiftPressed()))
