@@ -16,6 +16,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
     private const int TRANSPARENCY = 100;
     private const int DL_BAR_BORDER = 3;
     private readonly MainConfig _config;
+    private readonly AccountConfig _account;
     private readonly FileUploader _fileUploader;
 
     // For correct display tracking of upload and download displays.
@@ -24,10 +25,12 @@ public class TransferBarUI : WindowMediatorSubscriberBase
     private readonly ConcurrentDictionary<PlayerHandler, bool> _uploads = new();
     private static readonly ConcurrentDictionary<PlayerHandler, FileTransferProgress> _downloads = new();
 
-    public TransferBarUI(ILogger<TransferBarUI> logger, SundouleiaMediator mediator, MainConfig config,
-        FileUploader fileUploader) : base(logger, mediator, "##SundouleiaDLs")
+    public TransferBarUI(ILogger<TransferBarUI> logger, SundouleiaMediator mediator, 
+        MainConfig config, AccountConfig account, FileUploader fileUploader) 
+        : base(logger, mediator, "##SundouleiaDLs")
     {
         _config = config;
+        _account = account;
         _fileUploader = fileUploader;
 
         this.SetBoundaries(new(500, 90), new(500, 90));
@@ -47,24 +50,64 @@ public class TransferBarUI : WindowMediatorSubscriberBase
         ForceMainWindow = true;
         IsOpen = true;
 
+        // For when our connection state changes.
+        Mediator.Subscribe<ConnectionKindChanged>(this, OnConnectionKindChange);
+
         // Temporarily do this, hopefully we dont always need to.
-        Mediator.Subscribe<FileDownloadStarted>(this, (msg) => _downloads[msg.Player] = msg.Status);
-        Mediator.Subscribe<FileDownloadComplete>(this, (msg) => _downloads.TryRemove(msg.Player, out _));
+        Mediator.Subscribe<FileDownloadStarted>(this, OnDownloadStarted);
+        Mediator.Subscribe<FileDownloadComplete>(this, OnDownloadComplete);
         // For uploads (can configure later as there is not much reason with our new system)
-        Mediator.Subscribe<FilesUploading>(this, _ => _uploads[_.Player] = true);
-        Mediator.Subscribe<FilesUploaded>(this, (msg) => _uploads.TryRemove(msg.Player, out _));
-        Mediator.Subscribe<SundesmoOffline>(this, (msg) => 
-        {
-            _logger.LogTrace($"Ending all transfer tracking for offline {msg.Sundesmo.PlayerName}", LoggerType.PairDataTransfer);
-            _uploads.TryRemove(msg.Sundesmo.PlayerHandler, out _);
-            _downloads.TryRemove(msg.Sundesmo.PlayerHandler, out _);
-        });
+        Mediator.Subscribe<FilesUploading>(this, OnFileUploading);
+        Mediator.Subscribe<FilesUploaded>(this, OnFilesUploaded);
+        Mediator.Subscribe<SundesmoOffline>(this, OnSundesmoOffline);
+        
         // For GPose handling.
         Mediator.Subscribe<GPoseStartMessage>(this, _ => IsOpen = false);
         Mediator.Subscribe<GPoseEndMessage>(this, _ => IsOpen = true);
     }
 
     public static IReadOnlyDictionary<PlayerHandler, FileTransferProgress> Downloads => _downloads;
+
+    private void OnConnectionKindChange(ConnectionKindChanged msg)
+    {
+        // We only care about this change if we are in streamer mode.
+        if (msg.NewState is not ConnectionKind.StreamerMode)
+            return;
+        // It is, so we should clear the download and uploads.
+        _downloads.Clear();
+        _uploads.Clear();
+    }
+
+    private void OnDownloadStarted(FileDownloadStarted msg)
+    {
+        if (_account.ConnectionKind is ConnectionKind.StreamerMode)
+            return;
+        _downloads[msg.Player] = msg.Status;
+    }
+
+    private void OnDownloadComplete(FileDownloadComplete msg)
+    {
+        _downloads.TryRemove(msg.Player, out _);
+    }
+
+    private void OnFileUploading(FilesUploading msg)
+    {
+        if (_account.ConnectionKind is ConnectionKind.StreamerMode)
+            return;
+        _uploads[msg.Player] = true;
+    }
+
+    private void OnFilesUploaded(FilesUploaded msg)
+    {
+        _uploads.TryRemove(msg.Player, out _);
+    }
+
+    private void OnSundesmoOffline(SundesmoOffline msg)
+    {
+        _logger.LogTrace($"Ending all UI-Transfer for {msg.Sundesmo.PlayerName}({msg.Sundesmo.GetNickAliasOrUid()})", LoggerType.PairDataTransfer);
+        _uploads.TryRemove(msg.Sundesmo.PlayerHandler, out _);
+        _downloads.TryRemove(msg.Sundesmo.PlayerHandler, out _);
+    }
 
     protected override void PreDrawInternal()
     { }

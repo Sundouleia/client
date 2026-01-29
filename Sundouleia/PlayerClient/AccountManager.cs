@@ -35,8 +35,9 @@ public class AccountManager
         get => _config.ConnectionKind;
         set
         {
+            var prevState = _config.ConnectionKind;
             _config.ConnectionKind = value;
-            _mediator.Publish(new ConnectionKindChanged(value));
+            _mediator.Publish(new ConnectionKindChanged(prevState, value));
             _config.Save();
         }
     }

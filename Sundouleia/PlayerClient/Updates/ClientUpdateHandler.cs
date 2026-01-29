@@ -169,6 +169,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
     private void OnCPlusProfileUpdate(ushort objIdx, Guid id)
     {
         var address = Svc.Objects[objIdx]?.Address ?? IntPtr.Zero;
+        Svc.Logger.Warning($"CPlus Update on objIdx {objIdx} with id {id}, resolved address {address}");
         if (!_watcher.WatchedTypes.TryGetValue(address, out var type))
             return;
         _updater.AddPendingUpdate(type, IpcKind.CPlus);

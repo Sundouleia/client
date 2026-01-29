@@ -1,4 +1,5 @@
 using CkCommons;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
@@ -38,6 +39,9 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         _sundesmos = sundesmos;
 
         Mediator.Subscribe<SundesmoPlayerRendered>(this, msg => NewVisibleUsers.Add(msg.Handler.Sundesmo.UserData));
+
+        // We shouldnt technically need to add this, but we can if we need an extra failsafe
+        // Svc.ClientState.Logout += OnLogout;
     }
 
     // Update management, Internal use only.
@@ -63,6 +67,20 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
             _debounceCTS.SafeCancelDispose();
             _distributionCTS.SafeCancelDispose();
         }
+
+        // Svc.ClientState.Logout -= OnLogout;
+    }
+
+    /// <summary>
+    ///     An additional failsafe in place to ensure that no data is carried over between players.
+    /// </summary>
+    private async void OnLogout(int type, int code)
+    {
+        Logger.LogInformation($"Player Logout detected, cleaning up any stored IPC Data.");
+        _latestData = new();
+        _pendingUpdates.Clear();
+        _allPendingUpdates = IpcKind.None;
+        NewVisibleUsers.Clear();
     }
 
     // The debounce time increases based on what updates are pending currently.

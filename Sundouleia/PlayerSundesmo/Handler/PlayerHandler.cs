@@ -7,6 +7,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
@@ -25,6 +26,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 {
     private readonly FileCacheManager _fileCache;
     private readonly FileDownloader _downloader;
+    private readonly AccountConfig _config;
     private readonly IpcManager _ipc;
     private readonly CharaObjectWatcher _watcher;
 
@@ -44,17 +46,22 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private readonly SemaphoreSlim _dataLock = new(1, 1);
 
     private bool _hasReplacements => _moddedFiles.Count > 0 || _swappedFiles.Count > 0;
+    private bool _hasAlterations => _hasReplacements || _appearanceData is not null;
+    public bool _blockVisualApplication => _appearanceData is null || !IsRendered || _config.ConnectionKind is ConnectionKind.StreamerMode;
+    public bool _blockModApplication => _config.ConnectionKind is ConnectionKind.StreamerMode || !_hasReplacements;
 
     public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
-        FileCacheManager fileCache, FileDownloader downloads, CharaObjectWatcher watcher, IpcManager ipc)
+        FileCacheManager fileCache, FileDownloader downloads, AccountConfig config,
+        CharaObjectWatcher watcher, IpcManager ipc)
         : base(logger, mediator)
     {
         Sundesmo = sundesmo;
 
         _fileCache = fileCache;
         _downloader = downloads;
-        _watcher = watcher;
+        _config = config;
         _ipc = ipc;
+        _watcher = watcher;
 
         // Listen to Penumbra init & dispose methods to re-assign collections.
         Mediator.Subscribe<PenumbraInitialized>(this, async _ =>
@@ -65,20 +72,28 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // If rendered, create and assign to the temp collection if not already done.
             await TryCreateAssignTempCollection().ConfigureAwait(false);
             // If there is replacement data, reapply it.
-            if (_hasReplacements)
-                await ApplyMods().ConfigureAwait(false);
+            await ApplyMods().ConfigureAwait(false);
         });
 
         Mediator.Subscribe<PenumbraDisposed>(this, _ => _tempCollection = Guid.Empty);
         Mediator.Subscribe<HonorificReady>(this, async _ =>
         {
+            if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
             if (!IsRendered || string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Honorific])) return;
             await ApplyHonorific().ConfigureAwait(false);
         });
         Mediator.Subscribe<PetNamesReady>(this, async _ =>
         {
+            if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
             if (!IsRendered || string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.PetNames])) return;
             await ApplyPetNames().ConfigureAwait(false);
+        });
+        // Mass revert when modes are switched to spesific values.
+        Mediator.Subscribe<ConnectionKindChanged>(this, async _ =>
+        {
+            // If the new kind is streamer mode, we want to revert alterations if rendered.
+            if (_.NewState is ConnectionKind.StreamerMode && IsRendered)
+                await RevertAlterations().ConfigureAwait(false);
         });
 
         Mediator.Subscribe<WatchedObjectCreated>(this, msg => MarkVisibleForAddress(msg.Address));
@@ -98,7 +113,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     public string NameString { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
     public string NameWithWorld { get; private set; } = string.Empty; // Manual, to assist timeout tasks.
     public unsafe bool IsRendered => _player != null;
-    public bool HasAlterations => _appearanceData != null || _hasReplacements;
 
     #region Rendering
     // Initializes Player Rendering for this object if the address matches the OnlineUserIdent.
@@ -161,11 +175,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await TryCreateAssignTempCollection().ConfigureAwait(false);
 
             // If they are online and have alterations, reapply them. Otherwise, exit.
-            if (!Sundesmo.IsOnline || !HasAlterations)
+            if (!Sundesmo.IsOnline || (!_hasAlterations))
             {
-                Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] reinit skipped: IsOnline: {Sundesmo.IsOnline}, HasAlterations: {HasAlterations}.", LoggerType.PairHandler);
+                Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) skipped ReInit: [IsOnline: {Sundesmo.IsOnline}, HasAlterations: {_hasAlterations}.", LoggerType.PairHandler);
                 return;
             }
+
+            // Skip if in streamer mode.
+            if (_config.ConnectionKind is ConnectionKind.StreamerMode)
+                return;
 
             // Await until we know the player has absolutely finished loading in.
             await WaitUntilValidDrawObject().ConfigureAwait(false);
@@ -208,7 +226,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _tempCollection = await _ipc.Penumbra.NewSundesmoCollection(Sundesmo.UserData.UID).ConfigureAwait(false);
 
         // If we are rendered, assign the collection
-        if (IsRendered)
+        if (IsRendered && _config.ConnectionKind is not ConnectionKind.StreamerMode)
             await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
     }
 
@@ -388,6 +406,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // Update Data.
             var visualDiff = UpdateDataIpc(ipcChanges);
             var modDiff = UpdateDataMods(modChanges);
+
             // Apply Changes if necessary.
             await ApplyAlterations(visualDiff, modDiff).ConfigureAwait(false);
         }
@@ -405,13 +424,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             bool needsRedraw = false;
             // Update the manipString, and apply if changes occurred.
             if (!string.IsNullOrEmpty(manipString))
+            {
+                // Update the Manips, if they change mark us for a redraw.
                 if (UpdateDataIpc(IpcKind.ModManips, manipString))
                     needsRedraw |= await ApplyVisualsSingle(IpcKind.ModManips).ConfigureAwait(false);
+            }
 
             // Update the mod data, and apply if changes occurred.
             if (UpdateDataMods(modChanges))
                 needsRedraw |= await ApplyMods().ConfigureAwait(false);
-
+ 
             ConditionalRedraw(needsRedraw);
         }
         finally
@@ -426,10 +448,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         try
         {
             var visualDiff = UpdateDataIpc(ipcChanges);
-            if (visualDiff is IpcKind.None)
-                return;
-            // Apply changes.
-            ConditionalRedraw(await ApplyVisuals(visualDiff).ConfigureAwait(false));
+            if (UpdateDataIpc(ipcChanges) is { } diff && diff is not IpcKind.None)
+            {
+                // Apply changes
+                bool redraw = await ApplyVisuals(visualDiff).ConfigureAwait(false);
+                ConditionalRedraw(redraw);
+            }
         }
         finally
         {
@@ -442,10 +466,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!UpdateDataIpc(kind, newData))
-                return;
-            // Apply changes.
-            ConditionalRedraw(await ApplyVisualsSingle(kind).ConfigureAwait(false));
+            if (UpdateDataIpc(kind, newData))
+            {
+                bool redraw = await ApplyVisualsSingle(kind).ConfigureAwait(false);
+                ConditionalRedraw(redraw);
+            }
         }
         finally
         {
@@ -536,6 +561,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     #region Alteration Application
     private async Task ApplyAlterations(IpcKind visualChanges, bool modsChanged)
     {
+        // May want to revise how this redraw occurs.
         var refresh = false;
         if (visualChanges is not IpcKind.None)
             refresh |= await ApplyVisuals(visualChanges).ConfigureAwait(false);
@@ -550,20 +576,23 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     // (TODO: Extend this to detect when a reapply or redraw should be done)
     private async Task<bool> ApplyMods()
     {
+        if (_config.ConnectionKind is ConnectionKind.StreamerMode)
+            return false;
+
         // Sanity checks.
         if (!IsRendered)
         {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] is not rendered, skipping mod application.", LoggerType.PairMods);
+            Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) is not rendered, skipping ApplyMods()", LoggerType.PairMods);
             return false;
         }
         if (_tempCollection == Guid.Empty)
         {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] does not have a temporary collection, skipping mod application.", LoggerType.PairMods);
+            Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) has no Temp. Collection, skipping ApplyMods()", LoggerType.PairMods);
             return false;
         }
         if (!_hasReplacements)
         {
-            Logger.LogWarning($"[{Sundesmo.GetNickAliasOrUid()}] has no mod replacements, skipping mod application.", LoggerType.PairMods);
+            Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) has no replacements, skipping ApplyMods()", LoggerType.PairMods);
             return false;
         }
 
@@ -679,17 +708,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     // True if data was applied, false otherwise. (useful for redraw)
     private async Task<bool> ApplyVisuals(IpcKind changes)
     {
-        if (!IsRendered || _appearanceData is null)
+        if (_blockVisualApplication)
             return false;
 
         // Await for final render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
-
         // Sanity Check.
         if (_runtimeCTS.Token.IsCancellationRequested)
             return false;
 
-        Logger.LogDebug($"Reapplying visual data for [{Sundesmo.GetNickAliasOrUid()}]", LoggerType.PairHandler);
+        Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) Reapplying Visuals", LoggerType.PairHandler);
         var toApply = new List<Task>();
 
         if (changes.HasAny(IpcKind.Glamourer))  toApply.Add(ApplyGlamourer());
@@ -708,7 +736,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     // True if we should redraw, false otherwise.
     private async Task<bool> ApplyVisualsSingle(IpcKind kind)
     {
-        if (!IsRendered || _appearanceData is null)
+        if (_blockVisualApplication)
             return false;
 
         // Await for final render.
@@ -732,20 +760,20 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         };
         await task.ConfigureAwait(false);
 
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had a single IPC change ({kind})", LoggerType.PairHandler);
+        Logger.LogInformation($"{NameString}({Sundesmo.GetNickAliasOrUid()}) had a IPC change: {kind}", LoggerType.PairHandler);
         return kind.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips);
     }
 
     private async Task<bool> ReapplyVisuals()
     {
-        if (!IsRendered || _appearanceData is null)
+        if (_blockVisualApplication)
             return false;
 
         await WaitUntilValidDrawObject().ConfigureAwait(false);
         
         var toApply = new List<Task>();
         
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer])) toApply.Add(ApplyGlamourer());
+        if (!string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.Glamourer])) toApply.Add(ApplyGlamourer());
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Heels]))     toApply.Add(ApplyHeels());
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))     toApply.Add(ApplyCPlus());
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Honorific])) toApply.Add(ApplyHonorific());

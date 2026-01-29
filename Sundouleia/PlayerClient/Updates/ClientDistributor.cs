@@ -20,6 +20,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly MainConfig _config;
+    private readonly AccountConfig _account;
     private readonly IpcManager _ipc;
     private readonly FileUploader _fileUploader;
     private readonly LimboStateManager _limbo;
@@ -34,13 +35,14 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     private bool _hubConnectionSent = false;
 
     public ClientDistributor(ILogger<ClientDistributor> logger, SundouleiaMediator mediator,
-        MainHub hub, MainConfig config, IpcManager ipc, FileUploader fileUploader,
-        LimboStateManager limbo, ModdedStateManager moddedState, SundesmoManager sundesmos,
-        CharaObjectWatcher watcher, ClientUpdateService updater)
+        MainHub hub, MainConfig config, AccountConfig account, IpcManager ipc, 
+        FileUploader fileUploader, LimboStateManager limbo, ModdedStateManager moddedState, 
+        SundesmoManager sundesmos, CharaObjectWatcher watcher, ClientUpdateService updater)
         : base(logger, mediator)
     {
         _hub = hub;
         _config = config;
+        _account = account;
         _ipc = ipc;
         _fileUploader = fileUploader;
         _limbo = limbo;
@@ -52,12 +54,29 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         // Process applyToPair change.
         Mediator.Subscribe<MoodlesApplyStatusToPair>(this, _ => ApplyStatusTuplesToSundesmo(_.ApplyStatusTupleDto).ConfigureAwait(false));
         // Process connections.
-        Mediator.Subscribe<ConnectedMessage>(this, _ => OnHubConnected());
+        Mediator.Subscribe<ConnectedMessage>(this, _ =>
+        {
+            Logger.LogInformation("HubConnected Triggered, reloading and sending full cache.");
+            ReloadAndSendCache();
+        });
         Mediator.Subscribe<DisconnectedMessage>(this, _ =>
         {
             _updater.NewVisibleUsers.Clear();
             _hubConnectionSent = false;
         });
+        Mediator.Subscribe<ConnectionKindChanged>(this, _ =>
+        {
+            // If previous kind was full pause, dont worry about doing anything.
+            if (_.PrevState is ConnectionKind.FullPause)
+                return;
+            // Otherwise, if the previous type was TryOn, and the new type is not FullPause, perform a reload and send.
+            if (_.PrevState is ConnectionKind.TryOnMode && _.NewState is not ConnectionKind.FullPause)
+            {
+                Logger.LogInformation($"Switched off TryOnMode to another online state, reloading and sending full Cache!");
+                ReloadAndSendCache();
+            }
+        });
+
         // Process Update Checking.
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, _ => UpdateCheck());
     }
@@ -99,9 +118,8 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
 
     // Only entry point where we ignore timeout states.
     // If this gets abused through we can very easily add timeout functionality here too.
-    private async void OnHubConnected()
+    private async void ReloadAndSendCache()
     {
-        Logger.LogInformation("Hub Reconnected!");
         // Update the latest data.
         await _updater.RunOnDataUpdateSlim(async () =>
         {
@@ -120,7 +138,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             _updater.LatestData.CPlusState[OwnedObject.Companion] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             // Cache mods.
             var moddedState = await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false);
-            Logger.LogDebug($"(OnHubConnected) Collected modded state. [{moddedState.AllFiles.Count} Mod Files]", LoggerType.DataDistributor);
+            Logger.LogDebug($"(ReloadAndSendCache) Collected modded state. [{moddedState.AllFiles.Count} Mod Files]", LoggerType.DataDistributor);
             _updater.LatestData.ApplyNewModState(moddedState);
 
         }).ConfigureAwait(false);

@@ -14,7 +14,7 @@ public record NotificationMessage(string Title, string Message, NotificationType
 public record EventMessage(DataEvent Event) : MessageBase;
 
 /// <summary> The ConnectionKind was updated to reflect a new type. </summary>
-public record ConnectionKindChanged(ConnectionKind NewState) : MessageBase;
+public record ConnectionKindChanged(ConnectionKind PrevState, ConnectionKind NewState) : MessageBase;
 
 /// <summary> Fires whenever the client is disconnected from the Sundouleia Hub. </summary>
 public record DisconnectedMessage(DisconnectIntent Intent) : SameThreadMessage;
