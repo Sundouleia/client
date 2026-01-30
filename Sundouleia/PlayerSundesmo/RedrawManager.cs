@@ -7,10 +7,8 @@ using Sundouleia.Services.Mediator;
 ///    Manages redraw operations for a Sundesmo player, specifically ensuring redraws only happen while
 ///    no updates are being processed for the player or their owned objects.
 /// </summary>
-public class RedrawManager : DisposableMediatorSubscriberBase
+public class RedrawManager(ILogger<RedrawManager> logger, Sundesmo sundesmo) : IDisposable
 {
-    private readonly Sundesmo _sundesmo;
-
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly Dictionary<OwnedObject, Redraw> _pendingRedraws = new(){
         { OwnedObject.Player,         Redraw.None },
@@ -21,20 +19,15 @@ public class RedrawManager : DisposableMediatorSubscriberBase
 
     private int _updatesProcessing = 0;
 
-    public RedrawManager(ILogger<RedrawManager> logger, SundouleiaMediator mediator, Sundesmo sundesmo) : base(logger, mediator)
+	public void BeginUpdate()
     {
-        _sundesmo = sundesmo;
-    }
-
-    public void BeginUpdate()
-    {
-        Logger.LogDebug($"Beginning update for {_sundesmo.GetNickAliasOrUid()}.", LoggerType.PairManagement);
+        logger.LogDebug($"Beginning update for {sundesmo.GetNickAliasOrUid()}.", LoggerType.PairManagement);
         Interlocked.Increment(ref _updatesProcessing);
     }
 
     public async Task ApplyAndRedraw(OwnedObject ownedObject, Func<Task<Redraw>> applyUpdates)
     {
-        Logger.LogDebug($"Applying updates for {_sundesmo.GetNickAliasOrUid()}'s {ownedObject}.", LoggerType.PairManagement);
+        logger.LogDebug($"Applying updates for {sundesmo.GetNickAliasOrUid()}'s {ownedObject}.", LoggerType.PairManagement);
         try
         {
             await _semaphore.WaitAsync();
@@ -48,7 +41,7 @@ public class RedrawManager : DisposableMediatorSubscriberBase
 
     public void EndUpdate()
     {
-        Logger.LogDebug($"Ending update for {_sundesmo.GetNickAliasOrUid()}.", LoggerType.PairManagement);
+        logger.LogDebug($"Ending update for {sundesmo.GetNickAliasOrUid()}.", LoggerType.PairManagement);
         if (Interlocked.Decrement(ref _updatesProcessing) == 0)
         {
             ProcessPendingRedraws();
@@ -65,8 +58,8 @@ public class RedrawManager : DisposableMediatorSubscriberBase
             {
                 if (pendingRedraw != Redraw.None)
                 {
-                    Logger.LogDebug($"Processing pending redraw for {_sundesmo.GetNickAliasOrUid()}'s {obj}: {pendingRedraw}", LoggerType.PairManagement);
-                    _sundesmo.GetOwnedHandler(obj)?.RedrawGameObject(pendingRedraw);
+                    logger.LogDebug($"Processing pending redraw for {sundesmo.GetNickAliasOrUid()}'s {obj}: {pendingRedraw}", LoggerType.PairManagement);
+                    sundesmo.GetOwnedHandler(obj)?.RedrawGameObject(pendingRedraw);
                     _pendingRedraws[obj] = Redraw.None;
                 }
             }
@@ -76,4 +69,9 @@ public class RedrawManager : DisposableMediatorSubscriberBase
             _semaphore.Release();
         }
     }
+
+	public void Dispose()
+	{
+		_semaphore.Dispose();
+	}
 }
