@@ -3,7 +3,6 @@ using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
@@ -15,7 +14,6 @@ using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
-using static System.ComponentModel.Design.ObjectSelectorEditor;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -27,9 +25,9 @@ public class SidePanelUI : WindowMediatorSubscriberBase
     private readonly MainHub _hub;
     private readonly SundesmoTabs _sundesmoTabs;
     private readonly RequestsInDrawer _requestsDrawer;
-    private readonly GroupsDrawer _groupsDrawer;
     private readonly SidePanelInteractions _spInteractions;
     private readonly SidePanelGroups _spGroups;
+    private readonly GroupsDrawSystem _ddsGroups;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly SidePanelService _service;
@@ -40,20 +38,20 @@ public class SidePanelUI : WindowMediatorSubscriberBase
 
     public SidePanelUI(ILogger<SidePanelUI> logger, SundouleiaMediator mediator,
         MainHub hub, SundesmoTabs sundesmoTabs, RequestsInDrawer requestsDrawer,
-        GroupsDrawer groupsDrawer, SidePanelInteractions interactions, 
-        SidePanelGroups groups, RequestsManager requests, SundesmoManager sundesmos, 
-        SidePanelService service, GroupsDrawSystem groupsDDS)
+        SidePanelInteractions interactions, SidePanelGroups spGroups, 
+        RequestsManager requests, SundesmoManager sundesmos, SidePanelService service, 
+        GroupsDrawSystem groupsDDS)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
         _hub = hub;
         _sundesmoTabs = sundesmoTabs;
          _requestsDrawer = requestsDrawer;
-        _groupsDrawer = groupsDrawer;
         _spInteractions = interactions;
         _requests = requests;
         _sundesmos = sundesmos;
-        _spGroups = groups;
+        _spGroups = spGroups;
         _service = service;
+        _ddsGroups = groupsDDS;
 
         GroupSelector = new(logger, groupsDDS);
 
@@ -142,16 +140,14 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         ImGui.Text("Added Groups");
 
         if (CkGui.IconTextButton(FAI.Plus, "In Area"))
-        {
-            _logger.LogInformation("Adding selected requests from player location.");
-        }
+            GroupSelector.AddSelectedFolders(_ddsGroups.GetAllInArea());
         CkGui.AttachToolTip("Add Groups linked to this area.--NL--(All inner scopes are also included)");
+        
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.Plus, "In World"))
-        {
-            _logger.LogInformation("Adding selected requests from player world.");
-        }
+            GroupSelector.AddSelectedFolders(_ddsGroups.GetAllInWorld());
         CkGui.AttachToolTip("Add Groups linked to this world.--NL--(All inner scopes are also included)");
+        
         ImUtf8.SameLineInner();
         var comboWidth = ImGui.GetContentRegionAvail().X;
         GroupSelector.DrawSelectorCombo("ReqResp", "Add To Groups..", comboWidth, comboWidth * 1.5f);

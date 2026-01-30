@@ -76,9 +76,9 @@ public class RadarDistributor : DisposableMediatorSubscriberBase
         if (!_config.Current.RadarEnabled)
             return;
 
-        Logger.LogInformation($"Territory changed from {prevTerritory} to {newTerritory}", LoggerType.RadarData);      
+        Logger.LogInformation($"Territory changed from {prevTerritory} to {newTerritory}", LoggerType.RadarData);
         // Leave the current radar zone, notifying all users of the disconnect.
-        await _hub.RadarZoneLeave().ConfigureAwait(false);
+        await Generic.Safe(_hub.RadarZoneLeave).ConfigureAwait(false);
         // Clear all current radar users from the manager.
         _manager.ClearUsers();
         // await for us to finish loading (not entirely necessary but nice to have)

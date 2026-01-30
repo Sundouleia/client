@@ -188,7 +188,7 @@ public static class SundouleiaServiceExtensions
 
         // Misc. Services
         .AddSingleton<CosmeticService>()
-        .AddSingleton<DtrBarService>()
+        .AddSingleton<DtrService>()
         .AddSingleton<NotificationService>()
         .AddSingleton<OnTickService>()
         .AddSingleton<SundouleiaMediator>()

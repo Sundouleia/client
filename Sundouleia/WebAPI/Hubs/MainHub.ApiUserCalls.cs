@@ -253,6 +253,7 @@ public partial class MainHub
 
     public async Task<HubResponse> RadarZoneLeave()
     {
+        // Maybe add some other safegaurd here
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarZoneLeave)).ConfigureAwait(false);
     }

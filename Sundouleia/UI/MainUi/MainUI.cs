@@ -90,6 +90,12 @@ public class MainUI : WindowMediatorSubscriberBase
         // Update the tab menu selection.
         _tabMenu.TabSelection = _config.Current.CurMainUiTab;
 
+        Mediator.Subscribe<OpenSundesmoSidePanel>(this, _ =>
+        {
+            IsOpen = true;
+            _tabMenu.TabSelection = MainMenuTabs.SelectedTab.BasicWhitelist;
+        });
+
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
     }

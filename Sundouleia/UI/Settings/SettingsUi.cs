@@ -4,15 +4,16 @@ using CkCommons.Gui.Utility;
 using CkCommons.Helpers;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using Downloader;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using OtterGui;
 using OtterGui.Text;
-using OtterGuiInternal.Enums;
 using Sundouleia.Interop;
 using Sundouleia.Localization;
-using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -22,6 +23,7 @@ using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Util;
 using TerraFX.Interop.Windows;
+using static FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentAlarm;
 
 namespace Sundouleia.Gui;
 
@@ -30,7 +32,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private bool THEME_PUSHED = false;
 
     private readonly MainHub _hub;
-    private readonly MainConfig _mainConfig;
+    private readonly MainConfig _config;
     private readonly ProfilesTab _accountsTab;
     private readonly DebugTab _debugTab;
     private readonly UiDataStorageShared _storageShared;
@@ -40,7 +42,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;
-        _mainConfig = config;
+        _config = config;
         _accountsTab = accounts;
         _debugTab = debug;
         _storageShared = dataStorage;
@@ -137,6 +139,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 {
                     DrawPrefsDownloads();
                     ImGui.Separator();
+                    DrawPrefsRequests();
+                    ImGui.Separator();
                     DrawPrefsNotify();
                     ImGui.EndTabItem();
                 }
@@ -183,31 +187,31 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawMainGeneric()
     {
         CkGui.FontText(CkLoc.Settings.MainOptions.HeaderGeneric, UiFontService.UidFont);
-        var autoOpen = _mainConfig.Current.OpenUiOnStartup;
-        var contextMenus = _mainConfig.Current.ShowContextMenus;
-        var showProfiles = _mainConfig.Current.ShowProfiles;
-        var profileDelay = _mainConfig.Current.ProfileDelay;
-        var allowNsfw = _mainConfig.Current.AllowNSFW;
+        var autoOpen = _config.Current.OpenUiOnStartup;
+        var contextMenus = _config.Current.ShowContextMenus;
+        var showProfiles = _config.Current.ShowProfiles;
+        var profileDelay = _config.Current.ProfileDelay;
+        var allowNsfw = _config.Current.AllowNSFW;
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.ShowMainUiOnStartLabel, ref autoOpen))
         {
-            _mainConfig.Current.OpenUiOnStartup = autoOpen;
-            _mainConfig.Save();
+            _config.Current.OpenUiOnStartup = autoOpen;
+            _config.Save();
         }
         CkGui.HelpText(CkLoc.Settings.MainOptions.ShowMainUiOnStartTT);
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.ContextMenusLabel, ref contextMenus))
         {
-            _mainConfig.Current.ShowContextMenus = contextMenus;
-            _mainConfig.Save();
+            _config.Current.ShowContextMenus = contextMenus;
+            _config.Save();
         }
         CkGui.HelpText(CkLoc.Settings.MainOptions.ContextMenusTT);
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.ShowProfilesLabel, ref showProfiles))
         {
             Mediator.Publish(new ClearProfileCache());
-            _mainConfig.Current.ShowProfiles = showProfiles;
-            _mainConfig.Save();
+            _config.Current.ShowProfiles = showProfiles;
+            _config.Save();
         }
         CkGui.HelpText(CkLoc.Settings.MainOptions.ShowProfilesTT);
 
@@ -217,16 +221,16 @@ public class SettingsUi : WindowMediatorSubscriberBase
             ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
             if (ImGui.SliderFloat("##Profile-Delay", ref profileDelay, 0.3f, 5, $"%.1f {CkLoc.Settings.MainOptions.ProfileDelayLabel}"))
             {
-                _mainConfig.Current.ProfileDelay = profileDelay;
-                _mainConfig.Save();
+                _config.Current.ProfileDelay = profileDelay;
+                _config.Save();
             }
             CkGui.HelpText(CkLoc.Settings.MainOptions.ProfileDelayTT);
         }
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowNSFWLabel, ref allowNsfw))
         {
-            _mainConfig.Current.AllowNSFW = allowNsfw;
-            _mainConfig.Save();
+            _config.Current.AllowNSFW = allowNsfw;
+            _config.Save();
         }
         CkGui.HelpText(CkLoc.Settings.MainOptions.AllowNSFWTT);
     }
@@ -367,17 +371,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawMainRadar()
     {
         CkGui.FontText(CkLoc.Settings.MainOptions.HeaderRadar, UiFontService.UidFont);
-        var enabled = _mainConfig.Current.RadarEnabled;
-        var sendPings = _mainConfig.Current.RadarSendPings;
-        var nearbyDtr = _mainConfig.Current.RadarNearbyDtr;
-        var joinChats = _mainConfig.Current.RadarJoinChats;
-        var chatUnreadDtr = _mainConfig.Current.RadarChatUnreadDtr;
-        var showUnreadBubble = _mainConfig.Current.RadarShowUnreadBubble;
+        var enabled = _config.Current.RadarEnabled;
+        var sendPings = _config.Current.RadarSendPings;
+        var nearbyDtr = _config.Current.RadarNearbyDtr;
+        var joinChats = _config.Current.RadarJoinChats;
+        var chatUnreadDtr = _config.Current.RadarChatUnreadDtr;
+        var showUnreadBubble = _config.Current.RadarShowUnreadBubble;
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarEnabledLabel, ref enabled))
         {
-            _mainConfig.Current.RadarEnabled = enabled;
-            _mainConfig.Save();
+            _config.Current.RadarEnabled = enabled;
+            _config.Save();
             Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarEnabled)));
         }
 
@@ -385,8 +389,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarSendPingsLabel, ref sendPings))
         {
-            _mainConfig.Current.RadarSendPings = sendPings;
-            _mainConfig.Save();
+            _config.Current.RadarSendPings = sendPings;
+            _config.Save();
             Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarSendPings)));
         }
         ImUtf8.SameLineInner();
@@ -395,8 +399,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarNearbyDtrLabel, ref nearbyDtr))
         {
-            _mainConfig.Current.RadarNearbyDtr = nearbyDtr;
-            _mainConfig.Save();
+            _config.Current.RadarNearbyDtr = nearbyDtr;
+            _config.Save();
             Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarNearbyDtr)));
         }
         ImUtf8.SameLineInner();
@@ -405,8 +409,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarJoinChatsLabel, ref joinChats))
         {
-            _mainConfig.Current.RadarJoinChats = joinChats;
-            _mainConfig.Save();
+            _config.Current.RadarJoinChats = joinChats;
+            _config.Save();
             Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarJoinChats)));
         }
         ImUtf8.SameLineInner();
@@ -415,8 +419,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarChatUnreadDtrLabel, ref chatUnreadDtr))
         {
-            _mainConfig.Current.RadarChatUnreadDtr = chatUnreadDtr;
-            _mainConfig.Save();
+            _config.Current.RadarChatUnreadDtr = chatUnreadDtr;
+            _config.Save();
             Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarChatUnreadDtr)));
         }
         ImUtf8.SameLineInner();
@@ -425,8 +429,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleLabel, ref showUnreadBubble))
         {
-            _mainConfig.Current.RadarShowUnreadBubble = showUnreadBubble;
-            _mainConfig.Save();
+            _config.Current.RadarShowUnreadBubble = showUnreadBubble;
+            _config.Save();
             Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarShowUnreadBubble)));
         }
         ImUtf8.SameLineInner();
@@ -437,9 +441,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawPrefsDownloads()
     {
         CkGui.FontText(CkLoc.Settings.Preferences.HeaderDownloads, UiFontService.UidFont);
-        var maxParallelDLs = _mainConfig.Current.MaxParallelDownloads;
-        var dlLimit = _mainConfig.Current.DownloadLimitBytes;
-        var dlSpeedType = _mainConfig.Current.DownloadSpeedType;
+        var maxParallelDLs = _config.Current.MaxParallelDownloads;
+        var dlLimit = _config.Current.DownloadLimitBytes;
+        var dlSpeedType = _config.Current.DownloadSpeedType;
 
         CkGui.FramedIconText(FAI.Gauge);
         CkGui.TextFrameAlignedInline(CkLoc.Settings.Preferences.DownloadLimitLabel);
@@ -447,17 +451,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
         if (ImGui.InputInt("###DownloadSpeedLimit", ref dlLimit))
         {
-            _mainConfig.Current.DownloadLimitBytes = dlLimit;
-            _mainConfig.Save();
+            _config.Current.DownloadLimitBytes = dlLimit;
+            _config.Save();
             Mediator.Publish(new DownloadLimitChangedMessage());
         }
         CkGui.AttachToolTip(CkLoc.Settings.Preferences.DownloadLimitTT);
 
         ImUtf8.SameLineInner();
-        if (CkGuiUtils.EnumCombo("###SpeedType", 50 * ImGuiHelpers.GlobalScale, _mainConfig.Current.DownloadSpeedType, out var newType, s => s.ToName()))
+        if (CkGuiUtils.EnumCombo("###SpeedType", 50 * ImGuiHelpers.GlobalScale, _config.Current.DownloadSpeedType, out var newType, s => s.ToName()))
         {
-            _mainConfig.Current.DownloadSpeedType = newType;
-            _mainConfig.Save();
+            _config.Current.DownloadSpeedType = newType;
+            _config.Save();
             Mediator.Publish(new DownloadLimitChangedMessage());
         }
         CkGui.AttachToolTip(CkLoc.Settings.Preferences.DownloadSpeedTypeTT);
@@ -468,37 +472,37 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ImGui.SetNextItemWidth(150 * ImGuiHelpers.GlobalScale);
         if (ImGui.SliderInt("###Maximum Parallel Downloads", ref maxParallelDLs, 1, 10))
         {
-            _mainConfig.Current.MaxParallelDownloads = maxParallelDLs;
-            _mainConfig.Save();
+            _config.Current.MaxParallelDownloads = maxParallelDLs;
+            _config.Save();
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.MaxParallelDLsTT);
 
-        var showUploadText = _mainConfig.Current.ShowUploadingText;
-        var transferDebug = _mainConfig.Current.TransferWindow;
-        var progressBars = _mainConfig.Current.TransferBars;
-        var showBarText = _mainConfig.Current.TransferBarText;
-        var barHeight = _mainConfig.Current.TransferBarHeight;
-        var barWidth = _mainConfig.Current.TransferBarWidth;
+        var showUploadText = _config.Current.ShowUploadingText;
+        var transferDebug = _config.Current.TransferWindow;
+        var progressBars = _config.Current.TransferBars;
+        var showBarText = _config.Current.TransferBarText;
+        var barHeight = _config.Current.TransferBarHeight;
+        var barWidth = _config.Current.TransferBarWidth;
 
         if (ImGui.Checkbox(CkLoc.Settings.Preferences.ShowUploadingTextLabel, ref showUploadText))
         {
-            _mainConfig.Current.ShowUploadingText = showUploadText;
-            _mainConfig.Save();
+            _config.Current.ShowUploadingText = showUploadText;
+            _config.Save();
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.ShowUploadingTextTT);
 
         if (ImGui.Checkbox(CkLoc.Settings.Preferences.TransferWindowLabel, ref transferDebug))
         {
-            _mainConfig.Current.TransferWindow = transferDebug;
-            _mainConfig.Save();
+            _config.Current.TransferWindow = transferDebug;
+            _config.Save();
             Mediator.Publish(new UiToggleMessage(typeof(TransferBarUI), transferDebug ? ToggleType.Show : ToggleType.Hide));
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.TransferWindowTT);
 
         if (ImGui.Checkbox(CkLoc.Settings.Preferences.TransferBarsLabel, ref progressBars))
         {
-            _mainConfig.Current.TransferBars = progressBars;
-            _mainConfig.Save();
+            _config.Current.TransferBars = progressBars;
+            _config.Save();
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.TransferBarsTT);
 
@@ -514,8 +518,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
                 if (ImGui.SliderInt("##transfer-width", ref barWidth, 50, 1000))
                 {
-                    _mainConfig.Current.TransferBarWidth = barWidth;
-                    _mainConfig.Save();
+                    _config.Current.TransferBarWidth = barWidth;
+                    _config.Save();
                 }
             }
             CkGui.AttachToolTip(CkLoc.Settings.Preferences.TransferBarWidthTT);
@@ -529,8 +533,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
                 if (ImGui.SliderInt("##transfer-height", ref barHeight, 10, 500))
                 {
-                    _mainConfig.Current.TransferBarHeight = barHeight;
-                    _mainConfig.Save();
+                    _config.Current.TransferBarHeight = barHeight;
+                    _config.Save();
                 }
             }
             CkGui.AttachToolTip(CkLoc.Settings.Preferences.TransferBarHeightTT);
@@ -539,25 +543,125 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
             if (ImGui.Checkbox(CkLoc.Settings.Preferences.TransferBarTextLabel, ref showBarText))
             {
-                _mainConfig.Current.TransferBarText = showBarText;
-                _mainConfig.Save();
+                _config.Current.TransferBarText = showBarText;
+                _config.Save();
             }
             CkGui.HelpText(CkLoc.Settings.Preferences.TransferBarTextTT);
         }
+    }
+
+    private void DrawPrefsRequests()
+    {
+        CkGui.FontText("Requests", UiFontService.UidFont);
+        var showBubbles = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Bubble);
+        var showDtr = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.DtrBar);
+        var sounds = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Audio);
+        
+        if (ImGui.Checkbox("Show Total Incoming", ref showBubbles))
+        {
+            _config.Current.RequestNotifiers ^= RequestAlertKind.Bubble;
+            _config.Save();
+        }
+        CkGui.HelpText("Displays the number of incoming requests along the MainUI TabBar.");
+
+        if (ImGui.Checkbox("Show DTR Entry", ref showDtr))
+        {
+            _config.Current.RequestNotifiers ^= RequestAlertKind.DtrBar;
+            _config.Save();
+        }
+        CkGui.HelpText("Displays the number of incoming and outoing requests to the DTR bar.");
+
+        if (ImGui.Checkbox("Play Audio Alerts", ref sounds))
+        {
+            _config.Current.RequestNotifiers ^= RequestAlertKind.Audio;
+            _config.Save();
+        }
+        CkGui.HelpText("Use a In-Game or custom sound trigger after recieving a request");
+
+        using var dis = ImRaii.Disabled(!sounds);
+        using var ident = ImRaii.PushIndent();
+        
+        using (ImRaii.Group())
+        {
+            CkGui.FramedIconText(FAI.FileAudio);
+            ImUtf8.SameLineInner();
+            ImGui.SetNextItemWidth(125 * ImGuiHelpers.GlobalScale);
+            int soundType = _config.Current.AlertIsCustomSound ? 1 : 0;
+            if (ImGui.Combo("##SoundType", ref soundType, "Game Sound\0Custom Sound\0"))
+            {
+                _config.Current.AlertIsCustomSound = soundType == 1;
+                _config.UpdateAudio();
+            }
+        }
+        CkGui.AttachToolTip("The type of audio to be played.");
+                
+        CkGui.FrameSeparatorV();
+
+        // Sample sound.
+        if (CkGui.IconButton(FAI.Play, disabled: !sounds))
+            _config.StartSound();
+
+        ImUtf8.SameLineInner();
+        if (_config.Current.AlertIsCustomSound)
+            DrawCustomSound();
+        else
+            DrawGameSound();
+    }
+
+    private void DrawGameSound()
+    {
+        var curGamesound = _config.Current.AlertGameSoundbyte;
+        if (CkGuiUtils.EnumCombo("##alert-gamesounds", 150f, curGamesound, out var newSound, _ => _.ToName()))
+        {
+            _config.Current.AlertGameSoundbyte = newSound;
+            UIGlobals.PlaySoundEffect((uint)newSound);
+            _config.UpdateAudio();
+        }
+        CkGui.AttachToolTip("The In-Game Audio to play when recieving a new request");
+    }
+
+    private void DrawCustomSound()
+    {
+        var volume = _config.Current.AlertVolume;
+        ImGui.SetNextItemWidth(150 * ImGuiHelpers.GlobalScale);
+        if (ImGui.SliderFloat("##alertVolume", ref volume, 0, 1, $"Volume: {volume * 100:F1}%%"))
+        {
+            _config.Current.AlertVolume = volume;
+            _config.UpdateAudio();
+        }
+        CkGui.AttachToolTip("How loud the custom sound is in playback");
+
+        ImGui.SameLine();
+        var path = _config.Current.AlertSoundPath;
+
+        var soundInvalid = _config.Current.AlertIsCustomSound && !_config.IsSoundReady();
+        using var col = ImRaii.PushColor(ImGuiCol.Border, 0xFF0000FF, soundInvalid);
+        using var style = ImRaii.PushStyle(ImGuiStyleVar.FrameBorderSize, 2, soundInvalid);
+
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+        if (ImGui.InputTextWithHint($"##custom-path-input", "Sound File Path..", ref path, 256))
+        {
+            _config.Current.AlertSoundPath = path;
+        }
+        if (ImGui.IsItemDeactivatedAfterEdit())
+        {
+            _config.UpdateAudio();
+        }
+        CkGui.AttachToolTip(soundInvalid ? "--COL--Sound Path Invalid!--COL--" : "The filepath to the custom audio file.", ImGuiColors.DalamudRed);
     }
 
     private void DrawPrefsNotify()
     {
         /* --------------- Separator for moving onto the Notifications Section ----------- */
         CkGui.FontText(CkLoc.Settings.Preferences.HeaderNotifications, UiFontService.UidFont);
-        var onlineNotifs = _mainConfig.Current.OnlineNotifications;
-        var onlineNotifsNickLimited = _mainConfig.Current.NotifyLimitToNickedPairs;
+        var onlineNotifs = _config.Current.OnlineNotifications;
+        var onlineNotifsNickLimited = _config.Current.NotifyLimitToNickedPairs;
 
         if (ImGui.Checkbox(CkLoc.Settings.Preferences.OnlineNotifLabel, ref onlineNotifs))
         {
-            _mainConfig.Current.OnlineNotifications = onlineNotifs;
-            if (!onlineNotifs) _mainConfig.Current.NotifyLimitToNickedPairs = false;
-            _mainConfig.Save();
+            _config.Current.OnlineNotifications = onlineNotifs;
+            if (!onlineNotifs) _config.Current.NotifyLimitToNickedPairs = false;
+            _config.Save();
         }
         CkGui.HelpText(CkLoc.Settings.Preferences.OnlineNotifTT);
 
@@ -565,16 +669,16 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             if (ImGui.Checkbox(CkLoc.Settings.Preferences.LimitForNicksLabel, ref onlineNotifsNickLimited))
             {
-                _mainConfig.Current.NotifyLimitToNickedPairs = onlineNotifsNickLimited;
-                _mainConfig.Save();
+                _config.Current.NotifyLimitToNickedPairs = onlineNotifsNickLimited;
+                _config.Save();
             }
             CkGui.HelpText(CkLoc.Settings.Preferences.LimitForNicksTT);
         }
 
-        if(ImGuiUtil.GenericEnumCombo("Info Location##notifInfo", 125f, _mainConfig.Current.InfoNotification, out var newInfo, i => i.ToString()))
+        if(ImGuiUtil.GenericEnumCombo("Info Location##notifInfo", 125f, _config.Current.InfoNotification, out var newInfo, i => i.ToString()))
         {
-            _mainConfig.Current.InfoNotification = newInfo;
-            _mainConfig.Save();
+            _config.Current.InfoNotification = newInfo;
+            _config.Save();
         }
         CkGui.HelpText("The location where \"Info\" notifications will display." +
             "--NL----COL--Nowhere--COL-- will not show any Info notifications." +
@@ -582,10 +686,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
             "--NL----COL--Toast--COL-- shows Info toast notifications in the bottom right corner" +
             "--NL----COL--Both--COL-- shows chat as well as the toast notification", ImGuiColors.ParsedGold);
 
-        if (ImGuiUtil.GenericEnumCombo("Warning Location##notifWarn", 125f, _mainConfig.Current.WarningNotification, out var newWarn, i => i.ToString()))
+        if (ImGuiUtil.GenericEnumCombo("Warning Location##notifWarn", 125f, _config.Current.WarningNotification, out var newWarn, i => i.ToString()))
         {
-            _mainConfig.Current.WarningNotification = newWarn;
-            _mainConfig.Save();
+            _config.Current.WarningNotification = newWarn;
+            _config.Save();
         }
         CkGui.HelpText("The location where \"Warning\" notifications will display." +
             "--NL----COL--Nowhere--COL-- will not show any Warning notifications." +
@@ -593,10 +697,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
             "--NL----COL--Toast--COL-- shows Warning toast notifications in the bottom right corner" +
             "--NL----COL--Both--COL-- shows chat as well as the toast notification", ImGuiColors.ParsedGold);
 
-        if (ImGuiUtil.GenericEnumCombo("Error Location##notifError", 125f, _mainConfig.Current.ErrorNotification, out var newError, i => i.ToString()))
+        if (ImGuiUtil.GenericEnumCombo("Error Location##notifError", 125f, _config.Current.ErrorNotification, out var newError, i => i.ToString()))
         {
-            _mainConfig.Current.ErrorNotification = newError;
-            _mainConfig.Save();
+            _config.Current.ErrorNotification = newError;
+            _config.Save();
         }
         CkGui.HelpText("The location where \"Error\" notifications will display." +
             "--NL----COL--Nowhere--COL-- will not show any Error notifications." +

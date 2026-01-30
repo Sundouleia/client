@@ -9,6 +9,8 @@ namespace Sundouleia.PlayerClient;
 /// </summary>
 public sealed class RequestsManager : DisposableMediatorSubscriberBase
 {
+    private readonly MainConfig _config;
+
     // Maybe revise this as time goes on, as we store a seperate list of UserData's, if the requestEntry should be revised at any point.
     // It is currently functional, but a bit messy and could be improved upon.
     private HashSet<RequestEntry> _allRequests = new();
@@ -17,9 +19,11 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
     private Lazy<List<RequestEntry>> _incomingInternal;
     private Lazy<List<RequestEntry>> _outgoingInternal;
 
-    public RequestsManager(ILogger<RequestsManager> logger, SundouleiaMediator mediator)
+    public RequestsManager(ILogger<RequestsManager> logger, SundouleiaMediator mediator, MainConfig config)
         : base(logger, mediator)
     {
+        _config = config;
+
         _incomingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => !r.FromClient).ToList());
         _outgoingInternal = new Lazy<List<RequestEntry>>(() => _allRequests.Where(r => r.FromClient).ToList());
 
@@ -50,6 +54,8 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
         // Add it to the requests.
         Logger.LogDebug($"Adding new request entry to manager.", LoggerType.PairManagement);
         _allRequests.Add(entry);
+        // Only do this for new requests.
+        Mediator.Publish(new NewRequestAdded(entry));
         RecreateLazy();
     }
 

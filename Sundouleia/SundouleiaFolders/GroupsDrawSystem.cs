@@ -2,6 +2,7 @@ using CkCommons.DrawSystem;
 using CkCommons.HybridSaver;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 
@@ -121,6 +122,18 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
 
         // Return true if any folders were created.
         return anyCreated;
+    }
+
+    public IEnumerable<GroupFolder> GetAllInArea()
+    {
+        var groupFolders = FolderMap.Values.OfType<GroupFolder>();
+        return groupFolders.Where(gf => LocationSvc.IsMatch(gf.Group.Location, gf.Group.Scope));
+    }
+
+    public IEnumerable<GroupFolder> GetAllInWorld()
+    {
+        var groupFolders = FolderMap.Values.OfType<GroupFolder>();
+        return groupFolders.Where(gf => LocationSvc.IsMatch(gf.Group.Location, LocationScope.World));
     }
 
     /// <summary>

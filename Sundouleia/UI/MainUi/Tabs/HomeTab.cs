@@ -168,11 +168,12 @@ public class HomeTab
 
             if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", buttonWidth, noSMA))
                 _mediator.Publish(new UiToggleMessage(typeof(SMAManagerUI)));
-            CkGui.AttachToolTip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
+            CkGui.AttachToolTip("Organize and manage SMA's --COL--[WIP]--COL--", ImGuiColors.DalamudOrange);
+            // CkGui.AttachToolTip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
 
             if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", buttonWidth, noSMA))
                 _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
-            CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Files (WIP)");
+            CkGui.AttachToolTip("Create SMA's --COL--[WIP]--COL--", ImGuiColors.DalamudOrange);
             //CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
             //    "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
 

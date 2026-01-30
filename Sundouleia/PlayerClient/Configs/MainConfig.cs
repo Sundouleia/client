@@ -1,4 +1,6 @@
 using CkCommons.HybridSaver;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using NAudio.Wave;
 using Sundouleia.Gui.Components;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
@@ -25,6 +27,7 @@ public class ConfigStorage
     // Tab Selection Memory
     public MainMenuTabs.SelectedTab CurMainUiTab { get; set; } = MainMenuTabs.SelectedTab.BasicWhitelist;
     public SundesmoTabs.SelectedTab CurInteractionsTab { get; set; } = SundesmoTabs.SelectedTab.Interactions;
+    
     // General
     public bool OpenUiOnStartup { get; set; } = true;
     public bool ShowContextMenus { get; set; } = true;
@@ -54,7 +57,16 @@ public class ConfigStorage
     public int TransferBarHeight { get; set; } = 30;
     public int TransferBarWidth { get; set; } = 250;
 
+    // Preferences - Requests
+    public RequestAlertKind RequestNotifiers { get; set; } = RequestAlertKind.Bubble;
+    public string AlertSoundPath { get; set; } = string.Empty;
+    public float AlertVolume { get; set; } = 0.5f;
+    public Sounds AlertGameSoundbyte { get; set; } = Sounds.Sound02;
+    public bool AlertIsCustomSound { get; set; } = false;
+
+
     // Preferences - Notifier
+    public bool EnablePairDtr { get; set; } = false;
     public bool OnlineNotifications { get; set; } = true;
     public bool NotifyLimitToNickedPairs { get; set; } = false;
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
@@ -62,10 +74,16 @@ public class ConfigStorage
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
 }
 
-public class MainConfig : IHybridSavable
+public class MainConfig : IHybridSavable, IDisposable
 {
     private readonly ILogger<MainConfig> _logger;
     private readonly HybridSaveService _saver;
+
+    // Cached items for custom alert configuration.
+    private AudioFileReader? _audioFile;
+    private WaveOutEvent? _audioEvent;
+
+    // Hybrid Savable stuff
     [JsonIgnore] public DateTime LastWriteTimeUTC { get; private set; } = DateTime.MinValue;
     [JsonIgnore] public HybridSaveType SaveType => HybridSaveType.Json;
     public int ConfigVersion => 0;
@@ -87,6 +105,19 @@ public class MainConfig : IHybridSavable
         _logger = logger;
         _saver = saver;
         Load();
+    }
+
+    public void Dispose()
+    {
+        DisposeAudio();
+    }
+
+    private void DisposeAudio()
+    {
+        _audioFile?.Dispose();
+        _audioFile = null;
+        _audioEvent?.Dispose();
+        _audioEvent = null;
     }
 
     public void Save() => _saver.Save(this);
@@ -129,4 +160,61 @@ public class MainConfig : IHybridSavable
     public ConfigStorage Current { get; private set; } = new();
     public static LogLevel LogLevel = LogLevel.Trace;
     public static LoggerType LoggerFilters = LoggerType.Recommended;
+
+    // Audio Helpers
+    public bool IsSoundReady()
+        => !Current.AlertIsCustomSound || IsCustomSoundReady();
+
+    public bool StartSound()
+    {
+        if (!Current.RequestNotifiers.HasAny(RequestAlertKind.Audio))
+            return false;
+
+        if (Current.AlertIsCustomSound)
+            return PlayCustomSound();
+
+        UIGlobals.PlaySoundEffect((uint)Current.AlertGameSoundbyte);
+        return true;
+    }
+
+    public void UpdateAudio()
+    {
+        // Dispose the audio if no longer valid.
+        if (!(Current.RequestNotifiers.HasAny(RequestAlertKind.Audio) && Current.AlertIsCustomSound))
+        {
+            DisposeAudio();
+            return;
+        }
+
+        try
+        {
+            // If the audio file name is no longer the chosen sound path, dispose of it.
+            if (_audioFile?.FileName != Current.AlertSoundPath)
+                DisposeAudio();
+
+            // Recreate the audio with the requested path and volume.
+            _audioFile = new AudioFileReader(Current.AlertSoundPath) { Volume = Current.AlertVolume };
+            _audioEvent = new WaveOutEvent();
+            _audioEvent.Init(_audioFile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error setting up alert sound: {ex}");
+            DisposeAudio();
+        }
+    }
+    private bool IsCustomSoundReady()
+        => _audioFile != null && _audioEvent != null;
+
+    private bool PlayCustomSound()
+    {
+        if (_audioFile is null || _audioEvent is null)
+            return false;
+
+        _audioEvent!.Stop();
+        _audioFile!.Position = 0;
+        _audioEvent!.Play();
+        return true;
+    }
+
 }

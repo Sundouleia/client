@@ -53,6 +53,12 @@ public class RequestsGroupSelector : GroupMultiSelector
         CkGui.AttachToolTip($"Remove from Selection");
     }
 
+    public void AddSelectedFolders(IEnumerable<GroupFolder> folders)
+    {
+        foreach (var item in folders)
+            base.SelectFolder(item);
+    }
+
     // No need to override this for the requests as we can just pull them in bulk after.
     protected override void SelectFolder(IDynamicFolder<Sundesmo> folder)
     {
