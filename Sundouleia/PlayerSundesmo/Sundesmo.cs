@@ -6,6 +6,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using GagspeakAPI.Data;
 using OtterGui;
+using Sundouleia.Pairs.Enums;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
@@ -33,6 +34,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     private readonly NicksConfig _nicks;
     private readonly LimboStateManager _limboManager;
     private readonly CharaObjectWatcher _watcher;
+    private readonly RedrawManager _redrawManager;
 
     // Associated Player Data (Created once online).
     private OnlineUser? _onlineUser;
@@ -63,6 +65,14 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         _mountMinion = factory.Create(OwnedObject.MinionOrMount, this);
         _pet = factory.Create(OwnedObject.Pet, this);
         _companion = factory.Create(OwnedObject.Companion, this);
+
+        _redrawManager = factory.CreateRM(this);
+
+        _player.OnReapplyRequested += OnReapplyRequested;
+        _mountMinion.OnReapplyRequested += OnReapplyRequested;
+        _pet.OnReapplyRequested += OnReapplyRequested;
+        _companion.OnReapplyRequested += OnReapplyRequested;
+
         _logger.LogDebug($"Initialized Sundesmo for ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
     }
 
@@ -129,47 +139,103 @@ public sealed class Sundesmo : IComparable<Sundesmo>
 
     public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
-        if (newIpc.PlayerChanges != null)
-            await _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges, isInitialData);
+        try
+        {
+            _redrawManager.BeginUpdate();
+            if (newIpc.PlayerChanges != null)
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges, isInitialData));
 
-        if (newIpc.MinionMountChanges != null)
-            await _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, isInitialData);
+            if (newIpc.MinionMountChanges != null)
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, isInitialData));
 
-        if (newIpc.PetChanges != null)
-            await _pet.UpdateAndApplyIpc(newIpc.PetChanges, isInitialData);
+            if (newIpc.PetChanges != null)
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.UpdateAndApplyIpc(newIpc.PetChanges, isInitialData));
 
-        if (newIpc.CompanionChanges != null)
-            await _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, isInitialData);
+            if (newIpc.CompanionChanges != null)
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, isInitialData));
+        }
+        finally
+        {
+            _redrawManager.EndUpdate();
+        }
     }
 
     public async void SetModChanges(NewModUpdates newModData, string manipString)
-        => await _player.UpdateAndApplyMods(newModData, manipString);
+    {
+        try
+        {
+            _redrawManager.BeginUpdate();
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyMods(newModData, manipString));
+        }
+        finally
+        {
+            _redrawManager.EndUpdate();
+        }
+    }
 
     public async void SetIpcChanges(VisualUpdate newIpc)
     {
-        if (newIpc.PlayerChanges != null)
-            await _player.UpdateAndApplyIpc(newIpc.PlayerChanges);
+        try
+        {
+            _redrawManager.BeginUpdate();
+            if (newIpc.PlayerChanges != null)
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyIpc(newIpc.PlayerChanges));
 
-        if (newIpc.MinionMountChanges != null)
-            await _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, false);
+            if (newIpc.MinionMountChanges != null)
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, false));
 
-        if (newIpc.PetChanges != null)
-            await _pet.UpdateAndApplyIpc(newIpc.PetChanges, false);
+            if (newIpc.PetChanges != null)
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.UpdateAndApplyIpc(newIpc.PetChanges, false));
 
-        if (newIpc.CompanionChanges != null)
-            await _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, false);
+            if (newIpc.CompanionChanges != null)
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, false));
+        }
+        finally
+        {
+            _redrawManager.EndUpdate();
+        }
     }
 
     public async void SetIpcChanges(OwnedObject obj, IpcKind kind, string newData)
     {
-        await (obj switch
+        try
         {
-            OwnedObject.Player          => _player.UpdateAndApplyIpc(kind, newData),
-            OwnedObject.MinionOrMount   => _mountMinion.UpdateAndApplyIpc(kind, newData),
-            OwnedObject.Pet             => _pet.UpdateAndApplyIpc(kind, newData),
-            OwnedObject.Companion       => _companion.UpdateAndApplyIpc(kind, newData),
-            _ => Task.CompletedTask,
-        }).ConfigureAwait(false);
+            _redrawManager.BeginUpdate();
+            await _redrawManager.ApplyWithPendingRedraw(obj, () =>
+            {
+                return (obj switch
+                {
+                    OwnedObject.Player => _player.UpdateAndApplyIpc(kind, newData),
+                    OwnedObject.MinionOrMount => _mountMinion.UpdateAndApplyIpc(kind, newData),
+                    OwnedObject.Pet => _pet.UpdateAndApplyIpc(kind, newData),
+                    OwnedObject.Companion => _companion.UpdateAndApplyIpc(kind, newData),
+
+                    // Should never happen, as all valid values of OwnedObject are covered. If not, we forgot something.
+                    _ => throw new ArgumentOutOfRangeException(nameof(obj), obj, null),
+                });
+            });
+        }
+        finally
+        {
+            _redrawManager.EndUpdate();
+        }
+    }
+
+    internal IRedrawable GetOwnedHandler(OwnedObject obj)
+    {
+        switch (obj)
+        {
+            case OwnedObject.Player:
+                return _player;
+            case OwnedObject.MinionOrMount:
+                return _mountMinion;
+            case OwnedObject.Pet:
+                return _pet;
+            case OwnedObject.Companion:
+                return _companion;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(obj), obj, null);
+        }
     }
 
     /// <summary>
@@ -278,12 +344,19 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     /// <summary>
     ///     Reapply cached Alterations to all visible OwnedObjects.
     /// </summary>
-    public void ReapplyAlterations()
+    public async void ReapplyAlterations()
     {
-        _player.ReapplyAlterations().ConfigureAwait(false);
-        _mountMinion.ReapplyAlterations().ConfigureAwait(false);
-        _pet.ReapplyAlterations().ConfigureAwait(false);
-        _companion.ReapplyAlterations().ConfigureAwait(false);
+        try {
+            _redrawManager.BeginUpdate();
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.ReapplyAlterations()).ConfigureAwait(false);
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.ReapplyAlterations()).ConfigureAwait(false);
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.ReapplyAlterations()).ConfigureAwait(false);
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.ReapplyAlterations()).ConfigureAwait(false);
+        }
+        finally
+        {
+            _redrawManager.EndUpdate();
+        }
     }
 
     /// <summary>
@@ -311,6 +384,27 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     }
 
     /// <summary>
+    ///     Handler for when a redrawable requests a reapplication of alterations.
+    /// </summary>
+    private void OnReapplyRequested(IRedrawable handler, OwnedObject obj)
+    {
+        // This is wrapped in a task to avoid deadlocks, when reapply is requested from inside a data update lock in a handler.
+        // as reapply will try to acquire the same lock again.
+        Task.Run(async () =>
+        {
+            try
+            {
+                _redrawManager.BeginUpdate();
+                await _redrawManager.ApplyWithPendingRedraw(obj, () => handler.ReapplyAlterations());
+            }
+            finally
+            {
+                _redrawManager.EndUpdate();
+            }
+        });
+    }
+
+    /// <summary>
     ///     Disposes of the Sundesmo's Handlers. <br/>
     ///     <b>Should be called prior to disposing a Sundesmo, and 
     ///     treated like a disposal, prior to removing it.</b>
@@ -328,10 +422,15 @@ public sealed class Sundesmo : IComparable<Sundesmo>
 
         // The handler disposal methods effective perform a revert + data clear + final disposal state.
         // Because of this calling mark offline prior is not necessary.
+        _player.OnReapplyRequested -= OnReapplyRequested;
         _player.Dispose();
+        _mountMinion.OnReapplyRequested -= OnReapplyRequested;
         _mountMinion.Dispose();
+        _pet.OnReapplyRequested -= OnReapplyRequested;
         _pet.Dispose();
+        _companion.OnReapplyRequested -= OnReapplyRequested;
         _companion.Dispose();
+        _redrawManager.Dispose();
     }
 
     // --------------- Helper Methods -------------------
