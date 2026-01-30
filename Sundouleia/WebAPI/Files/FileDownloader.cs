@@ -139,8 +139,6 @@ public class FileDownloader : DisposableMediatorSubscriberBase
     /// <summary>
 	///    Waits for all downloads for the specified player to complete.
 	/// </summary>
-	/// <param name="handler"></param>
-	/// <returns></returns>
     public Task WaitForDownloadsToComplete(PlayerHandler handler)
     {
         if (_waiterDeduplicator.TryGetTask(handler, out var task))

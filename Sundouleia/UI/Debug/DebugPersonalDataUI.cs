@@ -206,7 +206,6 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
             ImGui.TableSetupColumn("Reloading");
             ImGui.TableSetupColumn("Online");
             ImGui.TableSetupColumn("Visible");
-            ImGui.TableSetupColumn("Chara Ident");
             ImGui.TableHeadersRow();
 
             ImGui.TableNextColumn();
@@ -222,7 +221,6 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
             DrawIconBoolColumn(s.IsReloading);
             DrawIconBoolColumn(s.IsOnline);
             DrawIconBoolColumn(s.IsRendered);
-            ImGuiUtil.DrawFrameColumn(s.Ident);
         }
     }
 }

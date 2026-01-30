@@ -6,6 +6,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using GagspeakAPI.Data;
 using OtterGui;
+using OtterGui.Text.Widget.Editors;
 using Sundouleia.Pairs.Enums;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
@@ -24,17 +25,15 @@ namespace Sundouleia.Pairs;
 ///     The handlers associated with the sundesmo must be disposed of when removing.
 ///     However, don't make Sundesmo itself IDiposable.
 /// </remarks>
-public sealed class Sundesmo : IComparable<Sundesmo>
+public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sundesmo>
 {
-    private readonly ILogger<Sundesmo> _logger;
-    private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
     private readonly FavoritesConfig _favorites;
     private readonly NicksConfig _nicks;
     private readonly LimboStateManager _limboManager;
     private readonly CharaObjectWatcher _watcher;
-    private readonly RedrawManager _redrawManager;
+    private readonly RedrawManager _redrawer;
 
     // Associated Player Data (Created once online).
     private OnlineUser? _onlineUser;
@@ -48,9 +47,8 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     public Sundesmo(UserPair userPairInfo, ILogger<Sundesmo> logger, SundouleiaMediator mediator,
         MainConfig config, FolderConfig folderConfig, FavoritesConfig favorites, NicksConfig nicks,
         SundesmoHandlerFactory factory, LimboStateManager limbo, CharaObjectWatcher watcher)
+        : base(logger, mediator)
     {
-        _logger = logger;
-        _mediator = mediator;
         _config = config;
         _folderConfig = folderConfig;
         _favorites = favorites;
@@ -59,21 +57,36 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         _watcher = watcher;
 
         UserPair = userPairInfo;
-        // Initialize all handlers for the sundesmo, holding their lifetime until disposal.
-        // Create handlers for each of the objects.
-        _player = factory.Create(this);
-        _mountMinion = factory.Create(OwnedObject.MinionOrMount, this);
-        _pet = factory.Create(OwnedObject.Pet, this);
-        _companion = factory.Create(OwnedObject.Companion, this);
+        // Init the redraw manager for this Sundesmo.
+        _redrawer = factory.CreateRM(this);
 
-        _redrawManager = factory.CreateRM(this);
+        // Using this Sundesmo and the created redraw manager, construct all of the Sundesmo's possible handlers.
+        _player = factory.Create(this, _redrawer);
+        _mountMinion = factory.Create(OwnedObject.MinionOrMount, this, _redrawer);
+        _pet = factory.Create(OwnedObject.Pet, this, _redrawer);
+        _companion = factory.Create(OwnedObject.Companion, this, _redrawer);
 
-        _player.OnReapplyRequested += OnReapplyRequested;
-        _mountMinion.OnReapplyRequested += OnReapplyRequested;
-        _pet.OnReapplyRequested += OnReapplyRequested;
-        _companion.OnReapplyRequested += OnReapplyRequested;
+        Logger.LogTrace($"Initialized Sundesmo for ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
+        // Mass revert when modes are switched to spesific values.
+        Mediator.Subscribe<ConnectionKindChanged>(this, async _ =>
+        {
+            // We dont care if previous state was FullPause.
+            if (_.PrevState is ConnectionKind.FullPause) return;
 
-        _logger.LogDebug($"Initialized Sundesmo for ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
+            // If we switched to StreamerMode, and we are rendered, revert alterations.
+            if (_.PrevState is not ConnectionKind.FullPause && _.NewState is ConnectionKind.StreamerMode && IsRendered)
+            {
+                Logger.LogDebug($"{PlayerName}({GetNickAliasOrUid()}) reverted alterations upon enabling StreamerMode", LoggerType.PairHandler);
+                await RevertRenderedAlterations().ConfigureAwait(false);
+            }
+            // Otherwise if the previous state was Streamer Mode and the new state was not FullPause, Reapply the alterations if rendered.
+            else if (_.PrevState is ConnectionKind.StreamerMode && _.NewState is not ConnectionKind.FullPause && IsRendered)
+            {
+                Logger.LogDebug($"{PlayerName}({GetNickAliasOrUid()}) now reinitializing upon disabling StreamerMode.", LoggerType.PairHandler);
+                // Public way to access ReinitializeInternal when already rendered, can optimize later
+                SetVisibleIfRendered();
+            }
+        });
     }
 
     // Associated ServerData.
@@ -98,13 +111,11 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     public string PlayerName => _player.NameString;
     public string PlayerNameWorld => _player.NameWithWorld;
     public IntPtr PlayerAddress => IsRendered ? _player.Address : IntPtr.Zero;
-    public PlayerHandler PlayerHandler => _player;
-
-    /// <summary> Do not call if you are not certain the player is rendered! </summary>
+    public ushort ObjIndex => _player.ObjIndex;
     public ulong PlayerEntityId => _player.EntityId;
-
-    /// <summary> Do not call if you are not certain the player is rendered! </summary>
     public ulong PlayerObjectId => _player.GameObjectId;
+    public PlayerHandler PlayerHandler => _player; // Phase this out
+
 
     // Comparable helper, allows us to do faster lookup.
     public int CompareTo(Sundesmo? other)
@@ -139,103 +150,47 @@ public sealed class Sundesmo : IComparable<Sundesmo>
 
     public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
-        try
-        {
-            _redrawManager.BeginUpdate();
-            if (newIpc.PlayerChanges != null)
-                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges, isInitialData));
+        if (newIpc.PlayerChanges != null)
+            await _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges, isInitialData);
 
-            if (newIpc.MinionMountChanges != null)
-                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, isInitialData));
+        if (newIpc.MinionMountChanges != null)
+            await _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, isInitialData);
 
-            if (newIpc.PetChanges != null)
-                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.UpdateAndApplyIpc(newIpc.PetChanges, isInitialData));
+        if (newIpc.PetChanges != null)
+            await _pet.UpdateAndApplyIpc(newIpc.PetChanges, isInitialData);
 
-            if (newIpc.CompanionChanges != null)
-                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, isInitialData));
-        }
-        finally
-        {
-            _redrawManager.EndUpdate();
-        }
+        if (newIpc.CompanionChanges != null)
+            await _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, isInitialData);
     }
 
     public async void SetModChanges(NewModUpdates newModData, string manipString)
-    {
-        try
-        {
-            _redrawManager.BeginUpdate();
-            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyMods(newModData, manipString));
-        }
-        finally
-        {
-            _redrawManager.EndUpdate();
-        }
-    }
+        => await _player.UpdateAndApplyMods(newModData, manipString);
 
     public async void SetIpcChanges(VisualUpdate newIpc)
     {
-        try
-        {
-            _redrawManager.BeginUpdate();
-            if (newIpc.PlayerChanges != null)
-                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyIpc(newIpc.PlayerChanges));
-
-            if (newIpc.MinionMountChanges != null)
-                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, false));
-
-            if (newIpc.PetChanges != null)
-                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.UpdateAndApplyIpc(newIpc.PetChanges, false));
-
-            if (newIpc.CompanionChanges != null)
-                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, false));
-        }
-        finally
-        {
-            _redrawManager.EndUpdate();
-        }
+        if (newIpc.PlayerChanges != null)
+            await _player.UpdateAndApplyIpc(newIpc.PlayerChanges);
+        
+        if (newIpc.MinionMountChanges != null)
+            await _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, false);
+        
+        if (newIpc.PetChanges != null)
+            await _pet.UpdateAndApplyIpc(newIpc.PetChanges, false);
+        
+        if (newIpc.CompanionChanges != null)
+            await _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, false);
     }
 
     public async void SetIpcChanges(OwnedObject obj, IpcKind kind, string newData)
     {
-        try
+        await (obj switch
         {
-            _redrawManager.BeginUpdate();
-            await _redrawManager.ApplyWithPendingRedraw(obj, () =>
-            {
-                return (obj switch
-                {
-                    OwnedObject.Player => _player.UpdateAndApplyIpc(kind, newData),
-                    OwnedObject.MinionOrMount => _mountMinion.UpdateAndApplyIpc(kind, newData),
-                    OwnedObject.Pet => _pet.UpdateAndApplyIpc(kind, newData),
-                    OwnedObject.Companion => _companion.UpdateAndApplyIpc(kind, newData),
-
-                    // Should never happen, as all valid values of OwnedObject are covered. If not, we forgot something.
-                    _ => throw new ArgumentOutOfRangeException(nameof(obj), obj, null),
-                });
-            });
-        }
-        finally
-        {
-            _redrawManager.EndUpdate();
-        }
-    }
-
-    internal IRedrawable GetOwnedHandler(OwnedObject obj)
-    {
-        switch (obj)
-        {
-            case OwnedObject.Player:
-                return _player;
-            case OwnedObject.MinionOrMount:
-                return _mountMinion;
-            case OwnedObject.Pet:
-                return _pet;
-            case OwnedObject.Companion:
-                return _companion;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(obj), obj, null);
-        }
+            OwnedObject.Player => _player.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.MinionOrMount => _mountMinion.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.Pet => _pet.UpdateAndApplyIpc(kind, newData),
+            OwnedObject.Companion => _companion.UpdateAndApplyIpc(kind, newData),
+            _ => Task.CompletedTask,
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -253,7 +208,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         // If they are in any limbostate, abort it
         _limboManager.CancelLimbo(dto.User);
         // Inform mediator of Online update.
-        _mediator.Publish(new SundesmoOnline(this));
+        Mediator.Publish(new SundesmoOnline(this));
 
         // If we were marked for reloading, turn it back to false.
         IsReloading = false;
@@ -261,10 +216,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         // Check each of the Sundesmo's potentially existing owned objects.
         // If any of them are rendered, we should mark them as visible and
         // bind the Objects to their data.
-        _player.SetVisibleIfRendered().ConfigureAwait(false);
-        _mountMinion.SetVisibleIfRendered().ConfigureAwait(false);
-        _pet.SetVisibleIfRendered().ConfigureAwait(false);
-        _companion.SetVisibleIfRendered().ConfigureAwait(false);
+        SetVisibleIfRendered();
     }
 
     /// <summary>
@@ -274,12 +226,12 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     {
         if (!UserPair.IsTemporary)
         {
-            _logger.LogWarning($"Attempted to update a temporary sundesmo [{PlayerName}] ({GetNickAliasOrUid()}) to permanent, but they are already permanent.", LoggerType.PairManagement);
+            Logger.LogWarning($"Attempted to update a temporary sundesmo [{PlayerName}] ({GetNickAliasOrUid()}) to permanent, but they are already permanent.", LoggerType.PairManagement);
             return;
         }
         // Update the status to non-temporary.
         UserPair = UserPair with { TempAccepterUID = string.Empty };
-        _logger.LogInformation($"Sundesmo [{PlayerName}] ({GetNickAliasOrUid()}) has been updated to permanent.", LoggerType.PairManagement);
+        Logger.LogInformation($"Sundesmo [{PlayerName}] ({GetNickAliasOrUid()}) has been updated to permanent.", LoggerType.PairManagement);
     }
 
     /// <summary>
@@ -291,7 +243,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     /// </summary>
     public void MarkForUnload()
     {
-        _logger.LogDebug($"Marking [{PlayerName}] ({GetNickAliasOrUid()}) as reloading.", LoggerType.PairManagement);
+        Logger.LogDebug($"Marking [{PlayerName}] ({GetNickAliasOrUid()}) as reloading.", LoggerType.PairManagement);
         IsReloading = true;
     }
 
@@ -304,7 +256,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     {
         _onlineUser = null;
         // Inform the TransferBarUI of their offline state so they're removed from the dictionaries.
-        _mediator.Publish(new SundesmoOffline(this));
+        Mediator.Publish(new SundesmoOffline(this));
 
         // If the Sundesmo is marked for Reloading or an immidiate revert is forced,
         // revert the alterations and clear the data now.
@@ -342,20 +294,50 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         => _limboManager.CancelLimbo(UserData);
 
     /// <summary>
+    ///     Checks all Sundesmo Objects to see if they are rendered and/or reinitialize them.
+    /// </summary>
+    public async void SetVisibleIfRendered()
+    {
+        try
+        {
+            _redrawer.BeginUpdate();
+            // Run all tasks in parallel.
+            await Task.WhenAll(
+                _player.SetVisibleIfRendered(),
+                _mountMinion.SetVisibleIfRendered(),
+                _pet.SetVisibleIfRendered(),
+                _companion.SetVisibleIfRendered()
+            ).ConfigureAwait(false);
+        }
+        finally
+        {
+            _redrawer.EndUpdate();
+        }
+    }
+
+    /// <summary>
     ///     Reapply cached Alterations to all visible OwnedObjects.
     /// </summary>
     public async void ReapplyAlterations()
     {
-        try {
-            _redrawManager.BeginUpdate();
-            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.ReapplyAlterations()).ConfigureAwait(false);
-            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.ReapplyAlterations()).ConfigureAwait(false);
-            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.ReapplyAlterations()).ConfigureAwait(false);
-            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.ReapplyAlterations()).ConfigureAwait(false);
+        // Ignore if not rendered.
+        if (!IsRendered)
+            return;
+
+        try
+        {
+            _redrawer.BeginUpdate();
+            // Run all tasks in parallel.
+            await Task.WhenAll(
+                _player.ReapplyAlterations(),
+                _mountMinion.ReapplyAlterations(),
+                _pet.ReapplyAlterations(),
+                _companion.ReapplyAlterations()
+            ).ConfigureAwait(false);
         }
         finally
         {
-            _redrawManager.EndUpdate();
+            _redrawer.EndUpdate();
         }
     }
 
@@ -364,7 +346,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     /// </summary>
     public async Task RevertRenderedAlterations()
     {
-        _logger.LogDebug($"Reverting alterations for [{PlayerName}] ({GetNickAliasOrUid()}).", UserData.AliasOrUID);
+        Logger.LogDebug($"Reverting alterations for [{PlayerName}] ({GetNickAliasOrUid()}).", UserData.AliasOrUID);
         await _player.RevertAlterations().ConfigureAwait(false);
         await _mountMinion.RevertAlterations().ConfigureAwait(false);
         await _pet.RevertAlterations().ConfigureAwait(false);
@@ -376,7 +358,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     /// </summary>
     public async Task ClearAllAlterationData()
     {
-        _logger.LogDebug($"Clearing alteration data for {PlayerName} ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
+        Logger.LogDebug($"Clearing alteration data for {PlayerName} ({GetNickAliasOrUid()}).", LoggerType.PairManagement);
         await _player.ClearAlterations().ConfigureAwait(false);
         await _mountMinion.ClearAlterations().ConfigureAwait(false);
         await _pet.ClearAlterations().ConfigureAwait(false);
@@ -384,53 +366,26 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     }
 
     /// <summary>
-    ///     Handler for when a redrawable requests a reapplication of alterations.
-    /// </summary>
-    private void OnReapplyRequested(IRedrawable handler, OwnedObject obj)
-    {
-        // This is wrapped in a task to avoid deadlocks, when reapply is requested from inside a data update lock in a handler.
-        // as reapply will try to acquire the same lock again.
-        Task.Run(async () =>
-        {
-            try
-            {
-                _redrawManager.BeginUpdate();
-                await _redrawManager.ApplyWithPendingRedraw(obj, () => handler.ReapplyAlterations());
-            }
-            finally
-            {
-                _redrawManager.EndUpdate();
-            }
-        });
-    }
-
-    /// <summary>
-    ///     Disposes of the Sundesmo's Handlers. <br/>
-    ///     <b>Should be called prior to disposing a Sundesmo, and 
-    ///     treated like a disposal, prior to removing it.</b>
+    ///     Disposes of the Sundesmo's Handlers, but not the Sundesmo itself.
     /// </summary>
     public void DisposeData()
     {
-        _logger.LogDebug($"Disposing data for {PlayerName} ({GetNickAliasOrUid()})", LoggerType.PairManagement);
+        Logger.LogDebug($"Disposing data for {PlayerName} ({GetNickAliasOrUid()})", LoggerType.PairManagement);
         // If online, just simply mark offline.
         if (IsOnline)
         {
             _onlineUser = null;
             // Inform the TransferBarUI of their offline state so they're removed from the dictionaries.
-            _mediator.Publish(new SundesmoOffline(this));
+            Mediator.Publish(new SundesmoOffline(this));
         }
 
         // The handler disposal methods effective perform a revert + data clear + final disposal state.
         // Because of this calling mark offline prior is not necessary.
-        _player.OnReapplyRequested -= OnReapplyRequested;
         _player.Dispose();
-        _mountMinion.OnReapplyRequested -= OnReapplyRequested;
         _mountMinion.Dispose();
-        _pet.OnReapplyRequested -= OnReapplyRequested;
         _pet.Dispose();
-        _companion.OnReapplyRequested -= OnReapplyRequested;
         _companion.Dispose();
-        _redrawManager.Dispose();
+        _redrawer.Dispose();
     }
 
     // --------------- Helper Methods -------------------

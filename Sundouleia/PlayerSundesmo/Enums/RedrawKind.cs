@@ -1,7 +1,7 @@
 namespace Sundouleia.Pairs.Enums;
 
 [Flags]
-public enum Redraw
+public enum RedrawKind
 {
 	None = 0,
 	Reapply = 1,

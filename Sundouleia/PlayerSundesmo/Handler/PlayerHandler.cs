@@ -1,3 +1,4 @@
+using Brio.API;
 using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
@@ -24,7 +25,7 @@ namespace Sundouleia.Pairs;
 ///     The Rendered status should be handled differently from the alterations. <para />
 ///     Every pair has their own instance of this data.
 /// </summary>
-public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
+public class PlayerHandler : DisposableMediatorSubscriberBase
 {
     private readonly AccountConfig _config;
     private readonly FileCacheManager _fileCache;
@@ -32,11 +33,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
     private readonly IpcManager _ipc;
     private readonly CharaObjectWatcher _watcher;
 
+    // Parent References
+    private RedrawManager _redrawer { get; init; }
+    public Sundesmo Sundesmo { get; init; }
+
+    // Task Control
     private CancellationTokenSource _runtimeCTS = new();
     private CancellationTokenSource _dlWaiterCTS = new();
     private Task? _dlWaiterTask;
     
-    public Sundesmo Sundesmo { get; init; }
     private unsafe Character* _player = null;
     // cached data for appearance.
     private Guid _tempCollection;
@@ -46,19 +51,17 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
     private IpcDataPlayerCache? _appearanceData = null;
 
     private readonly SemaphoreSlim _dataLock = new(1, 1);
-
-    public event Action<IRedrawable, OwnedObject> OnReapplyRequested;
-
     private bool _hasReplacements => _moddedFiles.Count > 0 || _swappedFiles.Count > 0;
     private bool _hasAlterations => _hasReplacements || _appearanceData is not null;
-    public bool _blockVisualApplication => _appearanceData is null || !IsRendered || _config.ConnectionKind is ConnectionKind.StreamerMode;
-    public bool _blockModApplication => _config.ConnectionKind is ConnectionKind.StreamerMode || !_hasReplacements;
+    public bool BlockVisualApplication => _appearanceData is null || !IsRendered || _config.ConnectionKind is ConnectionKind.StreamerMode;
+    public bool BlockModApplication => _config.ConnectionKind is ConnectionKind.StreamerMode || !_hasReplacements;
 
-    public PlayerHandler(Sundesmo sundesmo, ILogger<PlayerHandler> logger, SundouleiaMediator mediator,
-        AccountConfig config, FileCacheManager fileCache, FileDownloader downloads,
-        CharaObjectWatcher watcher, IpcManager ipc)
+    public PlayerHandler(Sundesmo sundesmo, RedrawManager redrawer, ILogger<PlayerHandler> logger, 
+        SundouleiaMediator mediator, AccountConfig config, FileCacheManager fileCache, 
+        FileDownloader downloads, IpcManager ipc, CharaObjectWatcher watcher)
         : base(logger, mediator)
     {
+        _redrawer = redrawer;
         Sundesmo = sundesmo;
 
         _config = config;
@@ -92,25 +95,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
             if (!IsRendered || string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.PetNames])) return;
             await ApplyPetNames().ConfigureAwait(false);
         });
-        // Mass revert when modes are switched to spesific values.
-        Mediator.Subscribe<ConnectionKindChanged>(this, async _ =>
-        {
-            // We dont care if previous state was FullPause.
-            if (_.PrevState is ConnectionKind.FullPause) return;
-
-            // If we switched to StreamerMode, and we are rendered, revert alterations.
-            if (_.PrevState is not ConnectionKind.FullPause && _.NewState is ConnectionKind.StreamerMode && IsRendered)
-            {
-                Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) switching to reverting alterations after entering StreamerMode", LoggerType.PairHandler);
-                await RevertAlterations().ConfigureAwait(false);
-            }
-            // Otherwise if the previous state was Streamer Mode and the new state was not FullPause, Reapply the alterations if rendered.
-            else if (_.PrevState is ConnectionKind.StreamerMode && _.NewState is not ConnectionKind.FullPause && IsRendered)
-            {
-                Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) reapplying Alterations after switching off StreamerMode.", LoggerType.PairHandler);
-                await ReInitializeInternal().ConfigureAwait(false);
-            }
-        });
 
         Mediator.Subscribe<WatchedObjectCreated>(this, msg => MarkVisibleForAddress(msg.Address));
         Mediator.Subscribe<WatchedObjectDestroyed>(this, msg => UnrenderPlayer(msg.Address));
@@ -118,9 +102,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
     // Public Accessors.
     public Character DataState { get { unsafe { return *_player; } } }
     public unsafe IntPtr Address => (nint)_player;
-    public unsafe ulong EntityId => _player->EntityId;
-    public unsafe ulong GameObjectId => _player->GetGameObjectId().ObjectId;
-    public unsafe ushort ObjIndex => _player->ObjectIndex;
+    public unsafe ushort ObjIndex => IsRendered ? _player->ObjectIndex : ushort.MaxValue;
+    public unsafe ulong EntityId => IsRendered ? _player->EntityId : 0;
+    public unsafe ulong GameObjectId => IsRendered ? _player->GetGameObjectId().ObjectId : ulong.MaxValue;
     public unsafe IntPtr DrawObjAddress => (nint)_player->DrawObject;
     public unsafe ulong RenderFlags => (ulong)_player->RenderFlags;
     public unsafe bool HasModelInSlotLoaded => ((CharacterBase*)_player->DrawObject)->HasModelInSlotLoaded != 0;
@@ -205,7 +189,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
             await WaitUntilValidDrawObject().ConfigureAwait(false);
 
             Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
-            OnReapplyRequested?.Invoke(this, OwnedObject.Player);
+            await ReapplyAlterationsInternal().ConfigureAwait(false);
         }
         finally
         {
@@ -405,26 +389,32 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
         _dataLock.Release();
     }
 
-    // Don't entirely need to await this, but its an option we want it i guess.
-    public async Task<Redraw> UpdateAndApplyAlterations(NewModUpdates modChanges, IpcDataPlayerUpdate ipcChanges, bool isInitialData)
+    // Ok to wrap this for pending redraws as we only ever call it from the sundesmo.
+    public async Task UpdateAndApplyAlterations(NewModUpdates modChanges, IpcDataPlayerUpdate ipcChanges, bool isInitialData)
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            // If initial data, clear replacements and appearance data.
-            if (isInitialData)
+            // Encapsulate this in a pending redraw as we will do so after this is completed.
+            await _redrawer.RunOnPendingRedrawSlim(this, async () =>
             {
-                _moddedFiles.Clear();
-                _swappedFiles.Clear();
-                _appearanceData = null;
-            }
+                // Wrap this call as a pending redraw
+                // If initial data, clear replacements and appearance data.
+                if (isInitialData)
+                {
+                    // TODO: Determine reapply state via identifiers
+                    _moddedFiles.Clear();
+                    _swappedFiles.Clear();
+                    _appearanceData = null;
+                }
 
-            // Update Data.
-            var visualDiff = UpdateDataIpc(ipcChanges);
-            var modDiff = UpdateDataMods(modChanges);
+                // Update Data.
+                var visualDiff = UpdateDataIpc(ipcChanges);
+                var modDiff = UpdateDataMods(modChanges);
 
-            // Apply Changes if necessary.
-            return await ApplyAlterations(visualDiff, modDiff).ConfigureAwait(false);
+                // Apply Changes if necessary.
+                return await ApplyAlterations(visualDiff, modDiff).ConfigureAwait(false);
+            });
         }
         finally
         {
@@ -432,25 +422,32 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
         }
     }
 
-    public async Task<Redraw> UpdateAndApplyMods(NewModUpdates modChanges, string manipString)
+    // Ok to wrap this for pending redraws as we only ever call it from the sundesmo.
+    public async Task UpdateAndApplyMods(NewModUpdates modChanges, string manipString)
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var redraw = Redraw.None;
-            // Update the manipString, and apply if changes occurred.
-            if (!string.IsNullOrEmpty(manipString))
+            // Encapsulate this in a pending redraw as we will do so after this is completed.
+            await _redrawer.RunOnPendingRedrawSlim(this, async () =>
             {
-                // Update the Manips, if they change mark us for a redraw.
-                if (UpdateDataIpc(IpcKind.ModManips, manipString))
-                    redraw |= await ApplyVisualsSingle(IpcKind.ModManips).ConfigureAwait(false);
-            }
+                var redrawType = RedrawKind.None;
 
-            // Update the mod data, and apply if changes occurred.
-            if (UpdateDataMods(modChanges))
-                redraw |= await ApplyMods().ConfigureAwait(false);
+                // Update the manipString, and apply if changes occurred.
+                if (!string.IsNullOrEmpty(manipString))
+                {
+                    // Update the Manips, if they change mark us for a redraw.
+                    if (UpdateDataIpc(IpcKind.ModManips, manipString))
+                        redrawType |= await ApplyVisualsSingle(IpcKind.ModManips).ConfigureAwait(false);
+                }
 
-            return redraw;
+                // Update the mod data, and apply if changes occurred.
+                if (UpdateDataMods(modChanges))
+                    redrawType |= await ApplyMods().ConfigureAwait(false);
+
+                // Return the final redraw type.
+                return redrawType;
+            });
         }
         finally
         {
@@ -458,18 +455,20 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
         }
     }
 
-    public async Task<Redraw> UpdateAndApplyIpc(IpcDataPlayerUpdate ipcChanges)
+    // Ok to wrap this for pending redraws as we only ever call it from the sundesmo.\
+    public async Task UpdateAndApplyIpc(IpcDataPlayerUpdate ipcChanges)
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var visualDiff = UpdateDataIpc(ipcChanges);
-            if (UpdateDataIpc(ipcChanges) is { } diff && diff is not IpcKind.None)
+            // Encapsulate this in a pending redraw as we will do so after this is completed.
+            await _redrawer.RunOnPendingRedrawSlim(this, async () =>
             {
-                // Apply changes
-                return await ApplyVisuals(visualDiff).ConfigureAwait(false);
-            }
-            return Redraw.None;
+                if (UpdateDataIpc(ipcChanges) is { } diff && diff is not IpcKind.None)
+                    return await ApplyVisuals(diff).ConfigureAwait(false);
+                // Otherwise return none.
+                return RedrawKind.None;
+            });
         }
         finally
         {
@@ -477,16 +476,21 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
         }
     }
 
-    public async Task<Redraw> UpdateAndApplyIpc(IpcKind kind, string newData)
+    // Ok to wrap this for pending redraws as we only ever call it from the sundesmo.
+    public async Task UpdateAndApplyIpc(IpcKind kind, string newData)
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (UpdateDataIpc(kind, newData))
+            // Encapsulate this in a pending redraw as we will do so after this is completed.
+            await _redrawer.RunOnPendingRedrawSlim(this, async () =>
             {
-                return await ApplyVisualsSingle(kind).ConfigureAwait(false);
-            }
-            return Redraw.None;
+                // If the updated IPC was changed, we should apply it.
+                if (UpdateDataIpc(kind, newData))
+                    return await ApplyVisualsSingle(kind).ConfigureAwait(false);
+                // Otherwise return none.
+                return RedrawKind.None;
+            });
         }
         finally
         {
@@ -494,12 +498,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
         }
     }
 
-    public async Task<Redraw> ReapplyAlterations()
+    public async Task ReapplyAlterations()
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            return await ReapplyAlterationsInternal();
+            await ReapplyAlterationsInternal();
         }
         finally
         {
@@ -507,23 +511,19 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
         }
     }
 
-    private async Task<Redraw> ReapplyAlterationsInternal()
+    private async Task ReapplyAlterationsInternal()
     {
-        // Apply changes, then redraw if necessary.
-        var redraw = Redraw.None;
-        redraw |= await ReapplyVisuals().ConfigureAwait(false);
-        redraw |= await ApplyMods().ConfigureAwait(false);
-        return redraw;
+        await _redrawer.RunOnPendingRedrawSlim(this, async () =>
+        {
+            var redrawType = RedrawKind.None;
+            redrawType |= await ReapplyVisuals().ConfigureAwait(false);
+            redrawType |= await ApplyMods().ConfigureAwait(false);
+            return redrawType;
+        });
     }
     #endregion Altaration Control
 
     #region Alteration Updates
-    private void UpdateDataFull(NewModUpdates modData, IpcDataPlayerUpdate ipcData, out IpcKind visualDiff, out bool modDiff)
-    {
-        visualDiff = UpdateDataIpc(ipcData);
-        modDiff = UpdateDataMods(modData);
-    }
-
     private bool UpdateDataMods(NewModUpdates modData)
     {
         // Remove all keys to remove.
@@ -576,41 +576,42 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
     #endregion Alteration Updates
 
     #region Alteration Application
-    private async Task<Redraw> ApplyAlterations(IpcKind visualChanges, bool modsChanged)
+    // Maybe move up to the update and apply since nothing else uses it but idk.
+    private async Task<RedrawKind> ApplyAlterations(IpcKind visualChanges, bool modsChanged)
     {
         // May want to revise how this redraw occurs.
-        var refresh = Redraw.None;
+        var redrawType = RedrawKind.None;
         if (visualChanges is not IpcKind.None)
-            refresh |= await ApplyVisuals(visualChanges).ConfigureAwait(false);
+            redrawType |= await ApplyVisuals(visualChanges).ConfigureAwait(false);
         if (modsChanged)
-            refresh |= await ApplyMods().ConfigureAwait(false);
+            redrawType |= await ApplyMods().ConfigureAwait(false);
 
-        Logger.LogInformation($"[{Sundesmo.GetNickAliasOrUid()}] had their alterations applied. (Visual Changes: {visualChanges}, Mod Changes: {modsChanged})", LoggerType.PairHandler);
-        return refresh;
+        Logger.LogInformation($"{NameString}({Sundesmo.GetNickAliasOrUid()}) applied alterations. (Visual: {visualChanges}, Mods: {modsChanged})", LoggerType.PairHandler);
+        return redrawType;
     }
 
     // True if data was applied, false otherwise. (useful for redraw)
     // (TODO: Extend this to detect when a reapply or redraw should be done)
-    private async Task<Redraw> ApplyMods()
+    private async Task<RedrawKind> ApplyMods()
     {
         if (_config.ConnectionKind is ConnectionKind.StreamerMode)
-            return Redraw.None;
+            return RedrawKind.None;
 
         // Sanity checks.
         if (!IsRendered)
         {
             Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) is not rendered, skipping ApplyMods()", LoggerType.PairMods);
-            return Redraw.None;
+            return RedrawKind.None;
         }
         if (_tempCollection == Guid.Empty)
         {
             Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) has no Temp. Collection, skipping ApplyMods()", LoggerType.PairMods);
-            return Redraw.None;
+            return RedrawKind.None;
         }
         if (!_hasReplacements)
         {
             Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) has no replacements, skipping ApplyMods()", LoggerType.PairMods);
-            return Redraw.None;
+            return RedrawKind.None;
         }
 
         // Wait for the mods to finish downloading (this can be interrupted by new mod data)
@@ -631,13 +632,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
 
         // Sanity Check.
         if (_runtimeCTS.Token.IsCancellationRequested)
-            return Redraw.None;
+            return RedrawKind.None;
 
         Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()}) with [{moddedPaths.Count}] modded paths.", LoggerType.PairMods);
         await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
         await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);
         
-        return moddedPaths.Count > 0 ? Redraw.Full : Redraw.None;
+        return moddedPaths.Count > 0 ? RedrawKind.Full : RedrawKind.None;
     }
 
     /// <summary>
@@ -723,16 +724,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
     }
 
     // True if data was applied, false otherwise. (useful for redraw)
-    private async Task<Redraw> ApplyVisuals(IpcKind changes)
+    private async Task<RedrawKind> ApplyVisuals(IpcKind changes)
     {
-        if (_blockVisualApplication)
-            return Redraw.None;
+        if (BlockVisualApplication)
+            return RedrawKind.None;
 
         // Await for final render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
         // Sanity Check.
         if (_runtimeCTS.Token.IsCancellationRequested)
-            return Redraw.None;
+            return RedrawKind.None;
 
         Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) Reapplying Visuals", LoggerType.PairHandler);
         var toApply = new List<Task>();
@@ -747,21 +748,21 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
 
         await Task.WhenAll(toApply).ConfigureAwait(false);
         Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) Applied Visuals: {string.Join("|", changes)}", LoggerType.PairHandler);
-        return changes.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips) ? Redraw.Reapply : Redraw.None;
+        return changes.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips) ? RedrawKind.Reapply : RedrawKind.None;
     }
 
     // True if we should redraw, false otherwise.
-    private async Task<Redraw> ApplyVisualsSingle(IpcKind kind)
+    private async Task<RedrawKind> ApplyVisualsSingle(IpcKind kind)
     {
-        if (_blockVisualApplication)
-            return Redraw.None;
+        if (BlockVisualApplication)
+            return RedrawKind.None;
 
         // Await for final render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
 
         // Sanity Check.
         if (_runtimeCTS.Token.IsCancellationRequested)
-            return Redraw.None;
+            return RedrawKind.None;
 
         // Apply change.
         var task = kind switch
@@ -778,13 +779,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
         await task.ConfigureAwait(false);
 
         Logger.LogInformation($"{NameString}({Sundesmo.GetNickAliasOrUid()}) had a IPC change: {kind}", LoggerType.PairHandler);
-        return kind.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips) ? Redraw.Reapply : Redraw.None;
+        return kind.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips) ? RedrawKind.Reapply : RedrawKind.None;
     }
 
-    private async Task<Redraw> ReapplyVisuals()
+    private async Task<RedrawKind> ReapplyVisuals()
     {
-        if (_blockVisualApplication)
-            return Redraw.None;
+        if (BlockVisualApplication)
+            return RedrawKind.None;
 
         await WaitUntilValidDrawObject().ConfigureAwait(false);
         
@@ -801,7 +802,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
         // Run in parallel.
         await Task.WhenAll(toApply).ConfigureAwait(false);
         Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) Reapplied Visuals: {string.Join("|", _appearanceData.Data.Keys)}", LoggerType.PairHandler);
-        return toApply.Count > 0 ? Redraw.Reapply : Redraw.None;
+        return toApply.Count > 0 ? RedrawKind.Reapply : RedrawKind.None;
     }
     #endregion Alteration Application
 
@@ -832,7 +833,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase, IRedrawable
 
     // Reapply the actor if we should.
     // (Append conditions for a redraw over reapply later probably)
-    public void RedrawGameObject(Redraw redraw)
+    public void RedrawGameObject(RedrawKind redraw)
     {
         if (IsRendered)
         {

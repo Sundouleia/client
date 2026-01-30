@@ -4,7 +4,7 @@ namespace Sundouleia.Pairs;
 
 public interface IRedrawable
 {
-	void RedrawGameObject(Redraw redraw);
-	Task<Redraw> ReapplyAlterations();
+	void RedrawGameObject(RedrawKind redraw);
+	Task<RedrawKind> ReapplyAlterations();
 	event Action<IRedrawable, OwnedObject> OnReapplyRequested;
 }

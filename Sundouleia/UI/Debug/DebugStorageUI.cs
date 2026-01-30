@@ -121,8 +121,8 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
                 ImGui.Text(incRequest.TimeToRespond.ToTimeSpanStr());
                 ImGui.TableNextColumn();
                 ImGui.Text(incRequest.Message ?? "N/A");
-                DrawIconBoolColumn(incRequest.SentFromWorld((ushort)PlayerData.CurrentWorldId));
-                DrawIconBoolColumn(incRequest.SentFromCurrentArea((ushort)PlayerData.CurrentWorldId, PlayerContent.TerritoryID));
+                DrawIconBoolColumn(incRequest.SentFromWorld(PlayerData.CurrentWorldId));
+                DrawIconBoolColumn(incRequest.SentFromCurrentArea(PlayerData.CurrentWorldId, PlayerContent.TerritoryID));
             }
         }
 

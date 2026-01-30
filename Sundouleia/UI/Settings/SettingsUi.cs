@@ -148,12 +148,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.EndTabItem();
             }
 
+#if DEBUG
             if (ImGui.BeginTabItem(CkLoc.Settings.TabSmaStorage))
             {
                 // Temporary placeholder
                 _storageShared.DrawSmaStorage();
                 ImGui.EndTabItem();
             }
+#endif
 
             if (ImGui.BeginTabItem(CkLoc.Settings.TabStorage))
             {

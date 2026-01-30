@@ -30,18 +30,12 @@ public class SundesmoHandlerFactory
         _watcher = watcher;
     }
 
-    /// <summary>
-    ///     This create method in the pair handler factory will create a new pair handler object.
-    /// </summary>
-    public PlayerHandler Create(Sundesmo sundesmo)
-        => new(sundesmo, _loggerFactory.CreateLogger<PlayerHandler>(), _mediator, _account, _fileCache, _downloader, _watcher, _ipc);
+    public PlayerHandler Create(Sundesmo sundesmo, RedrawManager redrawer)
+        => new(sundesmo, redrawer, _loggerFactory.CreateLogger<PlayerHandler>(), _mediator, _account, _fileCache, _downloader, _ipc, _watcher);
 
-    /// <summary>
-    ///     This create method in the pair handler factory will create a new owned object handler.
-    /// </summary>
-    public PlayerOwnedHandler Create(OwnedObject type, Sundesmo sundesmo)
-        => new(type, sundesmo, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _account, _ipc, _watcher);
+    public PlayerOwnedHandler Create(OwnedObject type, Sundesmo sundesmo, RedrawManager redrawer)
+        => new(type, sundesmo, redrawer, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _account, _ipc, _watcher);
 
     public RedrawManager CreateRM(Sundesmo sundesmo)
-        => new(_loggerFactory.CreateLogger<RedrawManager>(), sundesmo);
+        => new(sundesmo, _loggerFactory.CreateLogger<RedrawManager>(), _ipc);
 }

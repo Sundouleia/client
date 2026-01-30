@@ -1,4 +1,5 @@
 using Sundouleia;
+using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Enums;
 using Sundouleia.Services.Mediator;
@@ -15,19 +16,12 @@ using Sundouleia.Services.Mediator;
 ///    When EndUpdate is called and there are no other updates being processed, any pending redraws
 ///    are executed for the owned objects that requested them.
 /// </summary>
-public class RedrawManager(ILogger<RedrawManager> logger, Sundesmo sundesmo) : IDisposable
+public class RedrawManager(Sundesmo sundesmo, ILogger<RedrawManager> logger, IpcManager ipc) : IDisposable
 {
-    private readonly SemaphoreSlim _semaphore = new(1, 1);
-
     /// <summary>
-    ///    Tracks pending redraw requests for each owned object, which will be processed once all updates are complete.
+    ///     Ensures only one PlayerHandler operation is occuring at a time.
     /// </summary>
-    private readonly Dictionary<OwnedObject, Redraw> _pendingRedraws = new(){
-        { OwnedObject.Player,         Redraw.None },
-        { OwnedObject.MinionOrMount,  Redraw.None },
-        { OwnedObject.Pet,            Redraw.None },
-        { OwnedObject.Companion,      Redraw.None },
-    };
+    private readonly SemaphoreSlim _playerUpdateSlim = new(1, 1);
 
     /// <summary>
     ///    Tracks the number of ongoing update processes. Redraws are deferred until this count reaches zero.
@@ -35,40 +29,118 @@ public class RedrawManager(ILogger<RedrawManager> logger, Sundesmo sundesmo) : I
     private int _updatesProcessing = 0;
 
     /// <summary>
-    ///    Begins an update process, preventing redraws until all updates are complete.
+    ///     RedrawType assigned as a result of the ApplyWithRedraw call using the PlayerHandler. <para />
+    ///     This is kept so we can culminate redraws at the end of the update process.
+    /// </summary>
+    private RedrawKind _playerPendingType = RedrawKind.None;
+
+    /// <summary>
+    ///     Redraws enqueued by the Sundesmo's OwnedObjects while _updatesProcessing > 0 (Which incs from UpdateSlims).
+    /// </summary>
+    private readonly ConcurrentDictionary<PlayerOwnedHandler, RedrawKind> _pendingRedraws = new();
+
+    public void Dispose()
+    {
+        _playerUpdateSlim.Dispose();
+        _pendingRedraws.Clear();
+    }
+
+    /// <summary>
+    ///     Trigger a manual begin, that must complete with an end. Perform this if an extra outer scope is needed.
     /// </summary>
     public void BeginUpdate()
     {
-        logger.LogDebug($"Beginning update for {sundesmo.GetNickAliasOrUid()}.", LoggerType.PairManagement);
         Interlocked.Increment(ref _updatesProcessing);
+        logger.LogDebug($"[ManualBeginUpdate] {sundesmo.GetNickAliasOrUid()} (Processing {_updatesProcessing} Updates)", LoggerType.PairManagement);
     }
 
     /// <summary>
     ///    Applies updates and records any required redraws to be processed at the end of the update cycle.
     /// </summary>
-    public async Task ApplyWithPendingRedraw(OwnedObject ownedObject, Func<Task<Redraw>> applyUpdates)
+    public async Task RunOnPendingRedrawSlim(PlayerHandler player, Func<Task<RedrawKind>> funcWithPendingRedraw)
     {
-        logger.LogDebug($"Applying updates for {sundesmo.GetNickAliasOrUid()}'s {ownedObject}.", LoggerType.PairManagement);
+        // Begin by incrementing the interlocked processing count, to refer excessive redraws.
+        Interlocked.Increment(ref _updatesProcessing);
+        logger.LogDebug($"[BeginUpdate] {player.NameString}({sundesmo.GetNickAliasOrUid()}) (Now Processing {_updatesProcessing} Updates)", LoggerType.PairManagement);
         try
         {
-            await _semaphore.WaitAsync();
-            _pendingRedraws[ownedObject] |= await applyUpdates();
+            // Now we need to await for the slim to become free, then await for the func callback.
+            await _playerUpdateSlim.WaitAsync();
+            logger.LogDebug($"[RunOnSlim] {player.NameString}({sundesmo.GetNickAliasOrUid()})", LoggerType.PairManagement);
+
+            var ret = await funcWithPendingRedraw();
+            // Ensure the greater value is prioritized.
+            _playerPendingType = ret > _playerPendingType ? ret : _playerPendingType;
         }
         finally
         {
-            _semaphore.Release();
+            // Ends an update process. If no other updates are being processed, triggers processing of any pending redraws.
+            if (Interlocked.Decrement(ref _updatesProcessing) == 0)
+            {
+                logger.LogDebug($"[EndUpdate] {player.NameString}({sundesmo.GetNickAliasOrUid()}) Hit 0, processing pending redraws.", LoggerType.PairManagement);
+                ProcessPendingRedraws();
+            }
+            else
+            {
+                logger.LogDebug($"[EndUpdate] {player.NameString}({sundesmo.GetNickAliasOrUid()}) (Still has {_updatesProcessing} updates, deferring redraws)", LoggerType.PairManagement);
+            }
+            // Release the slim now that we are finished.
+            _playerUpdateSlim.Release();
         }
     }
 
     /// <summary>
-    ///    Ends an update process. If no other updates are being processed, triggers processing of any pending redraws.
+    ///    Decrements the interlocked update process count. Should only be used after a begin, and in a try-finally <para />
+    ///    If no other updates are being processed, triggers processing of any pending redraws.
     /// </summary>
     public void EndUpdate()
     {
-        logger.LogDebug($"Ending update for {sundesmo.GetNickAliasOrUid()}.", LoggerType.PairManagement);
         if (Interlocked.Decrement(ref _updatesProcessing) == 0)
         {
+            logger.LogDebug($"[ManualEndUpdate] {sundesmo.GetNickAliasOrUid()}, Nothing more to process, performing pending redraws.", LoggerType.PairManagement);
             ProcessPendingRedraws();
+        }
+        else
+        {
+            logger.LogDebug($"[ManualEndUpdate] {sundesmo.GetNickAliasOrUid()} (Still has {_updatesProcessing} updates, deferring redraws)", LoggerType.PairManagement);
+        }
+    }
+
+    public void RedrawOwnedObject(PlayerOwnedHandler ownedObj, RedrawKind type)
+    {
+        // Ignore if no redraw kind is needed or the object is not rendered.
+        if (type is RedrawKind.None || !ownedObj.IsRendered)
+            return;
+
+        // If updates are running, defer and escalate
+        if (Volatile.Read(ref _updatesProcessing) > 0)
+        {
+            _pendingRedraws.AddOrUpdate(ownedObj, type, (_, current) => type > current ? type : current);
+            return;
+        }
+
+        // Otherwise redraw immediately
+        RedrawOwnedInternal(ownedObj, type);
+    }
+
+    private void RedrawOwnedInternal(PlayerOwnedHandler ownedObj, RedrawKind type)
+    {
+        if (!ownedObj.IsRendered) return;
+        RedrawInternal(ownedObj.ObjIndex, type);
+    }
+
+    // Could be task idk.
+    private void RedrawInternal(ushort objIdx, RedrawKind type)
+    {
+        if (type.HasAny(RedrawKind.Full))
+        {
+            ipc.Penumbra.RedrawGameObject(objIdx);
+            return;
+        }
+        if (type.HasAny(RedrawKind.Reapply))
+        {
+            ipc.Glamourer.ReapplyActor(objIdx);
+            return;
         }
     }
 
@@ -77,28 +149,24 @@ public class RedrawManager(ILogger<RedrawManager> logger, Sundesmo sundesmo) : I
     /// </summary>
     private void ProcessPendingRedraws()
     {
-        try
+        // If there is a redraw pending for the player, handle it.
+        if (sundesmo.IsRendered && _playerPendingType is not RedrawKind.None)
         {
-            _semaphore.Wait();
-
-            foreach (var (obj, pendingRedraw) in _pendingRedraws.ToList())
-            {
-                if (pendingRedraw != Redraw.None)
-                {
-                    logger.LogDebug($"Processing pending redraw for {sundesmo.GetNickAliasOrUid()}'s {obj}: {pendingRedraw}", LoggerType.PairManagement);
-                    sundesmo.GetOwnedHandler(obj)?.RedrawGameObject(pendingRedraw);
-                    _pendingRedraws[obj] = Redraw.None;
-                }
-            }
+            var redrawType = _playerPendingType;
+            _playerPendingType = RedrawKind.None;
+            RedrawInternal(sundesmo.ObjIndex, redrawType);
         }
-        finally
+
+        // Then handle all pending for the owned objects.
+        foreach (var (ownedObj, redrawType) in _pendingRedraws)
         {
-            _semaphore.Release();
+            if (redrawType is RedrawKind.None)
+                continue;
+
+            _pendingRedraws.TryRemove(ownedObj, out _);
+
+            if (ownedObj.IsRendered)
+                RedrawOwnedInternal(ownedObj, redrawType);
         }
     }
-
-	public void Dispose()
-	{
-		_semaphore.Dispose();
-	}
 }

@@ -124,24 +124,6 @@ public static class SundouleiaEx
     public static T DeepClone<T>(this T obj)
         => System.Text.Json.JsonSerializer.Deserialize<T>(System.Text.Json.JsonSerializer.Serialize(obj))!;
 
-    /// <summary> Linearly interpolates between two values based on a factor t. </summary>
-    /// <remarks> Think, “What number is 35% between 56 and 132?" </remarks>
-    /// <param name="a"> lower bound value </param>
-    /// <param name="b"> upper bound value </param>
-    /// <param name="t"> should be in the range [a, b] </param>
-    /// <returns> the interpolated value between a and b </returns>
-    public static float Lerp(float a, float b, float t) 
-        => a + (b - a) * t;
-
-    public static float EaseInExpo(float t) 
-        => t <= 0f ? 0f : MathF.Pow(2f, 10f * (t - 1f));
-
-    public static float EaseOutExpo(float t)
-        => t >= 1f ? 1f : 1f - MathF.Pow(2f, -10f * t);
-
-    public static float EaseInOutSine(float t)
-        => (1f - MathF.Cos(t * MathF.PI)) * 0.5f;
-
     public static Vector4 UidColor()
     {
         return MainHub.ServerStatus switch
