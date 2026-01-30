@@ -7,6 +7,7 @@ using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Services;
 
@@ -71,14 +72,23 @@ public class RadarDistributor : DisposableMediatorSubscriberBase
     }
 
     private async void OnTerritoryChanged(ushort prevTerritory, ushort newTerritory)
-    {       
+    {
         // If we do not want to send radar updates, then dont.
         if (!_config.Current.RadarEnabled)
             return;
 
-        Logger.LogInformation($"Territory changed from {prevTerritory} to {newTerritory}", LoggerType.RadarData);      
-        // Leave the current radar zone, notifying all users of the disconnect.
-        await _hub.RadarZoneLeave().ConfigureAwait(false);
+        try
+        {
+            Logger.LogInformation($"Territory changed from {prevTerritory} to {newTerritory}", LoggerType.RadarData);
+            // Leave the current radar zone, notifying all users of the disconnect.
+            await _hub.RadarZoneLeave().ConfigureAwait(false);
+        }
+        catch (Bagagwa ex)
+        {
+            // but why crash for a network error? just move on...?
+            Logger.LogWarning($"RadarZoneLeave failed: {ex}");
+        }
+
         // Clear all current radar users from the manager.
         _manager.ClearUsers();
         // await for us to finish loading (not entirely necessary but nice to have)
