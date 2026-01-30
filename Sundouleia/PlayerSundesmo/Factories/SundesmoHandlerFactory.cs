@@ -41,4 +41,7 @@ public class SundesmoHandlerFactory
     /// </summary>
     public PlayerOwnedHandler Create(OwnedObject type, Sundesmo sundesmo)
         => new(type, sundesmo, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _account, _ipc, _watcher);
+
+    public RedrawManager CreateRM(Sundesmo sundesmo)
+        => new(_loggerFactory.CreateLogger<RedrawManager>(), _mediator, sundesmo);
 }

@@ -18,3 +18,7 @@ bash.exe.*
 
 # Ignore GitExtensions Config
 /GitExtensions.settings
+
+# Ignore Rider IDE files
+.idea/
+*.DotSettings.user
