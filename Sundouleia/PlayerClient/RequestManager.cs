@@ -56,6 +56,11 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
         _allRequests.Add(entry);
         // Only do this for new requests.
         Mediator.Publish(new NewRequestAdded(entry));
+
+        // If we have it set to play sounds, play them.
+        if (_config.Current.RequestNotifiers.HasAny(RequestAlertKind.Audio))
+            _config.StartSound();
+        
         RecreateLazy();
     }
 

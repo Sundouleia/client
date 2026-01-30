@@ -116,11 +116,14 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
                     ImGui.GetColorU32(ImGuiCol.Separator), 2f);
             }
 
-            if (tab.TargetTab is SelectedTab.Requests && _requests.Incoming.Count > 0)
+            if (tab.TargetTab is SelectedTab.Requests && _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Bubble))
             {
-                var newMsgTxtPos = new Vector2(x.X + buttonSize.X * .65f, x.Y - spacing.Y);
-                var newMsgTxt = _requests.Incoming.Count > 99 ? "99+" : _requests.Incoming.Count.ToString();
-                drawList.OutlinedFont(newMsgTxt, newMsgTxtPos, ImGuiColors.TankBlue.ToUint(), 0xFF000000, 1);
+                if (_requests.Incoming.Count > 0)
+                {
+                    var newMsgTxtPos = new Vector2(x.X + buttonSize.X * .65f, x.Y - spacing.Y);
+                    var newMsgTxt = _requests.Incoming.Count > 99 ? "99+" : _requests.Incoming.Count.ToString();
+                    drawList.OutlinedFont(newMsgTxt, newMsgTxtPos, ImGuiColors.TankBlue.ToUint(), 0xFF000000, 1);
+                }
             }
             // For Radar Chat.
             else if (tab.TargetTab is SelectedTab.RadarChat && _config.Current.RadarShowUnreadBubble)

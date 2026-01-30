@@ -646,6 +646,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (ImGui.IsItemDeactivatedAfterEdit())
         {
             _config.UpdateAudio();
+            _config.Save();
         }
         CkGui.AttachToolTip(soundInvalid ? "--COL--Sound Path Invalid!--COL--" : "The filepath to the custom audio file.", ImGuiColors.DalamudRed);
     }
