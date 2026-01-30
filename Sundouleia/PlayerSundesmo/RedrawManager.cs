@@ -5,11 +5,23 @@ using Sundouleia.Services.Mediator;
 
 /// <summary>
 ///    Manages redraw operations for a Sundesmo player, specifically ensuring redraws only happen while
-///    no updates are being processed for the player or their owned objects.
+///    no updates are being processed for the player or their owned objects.<para/>
+///    The general call pattern is:
+///    <list type="number">
+///        <item>BeginUpdate()</item>
+///        <item>ApplyWithPendingRedraw(...) - multiple times as needed</item>
+///        <item>EndUpdate()</item>
+///    </list>
+///    When EndUpdate is called and there are no other updates being processed, any pending redraws
+///    are executed for the owned objects that requested them.
 /// </summary>
 public class RedrawManager(ILogger<RedrawManager> logger, Sundesmo sundesmo) : IDisposable
 {
     private readonly SemaphoreSlim _semaphore = new(1, 1);
+
+    /// <summary>
+    ///    Tracks pending redraw requests for each owned object, which will be processed once all updates are complete.
+    /// </summary>
     private readonly Dictionary<OwnedObject, Redraw> _pendingRedraws = new(){
         { OwnedObject.Player,         Redraw.None },
         { OwnedObject.MinionOrMount,  Redraw.None },
@@ -17,15 +29,24 @@ public class RedrawManager(ILogger<RedrawManager> logger, Sundesmo sundesmo) : I
         { OwnedObject.Companion,      Redraw.None },
     };
 
+    /// <summary>
+    ///    Tracks the number of ongoing update processes. Redraws are deferred until this count reaches zero.
+    /// </summary>
     private int _updatesProcessing = 0;
 
-	public void BeginUpdate()
+    /// <summary>
+    ///    Begins an update process, preventing redraws until all updates are complete.
+    /// </summary>
+    public void BeginUpdate()
     {
         logger.LogDebug($"Beginning update for {sundesmo.GetNickAliasOrUid()}.", LoggerType.PairManagement);
         Interlocked.Increment(ref _updatesProcessing);
     }
 
-    public async Task ApplyAndRedraw(OwnedObject ownedObject, Func<Task<Redraw>> applyUpdates)
+    /// <summary>
+    ///    Applies updates and records any required redraws to be processed at the end of the update cycle.
+    /// </summary>
+    public async Task ApplyWithPendingRedraw(OwnedObject ownedObject, Func<Task<Redraw>> applyUpdates)
     {
         logger.LogDebug($"Applying updates for {sundesmo.GetNickAliasOrUid()}'s {ownedObject}.", LoggerType.PairManagement);
         try
@@ -39,6 +60,9 @@ public class RedrawManager(ILogger<RedrawManager> logger, Sundesmo sundesmo) : I
         }
     }
 
+    /// <summary>
+    ///    Ends an update process. If no other updates are being processed, triggers processing of any pending redraws.
+    /// </summary>
     public void EndUpdate()
     {
         logger.LogDebug($"Ending update for {sundesmo.GetNickAliasOrUid()}.", LoggerType.PairManagement);
@@ -48,7 +72,10 @@ public class RedrawManager(ILogger<RedrawManager> logger, Sundesmo sundesmo) : I
         }
     }
 
-    public void ProcessPendingRedraws()
+    /// <summary>
+    ///    Redraws any owned objects that have pending redraw requests, passing the appropriate redraw flags to each object.
+    /// </summary>
+    private void ProcessPendingRedraws()
     {
         try
         {

@@ -143,16 +143,16 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         {
             _redrawManager.BeginUpdate();
             if (newIpc.PlayerChanges != null)
-                await _redrawManager.ApplyAndRedraw(OwnedObject.Player, () => _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges, isInitialData));
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyAlterations(newModData, newIpc.PlayerChanges, isInitialData));
 
             if (newIpc.MinionMountChanges != null)
-                await _redrawManager.ApplyAndRedraw(OwnedObject.MinionOrMount, () => _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, isInitialData));
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, isInitialData));
 
             if (newIpc.PetChanges != null)
-                await _redrawManager.ApplyAndRedraw(OwnedObject.Pet, () => _pet.UpdateAndApplyIpc(newIpc.PetChanges, isInitialData));
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.UpdateAndApplyIpc(newIpc.PetChanges, isInitialData));
 
             if (newIpc.CompanionChanges != null)
-                await _redrawManager.ApplyAndRedraw(OwnedObject.Companion, () => _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, isInitialData));
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, isInitialData));
         }
         finally
         {
@@ -165,7 +165,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         try
         {
             _redrawManager.BeginUpdate();
-            await _redrawManager.ApplyAndRedraw(OwnedObject.Player, () => _player.UpdateAndApplyMods(newModData, manipString));
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyMods(newModData, manipString));
         }
         finally
         {
@@ -179,16 +179,16 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         {
             _redrawManager.BeginUpdate();
             if (newIpc.PlayerChanges != null)
-                await _redrawManager.ApplyAndRedraw(OwnedObject.Player, () => _player.UpdateAndApplyIpc(newIpc.PlayerChanges));
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.UpdateAndApplyIpc(newIpc.PlayerChanges));
 
             if (newIpc.MinionMountChanges != null)
-                await _redrawManager.ApplyAndRedraw(OwnedObject.MinionOrMount, () => _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, false));
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.UpdateAndApplyIpc(newIpc.MinionMountChanges, false));
 
             if (newIpc.PetChanges != null)
-                await _redrawManager.ApplyAndRedraw(OwnedObject.Pet, () => _pet.UpdateAndApplyIpc(newIpc.PetChanges, false));
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.UpdateAndApplyIpc(newIpc.PetChanges, false));
 
             if (newIpc.CompanionChanges != null)
-                await _redrawManager.ApplyAndRedraw(OwnedObject.Companion, () => _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, false));
+                await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.UpdateAndApplyIpc(newIpc.CompanionChanges, false));
         }
         finally
         {
@@ -201,7 +201,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
         try
         {
             _redrawManager.BeginUpdate();
-            await _redrawManager.ApplyAndRedraw(obj, () =>
+            await _redrawManager.ApplyWithPendingRedraw(obj, () =>
             {
                 return (obj switch
                 {
@@ -348,10 +348,10 @@ public sealed class Sundesmo : IComparable<Sundesmo>
     {
         try {
             _redrawManager.BeginUpdate();
-            await _redrawManager.ApplyAndRedraw(OwnedObject.Player, () => _player.ReapplyAlterations()).ConfigureAwait(false);
-            await _redrawManager.ApplyAndRedraw(OwnedObject.MinionOrMount, () => _mountMinion.ReapplyAlterations()).ConfigureAwait(false);
-            await _redrawManager.ApplyAndRedraw(OwnedObject.Pet, () => _pet.ReapplyAlterations()).ConfigureAwait(false);
-            await _redrawManager.ApplyAndRedraw(OwnedObject.Companion, () => _companion.ReapplyAlterations()).ConfigureAwait(false);
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Player, () => _player.ReapplyAlterations()).ConfigureAwait(false);
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.MinionOrMount, () => _mountMinion.ReapplyAlterations()).ConfigureAwait(false);
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Pet, () => _pet.ReapplyAlterations()).ConfigureAwait(false);
+            await _redrawManager.ApplyWithPendingRedraw(OwnedObject.Companion, () => _companion.ReapplyAlterations()).ConfigureAwait(false);
         }
         finally
         {
@@ -395,7 +395,7 @@ public sealed class Sundesmo : IComparable<Sundesmo>
             try
             {
                 _redrawManager.BeginUpdate();
-                await _redrawManager.ApplyAndRedraw(obj, () => handler.ReapplyAlterations());
+                await _redrawManager.ApplyWithPendingRedraw(obj, () => handler.ReapplyAlterations());
             }
             finally
             {
