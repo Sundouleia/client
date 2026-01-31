@@ -44,7 +44,8 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     private readonly IpcManager _ipc;
     private readonly CharaObjectWatcher _watcher; // saves my sanity.
 
-    private string CurrentClientKey = string.Empty;
+    // I very much dislike this but whatever. Until we find a better method I guess.
+    private string CurrentClientKey = "--_0";
 
     // Tracks transients for each of the clients owned objects, to help with processing.
     private ConcurrentDictionary<OwnedObject, HashSet<string>>? _persistentTransients = null;
