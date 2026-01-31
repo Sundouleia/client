@@ -124,6 +124,8 @@ public static class SundouleiaEx
     public static T DeepClone<T>(this T obj)
         => System.Text.Json.JsonSerializer.Deserialize<T>(System.Text.Json.JsonSerializer.Serialize(obj))!;
 
+
+
     public static Vector4 UidColor()
     {
         return MainHub.ServerStatus switch

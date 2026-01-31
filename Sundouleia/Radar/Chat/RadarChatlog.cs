@@ -9,6 +9,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using OtterGui.Text;
+using Penumbra.GameData.Structs;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
 using Sundouleia.Gui.MainWindow;
@@ -21,6 +22,7 @@ using Sundouleia.Services.Tutorial;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Network;
 using System.Globalization;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Radar.Chat;
 public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, IDisposable
@@ -331,18 +333,45 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         using (ImRaii.Disabled(disableBlock))
             if (ImGui.Selectable("Block User") && !isOwnMsg && !isSystemMsg)
             {
-                // probably do extra handling here for updating the blocker list after.
-                // TODO:
                 UiService.SetUITask(async () => await _hub.UserBlock(new(LastInteractedMsg.UserData)));
                 ClosePopupAndResetMsg();
             }
-        CkGui.AttachToolTip(shiftHeld ? $"Blocks {LastInteractedMsg.Name} permanently." : "Must be holding CTRL+SHIFT to select.");
+        CkGui.AttachToolTip(shiftHeld ? $"Blocks {LastInteractedMsg.Name} permanently. (Currently not implemented)" : "Must be holding CTRL+SHIFT to select.");
+
+        // Chat Reporting
+        using (ImRaii.Disabled(disableBlock))
+            if (ImGui.Selectable("Report Chat Behavior") && !isOwnMsg && !isSystemMsg)
+            {
+                Mediator.Publish(new OpenReportUIMessage(LastInteractedMsg.UserData, ReportKind.Chat));
+                ClosePopupAndResetMsg();
+            }
+        CkGui.AttachToolTip(shiftHeld ? $"Report {LastInteractedMsg.Name}'s chat behavior." : "Must be holding CTRL+SHIFT to select.");
     }
 
     private void ClosePopupAndResetMsg()
     {
         LastInteractedMsg = null;
         ImGui.CloseCurrentPopup();
+    }
+
+    public string GetRecentChatForReport()
+    {
+        if (_isInside)
+            return string.Empty;
+
+        var toSave = Messages.TakeLast(40).ToList();
+        var logToSave = new SerializableChatLog(LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId, TimeCreated, toSave);
+        try
+        {
+            var json = JsonConvert.SerializeObject(logToSave);
+            var compressed = json.Compress(6);
+            return Convert.ToBase64String(compressed);
+        }
+        catch (Bagagwa ex)
+        {
+            _logger.LogError($"Failed to compress chat log: {ex}");
+            return string.Empty;
+        }
     }
 
     private void SaveChatLog(ushort worldId, ushort zoneId)

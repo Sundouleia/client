@@ -7,11 +7,13 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Pairs;
+using Sundouleia.Radar.Chat;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
+using SundouleiaAPI.Network;
 
 namespace Sundouleia.Gui.Components;
 
@@ -20,19 +22,21 @@ internal class ReportPopupHandler : IPopupHandler
     private readonly MainHub _hub;
     private readonly SundesmoManager _sundesmos;
     private readonly ProfileService _profiles;
+    private readonly RadarChatLog _radarChat;
 
     private UserData _reportedUser = new("BlankUser");
     private string _reportedDisplayName = "User-XXX";
+    private ReportKind _reportType = ReportKind.Profile;
     private string _reportReason = DefaultReportReason;
 
     private const string DefaultReportReason = "Describe your report here...";
 
-    public ReportPopupHandler(MainHub hub, SundesmoManager pairs, ProfileService profiles)
+    public ReportPopupHandler(MainHub hub, SundesmoManager pairs, ProfileService profiles, RadarChatLog radarChat)
     {
         _hub = hub;
         _sundesmos = pairs;
         _profiles = profiles;
-
+        _radarChat = radarChat;
     }
 
     public Vector2 PopupSize => new(800, 450);
@@ -144,7 +148,22 @@ internal class ReportPopupHandler : IPopupHandler
                 {
                     ImGui.CloseCurrentPopup();
                     var reason = _reportReason;
-                    _ = _hub.UserReportProfile(new(_reportedUser, reason));
+                    switch (_reportType)
+                    {
+                        case ReportKind.Profile:
+                            _ = _hub.UserReportProfile(new(_reportedUser, reason));
+                            break;
+                        case ReportKind.Chat:
+                            var compressedData = _radarChat.GetRecentChatForReport();
+                            if (string.IsNullOrEmpty(compressedData))
+                                return;
+                            // Otherwise, create the dto to send.
+                            _ = _hub.UserReportChat(new(_reportedUser, LocationSvc.Current.TerritoryId, LocationSvc.Current.WorldId, compressedData, reason));
+                            break;
+                        default:
+                            // For all other cases, do nothing.
+                            break;
+                    }
                 }
             }
         }
@@ -199,6 +218,7 @@ internal class ReportPopupHandler : IPopupHandler
     public void Open(OpenReportUIMessage msg)
     {
         _reportedUser = msg.UserToReport;
+        _reportType = msg.Kind;
         _reportedDisplayName = _sundesmos.DirectPairs.Any(x => x.UserData.UID == _reportedUser.UID)
             ? _reportedUser.AliasOrUID
             : "User-" + _reportedUser.UID.Substring(_reportedUser.UID.Length - 4);

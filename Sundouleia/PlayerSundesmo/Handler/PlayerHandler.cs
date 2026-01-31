@@ -45,6 +45,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private unsafe Character* _player = null;
     // cached data for appearance.
     private Guid _tempCollection;
+    // Could maybe include a second copy if this for the filtered output, but for now filter them on accept.
     private Dictionary<string, ValidFileHash> _moddedFiles = [];
     private Dictionary<string, FileSwapData>  _swappedFiles = [];
     private Guid _tempProfile; // CPlus temp profile id.
@@ -251,7 +252,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         if (!IsRendered) return false; // Not even rendered, does not exist.
         if (DrawObjAddress == IntPtr.Zero) return false; // Character object does not exist yet.
-        if (RenderFlags == 2048) return false; // Render Flag for "IsLoading" (2048 == 0b100000000000)
+        if (RenderFlags == 2048) return false; // Render Flag "IsLoading" (2048 == 0b100000000000)
         if (HasModelInSlotLoaded) return false; // There are models that need to still be loaded into the DrawObject slots.
         if (HasModelFilesInSlotLoaded) return false; // There are model files that need to still be loaded into the DrawObject slots.
         return true;
@@ -398,22 +399,43 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // Encapsulate this in a pending redraw as we will do so after this is completed.
             await _redrawer.RunOnPendingRedrawSlim(this, async () =>
             {
+                var redrawType = RedrawKind.None;
                 // Wrap this call as a pending redraw
                 // If initial data, clear replacements and appearance data.
                 if (isInitialData)
                 {
-                    // TODO: Determine reapply state via identifiers
+                    // Check if existing modded files require redraw
+                    if (_moddedFiles.Count > 0 || _swappedFiles.Count > 0)
+                    {
+                        var allPaths = _moddedFiles.Values.SelectMany(f => f.GamePaths).Concat(_swappedFiles.Values.SelectMany(f => f.GamePaths)).ToArray();
+                        redrawType = NeedsRedraw(allPaths) ? RedrawKind.Full : RedrawKind.Reapply;
+                    }
+
+                    // Clear the dictionaries
                     _moddedFiles.Clear();
                     _swappedFiles.Clear();
+                    // Check appearance data if present and we still don't need full redraw
+                    if (redrawType < RedrawKind.Full && _appearanceData?.Data.Keys is { } keys)
+                        if (keys.Contains(IpcKind.Glamourer) || keys.Contains(IpcKind.CPlus) || keys.Contains(IpcKind.ModManips))
+                            redrawType |= RedrawKind.Reapply;
+                    // Clear the appearance.
                     _appearanceData = null;
                 }
 
-                // Update Data.
+                // Get the redraw data off the data updates.
                 var visualDiff = UpdateDataIpc(ipcChanges);
                 var modDiff = UpdateDataMods(modChanges);
 
-                // Apply Changes if necessary.
-                return await ApplyAlterations(visualDiff, modDiff).ConfigureAwait(false);
+                // Determine based on updates.
+                if (redrawType < RedrawKind.Full)
+                {
+                    redrawType |= NeedsReapply(visualDiff) ? RedrawKind.Reapply : RedrawKind.None;
+                    redrawType |= modDiff;
+                }
+
+                // Appply them
+                await ApplyAlterations(visualDiff, modDiff is not RedrawKind.None).ConfigureAwait(false);
+                return redrawType;
             });
         }
         finally
@@ -432,18 +454,20 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await _redrawer.RunOnPendingRedrawSlim(this, async () =>
             {
                 var redrawType = RedrawKind.None;
-
                 // Update the manipString, and apply if changes occurred.
                 if (!string.IsNullOrEmpty(manipString))
                 {
                     // Update the Manips, if they change mark us for a redraw.
                     if (UpdateDataIpc(IpcKind.ModManips, manipString))
-                        redrawType |= await ApplyVisualsSingle(IpcKind.ModManips).ConfigureAwait(false);
+                    {
+                        redrawType |= RedrawKind.Reapply;
+                        await ApplyVisualsSingle(IpcKind.ModManips).ConfigureAwait(false);
+                    }
                 }
 
                 // Update the mod data, and apply if changes occurred.
-                if (UpdateDataMods(modChanges))
-                    redrawType |= await ApplyMods().ConfigureAwait(false);
+                redrawType |= UpdateDataMods(modChanges);
+                await ApplyMods().ConfigureAwait(false);
 
                 // Return the final redraw type.
                 return redrawType;
@@ -465,7 +489,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await _redrawer.RunOnPendingRedrawSlim(this, async () =>
             {
                 if (UpdateDataIpc(ipcChanges) is { } diff && diff is not IpcKind.None)
-                    return await ApplyVisuals(diff).ConfigureAwait(false);
+                {
+                    await ApplyVisuals(diff).ConfigureAwait(false);
+                    return NeedsReapply(diff) ? RedrawKind.Reapply : RedrawKind.None;
+                }
                 // Otherwise return none.
                 return RedrawKind.None;
             });
@@ -487,7 +514,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             {
                 // If the updated IPC was changed, we should apply it.
                 if (UpdateDataIpc(kind, newData))
-                    return await ApplyVisualsSingle(kind).ConfigureAwait(false);
+                {
+                    await ApplyVisualsSingle(kind).ConfigureAwait(false);
+                    return NeedsReapply(kind) ? RedrawKind.Reapply : RedrawKind.None;
+                }
                 // Otherwise return none.
                 return RedrawKind.None;
             });
@@ -511,31 +541,68 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
     }
 
+    // Can add a force-redraw if needed.
     private async Task ReapplyAlterationsInternal()
     {
         await _redrawer.RunOnPendingRedrawSlim(this, async () =>
         {
-            var redrawType = RedrawKind.None;
-            redrawType |= await ReapplyVisuals().ConfigureAwait(false);
-            redrawType |= await ApplyMods().ConfigureAwait(false);
-            return redrawType;
+            // Reapply the visuals and the mods.
+            var visualsReapplied = await ReapplyVisuals().ConfigureAwait(false);
+            var affectedPaths = await ApplyMods().ConfigureAwait(false);
+            // The initial redraw type is defined by visuals.
+            return NeedsRedraw(affectedPaths)
+                ? RedrawKind.Full : NeedsReapply(visualsReapplied)
+                    ? RedrawKind.Reapply : RedrawKind.None;
         });
     }
     #endregion Altaration Control
 
     #region Alteration Updates
-    private bool UpdateDataMods(NewModUpdates modData)
+    private RedrawKind UpdateDataMods(NewModUpdates modData)
     {
+        var redrawType = modData.HasAnyChanges ? RedrawKind.Reapply : RedrawKind.None;
         // Remove all keys to remove.
         foreach (var hash in modData.HashesToRemove)
-            _moddedFiles.Remove(hash);
+        {
+            if (!_moddedFiles.Remove(hash, out var fileHash))
+                continue;
+            // Be sure to skip this check once we identify a file that needs a full redraw.
+            if (redrawType is not RedrawKind.Full && NeedsRedraw(fileHash.GamePaths))
+                redrawType = RedrawKind.Full;
+        }
+
         foreach (var swap in modData.SwapsToRemove)
-            _swappedFiles.Remove(swap);
+        {
+            if (!_swappedFiles.Remove(swap, out var swappedFile))
+                continue;
+
+            // Be sure to skip this check once we identify a file that needs a full redraw.
+            if (redrawType is not RedrawKind.Full && NeedsRedraw(swappedFile.GamePaths))
+                redrawType = RedrawKind.Full;
+        }
+
+        // Filter out the replacements and file swaps that we have opted to filter out.
+        modData = RemoveFilteredMods(modData);
+
         // Add / Update all new files and swaps.
         foreach (var file in modData.NewReplacements)
+        {
+            // Could run into an issue where the replaced path already present may require a redraw, but tackle that when the time comes.
             _moddedFiles[file.Hash] = file;
+
+            // Be sure to skip this check once we identify a file that needs a full redraw.
+            if (redrawType is not RedrawKind.Full && NeedsRedraw(file.GamePaths))
+                redrawType = RedrawKind.Full;
+        }
         foreach (var swap in modData.NewSwaps)
+        {
+            // Could run into an issue where the replaced path already present may require a redraw, but tackle that when the time comes.
             _swappedFiles[swap.SwappedPath] = swap;
+
+            // Be sure to skip this check once we identify a file that needs a full redraw.
+            if (redrawType is not RedrawKind.Full && NeedsRedraw(swap.GamePaths))
+                redrawType = RedrawKind.Full;
+        }
 
         Mediator.Publish(new EventMessage(new(NameString, Sundesmo.UserData.UID, DataEventType.ModDataReceive, "Downloading mod data")));
         Logger.LogTrace($"New ModData from {NameString}({Sundesmo.GetNickAliasOrUid()}) " +
@@ -547,7 +614,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!IpcCallerPenumbra.APIAvailable || !_fileCache.CacheFolderIsValid())
         {
             Logger.LogDebug("Either Penumbra IPC or File Cache is not available, cannot process mod data.", LoggerType.PairHandler);
-            return modData.HasAnyChanges;
+            return RedrawKind.None;
         }
         
         // Set the uploading text based on if we have new files to upload or not.
@@ -558,7 +625,80 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // We should take any new mods to add, and enqueue them to the file downloader.
         _downloader.BeginDownloads(this, modData.NewReplacements);
-        return modData.HasAnyChanges;
+        return redrawType;
+    }
+
+    public void ApplyModFiltersToCachedData()
+    {
+        _moddedFiles = _moddedFiles
+            .Where(kvp =>
+            {
+                var f = kvp.Value;
+                if (!Sundesmo.OwnPerms.AllowSounds && f.GamePaths.Any(p => p.EndsWith("scd", StringComparison.OrdinalIgnoreCase)))
+                    return false;
+                if (!Sundesmo.OwnPerms.AllowAnimations && f.GamePaths.Any(p => p.EndsWith("tmb", StringComparison.OrdinalIgnoreCase) || p.EndsWith("pap", StringComparison.OrdinalIgnoreCase)))
+                    return false;
+                if (!Sundesmo.OwnPerms.AllowVfx && f.GamePaths.Any(p => p.EndsWith("atex", StringComparison.OrdinalIgnoreCase) || p.EndsWith("avfx", StringComparison.OrdinalIgnoreCase)))
+                    return false;
+                return true;
+            })
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        _swappedFiles = _swappedFiles
+            .Where(kvp =>
+            {
+                var f = kvp.Value;
+                if (!Sundesmo.OwnPerms.AllowSounds && f.GamePaths.Any(p => p.EndsWith("scd", StringComparison.OrdinalIgnoreCase)))
+                    return false;
+                if (!Sundesmo.OwnPerms.AllowAnimations && f.GamePaths.Any(p => p.EndsWith("tmb", StringComparison.OrdinalIgnoreCase) || p.EndsWith("pap", StringComparison.OrdinalIgnoreCase)))
+                    return false;
+                if (!Sundesmo.OwnPerms.AllowVfx && f.GamePaths.Any(p => p.EndsWith("atex", StringComparison.OrdinalIgnoreCase) || p.EndsWith("avfx", StringComparison.OrdinalIgnoreCase)))
+                    return false;
+                return true;
+            })
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }
+
+    private bool NeedsRedraw(string[] gamePaths)
+        => gamePaths.Any(p => p.Contains("/face/", StringComparison.OrdinalIgnoreCase) || p.Contains("/hair/", StringComparison.OrdinalIgnoreCase) || p.Contains("/tail/", StringComparison.OrdinalIgnoreCase));
+    private bool NeedsReapply(IpcKind kinds)
+        => kinds.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips);
+
+    // Placeholder until we get a better system in place.
+    private NewModUpdates RemoveFilteredMods(NewModUpdates modData)
+    {
+        if (Sundesmo.OwnPerms.AllowVfx && Sundesmo.OwnPerms.AllowSounds && Sundesmo.OwnPerms.AllowAnimations)
+            return modData;
+
+        Logger.LogTrace($"{NameString}({Sundesmo.GetNickAliasOrUid()}) Removing Filtered Mods", LoggerType.PairHandler);
+        modData = modData with
+        {
+            NewReplacements = modData.NewReplacements
+                .Where(f =>
+                {
+                    if (!Sundesmo.OwnPerms.AllowSounds && f.GamePaths.Any(p => p.EndsWith("scd", StringComparison.OrdinalIgnoreCase)))
+                        return false;
+                    if (!Sundesmo.OwnPerms.AllowAnimations && f.GamePaths.Any(p => p.EndsWith("tmb", StringComparison.OrdinalIgnoreCase) || p.EndsWith("pap", StringComparison.OrdinalIgnoreCase)))
+                        return false;
+                    if (!Sundesmo.OwnPerms.AllowVfx && f.GamePaths.Any(p => p.EndsWith("atex", StringComparison.OrdinalIgnoreCase) || p.EndsWith("avfx", StringComparison.OrdinalIgnoreCase)))
+                        return false;
+                    return true;
+                })
+                .ToList(),
+
+            NewSwaps = modData.NewSwaps
+                .Where(f =>
+                {
+                    if (!Sundesmo.OwnPerms.AllowSounds && f.GamePaths.Any(p => p.EndsWith("scd", StringComparison.OrdinalIgnoreCase)))
+                        return false;
+                    if (!Sundesmo.OwnPerms.AllowAnimations && f.GamePaths.Any(p => p.EndsWith("tmb", StringComparison.OrdinalIgnoreCase) || p.EndsWith("pap", StringComparison.OrdinalIgnoreCase)))
+                        return false;
+                    if (!Sundesmo.OwnPerms.AllowVfx && f.GamePaths.Any(p => p.EndsWith("atex", StringComparison.OrdinalIgnoreCase) || p.EndsWith("avfx", StringComparison.OrdinalIgnoreCase)))
+                        return false;
+                    return true;
+                })
+                .ToList()
+        };
+        return modData;
     }
 
     // Returns the changes applied.
@@ -577,41 +717,37 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     #region Alteration Application
     // Maybe move up to the update and apply since nothing else uses it but idk.
-    private async Task<RedrawKind> ApplyAlterations(IpcKind visualChanges, bool modsChanged)
+    private async Task ApplyAlterations(IpcKind visualChanges, bool modsChanged)
     {
         // May want to revise how this redraw occurs.
-        var redrawType = RedrawKind.None;
         if (visualChanges is not IpcKind.None)
-            redrawType |= await ApplyVisuals(visualChanges).ConfigureAwait(false);
+            await ApplyVisuals(visualChanges).ConfigureAwait(false);
         if (modsChanged)
-            redrawType |= await ApplyMods().ConfigureAwait(false);
-
+            await ApplyMods().ConfigureAwait(false);
         Logger.LogInformation($"{NameString}({Sundesmo.GetNickAliasOrUid()}) applied alterations. (Visual: {visualChanges}, Mods: {modsChanged})", LoggerType.PairHandler);
-        return redrawType;
     }
 
-    // True if data was applied, false otherwise. (useful for redraw)
-    // (TODO: Extend this to detect when a reapply or redraw should be done)
-    private async Task<RedrawKind> ApplyMods()
+    // True if data was applied, false otherwise.
+    private async Task<string[]> ApplyMods()
     {
         if (_config.ConnectionKind is ConnectionKind.StreamerMode)
-            return RedrawKind.None;
+            return [];
 
         // Sanity checks.
         if (!IsRendered)
         {
             Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) is not rendered, skipping ApplyMods()", LoggerType.PairMods);
-            return RedrawKind.None;
+            return [];
         }
         if (_tempCollection == Guid.Empty)
         {
             Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) has no Temp. Collection, skipping ApplyMods()", LoggerType.PairMods);
-            return RedrawKind.None;
+            return [];
         }
         if (!_hasReplacements)
         {
             Logger.LogWarning($"{NameString}({Sundesmo.GetNickAliasOrUid()}) has no replacements, skipping ApplyMods()", LoggerType.PairMods);
-            return RedrawKind.None;
+            return [];
         }
 
         // Wait for the mods to finish downloading (this can be interrupted by new mod data)
@@ -632,13 +768,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // Sanity Check.
         if (_runtimeCTS.Token.IsCancellationRequested)
-            return RedrawKind.None;
+            return [];
 
         Logger.LogDebug($"Applying mod data for {NameString}({Sundesmo.GetNickAliasOrUid()}) with [{moddedPaths.Count}] modded paths.", LoggerType.PairMods);
         await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
         await _ipc.Penumbra.ReapplySundesmoMods(_tempCollection, moddedPaths).ConfigureAwait(false);
-        
-        return moddedPaths.Count > 0 ? RedrawKind.Full : RedrawKind.None;
+
+        return moddedPaths.Keys.ToArray();
     }
 
     /// <summary>
@@ -724,16 +860,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     }
 
     // True if data was applied, false otherwise. (useful for redraw)
-    private async Task<RedrawKind> ApplyVisuals(IpcKind changes)
+    private async Task ApplyVisuals(IpcKind changes)
     {
         if (BlockVisualApplication)
-            return RedrawKind.None;
+            return;
 
         // Await for final render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
         // Sanity Check.
         if (_runtimeCTS.Token.IsCancellationRequested)
-            return RedrawKind.None;
+            return;
 
         Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) Reapplying Visuals", LoggerType.PairHandler);
         var toApply = new List<Task>();
@@ -748,21 +884,20 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         await Task.WhenAll(toApply).ConfigureAwait(false);
         Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) Applied Visuals: {string.Join("|", changes)}", LoggerType.PairHandler);
-        return changes.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips) ? RedrawKind.Reapply : RedrawKind.None;
     }
 
-    // True if we should redraw, false otherwise.
-    private async Task<RedrawKind> ApplyVisualsSingle(IpcKind kind)
+    // True if we should redraw, false otherwise. (Should move this to the updater?)
+    private async Task ApplyVisualsSingle(IpcKind kind)
     {
         if (BlockVisualApplication)
-            return RedrawKind.None;
+            return;
 
         // Await for final render.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
 
         // Sanity Check.
         if (_runtimeCTS.Token.IsCancellationRequested)
-            return RedrawKind.None;
+            return;
 
         // Apply change.
         var task = kind switch
@@ -777,15 +912,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             _ => Task.CompletedTask
         };
         await task.ConfigureAwait(false);
-
         Logger.LogInformation($"{NameString}({Sundesmo.GetNickAliasOrUid()}) had a IPC change: {kind}", LoggerType.PairHandler);
-        return kind.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips) ? RedrawKind.Reapply : RedrawKind.None;
     }
 
-    private async Task<RedrawKind> ReapplyVisuals()
+    /// <summary>
+    ///     Returns the IpcKind's reapplied.
+    /// </summary>
+    private async Task<IpcKind> ReapplyVisuals()
     {
         if (BlockVisualApplication)
-            return RedrawKind.None;
+            return IpcKind.None;
 
         await WaitUntilValidDrawObject().ConfigureAwait(false);
         
@@ -802,7 +938,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Run in parallel.
         await Task.WhenAll(toApply).ConfigureAwait(false);
         Logger.LogDebug($"{NameString}({Sundesmo.GetNickAliasOrUid()}) Reapplied Visuals: {string.Join("|", _appearanceData.Data.Keys)}", LoggerType.PairHandler);
-        return toApply.Count > 0 ? RedrawKind.Reapply : RedrawKind.None;
+        return _appearanceData.Data.Keys.Aggregate(IpcKind.None, (current, next) => current | next);
     }
     #endregion Alteration Application
 

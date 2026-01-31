@@ -21,6 +21,8 @@ using SundouleiaAPI.Network;
 using System.Globalization;
 
 namespace Sundouleia.Radar.Chat;
+
+// Aim to phase this out as time goes on and make it more of an instanced chat than a zone spesific one.
 public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, IDisposable
 {
     private static string RecentFile
@@ -309,7 +311,16 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
                 UiService.SetUITask(async () => await _hub.Callback_Blocked(new(LastInteractedMsg.UserData)));
                 ClosePopupAndResetMsg();
             }
-        CkGui.AttachToolTip(shiftHeld ? $"Blocks {LastInteractedMsg.Name} permanently." : "Must be holding CTRL+SHIFT to select.");
+        CkGui.AttachToolTip(shiftHeld ? $"Blocks {LastInteractedMsg.Name} permanently. (Currently not implemented)" : "Must be holding CTRL+SHIFT to select.");
+
+        // Chat Reporting
+        using (ImRaii.Disabled(disableBlock))
+            if (ImGui.Selectable("Report Chat Behavior") && !isOwnMsg && !isSystemMsg)
+            {
+                Mediator.Publish(new OpenReportUIMessage(LastInteractedMsg.UserData, ReportKind.Chat));
+                ClosePopupAndResetMsg();
+            }
+        CkGui.AttachToolTip(shiftHeld ? $"Report {LastInteractedMsg.Name}'s chat behavior." : "Must be holding CTRL+SHIFT to select.");
     }
 
     private void ClosePopupAndResetMsg()
