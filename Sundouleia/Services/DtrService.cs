@@ -1,6 +1,10 @@
 using CkCommons;
 using Dalamud.Game.Gui.Dtr;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Microsoft.Extensions.Hosting;
+using OtterGui.Classes;
+using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
@@ -56,6 +60,8 @@ public sealed class DtrService : DisposableMediatorSubscriberBase, IHostedServic
         Mediator.Subscribe<FolderUpdateRadar>(this, _ => OnRadarUpdated());
         Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => OnSundesmosUpdated());
 
+        Mediator.Subscribe<ConnectedMessage>(this, _ => RefreshEntries());
+
         // Poll a general refresh.
         RefreshEntries();
     }
@@ -72,7 +78,7 @@ public sealed class DtrService : DisposableMediatorSubscriberBase, IHostedServic
         sundesmosEntry = null!;
     }
 
-    private void RefreshEntries()
+    public void RefreshEntries()
     {
         OnRequestsUpdated();
         OnRadarUpdated();
@@ -86,20 +92,84 @@ public sealed class DtrService : DisposableMediatorSubscriberBase, IHostedServic
         if (!_config.Current.RequestNotifiers.HasAny(RequestAlertKind.DtrBar))
             return;
 
-        // Otherwise create the entry for it and show it.
+        if (!MainHub.IsConnectionDataSynced)
+            return;
+
+        if (_requests.Incoming.Count is 0)
+            return;
+
+        requestsEntry.Shown = true;
+        requestsEntry.OnClick = _ => Mediator.Publish(new OpenMainUiTab(MainMenuTabs.SelectedTab.Requests));
+        var tooltip = new SeStringBuilder();
+        var entryTxt = new SeStringBuilder();
+        // Create the entry display.
+        entryTxt.AddIcon(BitmapFontIcon.VentureDeliveryMoogle);
+        entryTxt.AddText($"{_requests.Incoming.Count}");
+        tooltip.AddYellow($"{_requests.Incoming.Count} Incoming Requests\n");
+        foreach (var req in _requests.Incoming)
+        {
+            tooltip.AddIcon(req.IsTemporaryRequest ? BitmapFontIcon.GoldStar : BitmapFontIcon.BlueStar);
+            tooltip.AddText($" {req.SenderAnonName}\n");
+        }
+        requestsEntry.Text = entryTxt.BuiltString;
+        requestsEntry.Tooltip = tooltip.BuiltString;
     }
 
     private void OnRadarUpdated()
     {
-        requestsEntry.Shown = false;
+        radarEntry.Shown = false;
         if (!_config.Current.RadarNearbyDtr)
             return;
+
+        if (!MainHub.IsConnectionDataSynced)
+            return;
+
+        if (_radar.RadarUsers.Count is 0)
+
         // Otherwise create the entry for it and show it.
+        radarEntry.Shown = true;
+        radarEntry.OnClick = _ => Mediator.Publish(new OpenMainUiTab(MainMenuTabs.SelectedTab.Radar));
+        // Compile all possible icons into a single string.
+        var entryTxt = new SeStringBuilder();
+        var tooltip = new SeStringBuilder();
+        entryTxt.AddIcon(BitmapFontIcon.Recording);
+        entryTxt.AddText($"{_radar.RadarUsers.Count}");
+        // Devise the tooltip.
+        var total = _radar.RadarUsers.Count;
+        var totalPaired = _radar.RadarUsers.Count(u => u.IsPaired);
+        var totalLurkers = _radar.RadarUsers.Count(u => !u.IsValid);
+
+        tooltip.AddIcon(BitmapFontIcon.AnyClass);
+        tooltip.AddText($"{total} Radar Users\n");
+        tooltip.AddIcon(BitmapFontIcon.LevelSync);
+        tooltip.AddText($"{totalPaired} Paired Radar Users\n");
+        tooltip.AddIcon(BitmapFontIcon.DoNotDisturb);
+        tooltip.AddText($"{totalLurkers} Lurkers");
+        radarEntry.Text = entryTxt.BuiltString;
+        radarEntry.Tooltip = tooltip.BuiltString;
     }
 
     private void OnSundesmosUpdated()
     {
+        sundesmosEntry.Shown = false;
+        if (!MainHub.IsConnectionDataSynced)
+            return; 
+        
+        var onlinePairs = _sundesmos.GetOnlineSundesmos();
+        if (!_config.Current.EnablePairDtr || onlinePairs.Count is 0)
+            return;
 
+        sundesmosEntry.Shown = true;
+        sundesmosEntry.OnClick = _ => Mediator.Publish(new OpenMainUiTab(MainMenuTabs.SelectedTab.BasicWhitelist));
+        var tooltip = new SeStringBuilder();
+        // Otherwise create the entry for it and show it.
+        var pairCount = onlinePairs.Count;
+        sundesmosEntry.Text = new SeString(new TextPayload($"\uE044 {pairCount}"));
+        
+        var visible = onlinePairs.Count(p => p.IsRendered);
+        tooltip.AddText($"{visible} Visible\n");
+        tooltip.AddText($"{pairCount} Online");
+        sundesmosEntry.Tooltip = tooltip.BuiltString;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)

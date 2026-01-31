@@ -3,11 +3,13 @@ using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using Downloader;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
@@ -28,6 +30,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
     private readonly SidePanelInteractions _spInteractions;
     private readonly SidePanelGroups _spGroups;
     private readonly GroupsDrawSystem _ddsGroups;
+    private readonly RadarManager _radar;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly SidePanelService _service;
@@ -40,7 +43,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         MainHub hub, SundesmoTabs sundesmoTabs, RequestsInDrawer requestsDrawer,
         SidePanelInteractions interactions, SidePanelGroups spGroups, 
         RequestsManager requests, SundesmoManager sundesmos, SidePanelService service, 
-        GroupsDrawSystem groupsDDS)
+        GroupsDrawSystem groupsDDS, RadarManager radar)
         : base(logger, mediator, "##SundouleiaInteractionsUI")
     {
         _hub = hub;
@@ -52,6 +55,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         _spGroups = spGroups;
         _service = service;
         _ddsGroups = groupsDDS;
+        _radar = radar;
 
         GroupSelector = new(logger, groupsDDS);
 
@@ -252,23 +256,28 @@ public class SidePanelUI : WindowMediatorSubscriberBase
             {
                 _logger.LogWarning($"Failed to accept bulk requests: {res.ErrorCode}");
                 if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
+                {
                     _requests.RemoveRequests(requests);
-                return;
+                    _radar.RefreshUsers();
+                }
             }
-
-            // Remove all requests.
-            _requests.RemoveRequests(requests);
-
-            // Process each of the accepted pairs.
-            foreach (var addedPair in res.Value)
+            else
             {
-                // Append them to the sundesmosManager
-                _sundesmos.AddSundesmo(addedPair.Pair);
-                // If online, mark online.
-                if (addedPair.OnlineInfo is { } onlineUser)
-                    _sundesmos.MarkSundesmoOnline(onlineUser);
+                // Remove all requests.
+                _requests.RemoveRequests(requests);
+                _radar.RefreshUsers();
 
-                // TODO: Preset groups can be applied here, along with a desired nick, if we add later.
+                // Process each of the accepted pairs.
+                foreach (var addedPair in res.Value)
+                {
+                    // Append them to the sundesmosManager
+                    _sundesmos.AddSundesmo(addedPair.Pair);
+                    // If online, mark online.
+                    if (addedPair.OnlineInfo is { } onlineUser)
+                        _sundesmos.MarkSundesmoOnline(onlineUser);
+
+                    // TODO: Preset groups can be applied here, along with a desired nick, if we add later.
+                }
             }
         });
     }
@@ -281,7 +290,10 @@ public class SidePanelUI : WindowMediatorSubscriberBase
             // Try to reject all requests. If it fails, do not do anything.
             var res = await _hub.UserRejectRequests(new(requests.Select(x => new UserData(x.SenderUID)).ToList()));
             if (res.ErrorCode is SundouleiaApiEc.Success)
+            {
                 _requests.RemoveRequests(requests);
+                _radar.RefreshUsers();
+            }
             else
                 _logger.LogWarning($"Failed to bulk cancel outgoing requests: {res.ErrorCode}");
         });

@@ -9,10 +9,12 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using Downloader;
 using OtterGui.Text;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
@@ -31,20 +33,18 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
   "--NL----COL--[SHIFT + L-CLICK]--COL-- Select/Deselect all between current & last selected ";
 
     private readonly MainHub _hub;
-    private readonly FolderConfig _config; // Groups and defaults.
     private readonly RequestsManager _manager;
-    private readonly SidePanelService _sidePanel;
+    private readonly RadarManager _radar;
 
     private RequestCache _cache => (RequestCache)FilterCache;
 
-    public RequestsOutDrawer(MainHub hub, FolderConfig folders, RequestsManager manager, 
-        SundesmoManager sundesmos, SidePanelService sidePanel,RequestsDrawSystem ds) 
+    public RequestsOutDrawer(MainHub hub, RequestsManager manager, 
+        RadarManager radar, RequestsDrawSystem ds) 
         : base("##RequestsDrawer", Svc.Logger.Logger, ds, new RequestCache(ds))
     {
         _hub = hub;
-        _config = folders;
         _manager = manager;
-        _sidePanel = sidePanel;
+        _radar = radar;
     }
 
     #region Search
@@ -213,12 +213,16 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
             Log.Information($"Cancelling outgoing request to {request.RecipientAnonName} ({request.RecipientUID})");
             var res = await _hub.UserCancelRequest(new(new(request.RecipientUID)));
             if (res.ErrorCode is SundouleiaApiEc.Success)
+            {
                 _manager.RemoveRequest(request);
+                _radar.RefreshUser(new(request.SenderUID));
+            }
             else
                 Log.Warning($"Failed to cancel outgoing request to {request.RecipientAnonName} ({request.RecipientUID}): {res.ErrorCode}");
         });
     }
 
+    // Add later maybe
     private void CancelRequests(IEnumerable<RequestEntry> requests)
     {
         UiService.SetUITask(async () =>
@@ -226,7 +230,10 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
             Log.Information($"Bulk cancelling {requests.Count()} outgoing requests.");
             var res = await _hub.UserCancelRequests(new(requests.Select(x => new UserData(x.RecipientUID)).ToList()));
             if (res.ErrorCode is SundouleiaApiEc.Success)
+            {
                 _manager.RemoveRequests(requests);
+                _radar.RefreshUsers();
+            }
             else
                 Log.Warning($"Failed to bulk cancel outgoing requests: {res.ErrorCode}");
         });

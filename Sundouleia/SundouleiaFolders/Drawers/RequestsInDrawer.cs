@@ -14,6 +14,7 @@ using OtterGui.Text;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
@@ -33,6 +34,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
     private readonly MainHub _hub;
     private readonly FolderConfig _config;
     private readonly RequestsManager _manager;
+    private readonly RadarManager _radar;
     private readonly SundesmoManager _sundesmos;
     private readonly SidePanelService _sidePanel;
 
@@ -43,13 +45,14 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
     private DateTime? _hoverExpiry;             // time until we should hide the hovered reply node.
 
     public RequestsInDrawer(ILogger<RadarDrawer> logger, MainHub hub, FolderConfig folders, 
-        RequestsManager manager, SundesmoManager sundesmos, SidePanelService sidePanel,
-        RequestsDrawSystem ds) 
+        RequestsManager manager, RadarManager radar, SundesmoManager sundesmos, 
+        SidePanelService sidePanel, RequestsDrawSystem ds) 
         : base("##RequestsDrawer", Svc.Logger.Logger, ds, new RequestCache(ds))
     {
         _hub = hub;
         _config = folders;
         _manager = manager;
+        _radar = radar;
         _sundesmos = sundesmos;
         _sidePanel = sidePanel;
     }
@@ -325,21 +328,25 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             // Wait for the response.
             Log.Information($"Accepting request from {request.SenderAnonName} ({request.SenderUID})");
             var res = await _hub.UserAcceptRequest(new(new(request.SenderUID))).ConfigureAwait(false);
-            
+
             // If already paired, we should remove the request from the manager.
             if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
+            {
                 _manager.RemoveRequest(request);
+                _radar.RefreshUser(new(request.SenderUID));
+            }
             // Otherwise, if successful, proceed with pairing operations.
             else if (res.ErrorCode is SundouleiaApiEc.Success)
             {
                 // Remove the request from the manager.
                 _manager.RemoveRequest(request);
+                _radar.RefreshUser(new(request.SenderUID));
                 // Add the Sundesmo to the SundesmoManager.
                 _sundesmos.AddSundesmo(res.Value!.Pair);
                 // If they are online, mark them online.
                 if (res.Value!.OnlineInfo is { } onlineSundesmo)
                     _sundesmos.MarkSundesmoOnline(onlineSundesmo);
-                
+
                 // TODO: Add them to the groups we wanted to add them to.
                 // TODO: Set their nick to the desired nick.
             }
@@ -356,7 +363,10 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
         {
             var res = await _hub.UserRejectRequest(new(new(request.SenderUID))).ConfigureAwait(false);
             if (res.ErrorCode is SundouleiaApiEc.Success)
+            {
                 _manager.RemoveRequest(request);
+                _radar.RefreshUser(new(request.SenderUID));
+            }
             else
             {
                 Log.Warning($"Failed to reject request to {request.SenderAnonName} ({request.SenderUID}): {res.ErrorCode}");

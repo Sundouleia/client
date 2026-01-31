@@ -1,5 +1,6 @@
 using CkCommons;
 using CkCommons.Helpers;
+using Sundouleia.DrawSystem;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Network;
@@ -17,16 +18,20 @@ public class AccountManager
     private readonly ILogger<AccountManager> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly AccountConfig _config;
+    private readonly FolderConfig _folderConfig;
+    private readonly GroupsDrawSystem _ddsGroups;
     private readonly ConfigFileProvider _fileProvider;
 
     // Some kind of cached mapping to the linked profiles for the selected.
 
     public AccountManager(ILogger<AccountManager> logger, SundouleiaMediator mediator, 
-        AccountConfig config, ConfigFileProvider files)
+        AccountConfig config, FolderConfig folders, GroupsDrawSystem ddsGroups, ConfigFileProvider files)
     {
         _logger = logger;
         _mediator = mediator;
         _config = config;
+        _folderConfig = folders;
+        _ddsGroups = ddsGroups;
         _fileProvider = files;
     }
 
@@ -50,7 +55,19 @@ public class AccountManager
         => _config.Save();
 
     public void UpdateFileProviderForConnection(ConnectionResponse response)
-        => _fileProvider.UpdateConfigs(response.User.UID);
+    {
+        _logger.LogDebug($"Setting FileProvider ProfileUID to {response.User.UID}");
+        var isProfileDifferent = _fileProvider.CurrentProfileUID != response.User.UID;
+        _fileProvider.UpdateConfigs(response.User.UID);
+
+        // Inform mediator that the profile switched if it did.
+        if (isProfileDifferent)
+        {
+            _logger.LogDebug($"Logged into new ProfileUID: {response.User.UID}");
+            _folderConfig.Load(); // Saves folder config for the new UID, making a new one if none exist.
+            _ddsGroups.LoadData(); // Ensures the profile spesific groups load in for the new UID.
+        }        
+    }
 
     // If any profiles, and a player 
     public bool HasValidAccount()

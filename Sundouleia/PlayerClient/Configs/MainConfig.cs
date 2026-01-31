@@ -40,7 +40,6 @@ public class ConfigStorage
     public bool RadarSendPings { get; set; } = true; // If others can send you requests vis context menus.
     public bool RadarJoinChats { get; set; } = true;
     public bool RadarNearbyDtr { get; set; } = true;
-    public bool RadarChatUnreadDtr { get; set; } = false;
     public bool RadarShowUnreadBubble { get; set; } = true;
 
     // General - Sundouleia Modular Actor Files (Holds close relation with stored fileData...)

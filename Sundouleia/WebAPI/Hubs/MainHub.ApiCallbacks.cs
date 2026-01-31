@@ -158,6 +158,7 @@ public partial class MainHub
     {
         Logger.LogDebug($"Callback_RemoveRequest: {dto}", LoggerType.Callbacks);
         _requests.RemoveRequest(dto);
+        _radar.RefreshUser(dto.User);
         return Task.CompletedTask;
     }
     #endregion Pair/Request Callbacks

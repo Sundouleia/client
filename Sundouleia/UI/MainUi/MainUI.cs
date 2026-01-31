@@ -2,6 +2,7 @@ using CkCommons;
 using CkCommons.Classes;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
@@ -94,6 +95,11 @@ public class MainUI : WindowMediatorSubscriberBase
         {
             IsOpen = true;
             _tabMenu.TabSelection = MainMenuTabs.SelectedTab.BasicWhitelist;
+        });
+        Mediator.Subscribe<OpenMainUiTab>(this, _ =>
+        {
+            IsOpen = true;
+            _tabMenu.TabSelection = _.ToOpen;
         });
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);

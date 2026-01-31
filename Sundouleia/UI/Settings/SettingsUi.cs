@@ -36,9 +36,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly ProfilesTab _accountsTab;
     private readonly DebugTab _debugTab;
     private readonly UiDataStorageShared _storageShared;
+    private readonly DtrService _dtr;
 
-    public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, MainHub hub,
-        MainConfig config, ProfilesTab accounts, DebugTab debug, UiDataStorageShared dataStorage)
+    public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, 
+        MainHub hub, MainConfig config, ProfilesTab accounts, DebugTab debug, 
+        UiDataStorageShared dataStorage, DtrService dtr)
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;
@@ -46,6 +48,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _accountsTab = accounts;
         _debugTab = debug;
         _storageShared = dataStorage;
+        _dtr = dtr;
 
         Flags = WFlags.NoScrollbar;
         this.PinningClickthroughFalse();
@@ -375,7 +378,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var sendPings = _config.Current.RadarSendPings;
         var nearbyDtr = _config.Current.RadarNearbyDtr;
         var joinChats = _config.Current.RadarJoinChats;
-        var chatUnreadDtr = _config.Current.RadarChatUnreadDtr;
         var showUnreadBubble = _config.Current.RadarShowUnreadBubble;
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarEnabledLabel, ref enabled))
@@ -401,6 +403,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _config.Current.RadarNearbyDtr = nearbyDtr;
             _config.Save();
+            _dtr.RefreshEntries();
             Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarNearbyDtr)));
         }
         ImUtf8.SameLineInner();
@@ -411,21 +414,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _config.Current.RadarJoinChats = joinChats;
             _config.Save();
+            _dtr.RefreshEntries();
             Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarJoinChats)));
         }
         ImUtf8.SameLineInner();
         CkGui.FramedIconText(FAI.CommentDots);
         CkGui.HelpText(CkLoc.Settings.MainOptions.RadarJoinChatsTT, true);
-
-        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarChatUnreadDtrLabel, ref chatUnreadDtr))
-        {
-            _config.Current.RadarChatUnreadDtr = chatUnreadDtr;
-            _config.Save();
-            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarChatUnreadDtr)));
-        }
-        ImUtf8.SameLineInner();
-        CkGui.FramedIconText(FAI.PersonCircleExclamation);
-        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarChatUnreadDtrTT, true);
 
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleLabel, ref showUnreadBubble))
         {
@@ -568,6 +562,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _config.Current.RequestNotifiers ^= RequestAlertKind.DtrBar;
             _config.Save();
+            _dtr.RefreshEntries();
         }
         CkGui.HelpText("Displays the number of incoming and outoing requests to the DTR bar.");
 
@@ -655,8 +650,16 @@ public class SettingsUi : WindowMediatorSubscriberBase
     {
         /* --------------- Separator for moving onto the Notifications Section ----------- */
         CkGui.FontText(CkLoc.Settings.Preferences.HeaderNotifications, UiFontService.UidFont);
+        var pairDtr = _config.Current.EnablePairDtr;
         var onlineNotifs = _config.Current.OnlineNotifications;
         var onlineNotifsNickLimited = _config.Current.NotifyLimitToNickedPairs;
+
+        if (ImGui.Checkbox(CkLoc.Settings.Preferences.PairDtrEntry, ref pairDtr))
+        {
+            _config.Current.EnablePairDtr = pairDtr;
+            _config.Save();
+        }
+        CkGui.HelpText(CkLoc.Settings.Preferences.PairDtrEntryTT);
 
         if (ImGui.Checkbox(CkLoc.Settings.Preferences.OnlineNotifLabel, ref onlineNotifs))
         {

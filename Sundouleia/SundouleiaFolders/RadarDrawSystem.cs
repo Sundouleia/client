@@ -64,6 +64,13 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
             _logger.LogInformation("Changes detected during load, saving updated config.");
             _hybridSaver.Save(this);
         }
+        // See if the file doesnt exist, if it does not, load defaults.
+        else if (!File.Exists(_hybridSaver.FileNames.DDS_Radar))
+        {
+            _logger.LogInformation("Loading Defaults and saving.");
+            EnsureAllFolders(new Dictionary<string, string>());
+            _hybridSaver.Save(this);
+        }
     }
 
     protected override bool EnsureAllFolders(Dictionary<string, string> _)

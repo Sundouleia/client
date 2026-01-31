@@ -85,6 +85,13 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
             _logger.LogInformation("WhitelistDrawSystem folder structure changed on load, saving updated structure.");
             _hybridSaver.Save(this);
         }
+        // See if the file doesnt exist, if it does not, load defaults.
+        else if (!File.Exists(_hybridSaver.FileNames.DDS_Whitelist))
+        {
+            _logger.LogInformation("Loading Defaults and saving.");
+            EnsureAllFolders(new Dictionary<string, string>());
+            _hybridSaver.Save(this);
+        }
     }
 
     protected override bool EnsureAllFolders(Dictionary<string, string> _)

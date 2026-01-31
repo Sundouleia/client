@@ -340,9 +340,6 @@ namespace Sundouleia.Localization
         public readonly string RadarJoinChatsLabel = Loc.Localize("Preferences_RadarJoinChatsLabel", "Join Chats");
         public readonly string RadarJoinChatsTT = Loc.Localize("Preferences_RadarJoinChatsTT", "Automatically join/leave zone-specific radar chats with others!");
 
-        public readonly string RadarChatUnreadDtrLabel = Loc.Localize("Preferences_RadarChatUnreadDtrLabel", "Show Unread Chat DTR");
-        public readonly string RadarChatUnreadDtrTT = Loc.Localize("Preferences_RadarChatUnreadDtrTT", "Adds an unread message count bubble to the DTR.");
-
         public readonly string RadarShowUnreadBubbleLabel = Loc.Localize("Preferences_RadarShowUnreadBubbleLabel", "Show Unread Chat Bubble");
         public readonly string RadarShowUnreadBubbleTT = Loc.Localize("Preferences_RadarShowUnreadBubbleTT", "Displays a small bubble on the MainUI Chat tab for unread messages.");
     }
@@ -385,6 +382,9 @@ namespace Sundouleia.Localization
         public readonly string ConnectedNotifLabel = Loc.Localize("Preferences_ConnectedNotifLabel", "Enable Connection Notifications");
         public readonly string ConnectedNotifTT = Loc.Localize("Preferences_ConnectedNotifTT", "Displays a notification when server connection status changes." +
             "--SEP--Notifies you when: connected, disconnected, reconnecting or connection lost.");
+
+        public readonly string PairDtrEntry = Loc.Localize("Preferences_PairDtrEntry", "Paired Users DTR Entry");
+        public readonly string PairDtrEntryTT = Loc.Localize("Preferences_PairDtrEntryTT", "Displays a DTR entry showing the number of paired users visible/online");
 
         public readonly string OnlineNotifLabel = Loc.Localize("Preferences_OnlineNotifLabel", "Enable Online Pair Notifications");
         public readonly string OnlineNotifTT = Loc.Localize("Preferences_OnlineNotifTT", "Displays a notification when a pair comes online.");

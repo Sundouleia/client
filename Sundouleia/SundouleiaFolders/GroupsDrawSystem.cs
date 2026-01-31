@@ -65,12 +65,20 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
             _hybridSaver.Save(this);
     }
 
-    private void LoadData()
+    public void LoadData()
     {
         // Handles loading, folder assignment, and setting opened states all in one.
         if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Groups)))
         {
             _logger.LogWarning("Loaded GroupDrawSystem from file.");
+            _hybridSaver.Save(this);
+        }
+        // If the file does not exist for the user, we need to create a fresh one.
+        else if (!File.Exists(_hybridSaver.FileNames.DDS_Groups))
+        {
+            _logger.LogInformation("No existing GroupDrawSystem file found, creating new one.");
+            // Ensure all folders exist as per the current groups.
+            EnsureAllFolders(new Dictionary<string, string>());
             _hybridSaver.Save(this);
         }
     }
