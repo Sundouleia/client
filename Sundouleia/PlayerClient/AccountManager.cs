@@ -151,9 +151,9 @@ public class AccountManager
             return;
         }
 
-        if (Profiles.Contains(toLink))
+        if (!Profiles.Contains(toLink))
         {
-            _logger.LogError("Could not link the provided account profile, as it is not a stored profile!");
+            _logger.LogError("Could not link the provided account. No such profile exists!");
             return;
         }
 
