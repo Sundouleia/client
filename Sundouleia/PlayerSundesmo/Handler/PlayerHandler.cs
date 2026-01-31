@@ -399,6 +399,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // Encapsulate this in a pending redraw as we will do so after this is completed.
             await _redrawer.RunOnPendingRedrawSlim(this, async () =>
             {
+                // This currently doesnt handle reapplication entirely as the difference between removed and added should not redraw if the same
                 var redrawType = RedrawKind.None;
                 // Wrap this call as a pending redraw
                 // If initial data, clear replacements and appearance data.
@@ -658,10 +659,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
     }
 
-    private bool NeedsRedraw(string[] gamePaths)
-        => gamePaths.Any(p => p.Contains("/face/", StringComparison.OrdinalIgnoreCase) || p.Contains("/hair/", StringComparison.OrdinalIgnoreCase) || p.Contains("/tail/", StringComparison.OrdinalIgnoreCase));
-    private bool NeedsReapply(IpcKind kinds)
-        => kinds.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips);
+    private static readonly string[] RedrawPathTypes = [ "/face/", "/hair/", "/tail/", "/animation/", "/skeleton/" ];
+    private bool NeedsRedraw(string[] gamePaths) => gamePaths.Any(p => RedrawPathTypes.Any(s => p.Contains(s, StringComparison.OrdinalIgnoreCase)));
+    private bool NeedsReapply(IpcKind kinds) => kinds.HasAny(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.ModManips);
 
     // Placeholder until we get a better system in place.
     private NewModUpdates RemoveFilteredMods(NewModUpdates modData)
