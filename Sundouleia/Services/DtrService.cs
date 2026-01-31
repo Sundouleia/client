@@ -125,6 +125,7 @@ public sealed class DtrService : DisposableMediatorSubscriberBase, IHostedServic
             return;
 
         if (_radar.RadarUsers.Count is 0)
+            return;
 
         // Otherwise create the entry for it and show it.
         radarEntry.Shown = true;
