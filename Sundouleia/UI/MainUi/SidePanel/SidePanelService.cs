@@ -111,7 +111,7 @@ public class NewGroupCache : ISidePanelCache
         _dds = dds;
     }
 
-    public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
+    public float DisplayWidth => 300;
     public bool IsValid => true;
 
     public IDynamicFolderGroup<Sundesmo>? ParentNode = null;
@@ -143,7 +143,7 @@ public class NewFolderGroupCache : ISidePanelCache
     public NewFolderGroupCache(GroupsDrawSystem dds)
         => _dds = dds;
 
-    public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
+    public float DisplayWidth => 300;
     public bool IsValid => true;
 
     public IDynamicFolderGroup<Sundesmo>? ParentNode = null;
@@ -171,7 +171,7 @@ public class GroupEditorCache : ISidePanelCache, IDisposable
         _tabs = new();
     }
 
-    public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
+    public float DisplayWidth => 300;
     public bool IsValid => _cache.GroupInEditor is not null;
     public GroupEditorTabs.SelectedTab CurrentTab => _tabs.TabSelection;
 
@@ -224,7 +224,7 @@ public class ResponseCache : ISidePanelCache
     }
 
     public IReadOnlyList<DynamicLeaf<RequestEntry>> Selected => _selections?.Leaves ?? [];
-    public float DisplayWidth => 300 * ImGuiHelpers.GlobalScale;
+    public float DisplayWidth => 300;
     public bool IsValid => _selections is not null && Selected.Count > 0;
 } 
 
