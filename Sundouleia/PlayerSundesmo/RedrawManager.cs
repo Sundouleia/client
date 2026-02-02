@@ -85,7 +85,7 @@ public class RedrawManager(Sundesmo sundesmo, ILogger<RedrawManager> logger, Ipc
                 logger.LogDebug($"[EndUpdate] {player.NameString}({sundesmo.GetNickAliasOrUid()}) (Still has {_updatesProcessing} updates, deferring redraws)", LoggerType.PairManagement);
             }
             // Release the slim now that we are finished.
-            _playerUpdateSlim.Release();
+            SafeReleaseSlim();
         }
     }
 
@@ -167,6 +167,18 @@ public class RedrawManager(Sundesmo sundesmo, ILogger<RedrawManager> logger, Ipc
 
             if (ownedObj.IsRendered)
                 RedrawOwnedInternal(ownedObj, redrawType);
+        }
+    }
+
+    private void SafeReleaseSlim()
+    {
+        try
+        {
+            _playerUpdateSlim.Release();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Ignore, this instance of the class has been disposed.
         }
     }
 }
