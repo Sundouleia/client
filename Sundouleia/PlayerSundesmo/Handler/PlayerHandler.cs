@@ -264,7 +264,14 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     /// <inheritdoc cref="RevertAlterations(string, nint, ushort, CancellationToken)"/>
     public async Task RevertAlterations(CancellationToken ct = default)
     {
-        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await _dataLock.WaitAsync(ct).ConfigureAwait(false);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
         try
         {
             // Revert penumbra collection and customize+ data if set.
@@ -309,9 +316,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     ///     Reverts the rendered alterations on a player.<br/>
     ///     <b>This does not delete the alteration data. </b>
     /// </summary>
-    private async Task RevertAlterations(string name, IntPtr address, ushort objIdx, CancellationToken token)
+    private async Task RevertAlterations(IntPtr address, ushort objIdx, CancellationToken token)
     {
-        await _dataLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await _dataLock.WaitAsync(token).ConfigureAwait(false);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
         try
         {
             // Revert penumbra collection and customize+ data if set.
@@ -1030,7 +1044,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                     Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
                     using var timeoutCTS = new CancellationTokenSource();
                     timeoutCTS.CancelAfter(TimeSpan.FromSeconds(30));
-                    await RevertAlterations(name, addr, objIdx, timeoutCTS.Token);
+                    await RevertAlterations(addr, objIdx, timeoutCTS.Token);
                 }
             }
             catch (Exception ex)

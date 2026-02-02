@@ -108,7 +108,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     public async Task<string?> GetDataStrByPtr(nint charaAddr)
     {
         if (!APIAvailable) return null;
-        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusManagerByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
+        return await SafeInvokeCharaAddressAction(charaAddr, func: () => GetStatusManagerByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -117,7 +117,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     public async Task<List<MoodlesStatusInfo>> GetDataInfoByPtr(nint charaAddr)
     {
         if (!APIAvailable) return new List<MoodlesStatusInfo>();
-        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusManagerInfoByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
+        return await SafeInvokeCharaAddressAction(charaAddr, func: () => GetStatusManagerInfoByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false) ?? [];
     }
 
     /// <summary>
@@ -163,7 +163,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     public async Task SetByPtr(nint charaAddr, string statusString)
     {
         if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => SetStatusManagerByPtr.InvokeAction(charaAddr, statusString)).ConfigureAwait(false);
+        await SafeInvokeCharaAddressAction(charaAddr, () => { SetStatusManagerByPtr.InvokeAction(charaAddr, statusString); return true; }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -172,7 +172,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     public async Task ClearByPtr(nint charaAddr)
     {
         if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => ClearStatusMangerByPtr.InvokeAction(charaAddr)).ConfigureAwait(false);
+        await SafeInvokeCharaAddressAction(charaAddr, () => { ClearStatusMangerByPtr.InvokeAction(charaAddr); return true; }).ConfigureAwait(false);
     }
 
     public async Task ApplyStatuses(IEnumerable<Guid> toApply)
@@ -196,5 +196,19 @@ public sealed class IpcCallerMoodles : IIpcCaller
     {
         if (!APIAvailable) return;
         await Svc.Framework.RunOnFrameworkThread(() => RemoveStatusesByName.InvokeAction(toRemove.ToList(), PlayerData.NameWithWorld)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///   Safely invokes an action on a character address within the framework thread. Verifies the character is still rendered within the framework thread.
+    /// </summary>
+    private async Task<T?> SafeInvokeCharaAddressAction<T>(nint address, Func<T> func)
+    {
+        if (!APIAvailable) return default;
+        return await Svc.Framework.RunOnFrameworkThread(() =>
+        {
+            if (!Svc.Objects.Any(obj => obj.Address == address))
+                return default;
+            return func();
+        }).ConfigureAwait(false);
     }
 }
