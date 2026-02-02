@@ -89,8 +89,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task<string> GetOwnDataStr()
     {
-        if (!APIAvailable) return string.Empty;
-        return await Svc.Framework.RunOnFrameworkThread(() => GetOwnStatusManager.InvokeFunc() ?? string.Empty).ConfigureAwait(false);
+        return await Svc.Framework.RunOnFrameworkThread(() => APIAvailable ? GetOwnStatusManager.InvokeFunc() ?? string.Empty : string.Empty).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -98,8 +97,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task<List<MoodlesStatusInfo>> GetOwnDataInfo()
     {
-        if (!APIAvailable) return new List<MoodlesStatusInfo>();
-        return await Svc.Framework.RunOnFrameworkThread(GetOwnStatusManagerInfo.InvokeFunc).ConfigureAwait(false);
+        return await Svc.Framework.RunOnFrameworkThread(() => APIAvailable ? GetOwnStatusManagerInfo.InvokeFunc() : new List<MoodlesStatusInfo>()).ConfigureAwait(false);
     }
 
     /// <summary> 
@@ -107,7 +105,6 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task<string?> GetDataStrByPtr(nint charaAddr)
     {
-        if (!APIAvailable) return null;
         return await SafeInvokeCharaAddressAction(charaAddr, func: () => GetStatusManagerByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
     }
 
@@ -116,7 +113,6 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task<List<MoodlesStatusInfo>> GetDataInfoByPtr(nint charaAddr)
     {
-        if (!APIAvailable) return new List<MoodlesStatusInfo>();
         return await SafeInvokeCharaAddressAction(charaAddr, func: () => GetStatusManagerInfoByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false) ?? [];
     }
 
@@ -125,8 +121,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task<MoodlesStatusInfo> GetStatusDetails(Guid guid)
     {
-        if (!APIAvailable) return new MoodlesStatusInfo();
-        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusInfo.InvokeFunc(guid)).ConfigureAwait(false);
+        return await Svc.Framework.RunOnFrameworkThread(() => APIAvailable ? GetStatusInfo.InvokeFunc(guid) : new MoodlesStatusInfo()).ConfigureAwait(false);
     }
 
     /// <summary> 
@@ -134,8 +129,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task<IEnumerable<MoodlesStatusInfo>> GetStatusListDetails()
     {
-        if (!APIAvailable) return Enumerable.Empty<MoodlesStatusInfo>();
-        return await Svc.Framework.RunOnFrameworkThread(GetStatusInfoList.InvokeFunc).ConfigureAwait(false);
+        return await Svc.Framework.RunOnFrameworkThread(() => APIAvailable ? GetStatusInfoList.InvokeFunc() : Enumerable.Empty<MoodlesStatusInfo>()).ConfigureAwait(false);
     }
 
     /// <summary> 
@@ -143,8 +137,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task<MoodlePresetInfo> GetPresetDetails(Guid guid)
     {
-        if (!APIAvailable) return new MoodlePresetInfo();
-        return await Svc.Framework.RunOnFrameworkThread(() => GetPresetInfo.InvokeFunc(guid)).ConfigureAwait(false);
+        return await Svc.Framework.RunOnFrameworkThread(() => APIAvailable ? GetPresetInfo.InvokeFunc(guid) : new MoodlePresetInfo()).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -152,8 +145,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task<IEnumerable<MoodlePresetInfo>> GetPresetListDetails()
     {
-        if (!APIAvailable) return Enumerable.Empty<MoodlePresetInfo>();
-        return await Svc.Framework.RunOnFrameworkThread(GetPresetsInfoList.InvokeFunc).ConfigureAwait(false);
+        return await Svc.Framework.RunOnFrameworkThread(() => APIAvailable ? GetPresetsInfoList.InvokeFunc() : Enumerable.Empty<MoodlePresetInfo>()).ConfigureAwait(false);
     }
 
 
@@ -162,7 +154,6 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task SetByPtr(nint charaAddr, string statusString)
     {
-        if (!APIAvailable) return;
         await SafeInvokeCharaAddressAction(charaAddr, () => { SetStatusManagerByPtr.InvokeAction(charaAddr, statusString); return true; }).ConfigureAwait(false);
     }
 
@@ -171,15 +162,14 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     public async Task ClearByPtr(nint charaAddr)
     {
-        if (!APIAvailable) return;
         await SafeInvokeCharaAddressAction(charaAddr, () => { ClearStatusMangerByPtr.InvokeAction(charaAddr); return true; }).ConfigureAwait(false);
     }
 
     public async Task ApplyStatuses(IEnumerable<Guid> toApply)
     {
-        if (!APIAvailable) return;
         await Svc.Framework.RunOnFrameworkThread(() =>
         {
+            if (!APIAvailable) return;
             var clientNameWorld = PlayerData.NameWithWorld;
             foreach (var guid in toApply)
                 ApplyStatusByName.InvokeAction(guid, clientNameWorld);
@@ -188,14 +178,12 @@ public sealed class IpcCallerMoodles : IIpcCaller
 
     public async Task ApplyPreset(Guid id)
     {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => ApplyPresetByName.InvokeAction(id, PlayerData.NameWithWorld)).ConfigureAwait(false);
+        await Svc.Framework.RunOnFrameworkThread(() => { if (APIAvailable) ApplyPresetByName.InvokeAction(id, PlayerData.NameWithWorld); }).ConfigureAwait(false);
     }
 
     public async Task RemoveStatuses(IEnumerable<Guid> toRemove)
     {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => RemoveStatusesByName.InvokeAction(toRemove.ToList(), PlayerData.NameWithWorld)).ConfigureAwait(false);
+        await Svc.Framework.RunOnFrameworkThread(() => { if (APIAvailable) RemoveStatusesByName.InvokeAction(toRemove.ToList(), PlayerData.NameWithWorld); }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -203,9 +191,9 @@ public sealed class IpcCallerMoodles : IIpcCaller
     /// </summary>
     private async Task<T?> SafeInvokeCharaAddressAction<T>(nint address, Func<T> func)
     {
-        if (!APIAvailable) return default;
         return await Svc.Framework.RunOnFrameworkThread(() =>
         {
+            if (!APIAvailable) return default;
             if (!Svc.Objects.Any(obj => obj.Address == address))
                 return default;
             return func();
