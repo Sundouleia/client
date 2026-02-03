@@ -406,24 +406,16 @@ public class SidePanelInteractions
         using var _ = ImRaii.Group();
         CkGui.FramedIconText(current ? pdp.TrueFAI : pdp.FalseFAI);
         ImGui.SameLine(0, 0);
-        if (pdp.CondAfterLabel)
+        CkGui.ColorTextFrameAligned($" {(current ? pdp.CondTrue : pdp.CondFalse)} ", current ? CkColor.TriStateCheck.Uint() : CkColor.TriStateCross.Uint());
+        ImGui.SameLine(0, 0);
+        ImGui.Text(pdp.Label);
+        if (!pdp.SkipDisplayName)
         {
-            CkGui.TextFrameAligned($" {dispName}");
             ImGui.SameLine(0, 0);
-            ImGui.Text($" {pdp.Suffix} ");
-            ImGui.SameLine(0, 0);
-            CkGui.ColorTextFrameAligned(current ? pdp.CondTrue : pdp.CondFalse, current ? CkColor.TriStateCheck.Uint() : CkColor.TriStateCross.Uint());
-            ImGui.SameLine(0, 0);
-            ImGui.Text(".");
+            ImGui.Text(dispName);
         }
-        else
-        {
-            CkGui.ColorTextFrameAligned($" {(current ? pdp.CondTrue : pdp.CondFalse)} ", current ? CkColor.TriStateCheck.Uint() : CkColor.TriStateCross.Uint());
-            ImGui.SameLine(0, 0);
-            ImGui.Text(pdp.Label);
-            ImGui.SameLine(0, 0);
-            ImGui.Text($" {dispName}.");
-        }
+        ImGui.SameLine(0, 0);
+        ImGui.Text($"{pdp.Suffix}.");
     }
 
     private enum SIID : byte
@@ -445,22 +437,22 @@ public class SidePanelInteractions
         Clearing,
     }
 
-    private record PermInfo(FAI TrueFAI, FAI FalseFAI, string CondTrue, string CondFalse, string Label, bool CondAfterLabel, string Suffix = "");
+    private record PermInfo(FAI TrueFAI, FAI FalseFAI, string CondTrue, string CondFalse, string Label, bool SkipDisplayName, string Suffix = "");
 
     private readonly ImmutableDictionary<SIID, PermInfo> PermissionData = ImmutableDictionary<SIID, PermInfo>.Empty
-        .Add(SIID.DataSyncAnimations,   new PermInfo(FAI.Running,               FAI.Ban,        "Allowing", "Preventing",   "animations from",      false))
-        .Add(SIID.DataSyncSounds,       new PermInfo(FAI.VolumeUp,              FAI.VolumeMute, "Allowing", "Preventing",   "sounds from",          false))
-        .Add(SIID.DataSyncVfx,          new PermInfo(FAI.PersonBurst,           FAI.Ban,        "Allowing", "Preventing",   "VFX from",             false))
-        .Add(SIID.ShareMoodles,         new PermInfo(FAI.PeopleArrows,          FAI.Ban,        "Sharing",  "Not sharing",  "moodles with",         false))
-        .Add(SIID.AllowPositve,         new PermInfo(FAI.SmileBeam,             FAI.Ban,        "Allowing", "Preventing",   "positive moodles",     false))
-        .Add(SIID.AllowNegative,        new PermInfo(FAI.FrownOpen,             FAI.Ban,        "Allowing", "Preventing",   "negative moodles",     false))
-        .Add(SIID.AllowSpecial,         new PermInfo(FAI.WandMagicSparkles,     FAI.Ban,        "Allowing", "Preventing",   "special moodles",      false))
-        .Add(SIID.AllowOwnMoodles,      new PermInfo(FAI.PersonArrowUpFromLine, FAI.Ban,        "Allowing", "Preventing",   "applying your Moodles",false))
-        .Add(SIID.AllowOtherMoodles,    new PermInfo(FAI.PersonArrowDownToLine, FAI.Ban,        "Allowing", "Preventing",   "applying their Moodles",false))
-        .Add(SIID.MaxMoodleTime,        new PermInfo(FAI.HourglassHalf,         FAI.None,       "",         "",             "Max Moodle time",      false))
-        .Add(SIID.AllowPermanent,       new PermInfo(FAI.Infinity,              FAI.Ban,        "Allowing", "Preventing",   "permanent moodles",    false))
-        .Add(SIID.RemoveApplied,        new PermInfo(FAI.Eraser,                FAI.Ban,        "Allowing", "Preventing",   "removing Moodles",     false))
-        .Add(SIID.RemoveAny,            new PermInfo(FAI.Eraser,                FAI.Ban,        "Allowing", "Preventing",   "removing Moodles",     false));
+        .Add(SIID.DataSyncAnimations,   new PermInfo(FAI.Running,               FAI.Ban,        "Allowing", "Preventing",   "animations from ",      false))
+        .Add(SIID.DataSyncSounds,       new PermInfo(FAI.VolumeUp,              FAI.VolumeMute, "Allowing", "Preventing",   "sounds from ",          false))
+        .Add(SIID.DataSyncVfx,          new PermInfo(FAI.PersonBurst,           FAI.Ban,        "Allowing", "Preventing",   "VFX from ",             false))
+        .Add(SIID.ShareMoodles,         new PermInfo(FAI.PeopleArrows,          FAI.Ban,        "Sharing",  "Not sharing",  "moodles with ",         false))
+        .Add(SIID.AllowOwnMoodles,      new PermInfo(FAI.PersonArrowUpFromLine, FAI.Ban,        "Allowing", "Preventing",   "use of your moodles",   true))
+        .Add(SIID.AllowOtherMoodles,    new PermInfo(FAI.PersonArrowDownToLine, FAI.Ban,        "Allowing", "Preventing",   "use of their moodles",  true))
+        .Add(SIID.AllowPositve,         new PermInfo(FAI.SmileBeam,             FAI.Ban,        "Allowing", "Preventing",   "positive moodles",      true))
+        .Add(SIID.AllowNegative,        new PermInfo(FAI.FrownOpen,             FAI.Ban,        "Allowing", "Preventing",   "negative moodles",      true))
+        .Add(SIID.AllowSpecial,         new PermInfo(FAI.WandMagicSparkles,     FAI.Ban,        "Allowing", "Preventing",   "special moodles",       true))
+        .Add(SIID.AllowPermanent,       new PermInfo(FAI.Infinity,              FAI.Ban,        "Allowing", "Preventing",   "permanent moodles",     true))
+        .Add(SIID.RemoveApplied,        new PermInfo(FAI.Eraser,                FAI.Ban,        "Allowing", "Preventing",   "removing moodles by them",true))
+        .Add(SIID.RemoveAny,            new PermInfo(FAI.Eraser,                FAI.Ban,        "Allowing", "Preventing",   "removing moodles by anyone",true))
+        .Add(SIID.MaxMoodleTime,        new PermInfo(FAI.HourglassHalf,         FAI.None,       "",         "",             "Max moodle duration",   true));
 
 
 
