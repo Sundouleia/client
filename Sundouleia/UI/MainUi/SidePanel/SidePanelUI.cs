@@ -2,6 +2,7 @@ using CkCommons.Gui;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Downloader;
 using OtterGui.Text;
@@ -84,7 +85,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         Flags |= WFlags.NoMove;
 
         float fixedWidth = _service.DisplayWidth;
-        float fixedHeight = MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2;
+        float fixedHeight = (MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2) / ImGuiHelpers.GlobalScale;
 
         if (_service.DisplayMode is SidePanelMode.GroupEditor)
             this.SetBoundaries(new(fixedWidth, fixedHeight), new(1000, fixedHeight));
