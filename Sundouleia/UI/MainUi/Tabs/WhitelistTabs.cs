@@ -52,8 +52,7 @@ public class WhitelistTabs
         if (!_) return;
 
         ImGui.SetScrollX(0);
-        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One)
-             .Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale);
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One);
         
         _basicGroups.DrawFoldersOnly(width);
         _defaults.DrawFoldersOnly(width);

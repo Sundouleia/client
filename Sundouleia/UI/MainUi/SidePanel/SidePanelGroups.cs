@@ -69,7 +69,7 @@ public class SidePanelGroups
         using (var _ = CkRaii.FramedChildPaddedW(g.Label, width, ImUtf8.FrameHeight, 0, g.BorderColor, 5f, 1f))
         {
             CkGui.FramedIconText(_previewOpen ? FAI.CaretDown : FAI.CaretRight);
-            ImGui.SameLine();
+            ImUtf8.SameLineInner();
             CkGui.IconTextAligned(g.Icon, g.IconColor);
             CkGui.ColorTextFrameAlignedInline(g.Label, g.LabelColor);
         }
@@ -80,7 +80,7 @@ public class SidePanelGroups
         if (!_previewOpen)
             return;
         // Bump for child nodes.  
-        using var ident = ImRaii.PushIndent(ImUtf8.FrameHeight);
+        using var ident = ImRaii.PushIndent(ImUtf8.FrameHeight, false);
 
         var folderMin = ImGui.GetItemRectMin();
         var folderMax = ImGui.GetItemRectMax();

@@ -16,7 +16,6 @@ using Sundouleia.Utils;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI.Files;
 using SundouleiaAPI.Data;
-using ZstdSharp.Unsafe;
 
 namespace Sundouleia.Pairs;
 

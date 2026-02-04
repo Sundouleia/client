@@ -41,12 +41,14 @@ public class ProfileUI : WindowMediatorSubscriberBase
 
     public UserData User { get; init; }
 
+    private static float Rounding => 35f * ImGuiHelpers.GlobalScale;
+
     protected override void PreDrawInternal()
     {
         if (!ThemePushed)
         {
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(0, 0));
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 35f * ImGuiHelpers.GlobalScale);
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, Rounding);
 
             ThemePushed = true;
         }
@@ -79,7 +81,7 @@ public class ProfileUI : WindowMediatorSubscriberBase
         _drawHelper.RectMax = wdl.GetClipRectMax();
 
         // Draw the plate and store if we hovered the report button.
-        _drawHelper.DrawProfile(wdl, toDraw, dispName, User, ShowFullUID, ref HoveringReportButton);
+        _drawHelper.DrawProfile(wdl, Rounding, toDraw, dispName, User, ShowFullUID, ref HoveringReportButton);
         // Close button.
         CloseButton(wdl);
         CkGui.AttachToolTipRect(_drawHelper.CloseButtonPos, _drawHelper.CloseButtonSize, $"Close {dispName}'s Profile");

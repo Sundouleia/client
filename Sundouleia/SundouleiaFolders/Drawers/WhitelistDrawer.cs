@@ -410,7 +410,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
         using var s = ImRaii.PushStyle(ImGuiStyleVar.CellPadding, ImGui.GetStyle().CellPadding with { Y = 0 });
         using var child = CkRaii.ChildPaddedW("BasicExpandedChild", width, CkStyle.ThreeRowHeight(), bgCol, 5f);
-        
+
         using var _ = ImRaii.Table("BasicExpandedTable", 2, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.BordersInnerV);
         if (!_) return;
 
@@ -439,16 +439,15 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.ShowOfflineSeparateTT);
 
-        var favoritesFirst = _folders.Current.FavoritesFirst;
-        if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.FavoritesFirstLabel, ref favoritesFirst))
+        var useFocusTarget = _folders.Current.TargetWithFocus;
+        if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.FocusTargetLabel, ref useFocusTarget))
         {
-            _folders.Current.FavoritesFirst = favoritesFirst;
+            _folders.Current.TargetWithFocus = useFocusTarget;
             _folders.Save();
         }
-        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.FavoritesFirstTT);
+        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.FocusTargetTT);
 
         ImGui.TableNextColumn();
-
         var nickOverName = _folders.Current.NickOverPlayerName;
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.PreferNicknamesLabel, ref nickOverName))
         {
@@ -457,13 +456,23 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         }
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.PreferNicknamesTT);
 
-        var useFocusTarget = _folders.Current.TargetWithFocus;
-        if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.FocusTargetLabel, ref useFocusTarget))
+        var prioFavorites = _folders.Current.PrioritizeFavorites;
+        var prioTemps = _folders.Current.PrioritizeTemps;
+        if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.PrioritizeFavoritesLabel, ref prioFavorites))
         {
-            _folders.Current.TargetWithFocus = useFocusTarget;
+            _folders.Current.PrioritizeFavorites = prioFavorites;
             _folders.Save();
+            _drawSystem.UpdateFilters();
         }
-        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.FocusTargetTT);
+        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.PrioritizeFavoritesTT);
+
+        if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.PrioritizeTempLabel, ref prioTemps))
+        {
+            _folders.Current.PrioritizeTemps = prioTemps;
+            _folders.Save();
+            _drawSystem.UpdateFilters();
+        }
+        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.PrioritizeTempTT);
     }
 
     public bool DrawPopup(string popupId, GroupFolder folder, float width)

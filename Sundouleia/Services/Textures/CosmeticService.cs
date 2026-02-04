@@ -113,10 +113,10 @@ public class CosmeticService : IHostedService, IDisposable
         => user.Tier switch
         {
             CkVanityTier.ShopKeeper => (CoreTextures.Cache[CoreTexture.Tier4Icon], "Plugin Author of Sundouleia."),
-            CkVanityTier.DistinguishedConnoisseur => (CoreTextures.Cache[CoreTexture.Tier3Icon], $"{user.AliasOrUID} is supporting Sundouleia as a Distinguished Connoisseur"),
-            CkVanityTier.EsteemedPatron => (CoreTextures.Cache[CoreTexture.Tier2Icon], $"{user.AliasOrUID} is supporting Sundouleia as a Esteemed Patron"),
-            CkVanityTier.IllustriousSupporter => (CoreTextures.Cache[CoreTexture.Tier1Icon], $"{user.AliasOrUID} is supporting Sundouleia as a Illustrious Supporter"),
-            CkVanityTier.ServerBooster => (CoreTextures.Cache[CoreTexture.TierBoosterIcon], $"{user.AliasOrUID} is server boosting the Sundouleia Discord!"),
+            CkVanityTier.DistinguishedConnoisseur => (CoreTextures.Cache[CoreTexture.Tier3Icon], $"Supporting Sundouleia as a Distinguished Connoisseur"),
+            CkVanityTier.EsteemedPatron => (CoreTextures.Cache[CoreTexture.Tier2Icon], $"Supporting Sundouleia as a Esteemed Patron"),
+            CkVanityTier.IllustriousSupporter => (CoreTextures.Cache[CoreTexture.Tier1Icon], $"Supporting Sundouleia as a Illustrious Supporter"),
+            CkVanityTier.ServerBooster => (CoreTextures.Cache[CoreTexture.TierBoosterIcon], $"Server boosting the Sundouleia Discord!"),
             _ => (null, string.Empty),
         };
 

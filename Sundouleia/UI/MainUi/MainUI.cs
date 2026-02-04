@@ -484,7 +484,7 @@ public class MainUI : WindowMediatorSubscriberBase
             ServerState.Connected => string.Empty,
             ServerState.ConnectedDataSynced => string.Empty,
             ServerState.NoSecretKey => "No secret key is set for this current character. " +
-            "\nTo create UID's for your alt characters, be sure to claim your account in the CK discord." +
+            "\nTo create UID's for your alt characters, be sure to claim your account in the Sundouleia discord." +
             "\n\nOnce you have inserted a secret key, reload the plugin to be registered with the servers.",
             ServerState.VersionMisMatch => "Current Ver: " + MainHub.ClientVerString + Environment.NewLine
             + "Expected Ver: " + MainHub.ExpectedVerString +

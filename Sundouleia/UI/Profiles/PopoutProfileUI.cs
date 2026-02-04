@@ -1,4 +1,5 @@
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -34,22 +35,24 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
         });
     }
 
+    private static float Rounding => 35f * ImGuiHelpers.GlobalScale;
+
     protected override void PreDrawInternal()
     {
         if (!ThemePushed)
         {
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(0, 0));
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 35f);
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, Rounding);
             ThemePushed = true;
         }
 
         var position = MainUI.LastPos;
-        position.X -= 288;
+        position.X -= 288 * ImGuiHelpers.GlobalScale;
         ImGui.SetNextWindowPos(position);
 
         Flags |= WFlags.NoMove;
 
-        var size = new Vector2(288, 576);
+        var size = ImGuiHelpers.ScaledVector2(288, 576);
 
         ImGui.SetNextWindowSize(size);
     }
@@ -73,6 +76,6 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
         var wdl = ImGui.GetWindowDrawList();
         _drawHelper.RectMin = wdl.GetClipRectMin();
         _drawHelper.RectMax = wdl.GetClipRectMax();
-        _drawHelper.DrawProfile(wdl, toDraw, dispName, User, true);
+        _drawHelper.DrawProfile(wdl, Rounding, toDraw, dispName, User, true);
     }
 }

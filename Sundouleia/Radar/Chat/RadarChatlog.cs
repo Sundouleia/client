@@ -290,6 +290,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     protected override void OnMiddleClick(RadarCkChatMessage message)
     {
         if (disableContent) return;
+        if (message.UID == "System") return;
         Mediator.Publish(new ProfileOpenMessage(message.UserData));
     }
 

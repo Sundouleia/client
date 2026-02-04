@@ -243,21 +243,25 @@ namespace Sundouleia.Localization
     public class GroupPrefs
     {
         // Pairs Section
-        public readonly string FavoritesFirstLabel = Loc.Localize("Preferences_FavoritesFirstLabel", "By Favorites First");
-        public readonly string FavoritesFirstTT = Loc.Localize("Preferences_FavoritesFirstTT", "Sort Favorite-First Render for main folders.");
-
         public readonly string ShowVisibleSeparateLabel = Loc.Localize("Preferences_ShowVisibleSeparateLabel", "Visible Folder");
         public readonly string ShowVisibleSeparateTT = Loc.Localize("Preferences_ShowVisibleSeparateTT", "Lists rendered online pairs in a separate folder.");
 
         public readonly string ShowOfflineSeparateLabel = Loc.Localize("Preferences_ShowOfflineSeparateLabel", "Offline Folder");
         public readonly string ShowOfflineSeparateTT = Loc.Localize("Preferences_ShowOfflineSeparateTT", "Lists offline pairs in a separate group.");
 
-        public readonly string PreferNicknamesLabel = Loc.Localize("Preferences_PreferNicknamesLabel", "Prefer Nicknames");
-        public readonly string PreferNicknamesTT = Loc.Localize("Preferences_PreferNicknamesTT", "Still use a pairs nickname, even while visible.");
-
         public readonly string FocusTargetLabel = Loc.Localize("Preferences_FocusTargetLabel", "Prefer FocusTarget");
         public readonly string FocusTargetTT = Loc.Localize("Preferences_FocusTargetTT", "Uses the FocusTarget instead of the Target for identifying pairs." +
             "--SEP--Used when clicking the eye icon in the whitelist.");
+        
+        public readonly string PreferNicknamesLabel = Loc.Localize("Preferences_PreferNicknamesLabel", "Nicks over PlayerName");
+        public readonly string PreferNicknamesTT = Loc.Localize("Preferences_PreferNicknamesTT", "Still use a pairs nickname, even while visible.");
+
+        public readonly string PrioritizeFavoritesLabel = Loc.Localize("Preferences_PrioritizeFavoritesLabel", "Prioritize Favorites");
+        public readonly string PrioritizeFavoritesTT = Loc.Localize("Preferences_PrioritizeFavoritesTT", "Ensure favorited users display first.");
+
+        public readonly string PrioritizeTempLabel = Loc.Localize("Preferences_PrioritizeTempLabel", "Prioritize Temporaries");
+        public readonly string PrioritizeTempTT = Loc.Localize("Preferences_PrioritizeTempTT", "Ensure temporary pairs display first--NL--(or after favorite priority).");
+
     }
 
     public class MainOptions

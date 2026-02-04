@@ -32,6 +32,18 @@ public sealed class DefaultFolder : DynamicFolder<Sundesmo>
         _generator = generator;
     }
 
+    public DefaultFolder(DynamicFolderGroup<Sundesmo> parent, uint id, FAI icon, string name,
+        uint iconColor, Func<IReadOnlyList<Sundesmo>> generator, DynamicSorter<DynamicLeaf<Sundesmo>> sorter)
+        : base(parent, icon, name, id, sorter)
+    {
+        // Can set stylizations here.
+        NameColor = uint.MaxValue;
+        IconColor = iconColor;
+        BgColor = uint.MinValue;
+        BorderColor = ImGui.GetColorU32(ImGuiCol.TextDisabled);
+        _generator = generator;
+    }
+
     public int Rendered => Children.Count(s => s.Data.IsRendered);
     public int Online => Children.Count(s => s.Data.IsOnline);
     protected override IReadOnlyList<Sundesmo> GetAllItems() => _generator();
@@ -55,4 +67,11 @@ public sealed class DefaultFolder : DynamicFolder<Sundesmo>
         Constants.FolderTagOffline => $"{TotalChildren} offline",
         _ => string.Empty,
     };
+
+    /// <summary>
+    ///     Updates the SortOrder in the GroupFolder via the SortOrder in SundesmoGroup. <para />
+    ///     You are expected to execute a refresh after this somewhere if ever called.
+    /// </summary>
+    public void ApplySorter(IReadOnlyList<ISortMethod<DynamicLeaf<Sundesmo>>> sortSteps)
+        => Sorter.SetSteps(sortSteps);
 }

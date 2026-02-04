@@ -15,11 +15,12 @@ public class FolderStorage
     public bool ViewingGroups { get; set; } = false;
 
     // Main WhitelistFolders config.
-    public bool FavoritesFirst { get; set; } = true;
-    public bool NickOverPlayerName { get; set; } = false;
     public bool VisibleFolder { get; set; } = true;
     public bool OfflineFolder { get; set; } = true;
     public bool TargetWithFocus { get; set; } = false;
+    public bool NickOverPlayerName { get; set; } = false;
+    public bool PrioritizeFavorites { get; set; } = true;
+    public bool PrioritizeTemps { get; set; } = true;
 
     // Groups config options can be added here.
     public bool StyleEditing   { get; set; } = false;

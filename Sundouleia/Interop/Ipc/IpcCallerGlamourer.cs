@@ -16,8 +16,7 @@ namespace Sundouleia.Interop;
 // for almost every edge case if we run into edge cases to handle down the line.
 public sealed class IpcCallerGlamourer : IIpcCaller
 {
-    // value is Cordy's handle WUV = 01010111 01010101 01010110 = 5723478 (hey, don't cringe! I thought it was cute <3) - Nia
-    private const uint SUNDOULEIA_LOCK = 0x05723478;
+    private const uint SUNDOULEIA_LOCK = 0x46875381;
 
     // API Version
     private readonly ApiVersion ApiVersion;

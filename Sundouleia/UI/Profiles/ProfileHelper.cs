@@ -50,9 +50,9 @@ public class ProfileHelper
     private Vector2 StatsPos => RectMin + ImGuiHelpers.ScaledVector2(0, 358f);
     private Vector2 StatIconSize => ImGuiHelpers.ScaledVector2(22.5f);
 
-    public void DrawProfile(ImDrawListPtr drawList, Profile profile, string displayName, UserData userData, bool isPair)
+    public void DrawProfile(ImDrawListPtr drawList, float rounding, Profile profile, string displayName, UserData userData, bool isPair)
     {
-        DrawPlate(drawList, profile.Info, displayName);
+        DrawPlate(drawList, rounding, profile.Info, displayName);
         DrawProfilePic(drawList, profile, displayName, userData, isPair);
         DrawDescription(drawList, profile, userData, isPair);
 
@@ -73,9 +73,9 @@ public class ProfileHelper
         DrawStats(drawList, profile.Info, displayName, userData, false);
     }
 
-    public void DrawProfile(ImDrawListPtr drawList, Profile profile, string displayName, UserData userData, bool isPair, ref bool hoveringReport)
+    public void DrawProfile(ImDrawListPtr drawList, float rounding, Profile profile, string displayName, UserData userData, bool isPair, ref bool hoveringReport)
     {
-        DrawPlate(drawList, profile.Info, displayName);
+        DrawPlate(drawList, rounding, profile.Info, displayName);
         DrawProfilePic(drawList, profile, displayName, userData, isPair);
         DrawDescription(drawList, profile, userData, isPair);
 
@@ -98,15 +98,15 @@ public class ProfileHelper
 
     }
 
-    private void DrawPlate(ImDrawListPtr drawList, ProfileContent info, string displayName)
+    private void DrawPlate(ImDrawListPtr drawList, float rounding, ProfileContent info, string displayName)
     {
         // draw out the background for the window.
         if (CosmeticService.TryGetPlateBg(PlateElement.Plate, info.MainBG, out var plateBG))
-            drawList.AddDalamudImageRounded(plateBG, RectMin, PlateSize, 30f);
+            drawList.AddDalamudImageRounded(plateBG, RectMin, PlateSize, rounding);
 
         // draw out the border on top of that.
         if (CosmeticService.TryGetPlateBorder(PlateElement.Plate, info.MainBorder, out var plateBorder))
-            drawList.AddDalamudImageRounded(plateBorder, RectMin, PlateSize, 20f);
+            drawList.AddDalamudImageRounded(plateBorder, RectMin, PlateSize, rounding);
     }
 
     private void DrawProfilePic(ImDrawListPtr drawList, Profile profile, string displayName, UserData userData, bool isPair)
@@ -131,9 +131,8 @@ public class ProfileHelper
         // Draw out Supporter Icon.
         var supporterInfo = CosmeticService.GetSupporterInfo(userData);
         if (supporterInfo.SupporterWrap is { } wrap)
-        {
-            drawList.AddDalamudImageRounded(wrap, SupporterIconPos, SupporterIconSize, SupporterIconSize.Y / 2, displayName + " Is Supporting CK!");
-        }
+            drawList.AddDalamudImageRounded(wrap, SupporterIconPos, SupporterIconSize, SupporterIconSize.Y / 2, $"{displayName} is Supporting Sundouleia!");
+
         // Draw out the border for the icon.
         drawList.AddCircle(SupporterIconBorderPos + SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2,
             ImGui.GetColorU32(ImGuiColors.ParsedPink), 0, 4f);

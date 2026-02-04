@@ -11,7 +11,7 @@ namespace Sundouleia.DrawSystem;
 public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscriber, IDisposable, IHybridSavable
 {
     private readonly ILogger<WhitelistDrawSystem> _logger;
-    private readonly FolderConfig _folderConfig;
+    private readonly FolderConfig _config;
     private readonly SundesmoManager _sundesmos;
     private readonly HybridSaveService _hybridSaver;
 
@@ -24,7 +24,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
     {
         _logger = logger;
         Mediator = mediator;
-        _folderConfig = config;
+        _config = config;
         _sundesmos = sundesmos;
         _hybridSaver = saver;
 
@@ -32,20 +32,9 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         LoadData();
 
         // These can possibly occur at the same time and must be accounted for.
-        Mediator.Subscribe<FolderUpdateSundesmos>(this, _ =>
-        {
-            lock (_folderUpdateLock)
-            {
-                UpdateFolders();
-            }
-        });
-        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ =>
-        {
-            lock (_folderUpdateLock)
-            {
-                UpdateFolder(Constants.FolderTagVisible);
-            }
-        });
+        Mediator.Subscribe<FolderUpdateSundesmos>(this, _ => { lock (_folderUpdateLock) UpdateFolders(); });
+        Mediator.Subscribe<SundesmoPlayerRendered>(this, _ => { lock (_folderUpdateLock) UpdateFolder(Constants.FolderTagVisible); });
+        Mediator.Subscribe<ConnectedMessage>(this, _ => { lock (_folderUpdateLock) UpdateFolders(); });
 
         // Subscribe to the changes (which is to change very, very soon, with overrides.
         DDSChanged += OnChange;
@@ -98,8 +87,8 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
     {
         // Load in the folders, they are all descendants of root.
         bool anyChanged = false;
-        anyChanged |= UpdateVisibleFolderState(_folderConfig.Current.VisibleFolder);
-        anyChanged |= UpdateOfflineFolderState(_folderConfig.Current.OfflineFolder);
+        anyChanged |= UpdateVisibleFolderState(_config.Current.VisibleFolder);
+        anyChanged |= UpdateOfflineFolderState(_config.Current.OfflineFolder);
         _logger.LogInformation($"Ensured all folders, total now {FolderMap.Count} folders.");
         return anyChanged;
     }
@@ -112,8 +101,10 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         {
             if (FolderMap.ContainsKey(Constants.FolderTagVisible))
                 return false;
+
             // Try to add it.
-            return TryAdd(FAI.Eye, Constants.FolderTagVisible, CkColor.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(u => u.IsRendered && u.IsOnline)]);
+            return AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Eye, Constants.FolderTagVisible, CkColor.TriStateCheck.Uint(), 
+                () => [.. _sundesmos.DirectPairs.Where(u => u.IsRendered && u.IsOnline)], GetDefaultSorter()));
         }
         // Otherwise attempt to remove it.
         return Delete(Constants.FolderTagVisible);
@@ -127,24 +118,42 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         // If we wanted to show offline/online..
         if (showFolder)
         {
+            var sorter = GetDefaultSorter();
             anyChanges |= Delete(Constants.FolderTagAll);
-            anyChanges |= TryAdd(FAI.Link, Constants.FolderTagOnline, CkColor.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => s.IsOnline)]);
-            anyChanges |= TryAdd(FAI.Link, Constants.FolderTagOffline, CkColor.TriStateCross.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => !s.IsOnline)]);
+            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Link, Constants.FolderTagOnline, CkColor.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => s.IsOnline)], new(sorter)));
+            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Link, Constants.FolderTagOffline, CkColor.TriStateCross.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => !s.IsOnline)], new(sorter)));
         }
         // Otherwise we wanted to only show ALL.
         else
         {
+            var sorter = GetDefaultSorter();
+            sorter.Prepend(SorterExtensions.ByRendered);
+            sorter.Prepend(SorterExtensions.ByOnline);
+
             anyChanges |= Delete(Constants.FolderTagOnline);
             anyChanges |= Delete(Constants.FolderTagOffline);
-            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll,
-                                        uint.MaxValue, () => _sundesmos.DirectPairs, SorterExtensions.AllFolderSorter));
+            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Globe, Constants.FolderTagAll, uint.MaxValue, () => _sundesmos.DirectPairs, sorter));
         }
         // Return if anything was modified.
         return anyChanges;
     }
 
-    private bool TryAdd(FAI icon, string name, uint iconColor, Func<IReadOnlyList<Sundesmo>> generator)
-        => AddFolder(new DefaultFolder(root, idCounter + 1u, icon, name, iconColor, generator, [SorterExtensions.ByPairName]));
+    public void UpdateFilters()
+    {
+        var sorter = GetDefaultSorter();
+        // Update all children to be either favorites first or not.
+        foreach (var folder in Root.Children.OfType<DefaultFolder>())
+            SetSorterSteps(folder, sorter);
+    }
+
+    private IReadOnlyList<ISortMethod<DynamicLeaf<Sundesmo>>> GetDefaultSorter()
+        => (_config.Current.PrioritizeFavorites, _config.Current.PrioritizeTemps) switch
+        {
+            (true, true) => [SorterExtensions.ByFavorite, SorterExtensions.ByTemporary, SorterExtensions.ByPairName],
+            (true, false) => [SorterExtensions.ByFavorite, SorterExtensions.ByPairName],
+            (false, true) => [SorterExtensions.ByTemporary, SorterExtensions.ByPairName],
+            _ => [SorterExtensions.ByPairName]
+        };
 
     // HybridSavable
     public int ConfigVersion => 0;
