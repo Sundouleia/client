@@ -399,7 +399,7 @@ public class IntroUi : WindowMediatorSubscriberBase
             CkGui.BulletText("For your incredible work on Mare, for helping me understand its framework years ago when I was exploring similar tech " +
                 "stacks, and for being the kind of person who gave so many a free service to enjoy without asking for anything in return.", ImGuiColors.DalamudGrey2);
 
-            CkGui.BulletText("For sharing your heartfelt reflections after Mare�s shutdown. Your wish for people to come together and build something " +
+            CkGui.BulletText("For sharing your heartfelt reflections after Mare's shutdown. Your wish for people to come together and build something " +
                 "wonderful, instead of competing to come out on top.", ImGuiColors.DalamudGrey2);
 
             CkGui.BulletText("For being one of the few developers I genuinely look up to as both a mentor and a person I deeply respect.", ImGuiColors.DalamudGrey2);
@@ -433,19 +433,19 @@ public class IntroUi : WindowMediatorSubscriberBase
         CkGui.FontText("About Sundouleia", UiFontService.UidFont);
 
         ImGui.Spacing();
-        CkGui.ColorTextWrapped("Sundouleia was created to honor Mare�s legacy while addressing the issues that led to its takedown. " +
+        CkGui.ColorTextWrapped("Sundouleia was created to honor Mare's legacy while addressing the issues that led to its takedown. " +
             "It was built from the ground up with a focus on community health, transparency, and long-term sustainability.", SundColor.Gold.Uint());
 
         CkGui.SeparatorSpaced();
         CkGui.ColorTextWrapped("In the interview with DarkArchon, they emphasized how vital it is to protect the people who form the cornerstones" +
-            "of our modding community. Developers like Ottermandias, Goat, and others need to be protected and respected for the works they�ve given us.", ImGuiColors.DalamudGrey);
+            "of our modding community. Developers like Ottermandias, Goat, and others need to be protected and respected for the works they've given us.", ImGuiColors.DalamudGrey);
 
         ImGui.Spacing();
         CkGui.ColorTextWrapped("As both DarkArchon and Ottermandias reminded us, those who rush to fill these gaps often cannot be trusted. " +
             "We must allow time for the dust to settle and for solutions to emerge that are built with care, not short-sighted ambition.", ImGuiColors.DalamudGrey);
 
         ImGui.Spacing();
-        CkGui.ColorTextWrapped("Our team has worked with Mare�s tech stack for over two years. We know its structure, its strengths, and its limits " +
+        CkGui.ColorTextWrapped("Our team has worked with Mare's tech stack for over two years. We know its structure, its strengths, and its limits " +
             "inside and out. But when Mare fell, we made a deliberate choice not to act immediately.", ImGuiColors.DalamudGrey);
 
         ImGui.Spacing();
@@ -454,13 +454,13 @@ public class IntroUi : WindowMediatorSubscriberBase
             "rushed, but comes in time, handled with care.", ImGuiColors.DalamudGrey);
 
         ImGui.Spacing();
-        CkGui.ColorTextWrapped("At the end of the day, we�re all in the same boat. Placing too much trust in those who act without considering the " +
+        CkGui.ColorTextWrapped("At the end of the day, we're all in the same boat. Placing too much trust in those who act without considering the " +
             "broader impact puts everyone at risk. All it takes is one careless decision, a tool that exposes too much, repeats old mistakes, or grows " +
             "beyond control, can invite harsher action from SE.", ImGuiColors.DalamudGrey);
 
         CkGui.SeparatorSpaced();
         CkGui.TextWrapped("Sundouleia stands on its own codebase, UI library, authentication system, object management, and secure file sharing. " +
-            "It�s designed for scalability, stability, and to honor Ottermandias, DarkArchon, and the health of the XIV community.");
+            "It's designed for scalability, stability, and to honor Ottermandias, DarkArchon, and the health of the XIV community.");
     }
 
     // Understanding Sundouleia Privacy & Usage Transparency
