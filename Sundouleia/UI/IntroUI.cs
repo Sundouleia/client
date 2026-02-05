@@ -680,10 +680,14 @@ public class IntroUi : WindowMediatorSubscriberBase
                 // Set the new profile to add using the key.
                 var newProfile = new AccountProfile()
                 {
-                    ProfileLabel = $"Recovered Account Key - ({DateTime.Now:yyyy-MM-dd})",
+                    ProfileLabel = "Primary Profile",
                     Key = _recoveryKey,
                     IsPrimary = true,
                 };
+
+                // Ensure the tracked player exists for this profile.
+                if (!_accounts.CharaIsTracked())
+                    _accounts.CreateTrackedPlayer();
 
                 // Add this to the accounts and set the player profile to it.
                 if (!_accounts.Profiles.Add(newProfile))

@@ -379,7 +379,7 @@ public class MainUI : WindowMediatorSubscriberBase
             $"--NL--Disconnected from Servers.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton(ConnectionKind.WardrobeMode, FAI.ToiletPortable, CkColor.TriStateCheck.Uint(), offlineSize, false))
+        if (DrawConnectionButton(ConnectionKind.WardrobeMode, FAI.ToiletPortable, CkColor.TriStateCheck.Uint(), offlineSize, !MainHub.CanChangeConnectedState))
         {
             _account.ConnectionKind = ConnectionKind.WardrobeMode;
 
@@ -390,7 +390,7 @@ public class MainUI : WindowMediatorSubscriberBase
             $"--NL--Changes you make are not pushed to others, but you still see others normally.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton(ConnectionKind.StreamerMode, FAI.BroadcastTower, CkColor.TriStateCheck.Uint(), offlineSize, false))
+        if (DrawConnectionButton(ConnectionKind.StreamerMode, FAI.BroadcastTower, CkColor.TriStateCheck.Uint(), offlineSize, !MainHub.CanChangeConnectedState))
         {
             _account.ConnectionKind = ConnectionKind.StreamerMode;
 
@@ -401,7 +401,7 @@ public class MainUI : WindowMediatorSubscriberBase
             $"--NL--Appearance is sent to others, but others remain vanilla.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton(ConnectionKind.Normal, FAI.Link, CkColor.TriStateCheck.Uint(), offlineSize, false))
+        if (DrawConnectionButton(ConnectionKind.Normal, FAI.Link, CkColor.TriStateCheck.Uint(), offlineSize, !MainHub.CanChangeConnectedState))
         {
             _account.ConnectionKind = ConnectionKind.Normal;
 

@@ -52,7 +52,7 @@ internal class ReportPopupHandler : IPopupHandler
         var PlateSize = rectMax - rectMin;
         var frameH = ImUtf8.FrameHeight;
         var outerPadding = Vector2.One * 12f;
-        var borderSize = Vector2.One * 4;
+        var borderSize = Vector2.One * 8;
         var pfpBorderPos = rectMin + outerPadding;
         var pfpBorderSize = Vector2.One * 200;
         var pfpPos = rectMin + Vector2.One * 16f;
@@ -82,7 +82,7 @@ internal class ReportPopupHandler : IPopupHandler
             // Close Button
             var btnPos = rectMin + Vector2.One * 16;
             var btnSize = Vector2.One * 20;
-            var closeButtonColor = ImGui.GetColorU32(CloseHovered ? uint.MaxValue :SundColor.Gold.Uint());
+            var closeButtonColor = ImGui.GetColorU32(CloseHovered ? uint.MaxValue :SundColor.Silver.Uint());
             drawList.AddLine(btnPos, btnPos + btnSize, closeButtonColor, 3);
             drawList.AddLine(new Vector2(btnPos.X + btnSize.X, btnPos.Y), new Vector2(btnPos.X, btnPos.Y + btnSize.Y), closeButtonColor, 3);
             ImGui.SetCursorScreenPos(btnPos);
@@ -117,19 +117,35 @@ internal class ReportPopupHandler : IPopupHandler
                 ImGui.InputTextMultiline("##reportReason", ref _reportReason, 500, new Vector2(__.InnerRegion.X / 2, __.InnerRegion.Y));
 
                 ImGui.SameLine();
-                using (ImRaii.Group())
+                // Optimize this later.
+                if (_reportType is ReportKind.Profile)
                 {
-                    CkGui.ColorText("Profiles are reportable if they:", ImGuiColors.ParsedGold);
-                    CkGui.TextWrapped("- Harass another player. Directly or Indirectly.");
-                    CkGui.TextWrapped("- Impersonating another player.");
-                    CkGui.TextWrapped("- Displays NSFW content without being marked for NSFW.");
-                    CkGui.TextWrapped("- Used to share topics that dont belong here.");
-                    ImGui.Spacing();
-                    CkGui.ColorTextWrapped("Miss-use of reporting will result in your account being timed out.", ImGuiColors.DalamudRed);
+                    using (ImRaii.Group())
+                    {
+                        CkGui.ColorText("Profiles are reportable if they:", ImGuiColors.ParsedGold);
+                        CkGui.TextWrapped("- Harass another player. Directly or Indirectly.");
+                        CkGui.TextWrapped("- Impersonating another player.");
+                        CkGui.TextWrapped("- Displays NSFW content without being marked for NSFW.");
+                        CkGui.TextWrapped("- Used to share topics that dont belong here.");
+                        ImGui.Spacing();
+                        CkGui.ColorTextWrapped("Miss-use of reporting will result in your account being timed out.", ImGuiColors.DalamudRed);
+                    }
+                }
+                else
+                {
+                    using (ImRaii.Group())
+                    {
+                        CkGui.ColorText("Chat Messages are reportable if they:", ImGuiColors.ParsedGold);
+                        CkGui.TextWrapped("- Harass another player. Directly or Indirectly.");
+                        CkGui.TextWrapped("- Impersonating another player.");
+                        CkGui.TextWrapped("- Used to share topics that do not belong here (Use common sense on this)");
+                        ImGui.Spacing();
+                        CkGui.ColorTextWrapped("Miss-use of reporting will result in your account being timed out.", ImGuiColors.DalamudRed);
+                    }
                 }
             }
 
-            CkGui.SeparatorSpaced(SundColor.Gold.Uint());
+            CkGui.SeparatorSpaced(SundColor.Silver.Uint());
             CkGui.FontTextWrapped("The Sundouleia team will ensure the report system is not exploited or missused. Only report if nessisary.", UiFontService.Default150Percent, ImGuiColors.DalamudGrey);
 
             using var font = UiFontService.UidFont.Push();

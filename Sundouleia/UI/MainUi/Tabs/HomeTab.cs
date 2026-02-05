@@ -68,6 +68,7 @@ public class HomeTab
     {
         var left = region.X - ProfileSize.X - ImUtf8.ItemSpacing.X;
         var wdl = ImGui.GetWindowDrawList();
+        
         using (CkRaii.Child("##AccountInfo", new Vector2(left, ProfileSize.Y)))
         {
             CkGui.FontText(MainHub.DisplayName, UiFontService.UidFont);

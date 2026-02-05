@@ -313,7 +313,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         var isSystemMsg = LastInteractedMsg.UID == "System";
         var isOwnMsg = LastInteractedMsg.UID == MainHub.UID;
         var disableSilence = !ctrlHeld || isSystemMsg || isOwnMsg;
-        var disableBlock = !ctrlHeld || !shiftHeld || !disableSilence;
+        var disableBlock = !(ctrlHeld && shiftHeld) || isSystemMsg || isOwnMsg;
 
         // Profile Viewing
         CkGui.FontText(LastInteractedMsg.Name, Svc.PluginInterface.UiBuilder.MonoFontHandle, ImGuiColors.ParsedGold);

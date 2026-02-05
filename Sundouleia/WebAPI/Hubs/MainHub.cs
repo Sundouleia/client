@@ -123,6 +123,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public static bool IsConnectionDataSynced => _serverStatus is ServerState.ConnectedDataSynced;
     public static bool IsConnected => _serverStatus is ServerState.Connected or ServerState.ConnectedDataSynced;
     public static bool IsServerAlive => _serverStatus is ServerState.ConnectedDataSynced or ServerState.Connected or ServerState.Unauthorized or ServerState.Disconnected;
+    public static bool CanChangeConnectedState => _serverStatus is ServerState.ConnectedDataSynced or ServerState.Connected or ServerState.Disconnected;
 
     protected override void Dispose(bool disposing)
     {

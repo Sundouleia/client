@@ -90,11 +90,13 @@ public sealed class CommandManager : IDisposable
                 _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
             return;
         }
+#if DEBUG
         else if (string.Equals(splitArgs[0], "intro", StringComparison.OrdinalIgnoreCase))
         {
             _mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
             return;
         }
+#endif
 
         Svc.Chat.Print(new SeStringBuilder().AddYellow(" -- Sundouleia Commands --").BuiltString);
         Svc.Chat.Print(new SeStringBuilder().AddRed("Note that chat command logic is still being implemented!").BuiltString);
