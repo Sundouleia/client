@@ -45,7 +45,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     private readonly CharaObjectWatcher _watcher; // saves my sanity.
 
     // I very much dislike this but whatever. Until we find a better method I guess.
-    private string CurrentClientKey = "--_0";
+    private string CurrentClientKey = string.Empty;
 
     // Tracks transients for each of the clients owned objects, to help with processing.
     private ConcurrentDictionary<OwnedObject, HashSet<string>>? _persistentTransients = null;
@@ -61,6 +61,8 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     {
         get
         {
+            // I hate this with a passion and inner hatred of my soul.
+            // Please for the love of god refactor this mess if Penumbra has no plans of exposing their ChangedFiles to the API
             if (!_cacheConfig.Current.PlayerCaches.TryGetValue(CurrentClientKey, out var cache))
                 _cacheConfig.Current.PlayerCaches[CurrentClientKey] = cache = new();
             return cache;

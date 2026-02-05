@@ -161,6 +161,11 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
             {
                 foreach (var (nameWorld, caches) in config)
                 {
+                    // Skip the dumb blank entry that spawns in while loading other states
+                    // because its janky like that and I can't be asked to fix it right now.
+                    if (string.IsNullOrEmpty(nameWorld))
+                        continue;
+
                     var name = nameWorld.Split("_");
                     if (!GameDataSvc.WorldData.TryGetValue(ushort.Parse(name[1]), out var worldname))
                         continue;

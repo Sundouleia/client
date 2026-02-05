@@ -82,6 +82,9 @@ public class TransientCacheConfig : IHybridSavable
             Save();
         }
         catch (Bagagwa ex) { _logger.LogError("Failed to load config." + ex); }
+
+        // Remove any empty keys, if present.
+        Current.PlayerCaches.Remove(string.Empty);
     }
 
     public TransientCacheStorage Current { get; private set; } = new();
