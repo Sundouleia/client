@@ -42,8 +42,7 @@ public class RadarTab : DisposableMediatorSubscriberBase
         // Otherwise draw the UI in disabled mode with the overlay message.
         else
         {
-            using (ImRaii.Disabled(usageBlocked || unverified))
-                DrawContentBody(region.X);
+            DrawContentBody(region.X, usageBlocked || unverified);
 
             // Have to make a second child to overcome the conflicting z-ordering on text.
             ImGui.SetCursorScreenPos(min);
@@ -59,12 +58,15 @@ public class RadarTab : DisposableMediatorSubscriberBase
         }
     }
 
-    private void DrawContentBody(float width)
+    private void DrawContentBody(float width, bool disabled = false)
     {
         CkGui.FontTextCentered($"{LocationSvc.Current.WorldName} - {LocationSvc.Current.TerritoryName}", UiFontService.Default150Percent);
         ImGui.Spacing();
-        _drawer.DrawFilterRow(width, 25);
-        _drawer.DrawContents(width, DynamicFlags.None);
+        using (ImRaii.Disabled(disabled))
+        {
+            _drawer.DrawFilterRow(width, 25);
+            _drawer.DrawContents(width, DynamicFlags.None);
+        }
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.RadarUsers, MainUI.LastPos, MainUI.LastSize, () => _tabMenu.TabSelection = MainMenuTabs.SelectedTab.RadarChat);
     }
 

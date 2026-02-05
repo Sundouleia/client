@@ -101,9 +101,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         ImGui.SameLine();
         if (ImUtf8.SmallButton("Sundouleia Discord"))
-        {
-            // Void for now.
-        }
+            Util.OpenLink("https://discord.gg/QJy4zTqpMD");
 
         // draw out the tab bar for us.
         if (ImGui.BeginTabBar("mainTabBar"))
