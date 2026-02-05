@@ -23,7 +23,7 @@ public static class MoodlesEx
         using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One * 8f)
             .Push(ImGuiStyleVar.WindowRounding, 4f)
             .Push(ImGuiStyleVar.PopupBorderSize, 1f);
-        using var c = ImRaii.PushColor(ImGuiCol.Border, ImGuiColors.ParsedPink);
+        using var c = ImRaii.PushColor(ImGuiCol.Border, SundColor.Gold.Uint());
         using var tt = ImRaii.Tooltip();
 
         // push the title, converting all color tags into the actual label.

@@ -4,11 +4,9 @@ using CkCommons.Gui.Utility;
 using CkCommons.Helpers;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using Downloader;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using OtterGui;
 using OtterGui.Text;
@@ -22,15 +20,11 @@ using Sundouleia.WebAPI;
 using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Util;
-using TerraFX.Interop.Windows;
-using static FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentAlarm;
 
 namespace Sundouleia.Gui;
 
 public class SettingsUi : WindowMediatorSubscriberBase
 {
-    private bool THEME_PUSHED = false;
-
     private readonly MainHub _hub;
     private readonly MainConfig _config;
     private readonly ProfilesTab _accountsTab;
@@ -62,23 +56,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
     }
 
     protected override void PreDrawInternal()
-    {
-        if (!THEME_PUSHED)
-        {
-            ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.331f, 0.081f, 0.169f, .803f));
-            ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.579f, 0.170f, 0.359f, 0.828f));
-            THEME_PUSHED = true;
-        }
-    }
+    { }
 
     protected override void PostDrawInternal()
-    {
-        if (THEME_PUSHED)
-        {
-            ImGui.PopStyleColor(2);
-            THEME_PUSHED = false;
-        }
-    }
+    { }
 
     protected override void DrawInternal()
     {

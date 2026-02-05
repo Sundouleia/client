@@ -9,7 +9,6 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using Downloader;
 using OtterGui.Text;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
@@ -17,7 +16,6 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
-using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
 
 namespace Sundouleia.DrawSystem;

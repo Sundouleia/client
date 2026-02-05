@@ -110,13 +110,6 @@ public class IntroUi : WindowMediatorSubscriberBase
         }
     }
 
-    // Stylizations to move to SundColors later.
-    private static readonly Vector4 _sundouleiaGoldAlpha = new(.957f, .682f, .294f, .7f);
-    private static readonly Vector4 _sundouleiaGold = new(.957f, .682f, .294f, 1f);
-    private static readonly Vector4 _sundouleiaLight = new(.318f, .137f, .196f, 1f);
-    private static readonly Vector4 _sundouleiaLightAlpha = new(.318f, .137f, .196f, .5f);
-    private static readonly Vector4 _sundouleiaDark = new(.282f, .118f, .173f, 1f);
-
     protected override void DrawInternal()
     {
         if (_furthestPage is IntroUiPage.Initialized)
@@ -177,7 +170,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
         // Add a final gradient lining to the bottom of the progress display.
         var contentPos = expandedMin + new Vector2(0, scaledSize.Y);
-        wdl.AddRectFilledMultiColor(contentPos, expandedMax, _sundouleiaLightAlpha.ToUint(), _sundouleiaLightAlpha.ToUint(), 0, 0);
+        wdl.AddRectFilledMultiColor(contentPos, expandedMax, SundColor.LightAlpha.Uint(), SundColor.LightAlpha.Uint(), 0, 0);
         wdl.AddLine(contentPos, contentPos + new Vector2(scaledSize.X, 0), 0xFF000000, 1f);
         wdl.PopClipRect();
 
@@ -325,7 +318,7 @@ public class IntroUi : WindowMediatorSubscriberBase
     {
         using var dis = ImRaii.Disabled(page > _furthestPage);
         using var alpha = ImRaii.PushStyle(ImGuiStyleVar.Alpha, 1f);
-        var color = _currentPage == page ? _sundouleiaGoldAlpha : ImGuiColors.ParsedGrey.Darken(.15f).WithAlpha(.5f);
+        var color = _currentPage == page ? SundColor.GoldAlpha.Vec4() : ImGuiColors.ParsedGrey.Darken(.15f).WithAlpha(.5f);
         using var col = ImRaii.PushColor(ImGuiCol.Button, color).Push(ImGuiCol.ButtonHovered, color).Push(ImGuiCol.ButtonActive, color);
 
         if (ImGui.Button(label, region))
@@ -347,7 +340,7 @@ public class IntroUi : WindowMediatorSubscriberBase
                 
         CkGui.TextWrapped("Sundouleia is a player data synchronization plugin that aims for creating an improved " +
             "approach to data synchronization and features that focuses on positive community health and longevity.");
-        CkGui.ColorText("Clicking the above image will advance you to the next page.", _sundouleiaGold);
+        CkGui.ColorText("Clicking the above image will advance you to the next page.", SundColor.Gold.Uint());
 
         CkGui.FontText("Features:", UiFontService.Default150Percent);
         using (CkRaii.Child("FeaturesListScrollable", ImGui.GetContentRegionAvail()))
@@ -400,7 +393,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         CkGui.FontText("Dedications", UiFontService.Default150Percent);
         CkGui.ColorText("Ottermandias & DarkArchon were not involved in Sundouleias development. These are Dedications.", ImGuiColors.DalamudGrey);
 
-        CkGui.BulletText("DarkArchon/Floof", _sundouleiaGold);
+        CkGui.BulletText("DarkArchon/Floof", SundColor.Gold.Uint());
         using (ImRaii.PushIndent())
         {
             CkGui.BulletText("For your incredible work on Mare, for helping me understand its framework years ago when I was exploring similar tech " +
@@ -413,7 +406,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         }
 
         ImGui.Spacing();
-        CkGui.BulletText("Ottermandias", _sundouleiaGold);
+        CkGui.BulletText("Ottermandias", SundColor.Gold.Uint());
         using (ImRaii.PushIndent())
         {
             CkGui.BulletText("Being an incredible cornerstone to modding and plugin development through OtterGui, Penumbra, and Glamourer.", ImGuiColors.DalamudGrey2);
@@ -425,7 +418,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         // Special Thanks.
         ImGui.Spacing();
         CkGui.FontText("Special Thanks", UiFontService.Default150Percent);
-        CkGui.BulletText("XenosysVex", _sundouleiaGold);
+        CkGui.BulletText("XenosysVex", SundColor.Gold.Uint());
         using (ImRaii.PushIndent())
         {
             CkGui.BulletText("For interviewing DarkArchon, which both gave them closure through speaking about their passion project on an " +
@@ -441,7 +434,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
         ImGui.Spacing();
         CkGui.ColorTextWrapped("Sundouleia was created to honor Mare’s legacy while addressing the issues that led to its takedown. " +
-            "It was built from the ground up with a focus on community health, transparency, and long-term sustainability.", _sundouleiaGold);
+            "It was built from the ground up with a focus on community health, transparency, and long-term sustainability.", SundColor.Gold.Uint());
 
         CkGui.SeparatorSpaced();
         CkGui.ColorTextWrapped("In the interview with DarkArchon, they emphasized how vital it is to protect the people who form the cornerstones" +
@@ -476,21 +469,21 @@ public class IntroUi : WindowMediatorSubscriberBase
         CkGui.FontTextCentered("READ CAREFULLY, YOU WILL ONLY SEE THIS ONCE", UiFontService.Default150Percent, ImGuiColors.DalamudRed);
         ImGui.Spacing();
         CkGui.CenterText("Sundouleia Usage & Privacy");
-        using (CkRaii.FramedChildPaddedWH("UsageAndPrivacy", ImGui.GetContentRegionAvail(), 0, _sundouleiaDark.ToUint(), wFlags: WFlags.AlwaysVerticalScrollbar))
+        using (CkRaii.FramedChildPaddedWH("UsageAndPrivacy", ImGui.GetContentRegionAvail(), 0, SundColor.Dark.Uint(), wFlags: WFlags.AlwaysVerticalScrollbar))
         {
-            CkGui.FontText("Wise Word of Advice", UiFontService.Default150Percent, _sundouleiaGold);
+            CkGui.FontText("Wise Word of Advice", UiFontService.Default150Percent, SundColor.Gold.Uint());
             CkGui.TextWrapped("While a lot of effort has gone into ensuring your files are secure, remember nothing is 100% secure.");
             CkGui.ColorTextWrapped("If you are uncomfortable sharing the mod files on your character, then don't pair with people you don't trust.", ImGuiColors.DalamudRed);
 
             ImGui.Spacing();
-            CkGui.FontText("Data Distribution", UiFontService.Default150Percent, _sundouleiaGold);
+            CkGui.FontText("Data Distribution", UiFontService.Default150Percent, SundColor.Gold.Uint());
             CkGui.TextWrapped("Data from Penumbra, Glamourer, CPlus, Heels, Honorific, Moodles, and PetNames are shared to pairs visible to you.");
             CkGui.BulletText("Only the files used to render your on-screen actor at any given point are shared. (not full mods)");
             CkGui.BulletText("Shared files are cached on our FileHost servers temporarily for retrievals.");
             CkGui.ColorTextInline("*See Below", ImGuiColors.DalamudYellow);
 
             ImGui.Spacing();
-            CkGui.FontText("Account Reputation", UiFontService.Default150Percent, _sundouleiaGold);
+            CkGui.FontText("Account Reputation", UiFontService.Default150Percent, SundColor.Gold.Uint());
             CkGui.TextWrapped("Reputation is shared across all profiles and helps prevent misuse of social features. " +
                 "Valid reports may result in strikes. 3 in any category restrict access, and excessive strikes may lead to a ban.");
             CkGui.BulletText("Verification / Ban Status");
@@ -520,7 +513,7 @@ public class IntroUi : WindowMediatorSubscriberBase
             }
 
             ImGui.Spacing();
-            CkGui.FontText("File Server Privacy", UiFontService.Default150Percent, _sundouleiaGold);
+            CkGui.FontText("File Server Privacy", UiFontService.Default150Percent, SundColor.Gold.Uint());
             CkGui.TextWrapped("Uploaded files are cached on our servers for quick download retrieval, " +
                 "helping minimize how frequently users need to re-upload their mods.");
             CkGui.BulletText("Mare used SHA1 Encryption for file transfer (and partially open-ended connections), which was vulnerable to allowing files with " +
@@ -547,7 +540,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         CkGui.HelpText("Setup requires a valid FileCache Storage folder path. You can assign this via:" +
             "--SEP----COL--[@ Drive Root]--COL-- adds a \"SundouleiaCache\" folder in your drive's root directory." +
             "--NL----COL--[@ Penumbra Parent]--COL-- adds a \"SundouleiaCache\" folder in the folder your Penumbra folder is in." +
-            "--NL----COL--Folder Icon Button--COL-- lets you create/assign the folder how you'd like.", _sundouleiaGold);
+            "--NL----COL--Folder Icon Button--COL-- lets you create/assign the folder how you'd like.", SundColor.Gold.Uint());
 
         CkGui.FramedIconText(FAI.BarsProgress);
         CkGui.TextFrameAlignedInline("Initial Scan Completed");

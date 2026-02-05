@@ -2,7 +2,6 @@ using Sundouleia;
 using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Enums;
-using Sundouleia.Services.Mediator;
 
 /// <summary>
 ///    Manages redraw operations for a Sundesmo player, specifically ensuring redraws only happen while

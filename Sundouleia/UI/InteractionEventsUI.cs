@@ -61,23 +61,10 @@ internal class DataEventsUI : WindowMediatorSubscriberBase
         => ClearFilters();
 
     protected override void PreDrawInternal()
-    {
-        if (!ThemePushed)
-        {
-            ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.331f, 0.081f, 0.169f, .803f));
-            ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.579f, 0.170f, 0.359f, 0.828f));
-            ThemePushed = true;
-        }
-    }
+    { }
 
     protected override void PostDrawInternal()
-    {
-        if (ThemePushed)
-        {
-            ImGui.PopStyleColor(2);
-            ThemePushed = false;
-        }
-    }
+    { }
     protected override void DrawInternal()
     {
         using (ImRaii.Group())

@@ -124,66 +124,10 @@ public static class SundouleiaEx
     public static T DeepClone<T>(this T obj)
         => System.Text.Json.JsonSerializer.Deserialize<T>(System.Text.Json.JsonSerializer.Serialize(obj))!;
 
-
-
-    public static Vector4 UidColor()
-    {
-        return MainHub.ServerStatus switch
-        {
-            ServerState.Connecting => ImGuiColors.DalamudYellow,
-            ServerState.Reconnecting => ImGuiColors.DalamudRed,
-            ServerState.Connected => ImGuiColors.ParsedPink,
-            ServerState.ConnectedDataSynced => ImGuiColors.ParsedPink,
-            ServerState.Disconnected => ImGuiColors.DalamudYellow,
-            ServerState.Disconnecting => ImGuiColors.DalamudYellow,
-            ServerState.Unauthorized => ImGuiColors.DalamudRed,
-            ServerState.VersionMisMatch => ImGuiColors.DalamudRed,
-            ServerState.Offline => ImGuiColors.DalamudRed,
-            ServerState.NoSecretKey => ImGuiColors.DalamudYellow,
-            _ => ImGuiColors.DalamudRed
-        };
-    }
-
-    public static Vector4 ServerStateColor()
-    {
-        return MainHub.ServerStatus switch
-        {
-            ServerState.Connecting => ImGuiColors.DalamudYellow,
-            ServerState.Reconnecting => ImGuiColors.DalamudYellow,
-            ServerState.Connected => ImGuiColors.HealerGreen,
-            ServerState.ConnectedDataSynced => ImGuiColors.HealerGreen,
-            ServerState.Disconnected => ImGuiColors.DalamudRed,
-            ServerState.Disconnecting => ImGuiColors.DalamudYellow,
-            ServerState.Unauthorized => ImGuiColors.ParsedOrange,
-            ServerState.VersionMisMatch => ImGuiColors.ParsedOrange,
-            ServerState.Offline => ImGuiColors.DPSRed,
-            ServerState.NoSecretKey => ImGuiColors.ParsedOrange,
-            _ => ImGuiColors.ParsedOrange
-        };
-    }
-
-    public static FAI ServerStateIcon(ServerState state)
-    {
-        return state switch
-        {
-            ServerState.Connecting => FAI.SatelliteDish,
-            ServerState.Reconnecting => FAI.SatelliteDish,
-            ServerState.Connected => FAI.Link,
-            ServerState.ConnectedDataSynced => FAI.Link,
-            ServerState.Disconnected => FAI.Unlink,
-            ServerState.Disconnecting => FAI.SatelliteDish,
-            ServerState.Unauthorized => FAI.Shield,
-            ServerState.VersionMisMatch => FAI.Unlink,
-            ServerState.Offline => FAI.Signal,
-            ServerState.NoSecretKey => FAI.Key,
-            _ => FAI.ExclamationTriangle
-        };
-    }
-
     /// <summary> 
     ///     Retrieves the various UID text based on the current server state.
     /// </summary>
-    public static string GetUidText()
+    public static string GetErrorText()
     {
         return MainHub.ServerStatus switch
         {

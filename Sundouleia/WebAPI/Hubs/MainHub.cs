@@ -1,6 +1,5 @@
 using System.Reflection;
 using CkCommons;
-using Dalamud.Game.Text.SeStringHandling;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Hosting;
 using Sundouleia.Interop;

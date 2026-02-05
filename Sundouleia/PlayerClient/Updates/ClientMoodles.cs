@@ -1,9 +1,9 @@
 using CkCommons;
-using GagspeakAPI.Data;
 using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
+using SundouleiaAPI.Data;
 
 namespace Sundouleia.PlayerClient;
 

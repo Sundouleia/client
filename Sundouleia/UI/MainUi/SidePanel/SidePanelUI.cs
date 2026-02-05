@@ -4,7 +4,6 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using Downloader;
 using OtterGui.Text;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui.Components;
@@ -87,10 +86,11 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         float fixedWidth = _service.DisplayWidth;
         float fixedHeight = (MainUI.LastSize.Y - ImGui.GetFrameHeightWithSpacing() * 2) / ImGuiHelpers.GlobalScale;
 
-        if (_service.DisplayMode is SidePanelMode.GroupEditor)
-            this.SetBoundaries(new(fixedWidth, fixedHeight), new(1000, fixedHeight));
-        else
-            this.SetBoundaries(new(fixedWidth, fixedHeight), new(fixedWidth, fixedHeight));
+        // Can re-enable this if we run into issues with group editor sizing.
+        //if (_service.DisplayMode is SidePanelMode.GroupEditor)
+        //    this.SetBoundaries(new(fixedWidth, fixedHeight), new(1000, fixedHeight));
+        //else
+        this.SetBoundaries(new(fixedWidth, fixedHeight), new(fixedWidth, fixedHeight));
     }
 
     protected override void PostDrawInternal()

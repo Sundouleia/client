@@ -1,7 +1,6 @@
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
 using Sundouleia.WebAPI.Files.Models;
 using SundouleiaAPI.Data;
 

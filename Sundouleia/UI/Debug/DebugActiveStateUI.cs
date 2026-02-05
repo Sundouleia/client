@@ -1,4 +1,3 @@
-using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -36,9 +35,11 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         this.SetBoundaries(new Vector2(625, 400), ImGui.GetIO().DisplaySize);
     }
 
-    protected override void PreDrawInternal() { }
+    protected override void PreDrawInternal()
+    { }
 
-    protected override void PostDrawInternal() { }
+    protected override void PostDrawInternal()
+    { }
 
     protected override void DrawInternal()
     {

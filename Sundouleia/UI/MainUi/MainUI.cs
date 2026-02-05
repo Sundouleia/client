@@ -1,8 +1,6 @@
 using CkCommons;
-using CkCommons.Classes;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
@@ -20,8 +18,6 @@ using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
 using System.Globalization;
 using System.Reflection;
-using TerraFX.Interop.Windows;
-using static Lumina.Data.Parsing.Uld.NodeData;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -115,23 +111,10 @@ public class MainUI : WindowMediatorSubscriberBase
     private Vector2 WindowSize => ImGui.GetWindowSize();
 
     protected override void PreDrawInternal()
-    {
-        if (!THEME_PUSHED)
-        {
-            ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.331f, 0.081f, 0.169f, .803f));
-            ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.579f, 0.170f, 0.359f, 0.828f));
-            THEME_PUSHED = true;
-        }
-    }
+    { }
 
     protected override void PostDrawInternal()
-    {
-        if (THEME_PUSHED)
-        {
-            ImGui.PopStyleColor(2);
-            THEME_PUSHED = false;
-        }
-    }
+    { }
 
     public override void OnClose()
     {
@@ -147,7 +130,7 @@ public class MainUI : WindowMediatorSubscriberBase
         // If unauthorized draw the unauthorized display, otherwise draw the server status.
         if (MainHub.ServerStatus is (ServerState.NoSecretKey or ServerState.VersionMisMatch or ServerState.Unauthorized))
         {
-            CkGui.FontTextCentered(SundouleiaEx.GetUidText(), UiFontService.UidFont, SundouleiaEx.UidColor());
+            CkGui.FontTextCentered(SundouleiaEx.GetErrorText(), UiFontService.UidFont, CkColor.TriStateCross.Uint());
             // the wrapped text explanation based on the error.
             CkGui.ColorTextWrapped(GetServerError(), ImGuiColors.DalamudWhite);
         }

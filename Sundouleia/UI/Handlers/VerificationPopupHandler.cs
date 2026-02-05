@@ -39,7 +39,7 @@ internal class VerificationPopupHandler : IPopupHandler
             // canter the text input so that its width is the width of the _verificationCode text + 10px, centerd in the available context.
             ImGui.SetCursorPosX(width / 2 - ((ImGui.CalcTextSize(_verificationCode).X + ImGuiHelpers.GlobalScale * 12) / 2));
 
-            ImGui.TextColored(ImGuiColors.ParsedPink, _verificationCode);
+            ImGui.TextColored(SundColor.Gold.Uint(), _verificationCode);
             CkGui.CopyableDisplayText(_verificationCode, "Click to copy verification code to clipboard");
         }
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + ImGuiHelpers.GlobalScale * 10);

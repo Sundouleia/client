@@ -15,7 +15,6 @@ namespace Sundouleia.Gui;
 public class RadarChatPopoutUI : WindowMediatorSubscriberBase
 {
     private readonly PopoutRadarChatlog _chat;
-    private bool _themePushed = false;
 
     public RadarChatPopoutUI(ILogger<RadarChatPopoutUI> logger, SundouleiaMediator mediator, PopoutRadarChatlog chat) 
         : base(logger, mediator, "Radar Chat Popout UI")
@@ -27,24 +26,10 @@ public class RadarChatPopoutUI : WindowMediatorSubscriberBase
         this.SetBoundaries(new Vector2(380, 500), new Vector2(700, 2000));
     }
     protected override void PreDrawInternal()
-    {
-        if (!_themePushed)
-        {
-            ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.331f, 0.081f, 0.169f, .803f));
-            ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.579f, 0.170f, 0.359f, 0.828f));
-
-            _themePushed = true;
-        }
-    }
+    { }
 
     protected override void PostDrawInternal()
-    {
-        if (_themePushed)
-        {
-            ImGui.PopStyleColor(2);
-            _themePushed = false;
-        }
-    }
+    { }
 
     protected override void DrawInternal()
     {

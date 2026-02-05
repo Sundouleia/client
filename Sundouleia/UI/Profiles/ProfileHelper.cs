@@ -128,15 +128,16 @@ public class ProfileHelper
         drawList.AddCircleFilled(SupporterIconBorderPos + SupporterIconBorderSize / 2,
             SupporterIconBorderSize.X / 2, ImGui.GetColorU32(new Vector4(0, 0, 0, 1)));
 
+        // Draw out the border for the icon.
+        if (CosmeticService.TryGetPlateBorder(PlateElement.Avatar, profile.Info.AvatarBorder, out var supporterBorder))
+            drawList.AddDalamudImageRounded(supporterBorder, SupporterIconBorderPos, SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2);
+        else
+            drawList.AddCircle(SupporterIconBorderPos + SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2, ImGui.GetColorU32(SundColor.Gold.Uint()), 0, 4f);
+
         // Draw out Supporter Icon.
         var supporterInfo = CosmeticService.GetSupporterInfo(userData);
         if (supporterInfo.SupporterWrap is { } wrap)
             drawList.AddDalamudImageRounded(wrap, SupporterIconPos, SupporterIconSize, SupporterIconSize.Y / 2, $"{displayName} is Supporting Sundouleia!");
-
-        // Draw out the border for the icon.
-        drawList.AddCircle(SupporterIconBorderPos + SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2,
-            ImGui.GetColorU32(ImGuiColors.ParsedPink), 0, 4f);
-
 
         // draw out the UID here. We must make it centered. To do this, we must fist calculate how to center it.
         var widthToCenterOn = AvatarBorderSize.X;
@@ -145,7 +146,7 @@ public class ProfileHelper
             var aliasOrUidSize = ImGui.CalcTextSize(displayName);
             ImGui.SetCursorScreenPos(new Vector2(AvatarBorderPos.X + widthToCenterOn / 2 - aliasOrUidSize.X / 2, AvatarBorderPos.Y + AvatarBorderSize.Y + 5));
             // display it, it should be green if connected and red when not.
-            ImGui.TextColored(ImGuiColors.ParsedPink, displayName);
+            ImGui.TextColored(SundColor.Gold.Uint(), displayName);
         }
 #if DEBUG
         CkGui.CopyableDisplayText(userData.UID);

@@ -374,7 +374,7 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
         ImGui.Text("Total files:");
         CkGui.TextInline(_cachedAnalysis!.Values.Sum(c => c.Values.Count).ToString());
         ImGui.SameLine();
-        CkGui.HoverIconText(FAI.InfoCircle, CkColor.VibrantPink.Uint());
+        CkGui.HoverIconText(FAI.InfoCircle, ImGuiColors.TankBlue.ToUint());
         if (ImGui.IsItemHovered())
         {
             string text = "";
@@ -408,7 +408,7 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
 
             ImGui.Text($"Files for {ownedObject}");
             ImGui.SameLine();
-            CkGui.HoverIconText(FAI.InfoCircle, CkColor.VibrantPink.Uint());
+            CkGui.HoverIconText(FAI.InfoCircle, ImGuiColors.TankBlue.ToUint());
             if (ImGui.IsItemHovered())
             {
                 var text = string.Join('\n', filesByType.Select(f => $"{f.Key}: {f.Count()} files | " +
@@ -597,7 +597,7 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
         ImGui.TableSetupScrollFreeze(0, 1);
         ImGui.TableHeadersRow();
 
-        // Bomb them.
+        // Bomb them. (seemingly broken atm but i dont care too much right now since ill rework later)
         var sortSpecs = ImGui.TableGetSortSpecs();
         if (sortSpecs.SpecsDirty && _cachedAnalysis != null)
         {

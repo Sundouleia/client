@@ -93,7 +93,7 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
         ImGui.Text("Total Requests:");
         CkGui.ColorTextInline(_requests.TotalRequests.ToString(), ImGuiColors.DalamudViolet);
 
-        CkGui.ColorText("Incoming Requests", ImGuiColors.ParsedPink);
+        CkGui.ColorText("Incoming Requests", SundColor.Gold.Uint());
         using (var _ = ImRaii.Table("Incoming-requests-table", 9, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
             ImGui.TableSetupColumn("Sender");
@@ -127,7 +127,7 @@ public partial class DebugStorageUI : WindowMediatorSubscriberBase
         }
 
         ImGui.Spacing();
-        CkGui.ColorText("Pending Requests", ImGuiColors.ParsedPink);
+        CkGui.ColorText("Pending Requests", SundColor.Gold.Uint());
         using (var _ = ImRaii.Table("Pending-requests-table", 9, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
             ImGui.TableSetupColumn("Recipient");

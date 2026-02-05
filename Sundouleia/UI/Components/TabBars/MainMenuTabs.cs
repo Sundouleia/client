@@ -1,4 +1,3 @@
-using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Widgets;
 using Dalamud.Bindings.ImGui;
@@ -10,7 +9,6 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Radar.Chat;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Gui.Components;
 
@@ -132,7 +130,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
                 {
                     var newMsgTxtPos = new Vector2(x.X + buttonSize.X / 2, x.Y - spacing.Y);
                     var newMsgTxt = RadarChatLog.NewMsgCount > 99 ? "99+" : RadarChatLog.NewMsgCount.ToString();
-                    var newMsgCol = RadarChatLog.NewCorbyMsg ? ImGuiColors.ParsedPink : ImGuiColors.ParsedGold;
+                    var newMsgCol = RadarChatLog.NewCorbyMsg ? ImGuiColors.ParsedPink : SundColor.Gold.Vec4();
                     drawList.OutlinedFont(newMsgTxt, newMsgTxtPos, newMsgCol.ToUint(), 0xFF000000, 1);
                 }
             }

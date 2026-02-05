@@ -1,5 +1,4 @@
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using OtterGui;
 using OtterGui.Classes;
@@ -282,7 +281,7 @@ public abstract class CkFilterComboBase<T>
     public virtual bool DrawPopup(string label, Vector2 openPos, ref int currentSelection, float itemHeight, uint? customSearchBg = null)
     {
         using var s = ImRaii.PushStyle(ImGuiStyleVar.PopupBorderSize, 1);
-        using var c = ImRaii.PushColor(ImGuiCol.Border, ImGuiColors.ParsedPink);
+        using var c = ImRaii.PushColor(ImGuiCol.Border, SundColor.Gold.Uint());
 
         DrawComboPopup(label, openPos, currentSelection, itemHeight, customSearchBg);
         if (NewSelection is null)

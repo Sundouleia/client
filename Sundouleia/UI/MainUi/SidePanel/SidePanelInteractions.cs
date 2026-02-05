@@ -3,7 +3,6 @@ using CkCommons.DrawSystem;
 using CkCommons.Gui;
 using CkCommons.Helpers;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui;
@@ -18,7 +17,6 @@ using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Util;
 using System.Collections.Immutable;
-using System.Drawing;
 
 namespace Sundouleia.Gui.MainWindow;
 

@@ -52,7 +52,13 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
 
         this.SetBoundaries(new(200, 400), ImGui.GetIO().DisplaySize);
 
-        Mediator.Subscribe<GPoseStartMessage>(this, _ => IsOpen = true);
+        // Do not expose the SMA Information to prevent theft.
+        Mediator.Subscribe<GPoseStartMessage>(this, _ =>
+        {
+#if DEBUG
+            IsOpen = true;
+#endif
+        });
 
         Mediator.Subscribe<GPoseObjectDestroyed>(this, _ =>
         {
@@ -63,10 +69,16 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
             }
         });
 
-        Mediator.Subscribe<GPoseStartMessage>(this, _ => IsOpen = true);
-//# if DEBUG
-//        IsOpen = true;
-//# endif
+        Mediator.Subscribe<GPoseStartMessage>(this, _ =>
+        {
+#if DEBUG
+            IsOpen = true;
+#endif
+        });
+
+# if DEBUG
+        IsOpen = true;
+# endif
     }
 
     /// <summary>

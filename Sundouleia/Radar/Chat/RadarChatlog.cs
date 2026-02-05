@@ -9,7 +9,6 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using OtterGui.Text;
-using Penumbra.GameData.Structs;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
 using Sundouleia.Gui.MainWindow;
@@ -22,9 +21,11 @@ using Sundouleia.Services.Tutorial;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Network;
 using System.Globalization;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Radar.Chat;
+
+// Rework heavily later how this is formatted. It should become more of a factory like implementation over a limited scope.
+// Logs should n ot be loaded unless manually requested. This allows the outcome where chats can be instanced.
 public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, IDisposable
 {
     private static RichTextFilter AllowedTypes = RichTextFilter.Emotes;
@@ -207,7 +208,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
         // toggle emote viewing.
         ImUtf8.SameLineInner();
-        using (ImRaii.PushColor(ImGuiCol.Text, CkColor.VibrantPink.Uint(), _emoteSelectionOpened))
+        using (ImRaii.PushColor(ImGuiCol.Text, SundColor.Gold.Uint(), _emoteSelectionOpened))
         {
             if (CkGui.IconButton(FAI.Heart, disabled: disableInput))
                 _emoteSelectionOpened = !_emoteSelectionOpened;

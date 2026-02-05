@@ -1,6 +1,5 @@
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Sundouleia.Pairs;
-using Sundouleia.PlayerClient;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 

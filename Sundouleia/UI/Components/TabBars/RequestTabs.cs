@@ -5,7 +5,6 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
 using Sundouleia.Gui.MainWindow;
-using Sundouleia.PlayerClient;
 
 namespace Sundouleia.Gui.Components;
 

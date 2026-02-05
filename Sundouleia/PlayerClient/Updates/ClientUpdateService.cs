@@ -1,5 +1,4 @@
 using CkCommons;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;

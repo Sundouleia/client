@@ -34,11 +34,11 @@ public partial class UiDataStorageShared
     // Cache location validators.
     private FilePathValidation _fileCacheValidation = FilePathValidation.InvalidPath;
     private FilePathValidation _smaExportValidation = FilePathValidation.InvalidPath;
+
     private readonly string _rootPath;
     private readonly bool _isLinux;
 
     private bool _isMonitoring => _mainWatcher.Watcher is not null;
-
 
     public UiDataStorageShared(ILogger<UiDataStorageShared> logger, MainConfig config, FileUploader uploader,
         FileCompactor compactor, CacheMonitor monitor, SundouleiaWatcher mainWatcher, PenumbraWatcher penumbraWatcher,

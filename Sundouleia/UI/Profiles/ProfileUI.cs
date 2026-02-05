@@ -1,6 +1,5 @@
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
@@ -41,7 +40,7 @@ public class ProfileUI : WindowMediatorSubscriberBase
 
     public UserData User { get; init; }
 
-    private static float Rounding => 35f * ImGuiHelpers.GlobalScale;
+    private static float Rounding => 30f * ImGuiHelpers.GlobalScale;
 
     protected override void PreDrawInternal()
     {
@@ -91,7 +90,7 @@ public class ProfileUI : WindowMediatorSubscriberBase
     {
         var btnPos = _drawHelper.CloseButtonPos;
         var btnSize = _drawHelper.CloseButtonSize;
-        var col = HoveringCloseButton ? ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)) : ImGui.GetColorU32(ImGuiColors.ParsedPink);
+        var col = ImGui.GetColorU32(HoveringCloseButton ? uint.MaxValue : SundColor.Gold.Uint());
         drawList.AddLine(btnPos, btnPos + btnSize, col, 3 * ImGuiHelpers.GlobalScale);
         drawList.AddLine(new Vector2(btnPos.X + btnSize.X, btnPos.Y), new Vector2(btnPos.X, btnPos.Y + btnSize.Y), col, 3 * ImGuiHelpers.GlobalScale);
 

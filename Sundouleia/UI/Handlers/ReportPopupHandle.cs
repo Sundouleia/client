@@ -13,7 +13,6 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
-using SundouleiaAPI.Network;
 
 namespace Sundouleia.Gui.Components;
 
@@ -43,7 +42,7 @@ internal class ReportPopupHandler : IPopupHandler
     public bool ShowClosed => false;
     public bool CloseHovered { get; set; } = false;
     public Vector2? WindowPadding => Vector2.Zero;
-    public float? WindowRounding => 35f;
+    public float? WindowRounding => 35f * ImGuiHelpers.GlobalScale;
 
     public void DrawContent()
     {
@@ -83,7 +82,7 @@ internal class ReportPopupHandler : IPopupHandler
             // Close Button
             var btnPos = rectMin + Vector2.One * 16;
             var btnSize = Vector2.One * 20;
-            var closeButtonColor = CloseHovered ? ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)) : ImGui.GetColorU32(ImGuiColors.ParsedPink);
+            var closeButtonColor = ImGui.GetColorU32(CloseHovered ? uint.MaxValue :SundColor.Gold.Uint());
             drawList.AddLine(btnPos, btnPos + btnSize, closeButtonColor, 3);
             drawList.AddLine(new Vector2(btnPos.X + btnSize.X, btnPos.Y), new Vector2(btnPos.X, btnPos.Y + btnSize.Y), closeButtonColor, 3);
             ImGui.SetCursorScreenPos(btnPos);

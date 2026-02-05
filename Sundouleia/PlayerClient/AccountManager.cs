@@ -4,8 +4,6 @@ using Sundouleia.DrawSystem;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Network;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 
 namespace Sundouleia.PlayerClient;
 
