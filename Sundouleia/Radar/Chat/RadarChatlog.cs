@@ -183,16 +183,13 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         var width = ImGui.GetContentRegionAvail().X;
 
         // Set keyboard focus to the chat input box if needed
-        if (shouldFocusChatInput && ImGui.IsWindowFocused())
+        if (shouldFocusChatInput)// && ImGui.IsWindowFocused())
         {
             Svc.Logger.Information("Setting keyboard focus to chat input box.", LoggerType.RadarChat);
             ImGui.SetKeyboardFocusHere(0);
             shouldFocusChatInput = false;
         }
-        
-
         ImGui.SetNextItemWidth(width - (CkGui.IconButtonSize(scrollIcon).X + ImGui.GetStyle().ItemInnerSpacing.X) * 3);
-
         using (ImRaii.Disabled(disableInput))
         {
             ImGui.InputTextWithHint($"##ChatInput{Label}{ID}", "type here...", ref previewMessage, 300);
@@ -316,7 +313,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         var isSystemMsg = LastInteractedMsg.UID == "System";
         var isOwnMsg = LastInteractedMsg.UID == MainHub.UID;
         var disableSilence = !ctrlHeld || isSystemMsg || isOwnMsg;
-        var disableBlock = !shiftHeld || !disableSilence;
+        var disableBlock = !ctrlHeld || !shiftHeld || !disableSilence;
 
         // Profile Viewing
         CkGui.FontText(LastInteractedMsg.Name, Svc.PluginInterface.UiBuilder.MonoFontHandle, ImGuiColors.ParsedGold);
@@ -328,6 +325,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
             {
                 SilenceList.Add(LastInteractedMsg.UID);
                 ClosePopupAndResetMsg();
+                return;
             }
         CkGui.AttachToolTip(ctrlHeld ? $"Hides messages from {LastInteractedMsg.Name} until plugin reload/restart." : "Must be holding CTRL to select.");
 
@@ -337,6 +335,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
             {
                 UiService.SetUITask(async () => await _hub.UserBlock(new(LastInteractedMsg.UserData)));
                 ClosePopupAndResetMsg();
+                return;
             }
         CkGui.AttachToolTip(shiftHeld ? $"Blocks {LastInteractedMsg.Name} permanently. (Currently not implemented)" : "Must be holding CTRL+SHIFT to select.");
 
@@ -344,10 +343,11 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         using (ImRaii.Disabled(disableBlock))
             if (ImGui.Selectable("Report Chat Behavior") && !isOwnMsg && !isSystemMsg)
             {
-                Mediator.Publish(new OpenReportUIMessage(LastInteractedMsg.UserData, ReportKind.Chat));
+                Mediator.Publish(new OpenReportUIMessage(LastInteractedMsg!.UserData, ReportKind.Chat));
                 ClosePopupAndResetMsg();
+                return;
             }
-        CkGui.AttachToolTip(shiftHeld ? $"Report {LastInteractedMsg.Name}'s chat behavior." : "Must be holding CTRL+SHIFT to select.");
+        CkGui.AttachToolTip(shiftHeld ? $"Report {LastInteractedMsg!.Name}'s chat behavior." : "Must be holding CTRL+SHIFT to select.");
     }
 
     private void ClosePopupAndResetMsg()

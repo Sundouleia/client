@@ -20,8 +20,6 @@ public class AccountManager
     private readonly GroupsDrawSystem _ddsGroups;
     private readonly ConfigFileProvider _fileProvider;
 
-    // Some kind of cached mapping to the linked profiles for the selected.
-
     public AccountManager(ILogger<AccountManager> logger, SundouleiaMediator mediator, 
         AccountConfig config, FolderConfig folders, GroupsDrawSystem ddsGroups, ConfigFileProvider files)
     {

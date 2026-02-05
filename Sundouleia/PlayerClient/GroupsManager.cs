@@ -24,6 +24,7 @@ public class GroupsManager : DisposableMediatorSubscriberBase
         _sundesmos = sundesmos;
 
         // Update the groups based on location changes.
+        Mediator.Subscribe<ConnectedMessage>(this, _ => LinkByMatchingLocation());
         Mediator.Subscribe<TerritoryChanged>(this, _ => LinkByMatchingLocation());
         // Run a check after each hub connection.
         // Ensure that a newly rendered sundesmo is checked against for location-sorted groups.
