@@ -18,7 +18,7 @@ public class FileTransferService : DisposableMediatorSubscriberBase
     private readonly HttpClient _httpClient;
 
     // Download semaphore attributes.
-    private readonly object _semaphoreModificationLock = new();
+    private readonly Lock _semaphoreModificationLock = new();
     private int _availableDownloadSlots;
     private SemaphoreSlim _downloadSemaphore;
 

@@ -3,6 +3,7 @@ using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Enums;
 
+namespace Sundouleia.Pairs;
 /// <summary>
 ///    Manages redraw operations for a Sundesmo player, specifically ensuring redraws only happen while
 ///    no updates are being processed for the player or their owned objects.<para/>
@@ -40,6 +41,7 @@ public class RedrawManager(Sundesmo sundesmo, ILogger<RedrawManager> logger, Ipc
 
     public void Dispose()
     {
+        _playerUpdateSlim.Wait();
         _playerUpdateSlim.Dispose();
         _pendingRedraws.Clear();
     }

@@ -24,8 +24,8 @@ public sealed class FileCacheManager : IHostedService
 
     // File cache entities of current files stored in the cache.
     private readonly ConcurrentDictionary<string, List<FileCacheEntity>> _fileCaches = new(StringComparer.Ordinal);
-    private readonly SemaphoreSlim _getCachesByPathsSemaphore = new(1, 1);
-    private readonly object _fileWriteLock = new();
+    private readonly Lock _getCachesByPathsLock = new();
+    private readonly Lock _fileWriteLock = new();
 
     public FileCacheManager(ILogger<FileCacheManager> logger, SundouleiaMediator mediator,
         MainConfig config, IpcManager ipc, ConfigFileProvider fileNames)
@@ -227,9 +227,7 @@ public sealed class FileCacheManager : IHostedService
     // -- Dont entirely understand why we do this yet but i'm sure I will as time goes on.
     public Dictionary<string, FileCacheEntity?> GetFileCachesByPaths(string[] paths)
     {
-        _getCachesByPathsSemaphore.Wait();
-
-        try
+        lock( _getCachesByPathsLock)
         {
             // retrieved the cleansed paths via the penumbra mod directory and cache folder (not sure why we would need this, but whatever)
             var cleanedPaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p,
@@ -269,10 +267,6 @@ public sealed class FileCacheManager : IHostedService
             }
 
             return result;
-        }
-        finally
-        {
-            _getCachesByPathsSemaphore.Release();
         }
     }
 
