@@ -84,8 +84,8 @@ public class ProfilesTab
         _frameH = ImUtf8.FrameHeight;
         _frameHSpacingWidth = ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X;
 
-        _ckFrameCol = CkColor.VibrantPink.Uint();
-        _clientCol = ImGuiColors.ParsedGold.ToUint();
+        _ckFrameCol = SundColor.Silver.Uint();
+        _clientCol = SundColor.Gold.Uint();
 
         _txtCol = ImGui.GetColorU32(ImGuiCol.Text);
         _txtDisableCol = ImGui.GetColorU32(ImGuiCol.TextDisabled);

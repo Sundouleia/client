@@ -27,8 +27,6 @@ public class MainUI : WindowMediatorSubscriberBase
     // Note that if you ever change this width you will need to also adjust the display width for the account page display.
     public const float MAIN_UI_WIDTH = 380f;
 
-    private bool THEME_PUSHED = false;
-
     private readonly MainConfig _config;
     private readonly AccountManager _account;
     private readonly MainHub _hub;
@@ -333,12 +331,12 @@ public class MainUI : WindowMediatorSubscriberBase
         {
             if (MainHub.IsConnected)
             {
-                CkGui.ColorText(userCount, ImGuiColors.ParsedGold);
+                CkGui.ColorText(userCount, SundColor.Gold.Vec4());
                 CkGui.TextInline("Online");
             }
             else
             {
-                CkGui.ColorText("Disconnected", ImGuiColors.DalamudRed);
+                CkGui.ColorText(SundouleiaEx.GetErrorText(), ImGuiColors.DalamudRed);
             }
         }
     }

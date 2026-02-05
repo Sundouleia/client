@@ -90,7 +90,7 @@ public class ProfileUI : WindowMediatorSubscriberBase
     {
         var btnPos = _drawHelper.CloseButtonPos;
         var btnSize = _drawHelper.CloseButtonSize;
-        var col = ImGui.GetColorU32(HoveringCloseButton ? uint.MaxValue : SundColor.Gold.Uint());
+        var col = ImGui.GetColorU32(HoveringCloseButton ? uint.MaxValue : SundColor.Silver.Uint());
         drawList.AddLine(btnPos, btnPos + btnSize, col, 3 * ImGuiHelpers.GlobalScale);
         drawList.AddLine(new Vector2(btnPos.X + btnSize.X, btnPos.Y), new Vector2(btnPos.X, btnPos.Y + btnSize.Y), col, 3 * ImGuiHelpers.GlobalScale);
 

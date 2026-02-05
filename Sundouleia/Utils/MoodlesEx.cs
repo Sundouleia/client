@@ -9,10 +9,10 @@ namespace Sundouleia;
 public static class MoodlesEx
 {
     public static IPCMoodleAccessTuple ToIpc(this ProviderMoodleAccessTuple t)
-        => ((MoodleAccess)t.OtherAccessFlags, t.OtherMaxTime, (MoodleAccess)t.CallerAccessFlags, t.CallerMaxTime);
+        => ((MoodleAccess)t.ClientAccessFlags, t.ClientMaxTime, (MoodleAccess)t.RecipientAccessFlags, t.RecipientMaxTime);
 
     public static ProviderMoodleAccessTuple ToCallGate(this IPCMoodleAccessTuple t)
-        => ((short)t.OtherAccess, t.OtherMaxTime, (short)t.CallerAccess, t.CallerMaxTime);
+        => ((short)t.ClientAccessFlags, t.ClientMaxTime, (short)t.RecipientAccessFlags, t.RecipientMaxTime);
 
     public static void AttachTooltip(this MoodlesStatusInfo item, IEnumerable<MoodlesStatusInfo> otherStatuses)
     {

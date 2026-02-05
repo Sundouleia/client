@@ -8,6 +8,7 @@ public enum SundColor
 {
     Gold,
     GoldAlpha, // Maybe remove, idk
+    Silver,
     Light,
     LightAlpha, // Maybe remove.
     Dark,
@@ -30,6 +31,7 @@ public static class ColorStyle
         {
             SundColor.Gold => new Vector4(.957f, .682f, .294f, 1f),
             SundColor.GoldAlpha => new Vector4(.957f, .682f, .294f, .7f),
+            SundColor.Silver => new Vector4(.778f, .778f, .778f, 1f),
             SundColor.Light => new Vector4(.318f, .137f, .196f, 1f),
             SundColor.LightAlpha => new Vector4(.318f, .137f, .196f, .5f),
             SundColor.Dark => new Vector4(.282f, .118f, .173f, 1f),
@@ -41,6 +43,7 @@ public static class ColorStyle
         {
             SundColor.Gold => SundColor.Gold.Vec4().ToUint(),
             SundColor.GoldAlpha => SundColor.GoldAlpha.Vec4().ToUint(),
+            SundColor.Silver => SundColor.Silver.Vec4().ToUint(),
             SundColor.Light => SundColor.Light.Vec4().ToUint(),
             SundColor.LightAlpha => SundColor.LightAlpha.Vec4().ToUint(),
             SundColor.Dark => SundColor.Dark.Vec4().ToUint(),

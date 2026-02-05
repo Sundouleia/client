@@ -316,7 +316,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
         using var node = ImRaii.TreeNode("Glamour State");
         if (!node) return;
 
-        using var _ = CkRaii.FramedChildPaddedWH("##glamNode", ImGui.GetContentRegionAvail(), 0, CkColor.VibrantPink.Uint());
+        using var _ = CkRaii.FramedChildPaddedWH("##glamNode", ImGui.GetContentRegionAvail(), 0, SundColor.Gold.Uint());
         using var font = ImRaii.PushFont(UiBuilder.MonoFont);
         ImUtf8.TextWrapped(element.GlamourState.ToString() ?? string.Empty);
     }

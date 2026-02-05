@@ -129,10 +129,7 @@ public class ProfileHelper
             SupporterIconBorderSize.X / 2, ImGui.GetColorU32(new Vector4(0, 0, 0, 1)));
 
         // Draw out the border for the icon.
-        if (CosmeticService.TryGetPlateBorder(PlateElement.Avatar, profile.Info.AvatarBorder, out var supporterBorder))
-            drawList.AddDalamudImageRounded(supporterBorder, SupporterIconBorderPos, SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2);
-        else
-            drawList.AddCircle(SupporterIconBorderPos + SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2, ImGui.GetColorU32(SundColor.Gold.Uint()), 0, 4f);
+        drawList.AddCircle(SupporterIconBorderPos + SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2, ImGui.GetColorU32(SundColor.Silver.Uint()), 0, 4f);
 
         // Draw out Supporter Icon.
         var supporterInfo = CosmeticService.GetSupporterInfo(userData);
@@ -146,10 +143,10 @@ public class ProfileHelper
             var aliasOrUidSize = ImGui.CalcTextSize(displayName);
             ImGui.SetCursorScreenPos(new Vector2(AvatarBorderPos.X + widthToCenterOn / 2 - aliasOrUidSize.X / 2, AvatarBorderPos.Y + AvatarBorderSize.Y + 5));
             // display it, it should be green if connected and red when not.
-            ImGui.TextColored(SundColor.Gold.Uint(), displayName);
+            ImGui.Text(displayName);
         }
 #if DEBUG
-        CkGui.CopyableDisplayText(userData.UID);
+        CkGui.CopyableDisplayText(userData.UID, "Click to Copy");
 #endif
     }
 

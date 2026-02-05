@@ -55,7 +55,7 @@ public class HomeTab
         // Gradient backdrop
         wdl.AddRectFilledMultiColor(halfPos, max, uint.MinValue, uint.MinValue, 0x44000000, 0x44000000);
         
-        using var _ = CkRaii.FramedChildPaddedWH("Account", size, 0, CkColor.VibrantPink.Uint(), CkStyle.ChildRounding(), wFlags: WFlags.NoScrollbar);
+        using var _ = CkRaii.FramedChildPaddedWH("Account", size, 0, ImGuiColors.ParsedGold.ToUint(), CkStyle.ChildRounding(), wFlags: WFlags.NoScrollbar);
         
         using (ImRaii.Group())
             DrawProfileInfo(_.InnerRegion, profile);
@@ -120,7 +120,7 @@ public class HomeTab
             wdl.AddCircleFilled(EditBorderPos + EditBorderSize / 2, EditBorderSize.X / 2, bgCol);
             // Draw out Edit Icon.
             wdl.AddDalamudImage(CosmeticService.CoreTextures.Cache[CoreTexture.Edit], EditIconPos, EditIconSize);
-            wdl.AddCircle(EditBorderPos + EditBorderSize / 2, EditBorderSize.X / 2, CkColor.VibrantPink.Uint(), 0, 3f * ImGuiHelpers.GlobalScale);
+            wdl.AddCircle(EditBorderPos + EditBorderSize / 2, EditBorderSize.X / 2, SundColor.Silver.Uint(), 0, 3f * ImGuiHelpers.GlobalScale);
         }
     }
 

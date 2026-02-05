@@ -129,10 +129,8 @@ internal class ReportPopupHandler : IPopupHandler
                 }
             }
 
-            CkGui.SeparatorSpaced(CkColor.VibrantPink.Uint());
-            CkGui.FontTextWrapped("The Plugin Author has been victim of abuse in multiple forms. " +
-                "As such, she will ensure her team does not allow predators to exploit this system " +
-                "against you, and so you can feel safer using it.", UiFontService.Default150Percent, ImGuiColors.DalamudGrey);
+            CkGui.SeparatorSpaced(SundColor.Gold.Uint());
+            CkGui.FontTextWrapped("The Sundouleia team will ensure the report system is not exploited or missused. Only report if nessisary.", UiFontService.Default150Percent, ImGuiColors.DalamudGrey);
 
             using var font = UiFontService.UidFont.Push();
             // Get the center of this screen.

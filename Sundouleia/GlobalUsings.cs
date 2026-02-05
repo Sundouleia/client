@@ -48,9 +48,9 @@ global using MoodlePresetInfo = (
 
 // The IPC Tuple used to define MoodleAccess permission between recipient and client.
 global using IPCMoodleAccessTuple = (
-    SundouleiaAPI.Enums.MoodleAccess OtherAccess, long OtherMaxTime,
-    SundouleiaAPI.Enums.MoodleAccess CallerAccess, long CallerMaxTime
+    SundouleiaAPI.Enums.MoodleAccess ClientAccessFlags, long ClientMaxTime,
+    SundouleiaAPI.Enums.MoodleAccess RecipientAccessFlags, long RecipientMaxTime
 );
 
 // Dalamud's Newtonsoft-based converter for objects does not play nice with nested [Flag] Enums in tuples, inside dictionaries.
-global using ProviderMoodleAccessTuple = (short OtherAccessFlags, long OtherMaxTime, short CallerAccessFlags, long CallerMaxTime);
+global using ProviderMoodleAccessTuple = (short ClientAccessFlags, long ClientMaxTime, short RecipientAccessFlags, long RecipientMaxTime);

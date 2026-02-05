@@ -34,9 +34,9 @@ public class RadarChatPopoutUI : WindowMediatorSubscriberBase
     protected override void DrawInternal()
     {
         using var font = UiFontService.Default150Percent.Push();
-        using var _ = ImRaii.PushColor(ImGuiCol.ScrollbarBg, CkColor.LushPinkButton.Uint())
-            .Push(ImGuiCol.ScrollbarGrab, CkColor.VibrantPink.Uint())
-            .Push(ImGuiCol.ScrollbarGrabHovered, CkColor.VibrantPinkHovered.Uint());
+        using var _ = ImRaii.PushColor(ImGuiCol.ScrollbarBg, SundColor.Dark.Uint())
+            .Push(ImGuiCol.ScrollbarGrab, SundColor.GoldAlpha.Uint())
+            .Push(ImGuiCol.ScrollbarGrabHovered, SundColor.Gold.Uint());
         
         var min = ImGui.GetCursorScreenPos();
         var max = min + ImGui.GetContentRegionAvail();
