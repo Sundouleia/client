@@ -995,6 +995,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _dlWaiterCTS.SafeCancelDispose();
         _runtimeCTS.SafeCancel();
 
+
         // If they were valid before, parse out the event message for their disposal.
         if (!string.IsNullOrEmpty(NameString))
         {
@@ -1030,6 +1031,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                     timeoutCTS.CancelAfter(TimeSpan.FromSeconds(30));
                     await RevertAlterations(name, addr, objIdx, timeoutCTS.Token);
                 }
+
+                // Make sure we aren't leaving the semaphore hanging
+                _dataLock.Wait();
+                _dataLock.Dispose();
             }
             catch (Exception ex)
             {
