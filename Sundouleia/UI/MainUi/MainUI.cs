@@ -69,7 +69,7 @@ public class MainUI : WindowMediatorSubscriberBase
 
         // display info about the folders
         var ver = Assembly.GetExecutingAssembly().GetName().Version!;
-        WindowName = $"Sundouleia Hush-Hush Testing ({ver.Major}.{ver.Minor}.{ver.Build}.{ver.Revision})###SundouleiaMainUI";
+        WindowName = $"Sundouleia Early Access ({ver.Major}.{ver.Minor}.{ver.Build}.{ver.Revision})###SundouleiaMainUI";
         Flags |= WFlags.NoDocking;
 
         this.PinningClickthroughFalse();
