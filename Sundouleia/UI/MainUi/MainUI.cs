@@ -16,6 +16,7 @@ using Sundouleia.Services.Tutorial;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
+using SundouleiaAPI.Network;
 using System.Globalization;
 using System.Reflection;
 
@@ -194,7 +195,8 @@ public class MainUI : WindowMediatorSubscriberBase
         {
             UiService.SetUITask(async () =>
             {
-                var res = await _hub.UserSendRequest(new(new(_uidToSentTo), false, _requestMessage));
+                var details = new RequestDetails(false, _requestMessage, LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId);
+                var res = await _hub.UserSendRequest(new(new(_uidToSentTo), details));
                 _uidToSentTo = string.Empty;
                 _requestMessage = string.Empty;
                 _creatingRequest = false;

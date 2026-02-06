@@ -8,6 +8,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using OtterGui.Text;
@@ -17,6 +18,7 @@ using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Hub;
+using SundouleiaAPI.Network;
 
 namespace Sundouleia.DrawSystem;
 
@@ -27,31 +29,20 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         "--COL--[L-CLICK]--COL-- Open/Close Request Drafter" +
         "--NL----COL--[SHIFT + L-CLICK]--COL-- Quick-Send Request.";
 
-    private bool _configExpanded = false;
-
     private readonly MainHub _hub;
+    private readonly FolderConfig _config;
     private readonly RadarManager _manager;
     private readonly GroupsManager _groups; // For group selection.
     private readonly SundesmoManager _sundesmos; // Know if they are a pair or not.
     private readonly RequestsManager _requests; // Know if they are pending request or not.
 
-    // We want to make sending requests tedious as a group grows, but not too tedious.
-    // Because of this we want to ensure that some defaults can be set so things do not
-    // need to be assigned all the time.
+    private RadarCache _cache => (RadarCache)FilterCache;
 
-    // No variable for it, but include a button for 'Create Group for Zone'
-    // This should be stored in a config somewhere I think.
-    private List<SundesmoGroup> _defaultGroups = []; // Automatically place requests sent with defaults into these when accepted.
-    private bool _defaultIsTemporary = true; // the attached message in the request.
+    private string? _requestMsg = null;
 
-    // Private cache states.
-    private IDynamicNode? _inDrafter; // The node expanded for request drafting.
-    private List<string> _groupsToJoinOnAccept = [];
-    private string _requestMsg = string.Empty;
-    private bool _asTemporary;
-
-    public RadarDrawer(MainHub hub, RadarManager manager,
-        GroupsManager groups, SundesmoManager sundesmos, RequestsManager requests, RadarDrawSystem ds)
+    public RadarDrawer(MainHub hub, FolderConfig config, RadarManager manager,
+        GroupsManager groups, SundesmoManager sundesmos, RequestsManager requests,
+        RadarDrawSystem ds)
         : base("##RadarDrawer", Svc.Logger.Logger, ds, new RadarCache(ds))
     {
         _hub = hub;
@@ -71,35 +62,44 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             FilterCache.Filter = tmp; // Auto-Marks as dirty.
 
         // If the config is expanded, draw that.
-        if (_configExpanded)
+        if (_cache.FilterConfigOpen)
             DrawRadarConfig(width);
     }
 
     // Draws the grey line around the filtered content when expanded and stuff.
     protected override void PostSearchBar()
     {
-        if (_configExpanded)
+        if (_cache.FilterConfigOpen)
             ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Button), 5f);
     }
 
     private void DrawButtons()
     {
-        if (CkGui.IconButton(FAI.Cog, inPopup: !_configExpanded))
-            _configExpanded = !_configExpanded;
+        if (CkGui.IconButton(FAI.Cog, inPopup: !_cache.FilterConfigOpen))
+            _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
         CkGui.AttachToolTip("Configure radar defaults.");
     }
 
     private void DrawRadarConfig(float width)
     {
-        var bgCol = _configExpanded ? ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f) : 0;
+        var bgCol = _cache.FilterConfigOpen ? ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f) : 0;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
         using var child = CkRaii.ChildPaddedW("RadarConfig", width, ImUtf8.FrameHeight, bgCol, 5f);
 
-        // next row, checkbox.
-        if (ImGui.Checkbox("Requests Are Temporary", ref _defaultIsTemporary))
+        var isTemp = _config.Current.RadarRequestsAreTemp;
+        if (ImGui.Checkbox("Requests Are Temporary", ref isTemp))
         {
-            Log.Information($"Default Temporary Request setting changed to [{_defaultIsTemporary}]");
+            _config.Current.RadarRequestsAreTemp = isTemp;
+            _config.Save();
         }
+        ImGui.SetNextItemWidth(child.InnerRegion.X);
+        var defaultMsg = _config.Current.RadarDefaultMessage;
+        if (ImGui.InputTextWithHint("##DefaultMsg", "Default Attached Message.", ref defaultMsg, 40))
+        {
+            _config.Current.RadarDefaultMessage = defaultMsg;
+            _config.Save();
+        }
+
     }
     #endregion Search
 
@@ -157,9 +157,9 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
 
     private void DrawUnpairedUser(IDynamicLeaf<RadarUser> leaf, DynamicFlags flags, bool selected)
     {
-        bool drafting = _inDrafter == leaf;
+        bool drafting = _cache.NodeInDrafter == leaf;
         var height = drafting ? CkStyle.GetFrameRowsHeight(2) : ImUtf8.FrameHeight;
-        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), height);  
+        var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), height);
         var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
         var frameCol = drafting ? ImGui.GetColorU32(ImGuiCol.Button) : 0;
 
@@ -192,12 +192,14 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         if (!drafting)
             return;
 
-        var sendRequestSize = CkGui.IconTextButtonSize(FAI.CloudUploadAlt, "Send");
-        ImGui.SetNextItemWidth(_.InnerRegion.X - sendRequestSize - ImUtf8.ItemInnerSpacing.X);
-        ImGui.InputTextWithHint("##sendRequestMsg", "Attach Message (Optional)", ref _requestMsg, 100);
+        var iconSize = CkGui.IconTextButtonSize(FAI.CloudUploadAlt, "Send");
+        var msg = _requestMsg ?? _config.Current.RadarDefaultMessage;
+        ImGui.SetNextItemWidth(_.InnerRegion.X - iconSize - ImUtf8.ItemInnerSpacing.X);
+        if (ImGui.InputTextWithHint("##sendRequestMsg", "Attach Message (Optional)", ref msg, 50))
+            _requestMsg = msg;
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.CloudUploadAlt, "Send", disabled: UiService.DisableUI))
-            SendRequest(leaf, _groupsToJoinOnAccept);
+            SendRequest(leaf);
     }
 
     // We only ever do this for the unpaired leaves so it's ok to handle that logic here.
@@ -207,21 +209,19 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             return;
 
         // Send quick-request if shift is held.
-        if (ImGui.GetIO().KeyShift && _inDrafter != node)
-            SendRequest(node, []);
+        if (ImGui.GetIO().KeyShift && _cache.NodeInDrafter != node)
+            SendRequest(node);
         // Otherwise just set the drafter to this node and clear all drafter variables.
         else
         {
             // If in drafter for this node, close it.
-            if (_inDrafter == node)
-                _inDrafter = null;
+            if (_cache.NodeInDrafter == node)
+                _cache.NodeInDrafter = null;
             // Otherwise, open it, but not if the node is in any requests.
             else
             {
-                _inDrafter = node;
-                _groupsToJoinOnAccept = _defaultGroups.Select(g => g.Label).ToList();
-                _asTemporary = _defaultIsTemporary;
-                _requestMsg = string.Empty;
+                _cache.NodeInDrafter = node;
+                _requestMsg = _config.Current.RadarDefaultMessage;
             }
         }
     }
@@ -256,25 +256,24 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         return ImGui.IsItemHovered();
     }
 
-    private void SendRequest(IDynamicLeaf<RadarUser> node, List<string> preAddToGroups)
+    private void SendRequest(IDynamicLeaf<RadarUser> node)
     {
         UiService.SetUITask(async () =>
         {
-            var res = await _hub.UserSendRequest(new(new(node.Data.UID), _asTemporary, _requestMsg));
+            var attachedMsg = _requestMsg ?? _config.Current.RadarDefaultMessage;
+            var details = new RequestDetails(_config.Current.RadarRequestsAreTemp, attachedMsg, LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId);
+            var res = await _hub.UserSendRequest(new(new(node.Data.UID), details));
             if (res.ErrorCode is SundouleiaApiEc.Success && res.Value is { } sentRequest)
             {
-                Svc.Logger.Information($"Successfully sent sundesmo request to {node.Data.DisplayName}");
+                Log.Information($"Successfully sent sundesmo request to {node.Data.DisplayName}");
                 _requests.AddNewRequest(sentRequest);
-                _groupsToJoinOnAccept = _defaultGroups.Select(g => g.Label).ToList();
-                _asTemporary = _defaultIsTemporary;
+                // Clear temp variables
                 _requestMsg = string.Empty;
-                // Exit the drafter.
-                _inDrafter = null;
-                // If we wanted to pre-add them to groups, do that below before the return.
+                _cache.NodeInDrafter = null;
                 return;
             }
             // Notify failure.
-            Svc.Logger.Warning($"Request to {node.Data.DisplayName} failed with error code {res.ErrorCode}");
+            Log.Warning($"Request to {node.Data.DisplayName} failed with error code {res.ErrorCode}");
         });
     }
 }

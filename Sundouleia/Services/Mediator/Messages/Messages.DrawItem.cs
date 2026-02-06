@@ -10,6 +10,3 @@ public record FolderUpdateGroups : MessageBase;
 public record FolderUpdateGroup(string GroupName) : MessageBase;
 public record FolderUpdateRadar : MessageBase;
 public record FolderUpdateRequests : MessageBase;
-
-// Update helpers for DTR and stuff.
-public record NewRequestAdded(RequestEntry request) : MessageBase;

@@ -149,7 +149,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
     private IReadOnlyList<ISortMethod<DynamicLeaf<Sundesmo>>> GetDefaultSorter()
         => (_config.Current.PrioritizeFavorites, _config.Current.PrioritizeTemps) switch
         {
-            (true, true) => [SorterExtensions.ByFavorite, SorterExtensions.ByTemporary, SorterExtensions.ByPairName],
+            (true, true) => [SorterExtensions.ByTemporary, SorterExtensions.ByFavorite, SorterExtensions.ByPairName],
             (true, false) => [SorterExtensions.ByFavorite, SorterExtensions.ByPairName],
             (false, true) => [SorterExtensions.ByTemporary, SorterExtensions.ByPairName],
             _ => [SorterExtensions.ByPairName]

@@ -28,7 +28,6 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
         // Load the hierarchy and initialize the folders.
         LoadData();
 
-        Mediator.Subscribe<FolderUpdateRequests>(this, _ => UpdateFolders()); // should be able to remove.
         Mediator.Subscribe<FolderUpdateRadar>(this, _ => UpdateFolders());
 
         DDSChanged += OnChange;
@@ -76,11 +75,11 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
 
     protected override bool EnsureAllFolders(Dictionary<string, string> _)
     {
-        // Add both folders accordingly if necessary.
-        bool anyAdded = false;
-        anyAdded |= TryAddFolder(FAI.Link, Constants.FolderTagRadarPaired, () => [.. _radar.RadarUsers.Where(r => r.IsPaired)]);
-        anyAdded |= TryAddFolder(FAI.SatelliteDish, Constants.FolderTagRadarUnpaired, () => [.. _radar.RadarUsers.Where(r => !r.IsPaired)]);
-        return anyAdded;
+        bool diff = false;
+        diff |= TryAddFolder(FAI.Link, Constants.FolderTagRadarPaired, () => [.. _radar.RadarUsers.Where(r => r.IsPaired)]);
+        diff |= TryAddFolder(FAI.Inbox, Constants.FolderTagPendingRequest, () => [.. _radar.RadarUsers.Where(r => r.InRequests)]);
+        diff |= TryAddFolder(FAI.SatelliteDish, Constants.FolderTagRadarUnpaired, () => [.. _radar.RadarUsers.Where(r => !r.IsPaired)]);
+        return diff;
     }
 
     private bool TryAddFolder(FAI icon, string name, Func<IReadOnlyList<RadarUser>> gen)

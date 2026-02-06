@@ -79,7 +79,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
             {
                 Name = new SeStringBuilder().AddText("Send Temporary Request").Build(),
                 PrefixChar = 'S',
-                PrefixColor = 708,
+                PrefixColor = 527,
                 OnClicked = _ => Mediator.Publish(new SendTempRequestMessage(userData)),
             });
         }
@@ -151,7 +151,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
                 _watcher.TryGetExisting(user.Ident, out address);
 
             // Attempt to add the user. If it was successful, try updating the sundesmo.
-            _allRadarUsers.TryAdd(user.User, new RadarUser(_sundesmos, user, address));
+            _allRadarUsers.TryAdd(user.User, new RadarUser(_sundesmos, _requests, user, address));
         }
         // Could have removed hashedIdent from the User, so we should remove them from the list.
         RecreateLazy();

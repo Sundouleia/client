@@ -6,27 +6,17 @@ public static class Constants
 {
     public const int Blake3HashLength = 64;
     // Default, Unchangeable Tags used for base Sundesmo grouping.
-    public const string FolderTagAllDragDrop    = "All Sundesmos (For Drag-Drop)";
     public const string FolderTagAll            = "All Sundesmos";
     public const string FolderTagVisible        = "Visible";
     public const string FolderTagOnline         = "Online";
     public const string FolderTagOffline        = "Offline";
+    // Radar
     public const string FolderTagRadarPaired    = "Paired";
+    public const string FolderTagPendingRequest = "Pending Requests";
     public const string FolderTagRadarUnpaired  = "Unpaired";
+    // Requests
     public const string FolderTagRequestInc= "Incoming Requests";
     public const string FolderTagRequestPending = "Pending Requests";
-    // Sundouleia Folder Labels
-    public static readonly IEnumerable<string> OwnedFolders = [
-        FolderTagAllDragDrop,
-        FolderTagAll,
-        FolderTagVisible,
-        FolderTagOnline,
-        FolderTagOffline,
-        FolderTagRadarPaired,
-        FolderTagRadarUnpaired,
-        FolderTagRequestInc,
-        FolderTagRequestPending
-    ];
 
     // CachePrefixes
     public const string SMAFolderName = "ModularActorCache";

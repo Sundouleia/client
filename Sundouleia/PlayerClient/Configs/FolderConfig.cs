@@ -26,6 +26,10 @@ public class FolderStorage
     public bool StyleEditing   { get; set; } = false;
     public bool FilterEditing { get; set; } = false;
     public bool LocationEditing { get; set; } = false;
+
+    // Radar Config Options
+    public bool RadarRequestsAreTemp { get; set; } = true;
+    public string RadarDefaultMessage { get; set; } = string.Empty;
 }
 
 public class SundesmoGroup

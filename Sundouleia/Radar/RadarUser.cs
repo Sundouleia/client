@@ -1,5 +1,6 @@
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Network;
 
@@ -13,29 +14,33 @@ namespace Sundouleia.Radar;
 public unsafe class RadarUser
 {
     private readonly SundesmoManager _sundesmos;
+    private readonly RequestsManager _requests;
 
     private Character* _player;
     private UserData _user;
     private Sundesmo? _sundesmo;
 
     // Find a way to phase out the manager if possible, perhaps with a function
-    public RadarUser(SundesmoManager manager, OnlineUser onlineUser, IntPtr address)
+    public RadarUser(SundesmoManager sundesmos, RequestsManager requests, OnlineUser onlineUser, IntPtr address)
     {
-        _sundesmos = manager;
+        _sundesmos = sundesmos;
+        _requests = requests;
+
         _user = onlineUser.User;
         HashedIdent = onlineUser.Ident;
         _player = address != IntPtr.Zero ? (Character*)address : null;
         RefreshSundesmo();
     }
 
-    public string HashedIdent { get; private set; }
+    public string HashedIdent   { get; private set; }
+    public bool   InRequests    { get; private set; } = false;
 
     public string UID         => _sundesmo?.UserData.UID        ?? _user.UID;
     public string AnonTag     => _sundesmo?.UserData.AnonTag    ?? _user.AnonTag;
     public string DisplayName => _sundesmo?.GetNickAliasOrUid() ?? _user.AnonName;
 
     public bool IsPaired        => _sundesmo is not null;
-    public bool CanSendRequests => !IsPaired && HashedIdent.Length != 0;
+    public bool CanSendRequests => !IsPaired && !InRequests && HashedIdent.Length != 0;
 
     // Visibility.
     public bool   IsValid        => _player is not null;     
@@ -44,9 +49,15 @@ public unsafe class RadarUser
     public ulong  EntityId       => IsValid ? _player->EntityId : ulong.MaxValue;
     public ulong  PlayerObjectId => IsValid ? _player->GetGameObjectId().Id : ulong.MaxValue;
 
+    /// <summary>
+    ///     Should be called after updates to the SundesmoManager 
+    ///     and RequestsManager are made for accurate results.
+    /// </summary>
     public void RefreshSundesmo()
-        => _sundesmo = _sundesmos.GetUserOrDefault(_user);
-
+    {
+        _sundesmo = _sundesmos.GetUserOrDefault(_user);
+        InRequests = _requests.ExistsFor(UID);
+    }
     /// <summary>
     ///     Update the hashedId for this radar user. Determines visibility status.
     /// </summary>

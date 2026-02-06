@@ -6,6 +6,7 @@ using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
+using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Permissions;
@@ -22,6 +23,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public const string MAIN_SERVER_NAME = "Sundouleia Main";
     public const string MAIN_SERVER_URI = "wss://sundouleia.kinkporium.studio";
 
+    private readonly FolderConfig _folders;
     private readonly AccountManager _accounts;
     private readonly HubFactory _hubFactory;
     private readonly TokenProvider _tokenProvider;
@@ -50,6 +52,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
 
     public MainHub(ILogger<MainHub> logger,
         SundouleiaMediator mediator,
+        FolderConfig folders,
         AccountManager accounts,
         HubFactory hubFactory,
         TokenProvider tokenProvider,
@@ -60,6 +63,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         IpcProvider ipcProvider)
         : base(logger, mediator)
     {
+        _folders = folders;
         _accounts = accounts;
         _hubFactory = hubFactory;
         _tokenProvider = tokenProvider;
@@ -149,16 +153,15 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
 
     private async void OnSendTempRequest(UserData user)
     {
-        var msg = $"Temporary Request from {OwnUserData.AnonName}";
-        var ret = await UserSendRequest(new(new(user.UID), true, msg)).ConfigureAwait(false);
+        var details = new RequestDetails(true, _folders.Current.RadarDefaultMessage, LocationSvc.WorldId, LocationSvc.Current.TerritoryId);
+        var ret = await UserSendRequest(new(new(user.UID), details)).ConfigureAwait(false);
         if (ret.ErrorCode is SundouleiaApiEc.Success && ret.Value is { } request)
         {
             Logger.LogInformation($"Temporary request sent to {user.AnonName}.", LoggerType.RadarData);
-            // Add to our requests, updating the requests manager.
             _requests.AddNewRequest(request);
+            _radar.RefreshUser(user);
             return;
         }
-
         Logger.LogWarning($"Failed to send temporary pair request to {user.AnonName} [{ret.ErrorCode}]", LoggerType.RadarData);
     }
     private async void OnLogin()

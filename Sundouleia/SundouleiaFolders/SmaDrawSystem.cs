@@ -25,13 +25,13 @@ public sealed class SmaDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSubsc
         _sundesmos = sundesmos;
         _hybridSaver = saver;
 
-        // Load the hierarchy and initialize the folders.
-        LoadData();
+        //// Load the hierarchy and initialize the folders.
+        //LoadData();
 
-        Mediator.Subscribe<FolderUpdateRadar>(this, _ => UpdateFolders());
+        //Mediator.Subscribe<FolderUpdateRadar>(this, _ => UpdateFolders());
 
-        DDSChanged += OnChange;
-        CollectionUpdated += OnCollectionUpdate;
+        //DDSChanged += OnChange;
+        //CollectionUpdated += OnCollectionUpdate;
     }
 
     public void Dispose()

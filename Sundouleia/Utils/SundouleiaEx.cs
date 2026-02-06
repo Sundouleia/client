@@ -3,6 +3,7 @@ using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.WebAPI;
 
@@ -92,6 +93,27 @@ public static class SundouleiaEx
             return true;
         }
         return false;
+    }
+
+    // Could maybe optimize better with button generation like we do
+    // in our connection states, but as always can optimize this later.
+    public static bool DrawTempUserLink(Sundesmo sundesmo, bool disabled)
+    {
+        var pos = ImGui.GetCursorScreenPos();
+        var col = ImGuiColors.ParsedGrey; // Default color state.
+        var hovering = false;
+        if (!disabled)
+        {
+            hovering = ImGui.IsMouseHoveringRect(pos, pos + new Vector2(ImGui.GetFrameHeight()));
+            var pressed = hovering && ImGui.IsMouseDown(ImGuiMouseButton.Left);
+            col = pressed ? ImGuiColors.TankBlue : hovering ? ImGuiColors.DalamudGrey2 : ImGuiColors.ParsedGrey;
+        }
+
+        CkGui.FramedIconText(FAI.Clock, col);
+        CkGui.AttachToolTip($"Your pairing with {sundesmo.GetDisplayName()} is Temporary." +
+            $"--SEP----COL--[SHIFT + L-Click]--COL--Convert to permanent.", ImGuiColors.TankBlue);
+
+        return hovering && ImGui.GetIO().KeyShift && ImGui.IsMouseReleased(ImGuiMouseButton.Left);
     }
 
     public static string ByteToString(long bytes, bool addSuffix = true)

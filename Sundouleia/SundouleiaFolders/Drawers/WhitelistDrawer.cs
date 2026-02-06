@@ -14,8 +14,11 @@ using Sundouleia.Gui.MainWindow;
 using Sundouleia.Localization;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
+using Sundouleia.WebAPI;
+using SundouleiaAPI.Hub;
 
 namespace Sundouleia.DrawSystem;
 
@@ -28,6 +31,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         "--NL----COL--[R-CLICK]--COL-- Open Context Menu";
 
     private readonly SundouleiaMediator _mediator;
+    private readonly MainHub _hub;
     private readonly MainConfig _config;
     private readonly FolderConfig _folders;
     private readonly FavoritesConfig _favorites;
@@ -45,12 +49,13 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private bool          _profileShown = false;// If currently displaying a popout profile.
     private DateTime?     _lastHoverTime;       // time until we should show the profile.
 
-    public WhitelistDrawer(SundouleiaMediator mediator,MainConfig config, FolderConfig folders, 
-        FavoritesConfig favorites, NicksConfig nicks, GroupsManager groups, 
+    public WhitelistDrawer(SundouleiaMediator mediator, MainHub hub, MainConfig config,
+        FolderConfig folders, FavoritesConfig favorites, NicksConfig nicks, GroupsManager groups, 
         SundesmoManager sundesmos, SidePanelService sidePanel, WhitelistDrawSystem ds)
         : base("##WhitelistDrawer", Svc.Logger.Logger, ds, new WhitelistCache(ds))
     {
         _mediator = mediator;
+        _hub = hub;
         _config = config;
         _folders = folders;
         _favorites = favorites;
@@ -227,23 +232,33 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
     private float DrawRightButtons(IDynamicLeaf<Sundesmo> leaf, DynamicFlags flags)
     {
         var interactionsSize = CkGui.IconButtonSize(FAI.ChevronRight);
-        var windowEndX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
-        var currentRightSide = windowEndX - interactionsSize.X;
-
-        ImGui.SameLine(currentRightSide);
+        var endX = ImGui.GetWindowContentRegionMin().X + CkGui.GetWindowContentRegionWidth();
+        
         if (!flags.HasAny(DynamicFlags.DragDrop))
         {
+            endX -= interactionsSize.X;
+            ImGui.SameLine(endX);
             ImGui.AlignTextToFramePadding();
             if (CkGui.IconButton(FAI.ChevronRight, inPopup: true))
                 _sidePanel.ForInteractions(leaf.Data);
-
-            currentRightSide -= interactionsSize.X;
-            ImGui.SameLine(currentRightSide);
+            CkGui.AttachToolTip("Toggle Interactions View");
         }
 
-        ImGui.AlignTextToFramePadding();
+        // Now the favorites
+        endX -= ImUtf8.FrameHeight;
+        ImGui.SameLine(endX);
         SundouleiaEx.DrawFavoriteStar(_favorites, leaf.Data.UserData.UID, true);
-        return currentRightSide;
+
+        // If they are temporary, draw the interaction area for this as well.
+        if (leaf.Data.IsTemporary)
+        {
+            endX -= ImUtf8.FrameHeight;
+            ImGui.SameLine(endX);
+            if (SundouleiaEx.DrawTempUserLink(leaf.Data, UiService.DisableUI))
+                ConvertUserToPermanent(leaf);
+        }
+        // Return the remaining width
+        return endX;
     }
 
     private void DrawNameEditor(IDynamicLeaf<Sundesmo> leaf, float width)
@@ -475,25 +490,23 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.PrioritizeTempTT);
     }
 
-    public bool DrawPopup(string popupId, GroupFolder folder, float width)
+    private void ConvertUserToPermanent(IDynamicLeaf<Sundesmo> leaf)
     {
-        // Set next popup position, style, color, and display.
-        ImGui.SetNextWindowPos(ImGui.GetItemRectMin() + new Vector2(ImGui.GetItemRectSize().X, 0));
-        using var s = ImRaii.PushStyle(ImGuiStyleVar.PopupBorderSize, 1f)
-            .Push(ImGuiStyleVar.PopupRounding, 5f)
-            .Push(ImGuiStyleVar.WindowPadding, ImGuiHelpers.ScaledVector2(4f, 1f));
-        using var c = ImRaii.PushColor(ImGuiCol.Border, ImGuiColors.ParsedGold);
-        using var popup = ImRaii.Popup(popupId, WFlags.NoMove | WFlags.NoResize | WFlags.NoCollapse | WFlags.NoScrollbar);
-        if (!popup)
-            return false;
-
-        // Display the filter editor inside, after drawing the filter popup display.
-        CkGui.InlineSpacingInner();
-        CkGui.ColorTextFrameAligned("Filters:", ImGuiColors.ParsedGold);
-        ImGui.Separator();
-        return false;
+        UiService.SetUITask(async () =>
+        {
+            var res = await _hub.UserPersistPair(new(leaf.Data.UserData));
+            if (res.ErrorCode is not SundouleiaApiEc.Success)
+                Log.Warning($"Failed to make pairing with {leaf.Data.GetDisplayName()} permanent. Reason: {res.ErrorCode}");
+            else
+            {
+                Log.Warning($"Successfully made pairing with {leaf.Data.GetDisplayName()} permanent.");
+                leaf.Data.MarkAsPermanent();
+            }
+        });
     }
 
     #endregion Utility
+
+
 }
 

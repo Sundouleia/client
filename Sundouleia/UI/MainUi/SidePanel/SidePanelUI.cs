@@ -258,27 +258,24 @@ public class SidePanelUI : WindowMediatorSubscriberBase
                 _logger.LogWarning($"Failed to accept bulk requests: {res.ErrorCode}");
                 if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
                 {
+                    // Remove all requests then update the radar folders to reflect the changes
                     _requests.RemoveRequests(requests);
                     _radar.RefreshUsers();
                 }
             }
             else
             {
-                // Remove all requests.
+                // Remove all requests
                 _requests.RemoveRequests(requests);
-                _radar.RefreshUsers();
-
-                // Process each of the accepted pairs.
+                // Process each of the accepted pairs
                 foreach (var addedPair in res.Value)
                 {
-                    // Append them to the sundesmosManager
                     _sundesmos.AddSundesmo(addedPair.Pair);
-                    // If online, mark online.
                     if (addedPair.OnlineInfo is { } onlineUser)
                         _sundesmos.MarkSundesmoOnline(onlineUser);
-
-                    // TODO: Preset groups can be applied here, along with a desired nick, if we add later.
                 }
+                // Update radar folders to reflect these changes
+                _radar.RefreshUsers();
             }
         });
     }
@@ -292,6 +289,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
             var res = await _hub.UserRejectRequests(new(requests.Select(x => new UserData(x.SenderUID)).ToList()));
             if (res.ErrorCode is SundouleiaApiEc.Success)
             {
+                // Remove all requests then update the radar folders to reflect the changes
                 _requests.RemoveRequests(requests);
                 _radar.RefreshUsers();
             }
