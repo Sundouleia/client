@@ -28,6 +28,7 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
         // Load the hierarchy and initialize the folders.
         LoadData();
 
+        Mediator.Subscribe<FolderUpdateRequests>(this, _ => UpdateFolders()); // should be able to remove.
         Mediator.Subscribe<FolderUpdateRadar>(this, _ => UpdateFolders());
 
         DDSChanged += OnChange;

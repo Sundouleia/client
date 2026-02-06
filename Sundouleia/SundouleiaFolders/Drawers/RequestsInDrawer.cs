@@ -338,9 +338,8 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             {
                 // Remove the request from the manager.
                 _manager.RemoveRequest(request);
-                _radar.RefreshUser(new(request.SenderUID));
-                // Add the Sundesmo to the SundesmoManager.
                 _sundesmos.AddSundesmo(res.Value!.Pair);
+                _radar.RefreshUser(new(request.SenderUID));
                 // If they are online, mark them online.
                 if (res.Value!.OnlineInfo is { } onlineSundesmo)
                     _sundesmos.MarkSundesmoOnline(onlineSundesmo);

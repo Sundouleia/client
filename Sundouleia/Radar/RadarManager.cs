@@ -44,19 +44,6 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearUsers());
 
         Svc.ContextMenu.OnMenuOpened += OnRadarContextMenu;
-
-#if DEBUG
-        // Generate some dummy entries.
-        Mediator.Subscribe<ConnectedMessage>(this, _ =>
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                var toAdd = new RadarUser(_sundesmos, new(new($"Dummy Sender {i}"), $"RandomIdent{i}"), IntPtr.Zero);
-                _allRadarUsers.TryAdd(new($"Dummy Sender {i}"), toAdd);
-            }
-            RecreateLazy();
-        });
-#endif
     }
 
     // Expose the RadarUser, keeping the UserData private.
