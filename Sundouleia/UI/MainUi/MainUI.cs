@@ -5,11 +5,13 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using OtterGui.Text;
 using OtterGuiInternal;
 using Sundouleia.Gui.Components;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Tutorial;
@@ -34,9 +36,10 @@ public class MainUI : WindowMediatorSubscriberBase
     private readonly MainMenuTabs _tabMenu;
     private readonly HomeTab _homeTab;
     private readonly WhitelistTabs _whitelist;
-    private readonly RadarTab _radar;
+    private readonly RadarTab _radarTab;
     private readonly RadarChatTab _radarChat;
     private readonly RequestsTab _requestsTab;
+    private readonly RadarManager _radar;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly TutorialService _guides;
@@ -49,9 +52,9 @@ public class MainUI : WindowMediatorSubscriberBase
 
     public MainUI(ILogger<MainUI> logger, SundouleiaMediator mediator, MainConfig config,
         AccountManager account, MainHub hub, MainMenuTabs tabMenu, HomeTab homeTab,
-        RequestsTab requestsTab, WhitelistTabs whitelist, RadarTab radar, RadarChatTab chat,
-        RequestsManager requests, SundesmoManager sundesmos, TutorialService guides,
-        SidePanelService stickyService)
+        RequestsTab requestsTab, WhitelistTabs whitelist, RadarTab radarTab, RadarChatTab chat,
+        RadarManager radar, RequestsManager requests, SundesmoManager sundesmos, 
+        TutorialService guides, SidePanelService stickyService)
         : base(logger, mediator, "###Sundouleia_MainUI")
     {
         _config = config;
@@ -60,9 +63,10 @@ public class MainUI : WindowMediatorSubscriberBase
         _tabMenu = tabMenu;
         _homeTab = homeTab;
         _whitelist = whitelist;
-        _radar = radar;
+        _radarTab = radarTab;
         _radarChat = chat;
         _requestsTab = requestsTab;
+        _radar = radar;
         _requests = requests;
         _sundesmos = sundesmos;
         _guides = guides;
@@ -173,7 +177,7 @@ public class MainUI : WindowMediatorSubscriberBase
                 _whitelist.DrawGroupsView();
                 break;
             case MainMenuTabs.SelectedTab.Radar:
-                _radar.DrawSection();
+                _radarTab.DrawSection();
                 break;
             case MainMenuTabs.SelectedTab.RadarChat:
                 _radarChat.DrawSection();
@@ -197,12 +201,16 @@ public class MainUI : WindowMediatorSubscriberBase
             {
                 var details = new RequestDetails(false, _requestMessage, LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId);
                 var res = await _hub.UserSendRequest(new(new(_uidToSentTo), details));
+                // Add the request if it was successful!
+                if (res.ErrorCode is SundouleiaApiEc.Success)
+                {
+                    _requests.AddNewRequest(res.Value!);
+                    _radar.RefreshUser(new(_uidToSentTo));
+                }
+                // Clear values
                 _uidToSentTo = string.Empty;
                 _requestMessage = string.Empty;
                 _creatingRequest = false;
-                // Add the request if it was successful!
-                if (res.ErrorCode is SundouleiaApiEc.Success)
-                    _requests.AddNewRequest(res.Value!);
             });
         }
         if (!string.IsNullOrEmpty(_uidToSentTo))

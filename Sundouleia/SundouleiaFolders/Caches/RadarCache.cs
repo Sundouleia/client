@@ -21,6 +21,9 @@ public class RadarCache(DynamicDrawSystem<RadarUser> parent) : DynamicFilterCach
     // Override for matching the search filter.
     protected override bool IsVisible(IDynamicNode<RadarUser> node)
     {
+        if (node is RadarFolder radarFolder)
+            return radarFolder.TotalChildren > 0;
+
         if (Filter.Length is 0)
             return true;
 

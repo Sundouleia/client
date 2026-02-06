@@ -1,6 +1,7 @@
 using CkCommons;
 using Dalamud.Interface.ImGuiNotification;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.VisualBasic.ApplicationServices;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -147,6 +148,7 @@ public partial class MainHub
     {
         Logger.LogDebug($"Callback_AddPairRequest: {dto}", LoggerType.Callbacks);
         _requests.AddNewRequest(dto);
+        _radar.RefreshUser(dto.User);
         return Task.CompletedTask;
     }
 

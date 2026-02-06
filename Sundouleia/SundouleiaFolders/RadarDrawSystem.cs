@@ -78,7 +78,7 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
         bool diff = false;
         diff |= TryAddFolder(FAI.Link, Constants.FolderTagRadarPaired, () => [.. _radar.RadarUsers.Where(r => r.IsPaired)]);
         diff |= TryAddFolder(FAI.Inbox, Constants.FolderTagPendingRequest, () => [.. _radar.RadarUsers.Where(r => r.InRequests)]);
-        diff |= TryAddFolder(FAI.SatelliteDish, Constants.FolderTagRadarUnpaired, () => [.. _radar.RadarUsers.Where(r => !r.IsPaired)]);
+        diff |= TryAddFolder(FAI.SatelliteDish, Constants.FolderTagRadarUnpaired, () => [.. _radar.RadarUsers.Where(r => !r.IsPaired && !r.InRequests)]);
         return diff;
     }
 

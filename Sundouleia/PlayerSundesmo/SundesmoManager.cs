@@ -591,7 +591,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         subMenu.IsSubmenu = true;
         subMenu.Name = "Sundouleia";
         subMenu.PrefixChar = 'S';
-        subMenu.PrefixColor = 708;
+        subMenu.PrefixColor = 527;
         subMenu.OnClicked += (args) => OpenSubMenu(match, args);
         args.AddMenuItem(subMenu);
     }
@@ -605,13 +605,13 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         {
             Name = new SeStringBuilder().AddText("Open Profile").Build(),
             PrefixChar = 'S',
-            PrefixColor = 708,
+            PrefixColor = 527,
             OnClicked = (a) => { Mediator.Publish(new ProfileOpenMessage(sundesmo.UserData)); },
         }, new MenuItem()
         {
             Name = new SeStringBuilder().AddText("Open Permissions").Build(),
             PrefixChar = 'S',
-            PrefixColor = 708,
+            PrefixColor = 527,
             OnClicked = (a) => { Mediator.Publish(new OpenSundesmoSidePanel(sundesmo, true)); },
         }]);
     }

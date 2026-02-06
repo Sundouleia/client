@@ -298,7 +298,6 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
 //        }
 //        requests.AddRange(dummyRequests);
 //#endif
-
         _requests.AddNewRequest(requests);
     }
 

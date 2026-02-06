@@ -11,6 +11,7 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -25,9 +26,12 @@ namespace Sundouleia.DrawSystem;
 public class RadarDrawer : DynamicDrawer<RadarUser>
 {
     // Not sure how we will define where the quick-send stuff goes, but we'll figure it out overtime.
-    private static readonly string TooltipText =
+    private static readonly string AwaitingResponseTT =
+        "An incoming or pending request with this user is in your inbox!";
+    private static readonly string RequestableTT =
         "--COL--[L-CLICK]--COL-- Open/Close Request Drafter" +
         "--NL----COL--[SHIFT + L-CLICK]--COL-- Quick-Send Request.";
+
 
     private readonly MainHub _hub;
     private readonly FolderConfig _config;
@@ -46,6 +50,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         : base("##RadarDrawer", Svc.Logger.Logger, ds, new RadarCache(ds))
     {
         _hub = hub;
+        _config = config;
         _manager = manager;
         _groups = groups;
         _sundesmos = sundesmos;
@@ -84,7 +89,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     {
         var bgCol = _cache.FilterConfigOpen ? ColorHelpers.Fade(ImGui.GetColorU32(ImGuiCol.FrameBg), 0.4f) : 0;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImUtf8.ItemSpacing.Y);
-        using var child = CkRaii.ChildPaddedW("RadarConfig", width, ImUtf8.FrameHeight, bgCol, 5f);
+        using var child = CkRaii.ChildPaddedW("RadarConfig", width, CkStyle.TwoRowHeight(), bgCol, 5f);
 
         var isTemp = _config.Current.RadarRequestsAreTemp;
         if (ImGui.Checkbox("Requests Are Temporary", ref isTemp))
@@ -176,12 +181,9 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             if (ImGui.InvisibleButton($"node_{leaf.FullPath}", selectable.InnerRegion))
                 HandleLeftClick(leaf, flags);
             HandleDetections(leaf, flags);
-            if (leaf.Data.CanSendRequests)
-            {
-                CkGui.AttachToolTip(_requests.ExistsFor(leaf.Data.UID)
-                    ? "A pending/incoming request including this User exists."
-                    : TooltipText, ImGuiColors.DalamudOrange);
-            }
+            // Attach a tooltip based on the node's state
+            if (!leaf.Data.IsPaired)
+                CkGui.AttachToolTip(leaf.Data.InRequests ? AwaitingResponseTT : RequestableTT, ImGuiColors.DalamudOrange);
 
             // Go back and draw the name.
             ImGui.SameLine(pos.X);
@@ -200,6 +202,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.CloudUploadAlt, "Send", disabled: UiService.DisableUI))
             SendRequest(leaf);
+        CkGui.AttachToolTip("Send a request with the attached message.");
     }
 
     // We only ever do this for the unpaired leaves so it's ok to handle that logic here.
@@ -267,6 +270,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             {
                 Log.Information($"Successfully sent sundesmo request to {node.Data.DisplayName}");
                 _requests.AddNewRequest(sentRequest);
+                _manager.RefreshUser(new(node.Data.UID));
                 // Clear temp variables
                 _requestMsg = string.Empty;
                 _cache.NodeInDrafter = null;
