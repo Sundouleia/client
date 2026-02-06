@@ -66,10 +66,8 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         Logger.LogTrace("Context menu opened, checking for radar user.", LoggerType.RadarManagement);
         foreach (var (userData, radarUser) in _allRadarUsers)
         {
-            // If they are already a pair, skip.
-            if (_sundesmos.ContainsSundesmo(radarUser.UID)) continue;
-            // If they are not valid / rendered, skip.
-            if (!radarUser.IsValid) continue;
+            // If they are a pair, or in requests, skip.
+            if (radarUser.IsPaired || radarUser.InRequests) continue;
             // If they do not match the targetObjectId, skip.
             if (target.TargetObjectId != radarUser.PlayerObjectId) continue;
             
