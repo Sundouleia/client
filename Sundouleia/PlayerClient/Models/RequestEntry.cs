@@ -12,7 +12,9 @@ public class RequestEntry(SundesmoRequest request) : IEquatable<RequestEntry>, I
 
     // For anonymous display.
     public string SenderAnonName => request.User.AnonName;
+    public string SenderTag => request.User.AnonTag;
     public string RecipientAnonName => request.Target.AnonName;
+    public string RecipientTag => request.Target.AnonTag;
 
     // For comparison and unique identification.
     public string SenderUID => request.User.UID;

@@ -14,7 +14,6 @@ namespace Sundouleia.Gui;
 internal class DataEventsUI : WindowMediatorSubscriberBase
 {
     private readonly EventAggregator _eventAggregator;
-    private bool ThemePushed = false;
 
     private List<DataEvent> CurrentEvents => _eventAggregator.EventList.Value.OrderByDescending(f => f.EventTime).ToList();
     private List<DataEvent> FilteredEvents => CurrentEvents.Where(f => (string.IsNullOrEmpty(FilterText) || ApplyDynamicFilter(f))).ToList();

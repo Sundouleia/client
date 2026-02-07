@@ -349,7 +349,17 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
 
         // Handle Context Menus. (Maybe make a flag later. Would save on some drawtime.)
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            ImGui.OpenPopup(node.FullPath);
+        {
+            if (ImGui.GetIO().KeyShift)
+            {
+                _cache.RenamingNode = node;
+                _cache.NameEditStr = node.Data.GetNickname() ?? string.Empty;
+            }
+            else
+            {
+                ImGui.OpenPopup(node.FullPath);
+            }
+        }
     }
 
     /// <summary>

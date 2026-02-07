@@ -101,19 +101,20 @@ public static class SundouleiaEx
     {
         var pos = ImGui.GetCursorScreenPos();
         var col = ImGuiColors.ParsedGrey; // Default color state.
+        var shiftDown = ImGui.GetIO().KeyShift;
         var hovering = false;
         if (!disabled)
         {
             hovering = ImGui.IsMouseHoveringRect(pos, pos + new Vector2(ImGui.GetFrameHeight()));
-            var pressed = hovering && ImGui.IsMouseDown(ImGuiMouseButton.Left);
+            var pressed = hovering && shiftDown && ImGui.IsMouseDown(ImGuiMouseButton.Left);
             col = pressed ? ImGuiColors.TankBlue : hovering ? ImGuiColors.DalamudGrey2 : ImGuiColors.ParsedGrey;
         }
 
-        CkGui.FramedIconText(FAI.Clock, col);
+        CkGui.FramedIconText(FAI.History, col);
         CkGui.AttachToolTip($"Your pairing with {sundesmo.GetDisplayName()} is Temporary." +
             $"--SEP----COL--[SHIFT + L-Click]--COL--Convert to permanent.", ImGuiColors.TankBlue);
 
-        return hovering && ImGui.GetIO().KeyShift && ImGui.IsMouseReleased(ImGuiMouseButton.Left);
+        return hovering && shiftDown && ImGui.IsMouseReleased(ImGuiMouseButton.Left);
     }
 
     public static string ByteToString(long bytes, bool addSuffix = true)

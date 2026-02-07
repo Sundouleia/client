@@ -16,6 +16,7 @@ using Sundouleia.Utils;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
+using SundouleiaAPI.Network;
 
 namespace Sundouleia.Gui.MainWindow;
 
@@ -250,24 +251,22 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         UiService.SetUITask(async () =>
         {
             // Wait for the response.
-            _logger.LogInformation($"Accepting requests from: {string.Join(", ", requests.Select(r => $"[{r.SenderAnonName} ({r.SenderUID})"))}]");
+            _logger.LogInformation($"Accepting requests from: [{string.Join(", ", requests.Select(r => r.SenderAnonName))}]");
             // Try to accept all requests. If it fails, do not do anything.
-            var res = await _hub.UserAcceptRequests(new(requests.Select(r => new UserData(r.SenderUID)).ToList())).ConfigureAwait(false);
+            var responses = requests.Select(r => new RequestResponse(new(r.SenderUID), r.IsTemporaryRequest)).ToList();
+            var res = await _hub.UserAcceptRequests(new(responses)).ConfigureAwait(false);
             if (res.ErrorCode is not SundouleiaApiEc.Success || res.Value is null)
             {
                 _logger.LogWarning($"Failed to accept bulk requests: {res.ErrorCode}");
                 if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
                 {
-                    // Remove all requests then update the radar folders to reflect the changes
                     _requests.RemoveRequests(requests);
                     _radar.RefreshUsers();
                 }
             }
             else
             {
-                // Remove all requests
                 _requests.RemoveRequests(requests);
-                // Process each of the accepted pairs
                 foreach (var addedPair in res.Value)
                 {
                     _sundesmos.AddSundesmo(addedPair.Pair);

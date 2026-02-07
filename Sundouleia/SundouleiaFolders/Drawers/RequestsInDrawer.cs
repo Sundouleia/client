@@ -243,13 +243,6 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
         ImGui.SameLine(posX);
         using var _ = ImRaii.PushFont(UiBuilder.MonoFont);
         CkGui.TextFrameAligned(leaf.Data.SenderAnonName);
-
-        if (leaf.Data.IsTemporaryRequest)
-        {
-            ImGui.SameLine();
-            CkGui.IconTextAligned(FAI.Stopwatch, ImGuiColors.DalamudGrey2);
-            CkGui.AttachToolTip("A temporary pairing, that expires unless you make it permanent.");
-        }
     }
 
     private void DrawLeftSide(RequestEntry entry, DynamicFlags flags)
@@ -276,7 +269,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
         var spacing = ImUtf8.ItemInnerSpacing.X;
 
         var childWidth = replying
-            ? buttonSize + (buttonSize + spacing) * 2
+            ? buttonSize + (buttonSize + spacing) * 3
             : buttonSize;
 
         endX -= childWidth;
@@ -287,10 +280,21 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             {
                 using (ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, 12f))
                 {
+                    // override button.
+                    var overrideIcon = leaf.Data.IsTemporaryRequest ? FAI.Check : FAI.Stopwatch;
                     // Draw out the initial frame with a small outer boarder.
-                    if (CkGui.IconButtonColored(FAI.Check, CkColor.TriStateCheck.Uint(), UiService.DisableUI))
-                        AcceptRequest(leaf.Data);
-                    CkGui.AttachToolTip("Accept this request.");
+                    if (CkGui.IconButtonColored(overrideIcon, SundColor.Gold.Uint(), UiService.DisableUI))
+                        AcceptRequest(leaf.Data, !leaf.Data.IsTemporaryRequest);
+                    CkGui.AttachToolTip($"Override pairing preference.--NL----COL--Accept {leaf.Data.SenderTag} as a " +
+                        $"{(leaf.Data.IsTemporaryRequest ? "permanent" : "temporary")} pair.--COL--", ImGuiColors.DalamudOrange);
+
+                    // Draw out the initial frame with a small outer boarder.
+                    ImUtf8.SameLineInner();
+                    var defaultIcon = leaf.Data.IsTemporaryRequest ? FAI.Clock : FAI.Check;
+                    if (CkGui.IconButtonColored(defaultIcon, CkColor.TriStateCheck.Uint(), UiService.DisableUI))
+                        AcceptRequest(leaf.Data, leaf.Data.IsTemporaryRequest);
+                    CkGui.AttachToolTip($"Accept this --COL--{(leaf.Data.IsTemporaryRequest ? "Temporary" : "Permanent")}--COL-- request.", ImGuiColors.DalamudOrange);
+
                     ImUtf8.SameLineInner();
                     if (CkGui.IconButtonColored(FAI.Times, CkColor.TriStateCross.Uint(), UiService.DisableUI))
                         RejectRequest(leaf.Data);
@@ -312,21 +316,29 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             endX -= (timeTxtWidth + spacing);
             ImGui.SameLine(endX);
             CkGui.ColorTextFrameAligned(timeTxt, ImGuiColors.ParsedGrey);
-            CkGui.AttachToolTip("Time left to respond to this request.");
+            CkGui.AttachToolTip($"Time to respond to {leaf.Data.SenderTag}'s request.");
+
+            if (leaf.Data.IsTemporaryRequest)
+            {
+                endX -= (CkGui.IconButtonSize(FAI.History).X);
+                ImGui.SameLine(endX);
+                CkGui.IconTextAligned(FAI.History, ImGuiColors.TankBlue);
+                CkGui.AttachToolTip("This is a Temporary Request.");
+            }
+
         }
 
         return endX;
     }
 
     // Accepts a single request.
-    private void AcceptRequest(RequestEntry request)
+    private void AcceptRequest(RequestEntry request, bool acceptAsTemp)
     {
         UiService.SetUITask(async () =>
         {
             // Wait for the response.
-            Log.Information($"Accepting request from {request.SenderAnonName} ({request.SenderUID})");
-            var res = await _hub.UserAcceptRequest(new(new(request.SenderUID))).ConfigureAwait(false);
-
+            Log.Information($"Accepting request from {request.SenderAnonName}");
+            var res = await _hub.UserAcceptRequest(new(new(request.SenderUID), acceptAsTemp)).ConfigureAwait(false);
             // If already paired, we should remove the request from the manager.
             if (res.ErrorCode is SundouleiaApiEc.AlreadyPaired)
             {
@@ -343,13 +355,10 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
                 // If they are online, mark them online.
                 if (res.Value!.OnlineInfo is { } onlineSundesmo)
                     _sundesmos.MarkSundesmoOnline(onlineSundesmo);
-
-                // TODO: Add them to the groups we wanted to add them to.
-                // TODO: Set their nick to the desired nick.
             }
             else
             {
-                Log.Warning($"Failed to accept request from {request.SenderAnonName} ({request.SenderUID}): {res.ErrorCode}");
+                Log.Warning($"Failed to accept request from {request.SenderAnonName}: {res.ErrorCode}");
             }
         });
     }
@@ -366,7 +375,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             }
             else
             {
-                Log.Warning($"Failed to reject request to {request.SenderAnonName} ({request.SenderUID}): {res.ErrorCode}");
+                Log.Warning($"Failed to reject request to {request.SenderAnonName}: {res.ErrorCode}");
             }
         });
     }

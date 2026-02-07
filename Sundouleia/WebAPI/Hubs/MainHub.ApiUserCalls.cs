@@ -98,6 +98,12 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse<SundesmoRequest>>(nameof(UserSendRequest), dto).ConfigureAwait(false);
     }
 
+    public async Task<HubResponse<List<SundesmoRequest>>> UserSendRequests(CreateRequests dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<List<SundesmoRequest>>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<List<SundesmoRequest>>>(nameof(UserSendRequests), dto).ConfigureAwait(false);
+    }
+
     public async Task<HubResponse> UserCancelRequest(UserDto dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
@@ -110,13 +116,13 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserCancelRequests), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse<AddedUserPair>> UserAcceptRequest(UserDto dto)
+    public async Task<HubResponse<AddedUserPair>> UserAcceptRequest(RequestResponse dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt<AddedUserPair>(SundouleiaApiEc.NetworkError); ;
         return await _hubConnection!.InvokeAsync<HubResponse<AddedUserPair>>(nameof(UserAcceptRequest), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse<List<AddedUserPair>>> UserAcceptRequests(UserListDto dto)
+    public async Task<HubResponse<List<AddedUserPair>>> UserAcceptRequests(RequestResponses dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt<List<AddedUserPair>>(SundouleiaApiEc.NetworkError); ;
         return await _hubConnection!.InvokeAsync<HubResponse<List<AddedUserPair>>>(nameof(UserAcceptRequests), dto).ConfigureAwait(false);
