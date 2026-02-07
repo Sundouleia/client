@@ -965,19 +965,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    // Reapply the actor if we should.
-    // (Append conditions for a redraw over reapply later probably)
-    public void RedrawGameObject(RedrawKind redraw)
-    {
-        if (IsRendered)
-        {
-            Logger.LogDebug($"Redrawing [{Sundesmo.GetNickAliasOrUid()}] due to alteration changes.", LoggerType.PairHandler);
-            _ipc.Penumbra.RedrawGameObject(ObjIndex);
-            // TODO: Use the below when we know how to distinguish what redraw operation to perform.
-            //_ipc.Glamourer.ReapplyActor(ObjIndex);
-        }
-    }
-
     #endregion Ipc Helpers
 
     /// <summary>

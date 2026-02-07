@@ -37,5 +37,5 @@ public class SundesmoHandlerFactory
         => new(type, sundesmo, redrawer, _loggerFactory.CreateLogger<PlayerOwnedHandler>(), _mediator, _account, _ipc, _watcher);
 
     public RedrawManager CreateRM(Sundesmo sundesmo)
-        => new(sundesmo, _loggerFactory.CreateLogger<RedrawManager>(), _ipc);
+        => new(sundesmo, _loggerFactory.CreateLogger<RedrawManager>(), _ipc, _account);
 }

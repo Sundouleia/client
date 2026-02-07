@@ -2,6 +2,8 @@ using Sundouleia;
 using Sundouleia.Interop;
 using Sundouleia.Pairs;
 using Sundouleia.Pairs.Enums;
+using Sundouleia.PlayerClient;
+using Sundouleia.Watchers;
 
 namespace Sundouleia.Pairs;
 /// <summary>
@@ -16,7 +18,7 @@ namespace Sundouleia.Pairs;
 ///    When EndUpdate is called and there are no other updates being processed, any pending redraws
 ///    are executed for the owned objects that requested them.
 /// </summary>
-public class RedrawManager(Sundesmo sundesmo, ILogger<RedrawManager> logger, IpcManager ipc) : IDisposable
+public class RedrawManager(Sundesmo sundesmo, ILogger<RedrawManager> logger, IpcManager ipc, AccountConfig config) : IDisposable
 {
     /// <summary>
     ///     Ensures only one PlayerHandler operation is occuring at a time.
@@ -133,6 +135,10 @@ public class RedrawManager(Sundesmo sundesmo, ILogger<RedrawManager> logger, Ipc
     // Could be task idk.
     private void RedrawInternal(ushort objIdx, RedrawKind type)
     {
+        // Block if in streamer mode. No need to redraw at all.
+        if (config.ConnectionKind is ConnectionKind.StreamerMode)
+            return;
+
         if (type.HasAny(RedrawKind.Full))
         {
             ipc.Penumbra.RedrawGameObject(objIdx);
