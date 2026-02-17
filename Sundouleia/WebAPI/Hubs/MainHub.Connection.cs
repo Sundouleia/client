@@ -303,11 +303,19 @@ public partial class MainHub
             return false;
         }
 
-        // If we do not have an auth made for this character, make one, but still reject.
+        // If we do not have an auth made for this character, make a tracked player entry but reject.
         if (!_accounts.CharaIsTracked())
         {
             _accounts.CreateTrackedPlayer();
-            Logger.LogDebug("New LoginAuth made for character, but no key is connected!", LoggerType.ApiCore);
+            Logger.LogDebug("New LoginAuth made for character, but they are not linked to a profile!", LoggerType.ApiCore);
+            return false;
+        }
+
+        // If not attached, return that we are not attached.
+        if (!_accounts.CharaIsAttached())
+        {
+            ServerStatus = ServerState.Unattached;
+            Logger.LogDebug("This character is not attached to any profile!", LoggerType.ApiCore);
             return false;
         }
 

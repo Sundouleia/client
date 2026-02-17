@@ -161,9 +161,10 @@ public static class SundouleiaEx
             ServerState.Unauthorized => "Unauthorized",
             ServerState.VersionMisMatch => "Version mismatch",
             ServerState.Offline => "Unavailable",
+            ServerState.Unattached => "Unattached",
             ServerState.NoSecretKey => "Invalid / No Secret Key",
-            ServerState.Connected => MainHub.DisplayName,
-            ServerState.ConnectedDataSynced => MainHub.DisplayName,
+            ServerState.Connected => "Connected",
+            ServerState.ConnectedDataSynced => "Connected",
             _ => string.Empty
         };
     }

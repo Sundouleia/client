@@ -805,6 +805,10 @@ public class ProfilesTab
         // If we were logged into the moved player, we switched,
         if (movedClientPlayer && wasLoggedIntoMoved)
             UiService.SetUITask(async () => await _hub.Reconnect(DisconnectIntent.Reload).ConfigureAwait(false));
+        // For fresh logins
+        else if (movedClientPlayer && !MainHub.IsConnected && MainHub.ServerStatus is not ServerState.Connecting)
+            UiService.SetUITask(async () => await _hub.Reconnect(DisconnectIntent.Reload).ConfigureAwait(false));
+
     }
 
     private void UnlinkFromProfile()

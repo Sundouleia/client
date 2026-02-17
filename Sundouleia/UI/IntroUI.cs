@@ -707,7 +707,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
     private void FetchAccountDetailsAsync()
     {
-        UiService.SetUITask(async () =>
+        UiService.SetUITask((Func<Task>)(async () =>
         {
             _config.Current.ButtonUsed = true;
             _config.Save();
@@ -723,7 +723,7 @@ public class IntroUi : WindowMediatorSubscriberBase
                 // This means that we can not create the new authentication and validate our account as created.
                 _logger.LogInformation("Fetched Account Details, proceeding to create Primary Account authentication.");
                 // However, if an auth already exists for the current content ID, and we are trying to create a new primary account, this should not be possible, so early throw.
-                if (_accounts.CharaHasValidProfile())
+                if (_accounts.CharaIsAttached())
                     throw new InvalidOperationException("Auth already exists, cannot create new Primary auth if one already exists!");
 
                 _logger.LogInformation("No existing authentication found, proceeding to create new Primary Account authentication.");
@@ -767,6 +767,6 @@ public class IntroUi : WindowMediatorSubscriberBase
             {
                 _logger.LogError($"Failed to fetch account details and create the primary authentication. Performing early return: {ex}");
             }
-        });
+        }));
     }
 }

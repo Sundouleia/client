@@ -75,7 +75,8 @@ public class AccountManager
 
     public bool CharaIsTracked()
         => TrackedPlayers.ContainsKey(PlayerData.CID);
-    public bool CharaHasValidProfile()
+
+    public bool CharaIsAttached()
         => TrackedPlayers.TryGetValue(PlayerData.CID, out var a) && a.LinkedProfile is not null;
 
     public AccountProfile? GetMainProfile()

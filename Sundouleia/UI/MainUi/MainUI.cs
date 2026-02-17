@@ -323,7 +323,8 @@ public class MainUI : WindowMediatorSubscriberBase
         using var font = UiFontService.Default150Percent.Push();
 
         var userCount = MainHub.OnlineUsers.ToString(CultureInfo.InvariantCulture);
-        var textSize = ImGui.CalcTextSize(MainHub.IsConnected ? $"{userCount}Online" : "Disconnected");
+        var text = MainHub.IsConnected ? $"{userCount}Online" : SundouleiaEx.GetErrorText();
+        var textSize = ImGui.CalcTextSize(text);
         var offsetX = (topBarWidth - textSize.X - ImUtf8.ItemInnerSpacing.X) / 2;
 
         // Make two gradients from the left and right, based on region.
@@ -346,7 +347,7 @@ public class MainUI : WindowMediatorSubscriberBase
             }
             else
             {
-                CkGui.ColorText(SundouleiaEx.GetErrorText(), ImGuiColors.DalamudRed);
+                CkGui.ColorText(text, ImGuiColors.DalamudRed);
             }
         }
     }
@@ -397,7 +398,7 @@ public class MainUI : WindowMediatorSubscriberBase
                 _ = _hub.Connect();
         }
         CkGui.AttachToolTip($"--COL--[Try Out Mode]--COL--" +
-            $"--NL--Changes you make are not pushed to others, but you still see others normally.", ImGuiColors.DalamudOrange);
+            $"--NL--Changes you make aren't pushed to others, but you still see others normally.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
         if (DrawConnectionButton(ConnectionKind.StreamerMode, FAI.BroadcastTower, CkColor.TriStateCheck.Uint(), offlineSize, !MainHub.CanChangeConnectedState))
@@ -411,6 +412,7 @@ public class MainUI : WindowMediatorSubscriberBase
             $"--NL--Appearance is sent to others, but others remain vanilla.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
+        // This is a bit confusing at the moment, possibly rework later?
         if (DrawConnectionButton(ConnectionKind.Normal, FAI.Link, CkColor.TriStateCheck.Uint(), offlineSize, !MainHub.CanChangeConnectedState))
         {
             _account.ConnectionKind = ConnectionKind.Normal;
@@ -419,7 +421,8 @@ public class MainUI : WindowMediatorSubscriberBase
                 _ = _hub.Connect();
         }
         CkGui.AttachToolTip($"--COL--[Connected]--COL--" +
-            $"--NL--Normal/Default connection with the server.", ImGuiColors.DalamudOrange);
+            $"--NL--Normal/Default connection with the server." +
+            $"--SEP--May display while not connected if you have an error", ImGuiColors.DalamudOrange);
 
         bool DrawConnectionButton(ConnectionKind kind, FAI icon, uint color, Vector2 size, bool disabled)
         {
@@ -442,7 +445,7 @@ public class MainUI : WindowMediatorSubscriberBase
             // Render possible nav highlight space over the bounding box region.
             ImGuiP.RenderNavHighlight(hitbox, id);
 
-            // Draw based on current state.
+            // Draw based on current state. (a little flawed here)
             if (_account.ConnectionKind == kind)
             {
                 using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())

@@ -413,7 +413,7 @@ namespace Sundouleia.Localization
         public readonly string RemoveProfileTT = Loc.Localize("Accounts_RemoveProfileTT", "Deletes this profile from your account!" +
             "--NL----COL--WARNING:--COL--Once an profile is deleted, the secret key is invalidated." +
             "--SEP--Must hold --COL--CTRL+SHIFT--COL--To delete this profile.");
-        public readonly string RemoveProfileProfileTT = Loc.Localize("Accounts_RemoveProfileProfileTT", "Deletes your main profile from your account!" +
+        public readonly string RemoveProfileProfileTT = Loc.Localize("Accounts_RemoveMainProfileTT", "Deletes your main profile from your account!" +
             "--SEP----COL--THIS WILL REMOVE YOUR ENTIRE ACCOUNT AND ALL OTHER PROFILES.--COL--" +
             "--SEP--Must hold --COL--CTRL+SHIFT--COL--To delete this profile." +
             "--NL--(A confirmation dialog will open upon clicking this button)");
