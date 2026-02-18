@@ -102,7 +102,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
         
         DrawGlobalPermissions(sundesmo);
         DrawPairPerms(sundesmo);
-        CkGui.SeparatorSpaced(SundColor.Gold.Uint());
+        CkGui.SeparatorSpaced(SundCol.Gold.Uint());
     }
 
     private void DrawIconBoolColumn(bool value)

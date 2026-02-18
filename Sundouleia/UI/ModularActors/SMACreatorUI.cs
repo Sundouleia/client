@@ -55,7 +55,7 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
     
     protected override void DrawInternal()
     {
-        CkGui.FontText("SMA Exporter", UiFontService.UidFont);
+        CkGui.FontText("SMA Exporter", Fonts.UidFont);
         ImGui.Separator();
 
         CkGui.FramedIconText(FAI.MapPin);

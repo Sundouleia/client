@@ -130,7 +130,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
                 {
                     var newMsgTxtPos = new Vector2(x.X + buttonSize.X / 2, x.Y - spacing.Y);
                     var newMsgTxt = RadarChatLog.NewMsgCount > 99 ? "99+" : RadarChatLog.NewMsgCount.ToString();
-                    var newMsgCol = RadarChatLog.NewCorbyMsg ? ImGuiColors.ParsedPink : SundColor.Gold.Vec4();
+                    var newMsgCol = RadarChatLog.NewCorbyMsg ? ImGuiColors.ParsedPink : SundCol.Gold.Vec4();
                     drawList.OutlinedFont(newMsgTxt, newMsgTxtPos, newMsgCol.ToUint(), 0xFF000000, 1);
                 }
             }

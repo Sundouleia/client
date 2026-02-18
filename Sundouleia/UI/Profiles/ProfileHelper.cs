@@ -129,7 +129,7 @@ public class ProfileHelper
             SupporterIconBorderSize.X / 2, ImGui.GetColorU32(new Vector4(0, 0, 0, 1)));
 
         // Draw out the border for the icon.
-        drawList.AddCircle(SupporterIconBorderPos + SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2, ImGui.GetColorU32(SundColor.Silver.Uint()), 0, 4f);
+        drawList.AddCircle(SupporterIconBorderPos + SupporterIconBorderSize / 2, SupporterIconBorderSize.X / 2, ImGui.GetColorU32(SundCol.Silver.Uint()), 0, 4f);
 
         // Draw out Supporter Icon.
         var supporterInfo = CosmeticService.GetSupporterInfo(userData);
@@ -138,7 +138,7 @@ public class ProfileHelper
 
         // draw out the UID here. We must make it centered. To do this, we must fist calculate how to center it.
         var widthToCenterOn = AvatarBorderSize.X;
-        using (UiFontService.UidFont.Push())
+        using (Fonts.UidFont.Push())
         {
             var aliasOrUidSize = ImGui.CalcTextSize(displayName);
             ImGui.SetCursorScreenPos(new Vector2(AvatarBorderPos.X + widthToCenterOn / 2 - aliasOrUidSize.X / 2, AvatarBorderPos.Y + AvatarBorderSize.Y + 5));

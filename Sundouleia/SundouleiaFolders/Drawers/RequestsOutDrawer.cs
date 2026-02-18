@@ -196,7 +196,7 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
         CkGui.AttachToolTip("Time left until the request expires.");
 
         ImUtf8.SameLineInner();
-        using (ImRaii.PushColor(ImGuiCol.Text, CkColor.TriStateCross.Uint()))
+        using (ImRaii.PushColor(ImGuiCol.Text, CkCol.TriStateCross.Uint()))
             if (CkGui.IconButton(FAI.Times, null, leaf.Name, UiService.DisableUI, true))
                 CancelRequest(leaf.Data);
         CkGui.AttachToolTip("Cancel this pending request.");

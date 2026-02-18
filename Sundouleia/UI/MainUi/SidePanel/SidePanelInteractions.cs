@@ -254,7 +254,7 @@ public class SidePanelInteractions
         ImGui.SameLine(0, 0);
         CkGui.TextFrameAligned($" {dispName} is ");
         ImGui.SameLine(0, 0);
-        CkGui.ColorTextFrameAligned(isPaused ? "Paused" : "Unpaused", isPaused ? CkColor.TriStateCross.Uint() : CkColor.TriStateCheck.Uint());
+        CkGui.ColorTextFrameAligned(isPaused ? "Paused" : "Unpaused", isPaused ? CkCol.TriStateCross.Uint() : CkCol.TriStateCheck.Uint());
         ImGui.SameLine(0, 0);
         ImGui.Text(".");
     }
@@ -404,7 +404,7 @@ public class SidePanelInteractions
         using var _ = ImRaii.Group();
         CkGui.FramedIconText(current ? pdp.TrueFAI : pdp.FalseFAI);
         ImGui.SameLine(0, 0);
-        CkGui.ColorTextFrameAligned($" {(current ? pdp.CondTrue : pdp.CondFalse)} ", current ? CkColor.TriStateCheck.Uint() : CkColor.TriStateCross.Uint());
+        CkGui.ColorTextFrameAligned($" {(current ? pdp.CondTrue : pdp.CondFalse)} ", current ? CkCol.TriStateCheck.Uint() : CkCol.TriStateCross.Uint());
         ImGui.SameLine(0, 0);
         ImGui.Text(pdp.Label);
         if (!pdp.SkipDisplayName)

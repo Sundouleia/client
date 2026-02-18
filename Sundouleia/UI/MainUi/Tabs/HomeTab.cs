@@ -71,7 +71,7 @@ public class HomeTab
         
         using (CkRaii.Child("##AccountInfo", new Vector2(left, ProfileSize.Y)))
         {
-            CkGui.FontText(MainHub.DisplayName, UiFontService.UidFont);
+            CkGui.FontText(MainHub.DisplayName, Fonts.UidFont);
             CkGui.AttachToolTip("Your Profile's Alias / UID.");
             CkGui.CopyableDisplayText(MainHub.DisplayName);
             // Line Splitter.
@@ -121,7 +121,7 @@ public class HomeTab
             wdl.AddCircleFilled(EditBorderPos + EditBorderSize / 2, EditBorderSize.X / 2, bgCol);
             // Draw out Edit Icon.
             wdl.AddDalamudImage(CosmeticService.CoreTextures.Cache[CoreTexture.Edit], EditIconPos, EditIconSize);
-            wdl.AddCircle(EditBorderPos + EditBorderSize / 2, EditBorderSize.X / 2, SundColor.Silver.Uint(), 0, 3f * ImGuiHelpers.GlobalScale);
+            wdl.AddCircle(EditBorderPos + EditBorderSize / 2, EditBorderSize.X / 2, SundCol.Silver.Uint(), 0, 3f * ImGuiHelpers.GlobalScale);
         }
     }
 

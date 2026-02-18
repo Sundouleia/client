@@ -82,7 +82,7 @@ internal class ReportPopupHandler : IPopupHandler
             // Close Button
             var btnPos = rectMin + Vector2.One * 16;
             var btnSize = Vector2.One * 20;
-            var closeButtonColor = ImGui.GetColorU32(CloseHovered ? uint.MaxValue :SundColor.Silver.Uint());
+            var closeButtonColor = ImGui.GetColorU32(CloseHovered ? uint.MaxValue :SundCol.Silver.Uint());
             drawList.AddLine(btnPos, btnPos + btnSize, closeButtonColor, 3);
             drawList.AddLine(new Vector2(btnPos.X + btnSize.X, btnPos.Y), new Vector2(btnPos.X, btnPos.Y + btnSize.Y), closeButtonColor, 3);
             ImGui.SetCursorScreenPos(btnPos);
@@ -145,10 +145,10 @@ internal class ReportPopupHandler : IPopupHandler
                 }
             }
 
-            CkGui.SeparatorSpaced(SundColor.Silver.Uint());
-            CkGui.FontTextWrapped("The Sundouleia team will ensure the report system is not exploited or missused. Only report if nessisary.", UiFontService.Default150Percent, ImGuiColors.DalamudGrey);
+            CkGui.SeparatorSpaced(SundCol.Silver.Uint());
+            CkGui.FontTextWrapped("The Sundouleia team will ensure the report system is not exploited or missused. Only report if nessisary.", Fonts.Default150Percent, ImGuiColors.DalamudGrey);
 
-            using var font = UiFontService.UidFont.Push();
+            using var font = Fonts.UidFont.Push();
             // Get the center of this screen.
             var disableButton = _reportReason.IsNullOrWhitespace() || string.Equals(_reportReason, DefaultReportReason, StringComparison.OrdinalIgnoreCase);
             var buttonSize = ImGuiHelpers.GetButtonSize($"Report {_reportedDisplayName} To Sundouleia");

@@ -69,7 +69,7 @@ public partial class UiDataStorageShared
     public void DrawSmaStorage()
     {
         var smaFileDir = _config.Current.SMAExportFolder;
-        CkGui.FontText(CkLoc.Settings.TabSmaStorage, UiFontService.UidFont);
+        CkGui.FontText(CkLoc.Settings.TabSmaStorage, Fonts.UidFont);
 
         if (CkGui.IconButton(FAI.Folder))
             OpenSmaStorageDialog();
@@ -103,17 +103,17 @@ public partial class UiDataStorageShared
         var penumbraGenWidth = CkGui.IconTextButtonSize(FAI.FolderPlus, "In Penumbras Parent Folder");
         var rootGenWidth = CkGui.IconTextButtonSize(FAI.FolderPlus, "At Drive Root");
         var rightWidth = penumbraGenWidth + rootGenWidth + ImUtf8.ItemInnerSpacing.X * 2;
-        var height = CkStyle.TwoRowHeight() + CkGui.GetSeparatorHeight() + CkGui.CalcFontTextSize("A", UiFontService.UidFont).Y;
+        var height = CkStyle.TwoRowHeight() + CkGui.GetSeparatorHeight() + CkGui.CalcFontTextSize("A", Fonts.UidFont).Y;
         // extra line for error text if any.
         if (!IsCachePathValid)
             height += ImUtf8.FrameHeightSpacing;
 
         // Framed child.
-        using var _ = CkRaii.FramedChildPaddedW("Storage", ImGui.GetContentRegionAvail().X, height, 0, SundColor.Gold.Uint(), CkStyle.ChildRoundingLarge());
+        using var _ = CkRaii.FramedChildPaddedW("Storage", ImGui.GetContentRegionAvail().X, height, 0, SundCol.Gold.Uint(), CkStyle.ChildRoundingLarge());
         var topLeftPos = ImGui.GetCursorScreenPos();
 
-        CkGui.FontTextCentered("FileCache Storage", UiFontService.UidFont);
-        CkGui.Separator(SundColor.Gold.Uint());
+        CkGui.FontTextCentered("FileCache Storage", Fonts.UidFont);
+        CkGui.Separator(SundCol.Gold.Uint());
 
         // Draw out the folder icon first, prior to drawing out the file storage.
         if (CkGui.IconButton(FAI.Folder, disabled: _isMonitoring))
@@ -188,12 +188,12 @@ public partial class UiDataStorageShared
         CkGui.FramedHoverIconText(FAI.QuestionCircle, ImGuiColors.TankBlue.ToUint(), ImGui.GetColorU32(ImGuiCol.TextDisabled));
         CkGui.AttachToolTip("Sundouleia's Cache is --COL--self-regulated--COL-- for downloaded mod files." +
             "--NL--It helps improve performance when loading mods and reduces download requirements." +
-            "--SEP--Cleans are ran regularily to remove any files unused for 6+ weeks to keep things tidy!", SundColor.Light.Vec4());
+            "--SEP--Cleans are ran regularily to remove any files unused for 6+ weeks to keep things tidy!", SundCol.Light.Vec4());
     }
 
     public void DrawCacheMonitoring(bool showRescan, bool showPenumbraControls, bool showSundouleiaControls)
     {
-        CkGui.FontText("Cache Monitoring", UiFontService.UidFont);
+        CkGui.FontText("Cache Monitoring", Fonts.UidFont);
 
         CkGui.FramedIconText(FAI.BarsProgress);
         CkGui.TextFrameAlignedInline("Scanner Status:");
@@ -279,7 +279,7 @@ public partial class UiDataStorageShared
 
     public void DrawFileCompactor(bool allowCompactOperations)
     {
-        CkGui.FontText("File Compactor", UiFontService.UidFont);
+        CkGui.FontText("File Compactor", Fonts.UidFont);
 
         CkGui.FramedIconText(FAI.Hdd);
         CkGui.TextFrameAlignedInline("Utilized Storage:");
@@ -350,7 +350,7 @@ public partial class UiDataStorageShared
 
     public void DrawTransfers()
     {
-        CkGui.FontText("File Transfer Monitor", UiFontService.UidFont);
+        CkGui.FontText("File Transfer Monitor", Fonts.UidFont);
 
         using var _ = ImRaii.Table("transfer monitor", 2, ImGuiTableFlags.SizingFixedSame | ImGuiTableFlags.BordersInnerV);
         if (!_)

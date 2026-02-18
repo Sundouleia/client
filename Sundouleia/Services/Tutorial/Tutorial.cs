@@ -123,7 +123,7 @@ public class Tutorial
         var windowSize = ImGui.GetContentRegionAvail();
 
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - 5f);
-        CkGui.FontText(step.Name, UiFontService.Default150Percent);
+        CkGui.FontText(step.Name, Fonts.Default150Percent);
         int? nextValue = null;
 
         ImGui.Separator();
@@ -174,7 +174,7 @@ public class Tutorial
 
             ImUtf8.SameLineInner();
             ImGui.AlignTextToFramePadding();
-            ImGui.TextColored(SundColor.Gold.Uint(), PopupLabel + " ("+(CurrentStep+1)+"/"+EndStep+")");
+            ImGui.TextColored(SundCol.Gold.Uint(), PopupLabel + " ("+(CurrentStep+1)+"/"+EndStep+")");
         }
 
         var buttonPos = windowPos + new Vector2(windowSize.X - _buttonCloseSize.X - ImGui.GetStyle().ItemInnerSpacing.X, ImGui.GetStyle().ItemSpacing.Y);

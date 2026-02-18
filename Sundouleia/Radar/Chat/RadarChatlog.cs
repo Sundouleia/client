@@ -141,9 +141,9 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         if (newMsg.Tier is CkVanityTier.ShopKeeper)
         {
             // Apply Cordy's signature color to her name, and also prefix her icon and give all RichText permissions.
-            UserColors[newMsg.UID] = CkColor.ShopKeeperColor.Vec4();
-            var prefix = $"[img=RequiredImages\\Tier4Icon][rawcolor={CkColor.ShopKeeperColor.Uint()}]{newMsg.Name}[/rawcolor]: ";
-            Messages.PushBack(newMsg with { Message = $"{prefix} [rawcolor={CkColor.ShopKeeperText.Uint()}]{newMsg.Message}[/rawcolor]" });
+            UserColors[newMsg.UID] = SundCol.ShopKeeperColor.Vec4();
+            var prefix = $"[img=RequiredImages\\Tier4Icon][rawcolor={SundCol.ShopKeeperColor.Uint()}]{newMsg.Name}[/rawcolor]: ";
+            Messages.PushBack(newMsg with { Message = $"{prefix} [rawcolor={SundCol.ShopKeeperText.Uint()}]{newMsg.Message}[/rawcolor]" });
             unreadSinceScroll++;
             NewCorbyMsg = true;
         }
@@ -205,7 +205,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
 
         // toggle emote viewing.
         ImUtf8.SameLineInner();
-        using (ImRaii.PushColor(ImGuiCol.Text, SundColor.Gold.Uint(), _emoteSelectionOpened))
+        using (ImRaii.PushColor(ImGuiCol.Text, SundCol.Gold.Uint(), _emoteSelectionOpened))
         {
             if (CkGui.IconButton(FAI.Heart, disabled: disableInput))
                 _emoteSelectionOpened = !_emoteSelectionOpened;
@@ -464,7 +464,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         {
             // Cordy is special girl :3
             if (msg.Tier is CkVanityTier.ShopKeeper)
-                UserColors[msg.UID] = CkColor.ShopKeeperColor.Vec4();
+                UserColors[msg.UID] = SundCol.ShopKeeperColor.Vec4();
             else
                 AssignSenderColor(msg);
 

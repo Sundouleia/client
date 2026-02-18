@@ -33,16 +33,16 @@ public class RadarChatPopoutUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        using var font = UiFontService.Default150Percent.Push();
-        using var _ = ImRaii.PushColor(ImGuiCol.ScrollbarBg, SundColor.Dark.Uint())
-            .Push(ImGuiCol.ScrollbarGrab, SundColor.GoldAlpha.Uint())
-            .Push(ImGuiCol.ScrollbarGrabHovered, SundColor.Gold.Uint());
+        using var font = Fonts.Default150Percent.Push();
+        using var _ = ImRaii.PushColor(ImGuiCol.ScrollbarBg, SundCol.Dark.Uint())
+            .Push(ImGuiCol.ScrollbarGrab, SundCol.GoldAlpha.Uint())
+            .Push(ImGuiCol.ScrollbarGrabHovered, SundCol.Gold.Uint());
         
         var min = ImGui.GetCursorScreenPos();
         var max = min + ImGui.GetContentRegionAvail();
         var col = RadarChatLog.AccessBlocked ? ImGuiColors.DalamudGrey : ImGuiColors.DalamudWhite;
         // Add some CkRichText variant here later.
-        CkGui.FontTextCentered($"Radar Chat - {LocationSvc.Current.TerritoryName}", UiFontService.Default150Percent, col);
+        CkGui.FontTextCentered($"Radar Chat - {LocationSvc.Current.TerritoryName}", Fonts.Default150Percent, col);
         ImGui.Separator();
 
         // Restrict drawing the chat if their not verified or blocked from using it.
@@ -73,28 +73,28 @@ public class RadarChatPopoutUI : WindowMediatorSubscriberBase
 
     private void DrawChatUseBlockedWarning()
     {
-        var errorHeight = CkGui.CalcFontTextSize("A", UiFontService.UidFont).Y * 2 + CkGui.CalcFontTextSize("A", UiFontService.Default150Percent).Y + ImUtf8.ItemSpacing.Y * 2;
+        var errorHeight = CkGui.CalcFontTextSize("A", Fonts.UidFont).Y * 2 + CkGui.CalcFontTextSize("A", Fonts.Default150Percent).Y + ImUtf8.ItemSpacing.Y * 2;
         var centerDrawHeight = (ImGui.GetContentRegionAvail().Y - ImUtf8.FrameHeightSpacing - errorHeight) / 2;
 
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + centerDrawHeight);
-        CkGui.FontTextCentered("Blocked Via Bad Reputation!", UiFontService.UidFont, ImGuiColors.DalamudRed);
-        CkGui.FontTextCentered("Unable to view chat anymore.", UiFontService.UidFont, ImGuiColors.DalamudRed);
-        CkGui.FontTextCentered($"You have [{MainHub.Reputation.ChatStrikes}] radar chat strikes.", UiFontService.Default150Percent, ImGuiColors.DalamudRed);
+        CkGui.FontTextCentered("Blocked Via Bad Reputation!", Fonts.UidFont, ImGuiColors.DalamudRed);
+        CkGui.FontTextCentered("Unable to view chat anymore.", Fonts.UidFont, ImGuiColors.DalamudRed);
+        CkGui.FontTextCentered($"You have [{MainHub.Reputation.ChatStrikes}] radar chat strikes.", Fonts.Default150Percent, ImGuiColors.DalamudRed);
     }
 
     private void DrawNotVerifiedHelp()
     {
-        var errorHeight = CkGui.CalcFontTextSize("A", UiFontService.UidFont).Y * 2 + CkGui.CalcFontTextSize("A", UiFontService.Default150Percent).Y * 2 + ImUtf8.TextHeight * 3 + ImUtf8.ItemSpacing.Y * 6;
+        var errorHeight = CkGui.CalcFontTextSize("A", Fonts.UidFont).Y * 2 + CkGui.CalcFontTextSize("A", Fonts.Default150Percent).Y * 2 + ImUtf8.TextHeight * 3 + ImUtf8.ItemSpacing.Y * 6;
         var centerDrawHeight = (ImGui.GetContentRegionAvail().Y - errorHeight) / 2;
 
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + centerDrawHeight);
-        CkGui.FontTextCentered("Must Claim Account To Chat!", UiFontService.UidFont, ImGuiColors.DalamudRed);
-        CkGui.FontTextCentered("For Moderation & Safety Reasons", UiFontService.Default150Percent, ImGuiColors.DalamudGrey);
-        CkGui.FontTextCentered("Only Verified Users Get Social Features.", UiFontService.Default150Percent, ImGuiColors.DalamudGrey);
+        CkGui.FontTextCentered("Must Claim Account To Chat!", Fonts.UidFont, ImGuiColors.DalamudRed);
+        CkGui.FontTextCentered("For Moderation & Safety Reasons", Fonts.Default150Percent, ImGuiColors.DalamudGrey);
+        CkGui.FontTextCentered("Only Verified Users Get Social Features.", Fonts.Default150Percent, ImGuiColors.DalamudGrey);
         ImGui.Spacing();
         CkGui.CenterText("You can verify via Sundouleia's Discord Bot.");
         CkGui.CenterText("Verification is easy & doesn't interact with lodestone");
         CkGui.CenterText("or any other SE properties.");
-        CkGui.FontTextCentered("Now In View-Only Mode", UiFontService.UidFont);
+        CkGui.FontTextCentered("Now In View-Only Mode", Fonts.UidFont);
     }
 }

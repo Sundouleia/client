@@ -96,7 +96,7 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        CkGui.FontText($"GPose Manager:", UiFontService.UidFont);
+        CkGui.FontText($"GPose Manager:", Fonts.UidFont);
         ImGui.Separator();
         
         DrawListBoxes();

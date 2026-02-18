@@ -170,7 +170,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
     private void DrawMainGeneric()
     {
-        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderGeneric, UiFontService.UidFont);
+        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderGeneric, Fonts.UidFont);
         var autoOpen = _config.Current.OpenUiOnStartup;
         var contextMenus = _config.Current.ShowContextMenus;
         var showProfiles = _config.Current.ShowProfiles;
@@ -225,7 +225,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (!MainHub.IsConnected)
             return;
 
-        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderGlobalPerms, UiFontService.UidFont);
+        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderGlobalPerms, Fonts.UidFont);
 
         using (ImRaii.Group())
         {
@@ -354,7 +354,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
     private void DrawMainRadar()
     {
-        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderRadar, UiFontService.UidFont);
+        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderRadar, Fonts.UidFont);
         var enabled = _config.Current.RadarEnabled;
         var sendPings = _config.Current.RadarSendPings;
         var nearbyDtr = _config.Current.RadarNearbyDtr;
@@ -415,7 +415,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
     private void DrawPrefsDownloads()
     {
-        CkGui.FontText(CkLoc.Settings.Preferences.HeaderDownloads, UiFontService.UidFont);
+        CkGui.FontText(CkLoc.Settings.Preferences.HeaderDownloads, Fonts.UidFont);
         var maxParallelDLs = _config.Current.MaxParallelDownloads;
         var dlLimit = _config.Current.DownloadLimitBytes;
         var dlSpeedType = _config.Current.DownloadSpeedType;
@@ -527,7 +527,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
     private void DrawPrefsRequests()
     {
-        CkGui.FontText("Requests", UiFontService.UidFont);
+        CkGui.FontText("Requests", Fonts.UidFont);
         var showBubbles = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Bubble);
         var showDtr = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.DtrBar);
         var sounds = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Audio);
@@ -630,7 +630,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawPrefsNotify()
     {
         /* --------------- Separator for moving onto the Notifications Section ----------- */
-        CkGui.FontText(CkLoc.Settings.Preferences.HeaderNotifications, UiFontService.UidFont);
+        CkGui.FontText(CkLoc.Settings.Preferences.HeaderNotifications, Fonts.UidFont);
         var pairDtr = _config.Current.EnablePairDtr;
         var onlineNotifs = _config.Current.OnlineNotifications;
         var onlineNotifsNickLimited = _config.Current.NotifyLimitToNickedPairs;

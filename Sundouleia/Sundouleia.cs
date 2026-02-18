@@ -50,6 +50,8 @@ public sealed class Sundouleia : IDalamudPlugin
         _host = ConstructHostBuilder(pi);
         // start up the host
         _ = _host.StartAsync();
+        // Init the fonts
+        _ = Fonts.InitializeFonts().ConfigureAwait(false);
     }
 
     // Method that creates the host builder for the Sundouleia plugin
@@ -112,7 +114,8 @@ public sealed class Sundouleia : IDalamudPlugin
         _httpHandler.Dispose();
         // Dispose the Host.
         _host.Dispose();
-
+        // Dispose of fonts.
+        Fonts.Dispose();
     }
 }
 
@@ -194,7 +197,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<SundouleiaMediator>()
         .AddSingleton<SidePanelService>()
         .AddSingleton<TutorialService>()
-        .AddSingleton<UiFontService>()
 
         // UI (Probably mostly in Scoped)
         .AddSingleton<RadarChatLog>()
@@ -323,7 +325,6 @@ public static class SundouleiaServiceExtensions
         // Cached Data That MUST be initialized before anything else for validity.
         .AddHostedService(p => p.GetRequiredService<FileCacheManager>())      // Handle the csv cache for all file locations.
         .AddHostedService(p => p.GetRequiredService<CosmeticService>())     // Provides all Textures necessary for the plugin.
-        .AddHostedService(p => p.GetRequiredService<UiFontService>())       // Provides all fonts necessary for the plugin.
 
         .AddHostedService(p => p.GetRequiredService<SundouleiaLoc>())       // Initializes Localization with the current language.
         .AddHostedService(p => p.GetRequiredService<EventAggregator>())     // Forcibly calls the constructor, subscribing to the monitors.

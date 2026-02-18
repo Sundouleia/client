@@ -84,8 +84,8 @@ public class ProfilesTab
         _frameH = ImUtf8.FrameHeight;
         _frameHSpacingWidth = ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X;
 
-        _ckFrameCol = SundColor.Silver.Uint();
-        _clientCol = SundColor.Gold.Uint();
+        _ckFrameCol = SundCol.Silver.Uint();
+        _clientCol = SundCol.Gold.Uint();
 
         _txtCol = ImGui.GetColorU32(ImGuiCol.Text);
         _txtDisableCol = ImGui.GetColorU32(ImGuiCol.TextDisabled);
@@ -390,7 +390,7 @@ public class ProfilesTab
         var iconPosTR = new Vector2(drawArea.Max.X - iconSize.X, drawArea.Min.Y);
         var iconPosBL = new Vector2(drawArea.Min.X, drawArea.Min.Y + ImUtf8.TextHeightSpacing);
         using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            window.DrawList.AddText(FAI.CheckCircle.ToIconString(), iconPosTR, profile.HadValidConnection ? CkColor.TriStateCheck.Uint() : _frameBgHoverCol);
+            window.DrawList.AddText(FAI.CheckCircle.ToIconString(), iconPosTR, profile.HadValidConnection ? CkCol.TriStateCheck.Uint() : _frameBgHoverCol);
         if (ImGui.IsMouseHoveringRect(iconPosTR, iconPosTR + iconSize))
             CkGui.ToolTipInternal(profile.HadValidConnection ? "Had a Successful Connection & Aquired UID." : "Profile has not yet connected to the server.");
 
@@ -416,7 +416,7 @@ public class ProfilesTab
         // If no profile is selected, just draw nothing is selected and return.
         if (_selected is not { } profile)
         {
-            CkGui.FontText("No Profile Selected", UiFontService.UidFont);
+            CkGui.FontText("No Profile Selected", Fonts.UidFont);
             return;
         }
         // We need to determine the maximum left width to know how to scale the profile image.
@@ -429,7 +429,7 @@ public class ProfilesTab
 
         using (ImRaii.Group())
         {
-            CkGui.FontText(profile.ProfileLabel, UiFontService.UidFont);
+            CkGui.FontText(profile.ProfileLabel, Fonts.UidFont);
             var lineSize = new Vector2(leftWidth, _lineH);
             _wdl.AddDalamudImage(CosmeticService.CoreTextures.Cache[CoreTexture.AchievementLineSplit], ImGui.GetCursorScreenPos(), lineSize);
             ImGui.Dummy(lineSize);
@@ -569,7 +569,7 @@ public class ProfilesTab
     private void DrawLinkedPlayers(AccountProfile profile, float fullWidth, float innerHeight)
     {
         // Outer Child style
-        var greenBg = CkColor.TriStateCheck.Vec4();
+        var greenBg = CkCol.TriStateCheck.Vec4();
         var bgCol = _isDraggingOther ? CkGui.Color(Gradient.Get(greenBg, greenBg with { W = greenBg.W / 4 }, 500)) : 0;
 
         var clientPlayer = _linkedPlayers.FirstOrDefault(c => c.ContentId == PlayerData.CID);
@@ -609,7 +609,7 @@ public class ProfilesTab
         ImGui.Dummy(lineSize);
 
         // Outer Style
-        var greenBg = CkColor.TriStateCheck.Vec4();
+        var greenBg = CkCol.TriStateCheck.Vec4();
         var bgCol = _isDraggingLinked ? CkGui.Color(Gradient.Get(greenBg, greenBg with { W = greenBg.W / 4 }, 500)) : 0;
 
         var clientPlayer = _otherPlayers.FirstOrDefault(c => c.ContentId == PlayerData.CID);
@@ -714,7 +714,7 @@ public class ProfilesTab
         {
             var iconPosTR = new Vector2(drawArea.Max.X - iconSize.X, drawArea.Min.Y + (drawArea.GetSize().Y - iconSize.Y) * .5f);
             using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-                window.DrawList.AddText(FAI.Link.ToIconString(), iconPosTR, CkColor.TriStateCross.Uint());
+                window.DrawList.AddText(FAI.Link.ToIconString(), iconPosTR, CkCol.TriStateCross.Uint());
         }
 
 
@@ -860,7 +860,7 @@ public class ProfilesTab
 
         using (ImRaii.Group())
         {
-            CkGui.FontTextCentered("WARNING", UiFontService.UidFont, ImGuiColors.DalamudRed);
+            CkGui.FontTextCentered("WARNING", Fonts.UidFont, ImGuiColors.DalamudRed);
             CkGui.Separator(ImGuiColors.DalamudRed.ToUint(), size.X);
 
             if (profile.IsPrimary)

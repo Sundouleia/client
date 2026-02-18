@@ -323,6 +323,7 @@ public partial class MainHub
         if (_accounts.ConnectionKind is ConnectionKind.FullPause)
         {
             Logger.LogDebug("You have your connection to server paused. Stopping any attempt to connect!", LoggerType.ApiCore);
+            ServerStatus = ServerState.Disconnected;
             return false;
         }
 

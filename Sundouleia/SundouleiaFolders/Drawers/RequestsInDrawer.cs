@@ -283,7 +283,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
                     // override button.
                     var overrideIcon = leaf.Data.IsTemporaryRequest ? FAI.Check : FAI.Stopwatch;
                     // Draw out the initial frame with a small outer boarder.
-                    if (CkGui.IconButtonColored(overrideIcon, SundColor.Gold.Uint(), UiService.DisableUI))
+                    if (CkGui.IconButtonColored(overrideIcon, SundCol.Gold.Uint(), UiService.DisableUI))
                         AcceptRequest(leaf.Data, !leaf.Data.IsTemporaryRequest);
                     CkGui.AttachToolTip($"Override pairing preference.--NL----COL--Accept {leaf.Data.SenderTag} as a " +
                         $"{(leaf.Data.IsTemporaryRequest ? "permanent" : "temporary")} pair.--COL--", ImGuiColors.DalamudOrange);
@@ -291,12 +291,12 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
                     // Draw out the initial frame with a small outer boarder.
                     ImUtf8.SameLineInner();
                     var defaultIcon = leaf.Data.IsTemporaryRequest ? FAI.Clock : FAI.Check;
-                    if (CkGui.IconButtonColored(defaultIcon, CkColor.TriStateCheck.Uint(), UiService.DisableUI))
+                    if (CkGui.IconButtonColored(defaultIcon, CkCol.TriStateCheck.Uint(), UiService.DisableUI))
                         AcceptRequest(leaf.Data, leaf.Data.IsTemporaryRequest);
                     CkGui.AttachToolTip($"Accept this --COL--{(leaf.Data.IsTemporaryRequest ? "Temporary" : "Permanent")}--COL-- request.", ImGuiColors.DalamudOrange);
 
                     ImUtf8.SameLineInner();
-                    if (CkGui.IconButtonColored(FAI.Times, CkColor.TriStateCross.Uint(), UiService.DisableUI))
+                    if (CkGui.IconButtonColored(FAI.Times, CkCol.TriStateCross.Uint(), UiService.DisableUI))
                         RejectRequest(leaf.Data);
                     CkGui.AttachToolTip("Reject this request.");
                     ImUtf8.SameLineInner();

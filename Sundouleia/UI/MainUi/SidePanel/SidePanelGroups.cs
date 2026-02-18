@@ -163,7 +163,7 @@ public class SidePanelGroups
         CkGui.AttachToolTip("Set the name of the Group.");
 
         ImGui.Separator();
-        CkGui.FontText("Stylization", UiFontService.Default150Percent);
+        CkGui.FontText("Stylization", Fonts.Default150Percent);
         DrawIconStyle(cache.NewGroup, width, newCol => cache.NewGroup.IconColor = newCol);
 
         ImUtf8.SameLineInner();
@@ -176,7 +176,7 @@ public class SidePanelGroups
         DrawGradientStyle(cache.NewGroup, width, newCol => cache.NewGroup.GradientColor = newCol);
 
         ImGui.Separator();
-        CkGui.FontText("Preferences", UiFontService.Default150Percent);
+        CkGui.FontText("Preferences", Fonts.Default150Percent);
         DrawOfflineFlag(cache.NewGroup, width, newState => cache.NewGroup.ShowOffline = newState);
         DrawLocationFlag(cache.NewGroup, width);
 
@@ -233,7 +233,7 @@ public class SidePanelGroups
         CkGui.AttachToolTip("Set the name of the Group.");
 
         ImGui.Separator();
-        CkGui.FontText("Stylization", UiFontService.Default150Percent);
+        CkGui.FontText("Stylization", Fonts.Default150Percent);
         DrawIconStyle(cache.GroupInEditor, width, newCol =>
         {
             cache.GroupInEditor.IconColor = newCol;
@@ -266,7 +266,7 @@ public class SidePanelGroups
         });
 
         ImGui.Separator();
-        CkGui.FontText("Preferences", UiFontService.Default150Percent);
+        CkGui.FontText("Preferences", Fonts.Default150Percent);
         DrawOfflineFlag(cache.GroupInEditor, width, newState =>
         {
             cache.GroupInEditor.ShowOffline = newState;

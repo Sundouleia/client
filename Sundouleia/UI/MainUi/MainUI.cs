@@ -133,7 +133,7 @@ public class MainUI : WindowMediatorSubscriberBase
         // If unauthorized draw the unauthorized display, otherwise draw the server status.
         if (MainHub.ServerStatus is (ServerState.NoSecretKey or ServerState.VersionMisMatch or ServerState.Unauthorized))
         {
-            CkGui.FontTextCentered(SundouleiaEx.GetErrorText(), UiFontService.UidFont, CkColor.TriStateCross.Uint());
+            CkGui.FontTextCentered(SundouleiaEx.GetErrorText(), Fonts.UidFont, CkCol.TriStateCross.Uint());
             // the wrapped text explanation based on the error.
             CkGui.ColorTextWrapped(GetServerError(), ImGuiColors.DalamudWhite);
         }
@@ -250,7 +250,7 @@ public class MainUI : WindowMediatorSubscriberBase
         var streamerSize = CkGui.IconSize(FAI.BroadcastTower);
         var connectedSize = CkGui.IconSize(FAI.Link);
         var sideWidth = offlineSize.X + tryonSize.X + streamerSize.X + connectedSize.X + ImUtf8.ItemSpacing.X * 5;
-        var height = CkGui.CalcFontTextSize("A", UiFontService.Default150Percent).Y;
+        var height = CkGui.CalcFontTextSize("A", Fonts.Default150Percent).Y;
 
         if (DrawAddUser(winPtr, new Vector2(sideWidth, height), minPos))
             _creatingRequest = !_creatingRequest;
@@ -320,7 +320,7 @@ public class MainUI : WindowMediatorSubscriberBase
 
     private void DrawConnectedUsers(ImGuiWindowPtr winPtr, Vector2 region, float topBarWidth)
     {
-        using var font = UiFontService.Default150Percent.Push();
+        using var font = Fonts.Default150Percent.Push();
 
         var userCount = MainHub.OnlineUsers.ToString(CultureInfo.InvariantCulture);
         var text = MainHub.IsConnected ? $"{userCount}Online" : SundouleiaEx.GetErrorText();
@@ -342,7 +342,7 @@ public class MainUI : WindowMediatorSubscriberBase
         {
             if (MainHub.IsConnected)
             {
-                CkGui.ColorText(userCount, SundColor.Gold.Vec4());
+                CkGui.ColorText(userCount, SundCol.Gold.Vec4());
                 CkGui.TextInline("Online");
             }
             else
@@ -381,7 +381,7 @@ public class MainUI : WindowMediatorSubscriberBase
         var iconsWidth = offlineSize.X + tryonSize.X + streamerSize.X + connectedSize.X;
 
         CkGui.InlineSpacingInner();
-        if (DrawConnectionButton(ConnectionKind.FullPause, FAI.Unlink, CkColor.TriStateCross.Uint(), offlineSize, !MainHub.IsConnected))
+        if (DrawConnectionButton(ConnectionKind.FullPause, FAI.Unlink, CkCol.TriStateCross.Uint(), offlineSize, IsStateDisabled(ConnectionKind.FullPause)))
         {
             _account.ConnectionKind = ConnectionKind.FullPause;
             _ = _hub.Disconnect(ServerState.Disconnected, DisconnectIntent.Normal);
@@ -390,7 +390,7 @@ public class MainUI : WindowMediatorSubscriberBase
             $"--NL--Disconnected from Servers.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton(ConnectionKind.WardrobeMode, FAI.ToiletPortable, CkColor.TriStateCheck.Uint(), offlineSize, !MainHub.CanChangeConnectedState))
+        if (DrawConnectionButton(ConnectionKind.WardrobeMode, FAI.ToiletPortable, CkCol.TriStateCheck.Uint(), offlineSize, IsStateDisabled(ConnectionKind.WardrobeMode)))
         {
             _account.ConnectionKind = ConnectionKind.WardrobeMode;
 
@@ -401,7 +401,7 @@ public class MainUI : WindowMediatorSubscriberBase
             $"--NL--Changes you make aren't pushed to others, but you still see others normally.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
-        if (DrawConnectionButton(ConnectionKind.StreamerMode, FAI.BroadcastTower, CkColor.TriStateCheck.Uint(), offlineSize, !MainHub.CanChangeConnectedState))
+        if (DrawConnectionButton(ConnectionKind.StreamerMode, FAI.BroadcastTower, CkCol.TriStateCheck.Uint(), offlineSize, IsStateDisabled(ConnectionKind.StreamerMode)))
         {
             _account.ConnectionKind = ConnectionKind.StreamerMode;
 
@@ -413,16 +413,14 @@ public class MainUI : WindowMediatorSubscriberBase
 
         ImGui.SameLine();
         // This is a bit confusing at the moment, possibly rework later?
-        if (DrawConnectionButton(ConnectionKind.Normal, FAI.Link, CkColor.TriStateCheck.Uint(), offlineSize, !MainHub.CanChangeConnectedState))
+        if (DrawConnectionButton(ConnectionKind.Normal, FAI.Link, CkCol.TriStateCheck.Uint(), offlineSize, IsStateDisabled(ConnectionKind.Normal)))
         {
             _account.ConnectionKind = ConnectionKind.Normal;
 
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();
         }
-        CkGui.AttachToolTip($"--COL--[Connected]--COL--" +
-            $"--NL--Normal/Default connection with the server." +
-            $"--SEP--May display while not connected if you have an error", ImGuiColors.DalamudOrange);
+        CkGui.AttachToolTip($"--COL--[Connected]--COL----NL--Normal/Default connection with the server.", ImGuiColors.DalamudOrange);
 
         bool DrawConnectionButton(ConnectionKind kind, FAI icon, uint color, Vector2 size, bool disabled)
         {
@@ -446,7 +444,7 @@ public class MainUI : WindowMediatorSubscriberBase
             ImGuiP.RenderNavHighlight(hitbox, id);
 
             // Draw based on current state. (a little flawed here)
-            if (_account.ConnectionKind == kind)
+            if (InState(kind))
             {
                 using (Svc.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
                     winPtr.DrawList.AddText(icon.ToIconString(), min, color);
@@ -462,6 +460,25 @@ public class MainUI : WindowMediatorSubscriberBase
             return clicked && !disabled;
         }
     }
+
+    private bool _blockConnection => MainHub.ServerStatus is (ServerState.NoSecretKey or ServerState.VersionMisMatch or ServerState.Unauthorized);
+    private bool _changingStates => MainHub.ServerStatus is (ServerState.Connecting or ServerState.Reconnecting or ServerState.Disconnecting);
+    private bool InState(ConnectionKind kind) => kind switch
+    {
+        ConnectionKind.FullPause => _account.ConnectionKind is ConnectionKind.FullPause && !MainHub.IsConnected,
+        ConnectionKind.WardrobeMode => _account.ConnectionKind is ConnectionKind.WardrobeMode && MainHub.IsConnected,
+        ConnectionKind.StreamerMode => _account.ConnectionKind is ConnectionKind.StreamerMode && MainHub.IsConnected,
+        ConnectionKind.Normal => _account.ConnectionKind is ConnectionKind.Normal && MainHub.IsConnected,
+        _ => false
+    };
+    private bool IsStateDisabled(ConnectionKind kind) => _changingStates || kind switch
+    {
+        ConnectionKind.FullPause => !MainHub.IsConnected,
+        ConnectionKind.WardrobeMode => _blockConnection || _account.ConnectionKind is ConnectionKind.WardrobeMode,
+        ConnectionKind.StreamerMode => _blockConnection || _account.ConnectionKind is ConnectionKind.StreamerMode,
+        ConnectionKind.Normal => _blockConnection || _account.ConnectionKind is ConnectionKind.Normal,
+        _ => true
+    };
 
     /// <summary> 
     ///     Retrieves the various server error messages based on the current server state.

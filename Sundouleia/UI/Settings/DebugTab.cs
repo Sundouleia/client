@@ -40,7 +40,7 @@ public class DebugTab
 
     public void DrawDebugMain()
     {
-        CkGui.FontText("Debug Configuration", UiFontService.UidFont);
+        CkGui.FontText("Debug Configuration", Fonts.UidFont);
 
         // display the combo box for setting the log level we wish to have for our plugin
         if (CkGuiUtils.EnumCombo("Log Level", 400, MainConfig.LogLevel, out var newValue))

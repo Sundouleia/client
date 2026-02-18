@@ -26,7 +26,7 @@ internal class VerificationPopupHandler : IPopupHandler
     {
         var width = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
         // push the title for the popup.
-        using (UiFontService.UidFont.Push())
+        using (Fonts.UidFont.Push())
         {
             var headerTextSize = ImGui.CalcTextSize("Verification Code for " + MainHub.DisplayName);
             ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X) / 2 - (headerTextSize.X / 2));
@@ -39,7 +39,7 @@ internal class VerificationPopupHandler : IPopupHandler
             // canter the text input so that its width is the width of the _verificationCode text + 10px, centerd in the available context.
             ImGui.SetCursorPosX(width / 2 - ((ImGui.CalcTextSize(_verificationCode).X + ImGuiHelpers.GlobalScale * 12) / 2));
 
-            ImGui.TextColored(SundColor.Gold.Uint(), _verificationCode);
+            ImGui.TextColored(SundCol.Gold.Uint(), _verificationCode);
             CkGui.CopyableDisplayText(_verificationCode, "Click to copy verification code to clipboard");
         }
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + ImGuiHelpers.GlobalScale * 10);

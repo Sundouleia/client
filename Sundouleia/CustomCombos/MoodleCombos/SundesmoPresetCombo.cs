@@ -40,7 +40,7 @@ public sealed class SundesmoPresetCombo : MoodleComboBase<MoodlePresetInfo>
         var ret = ImGui.Selectable($"##{moodlePreset.Title}", selected, ImGuiSelectableFlags.None, size);
 
         // Push the font first so the height is correct.
-        using var _ = UiFontService.Default150Percent.Push();
+        using var _ = Fonts.Default150Percent.Push();
 
         if (moodlePreset.Statuses.Count > 0)
         {

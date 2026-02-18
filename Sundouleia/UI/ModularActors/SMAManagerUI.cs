@@ -47,7 +47,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        CkGui.FontText("Modular Actor Files", UiFontService.UidFont);
+        CkGui.FontText("Modular Actor Files", Fonts.UidFont);
         using var tabBar = ImRaii.TabBar("smaFileTabBar");
         DrawSMAData();
         DrawSMABase();
@@ -66,7 +66,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
         ImGui.SameLine();
         using var _ = ImRaii.Group();
         
-        CkGui.FontText($"Selected: {(_selectedSmad is null ? "<none>" : _selectedSmad.Name)}", UiFontService.Default150Percent);
+        CkGui.FontText($"Selected: {(_selectedSmad is null ? "<none>" : _selectedSmad.Name)}", Fonts.Default150Percent);
         if (_selectedSmad is not { } cur)
             return;
 
@@ -106,7 +106,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
         ImGui.SameLine();
         using var _ = ImRaii.Group();
 
-        CkGui.FontText($"Selected: {(_selectedSmab is null ? "<none>" : _selectedSmab.Name)}", UiFontService.Default150Percent);
+        CkGui.FontText($"Selected: {(_selectedSmab is null ? "<none>" : _selectedSmab.Name)}", Fonts.Default150Percent);
         if (_selectedSmab is not { } cur)
             return;
 
@@ -146,7 +146,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
         ImGui.SameLine();
         using var _ = ImRaii.Group();
 
-        CkGui.FontText($"Selected: {(_selectedSmao is null ? "<none>" : _selectedSmao.Name)}", UiFontService.Default150Percent);
+        CkGui.FontText($"Selected: {(_selectedSmao is null ? "<none>" : _selectedSmao.Name)}", Fonts.Default150Percent);
         if (_selectedSmao is not { } cur)
             return;
 
@@ -186,7 +186,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
         ImGui.SameLine();
         using var _ = ImRaii.Group();
         
-        CkGui.FontText($"Selected: {(_selectedSmai is null ? "<none>" : _selectedSmai.Name)}", UiFontService.Default150Percent);
+        CkGui.FontText($"Selected: {(_selectedSmai is null ? "<none>" : _selectedSmai.Name)}", Fonts.Default150Percent);
         if (_selectedSmai is not { } cur)
             return;
 
@@ -316,7 +316,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
         using var node = ImRaii.TreeNode("Glamour State");
         if (!node) return;
 
-        using var _ = CkRaii.FramedChildPaddedWH("##glamNode", ImGui.GetContentRegionAvail(), 0, SundColor.Gold.Uint());
+        using var _ = CkRaii.FramedChildPaddedWH("##glamNode", ImGui.GetContentRegionAvail(), 0, SundCol.Gold.Uint());
         using var font = ImRaii.PushFont(UiBuilder.MonoFont);
         ImUtf8.TextWrapped(element.GlamourState.ToString() ?? string.Empty);
     }

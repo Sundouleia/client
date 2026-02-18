@@ -222,7 +222,7 @@ public class TransferBarUI : WindowMediatorSubscriberBase
 
             try
             {
-                using var _ = UiFontService.UidFont.Push();
+                using var _ = Fonts.UidFont.Push();
                 var uploadText = "Uploading";
 
                 var textSize = ImGui.CalcTextSize(uploadText);

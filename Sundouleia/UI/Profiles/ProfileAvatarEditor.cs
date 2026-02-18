@@ -98,7 +98,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
         // we need here to draw the group for content.
         using (ImRaii.Group())
         {
-            CkGui.FontText("Current Image", UiFontService.UidFont);
+            CkGui.FontText("Current Image", Fonts.UidFont);
             ImGui.Separator();
             CkGui.ColorText("Square Image Preview:", ImGuiColors.ParsedGold);
             CkGui.TextWrapped("Meant to display the original display of the stored image data.");
@@ -235,7 +235,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
         ImGuiHelpers.ScaledRelativeSameLine(256, spacing);
         using (ImRaii.Group())
         {
-            CkGui.FontText("Image Editor", UiFontService.UidFont);
+            CkGui.FontText("Image Editor", Fonts.UidFont);
             ImGui.Separator();
             CkGui.ColorText("Adjustments may crash your game atm! (WIP)", ImGuiColors.DalamudRed);
             if (_croppedImageData != null)

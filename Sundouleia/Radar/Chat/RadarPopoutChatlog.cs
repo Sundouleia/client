@@ -113,9 +113,9 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         if (newMsg.Tier is CkVanityTier.ShopKeeper)
         {
             // Apply Cordy's signature color to her name, and also prefix her icon and give all RichText permissions.
-            UserColors[newMsg.UID] = CkColor.ShopKeeperColor.Vec4();
-            var prefix = $"[img=RequiredImages\\Tier4Icon][rawcolor={CkColor.ShopKeeperColor.Uint()}]{newMsg.Name}[/rawcolor]: ";
-            Messages.PushBack(newMsg with { Message = $"{prefix} [rawcolor={CkColor.ShopKeeperText.Uint()}]{newMsg.Message}[/rawcolor]" });
+            UserColors[newMsg.UID] = SundCol.ShopKeeperColor.Vec4();
+            var prefix = $"[img=RequiredImages\\Tier4Icon][rawcolor={SundCol.ShopKeeperColor.Uint()}]{newMsg.Name}[/rawcolor]: ";
+            Messages.PushBack(newMsg with { Message = $"{prefix} [rawcolor={SundCol.ShopKeeperText.Uint()}]{newMsg.Message}[/rawcolor]" });
         }
         // System messages should not inc the unread count.
         else if (string.Equals(newMsg.UID, "System", StringComparison.OrdinalIgnoreCase))
@@ -150,7 +150,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         if (newMsg.Tier is CkVanityTier.ShopKeeper)
         {
             // Force set the uid color to her favorite color.
-            UserColors[newMsg.UID] = CkColor.ShopKeeperColor.Vec4();
+            UserColors[newMsg.UID] = SundCol.ShopKeeperColor.Vec4();
             Messages.PushBack(newMsg);
             unreadSinceScroll++;
         }
@@ -242,7 +242,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         var wdl = ImGui.GetWindowDrawList();
         wdl.PushClipRect(winPos, winPos + c.InnerRegion.WithWinPadding(), false);
         wdl.AddRectFilled(winPos, winPos + c.InnerRegion.WithWinPadding(), 0xCC000000, 5, ImDrawFlags.RoundCornersAll);
-        wdl.AddRect(winPos, winPos + c.InnerRegion.WithWinPadding(), CkColor.LushPinkLine.Uint(), 5, ImDrawFlags.RoundCornersAll);
+        wdl.AddRect(winPos, winPos + c.InnerRegion.WithWinPadding(), SundCol.Gold.Uint(), 5, ImDrawFlags.RoundCornersAll);
         wdl.PopClipRect();
 
         var count = 0;
@@ -391,7 +391,7 @@ public class PopoutRadarChatlog : CkChatlog<RadarCkChatMessage>, IMediatorSubscr
         {
             // Cordy is special girl :3
             if (msg.Tier is CkVanityTier.ShopKeeper)
-                UserColors[msg.UID] = CkColor.ShopKeeperColor.Vec4();
+                UserColors[msg.UID] = SundCol.ShopKeeperColor.Vec4();
             else
                 AssignSenderColor(msg);
 

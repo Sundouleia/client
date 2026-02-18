@@ -1,3 +1,4 @@
+using CkCommons;
 using CkCommons.HybridSaver;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using NAudio.Wave;
@@ -157,8 +158,12 @@ public class MainConfig : IHybridSavable, IDisposable
     }
 
     public ConfigStorage Current { get; private set; } = new();
+    public Dictionary<SundCol, uint> SundColors { get; private set; } = [];
+    public Dictionary<CkCol, uint> CkColors { get; private set; } = [];
+    
     public static LogLevel LogLevel = LogLevel.Trace;
     public static LoggerType LoggerFilters = LoggerType.Recommended;
+
 
     // Audio Helpers
     public bool IsSoundReady()

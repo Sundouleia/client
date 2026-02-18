@@ -136,7 +136,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         using var _ = CkRaii.Child("RequestResponder", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
 
-        CkGui.FontTextCentered("Bulk Request Responder", UiFontService.Default150Percent);
+        CkGui.FontTextCentered("Bulk Request Responder", Fonts.Default150Percent);
         ImGui.Separator();
 
         ImGui.Text("Selected Requests");
@@ -200,7 +200,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         using var _ = CkRaii.Child("GroupCreator", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
 
-        CkGui.FontTextCentered($"Create New Group", UiFontService.Default150Percent);
+        CkGui.FontTextCentered($"Create New Group", Fonts.Default150Percent);
         _spGroups.DrawCreator(ngc, width);
         ImGui.Separator();
         // Draw the center button for creating.
@@ -221,7 +221,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         using var _ = CkRaii.Child("FolderGroupCreator", ImGui.GetContentRegionAvail(), wFlags: WFlags.NoScrollbar);
         var width = _.InnerRegion.X;
 
-        CkGui.FontTextCentered($"Create New Folder", UiFontService.Default150Percent);
+        CkGui.FontTextCentered($"Create New Folder", Fonts.Default150Percent);
         ImGui.Separator();
         _spGroups.DrawFolderCreator(nfgc, width);
         ImGui.Separator();
@@ -241,7 +241,7 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         var width = _.InnerRegion.X;
 
         // Include the group name in the title.
-        CkGui.FontTextCentered($"Editing {gec.GroupInEditor.Label}", UiFontService.Default150Percent);
+        CkGui.FontTextCentered($"Editing {gec.GroupInEditor.Label}", Fonts.Default150Percent);
         ImGui.Separator();
         _spGroups.DrawGroupEditor(gec, width);
     }

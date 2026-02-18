@@ -103,7 +103,7 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
                 return false;
 
             // Try to add it.
-            return AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Eye, Constants.FolderTagVisible, CkColor.TriStateCheck.Uint(), 
+            return AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Eye, Constants.FolderTagVisible, CkCol.TriStateCheck.Uint(), 
                 () => [.. _sundesmos.DirectPairs.Where(u => u.IsRendered && u.IsOnline)], GetDefaultSorter()));
         }
         // Otherwise attempt to remove it.
@@ -120,8 +120,8 @@ public class WhitelistDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSubscri
         {
             var sorter = GetDefaultSorter();
             anyChanges |= Delete(Constants.FolderTagAll);
-            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Link, Constants.FolderTagOnline, CkColor.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => s.IsOnline)], new(sorter)));
-            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Link, Constants.FolderTagOffline, CkColor.TriStateCross.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => !s.IsOnline)], new(sorter)));
+            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Link, Constants.FolderTagOnline, CkCol.TriStateCheck.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => s.IsOnline)], new(sorter)));
+            anyChanges |= AddFolder(new DefaultFolder(root, idCounter + 1u, FAI.Link, Constants.FolderTagOffline, CkCol.TriStateCross.Uint(), () => [.. _sundesmos.DirectPairs.Where(s => !s.IsOnline)], new(sorter)));
         }
         // Otherwise we wanted to only show ALL.
         else

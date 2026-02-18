@@ -154,8 +154,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         ImGui.SameLine(pos.X);
         CkGui.FramedIconText(folder.IsOpen ? FAI.CaretDown : FAI.CaretRight);
         ImGui.SameLine();
-        ImGui.AlignTextToFramePadding();
-        CkGui.IconText(folder.Icon, folder.IconColor);
+        CkGui.IconTextAligned(folder.Icon, folder.IconColor);
         CkGui.ColorTextFrameAlignedInline(folder.Name, folder.NameColor);
         // Total Context.
         CkGui.ColorTextFrameAlignedInline(folder.BracketText, ImGuiColors.DalamudGrey2);
