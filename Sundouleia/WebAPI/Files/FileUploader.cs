@@ -12,7 +12,6 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
     private readonly MainConfig _config;
     private readonly FileCacheManager _fileDbManager;
     private readonly FileTransferService _transferService;
-    private readonly Compressor  _compressor = new();
 
     public FileUploader(ILogger<FileUploader> logger, SundouleiaMediator mediator,
         MainConfig config, FileCacheManager fileDbManager, FileTransferService transferService)
@@ -21,12 +20,6 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
         _config = config;
         _fileDbManager = fileDbManager;
         _transferService = transferService;
-    }
-    
-    protected override void Dispose(bool disposing)
-    {
-        _compressor.Dispose();
-        base.Dispose(disposing);
     }
 
     public FileTransferProgress CurrentUploads { get; } = new(); // update as time does on.
@@ -96,10 +89,11 @@ public sealed class FileUploader : DisposableMediatorSubscriberBase
         });
 
         HttpResponseMessage response;
-        if (fileInfo.Size > 300_000)
+        if (fileInfo.Size > 1_300_000)
         {
             var fileBytes = await File.ReadAllBytesAsync(fileInfo.ResolvedFilepath, cancelToken);
-            Span<byte> compressedBytes = _compressor.Wrap(fileBytes);
+            using var compressor = new Compressor();
+            Span<byte> compressedBytes = compressor.Wrap(fileBytes);
             using var compressedStream = new MemoryStream(compressedBytes.ToArray());
             compressedStream.Position = 0;
             using var content = new ProgressableStreamContent(compressedStream, progressTracker);
