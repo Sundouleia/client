@@ -960,6 +960,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         if (!_lociRegistered)
         {
+            // Could cause some confusion (due to clearing alterations), but should work for the most part.
             if (await _ipc.LociRegister(Address).ConfigureAwait(false))
                 _lociRegistered = true;
         }
