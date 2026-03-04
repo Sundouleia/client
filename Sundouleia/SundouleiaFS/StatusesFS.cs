@@ -45,15 +45,9 @@ public sealed class StatusesFS : CkFileSystem<LociStatus>, IMediatorSubscriber, 
     {
         var basePath = new FileInfo(_hybridSaver.FileNames.CKFS_Statuses);
         var migratableFile = new FileInfo(migratablePath);
-        if (MigrateAndReloadFsFile(migratableFile, basePath, _manager.SavedStatuses, StatusToIdentifier, StatusToName))
-        {
-            _logger.LogInformation($"Migrated statuses from {migratableFile.FullName} to {basePath.FullName}.");
-            _hybridSaver.Save(this);
-        }
-        else
-        {
-            _logger.LogWarning($"Failed to migrate statuses from {migratableFile.FullName}. No changes were made.");
-        }
+        MigrateAndReloadFsFile(migratableFile, basePath, _manager.SavedStatuses, StatusToIdentifier, StatusToName);
+        _logger.LogInformation($"Migrated statuses from {migratableFile.FullName} to {basePath.FullName}.");
+        _hybridSaver.Save(this);
     }
 
     public void Dispose()

@@ -43,17 +43,11 @@ public sealed class PresetsFS : CkFileSystem<LociPreset>, IMediatorSubscriber, I
 
     public void MergeWithMigratableFile(string migratablePath)
     {
-        var basePath = new FileInfo(_hybridSaver.FileNames.CKFS_Statuses);
+        var basePath = new FileInfo(_hybridSaver.FileNames.CKFS_Presets);
         var migratableFile = new FileInfo(migratablePath);
-        if (MigrateAndReloadFsFile(migratableFile, basePath, _manager.SavedPresets, PresetToIdentifier, PresetToName))
-        {
-            _logger.LogInformation($"Migrated presets from {migratableFile.FullName} to {basePath.FullName}.");
-            _hybridSaver.Save(this);
-        }
-        else
-        {
-            _logger.LogWarning($"Failed to migrate presets from {migratableFile.FullName}. No changes were made.");
-        }
+        MigrateAndReloadFsFile(migratableFile, basePath, _manager.SavedPresets, PresetToIdentifier, PresetToName);
+        _logger.LogInformation($"Migrated presets from {migratableFile.FullName} to {basePath.FullName}.");
+        _hybridSaver.Save(this);
     }
 
     public void Dispose()

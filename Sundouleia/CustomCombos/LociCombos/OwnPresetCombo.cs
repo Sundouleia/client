@@ -94,7 +94,7 @@ public sealed class OwnPresetCombo : LociComboBase<LociPreset>
             var toSend = _loci.SavedStatuses.Where(s => ids.Contains(s.GUID)).Select(s => s.ToTuple());
 
             var res = await _hub.UserApplyLociStatusTuples(new(_sundesmo.UserData, toSend));
-            if (res.ErrorCode is SundouleiaApiEc.Success)
+            if (res.ErrorCode is not SundouleiaApiEc.Success)
                 Log.LogWarning($"Failed to apply loci preset {item.Title} on {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
         });
     }
