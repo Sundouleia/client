@@ -1,6 +1,7 @@
 using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState;
 using Dalamud.Interface.Colors;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using Lumina.Excel;
@@ -96,9 +97,9 @@ public class LocationSvc : DisposableMediatorSubscriberBase
         : base(logger, mediator)
     {
         // Listen to zone changes.
-        Svc.ClientState.TerritoryChanged += OnTerritoryChanged;
         Svc.ClientState.Login += SetInitialData;
         Svc.ClientState.Logout += OnLogout;
+        Svc.ClientState.ZoneInit += OnZoneInit;
 
         if (Svc.ClientState.IsLoggedIn)
             SetInitialData();
@@ -114,9 +115,9 @@ public class LocationSvc : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        Svc.ClientState.TerritoryChanged -= OnTerritoryChanged;
         Svc.ClientState.Login -= SetInitialData;
         Svc.ClientState.Logout -= OnLogout;
+        Svc.ClientState.ZoneInit -= OnZoneInit;
     }
 
     private async void OnLogout(int type, int code)
@@ -127,14 +128,17 @@ public class LocationSvc : DisposableMediatorSubscriberBase
     }
 
     // Set a slightly delayed territory changed update to make sure all data is correctly loaded in.
-    private async void OnTerritoryChanged(ushort newTerritory)
+    private async void OnZoneInit(ZoneInitEventArgs args)
     {
         // Ignore territories from login zone / title screen (if any even exist)
         if (!Svc.ClientState.IsLoggedIn)
             return;
 
-        Logger.LogDebug($"Territory changed to: {newTerritory} ({PlayerContent.GetTerritoryName(newTerritory)})");
+        // Upon a zone init, we are always not loaded in. As such, await for player to continue processing.
+        Logger.LogInformation($"Zone initialized: {args.ToString()}");
+        Logger.LogDebug($"Territory changed to: {args.TerritoryType.RowId} ({PlayerContent.GetTerritoryName((ushort)args.TerritoryType.RowId)})");
         Previous = Current;
+
         // Await for the player to be loaded.
         // This also ensures that by the time this is fired, all visible users will also be visible.
         await SundouleiaEx.WaitForPlayerLoading();

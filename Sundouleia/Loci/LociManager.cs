@@ -42,7 +42,7 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
         // Process object creation here
         Mediator.Subscribe<WatchedObjectCreated>(this, _ => OnObjectCreated(_.Address));
         Mediator.Subscribe<WatchedObjectDestroyed>(this, _ => OnObjectDeleted(_.Address));
-
+        Mediator.Subscribe<TerritoryChanged>(this, _ => OnTerritoryChange(_.PrevTerritory, _.NewTerritory));
         Svc.ClientState.Login += OnLogin;
 
         if (Svc.ClientState.IsLoggedIn)
@@ -69,6 +69,20 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
         await SundouleiaEx.WaitForPlayerLoading().ConfigureAwait(false);
         // Init data
         InitializeData();
+    }
+
+    // This occurs after the player is finished rendering.
+    private void OnTerritoryChange(ushort prev, ushort next)
+    {
+        var clientNameWorld = PlayerData.NameWithWorld;
+        // Clean up all non-client and non-ephemeral managers.
+        foreach (var (name, lociSM) in _statusManagers.ToList())
+        {
+            if (name == clientNameWorld || lociSM.Ephemeral || lociSM.OwnerValid)
+                continue;
+            // Remove it
+            _statusManagers.Remove(name);
+        }
     }
 
     private unsafe void InitializeData()
