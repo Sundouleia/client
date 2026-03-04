@@ -1,5 +1,3 @@
-using System.Net.Http.Headers;
-using System.Reflection;
 using CkCommons;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
@@ -9,9 +7,12 @@ using Microsoft.Extensions.Hosting;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
+using Sundouleia.Gui.Loci;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Interop;
+using Sundouleia.Loci;
+using Sundouleia.Loci.Processors;
 using Sundouleia.ModFiles;
 using Sundouleia.ModFiles.Cache;
 using Sundouleia.ModularActor;
@@ -29,6 +30,8 @@ using Sundouleia.Services.Tutorial;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
 using Sundouleia.WebAPI.Files;
+using System.Net.Http.Headers;
+using System.Reflection;
 
 namespace Sundouleia;
 
@@ -50,7 +53,6 @@ public sealed class Sundouleia : IDalamudPlugin
         _host = ConstructHostBuilder(pi);
         // start up the host
         _ = _host.StartAsync();
-        // Init the fonts
         _ = Fonts.InitializeFonts().ConfigureAwait(false);
     }
 
@@ -137,11 +139,9 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<RequestsInDrawer>()
         .AddSingleton<RequestsOutDrawer>()
         .AddSingleton<WhitelistDrawer>()
-        .AddSingleton<GroupsDrawSystem>()
         .AddSingleton<RadarDrawSystem>()
-        .AddSingleton<RequestsDrawSystem>()
-        .AddSingleton<SmaDrawSystem>()
-        .AddSingleton<WhitelistDrawSystem>()
+        .AddSingleton<PresetSelector>()
+        .AddSingleton<StatusSelector>()
 
         // Modular Actor Data
         .AddSingleton<SMAFileManager>()
@@ -164,7 +164,7 @@ public static class SundouleiaServiceExtensions
         // Player Client
         .AddSingleton<BlockedUserManager>()
         .AddSingleton<RequestsManager>()
-        .AddSingleton<ClientMoodles>()
+        .AddSingleton<LociMonitor>()
         .AddSingleton<ClientUpdateHandler>()
 
         // Player User
@@ -178,7 +178,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<ProfileService>()
 
         // Distribution
-        .AddSingleton<CharaObjectWatcher>()
+        .AddSingleton<CharaWatcher>()
         .AddSingleton<ClientUpdateService>()
         .AddSingleton<ClientDistributor>()
         .AddSingleton<RadarDistributor>()
@@ -188,6 +188,17 @@ public static class SundouleiaServiceExtensions
         // Radar
         .AddSingleton<RadarManager>()
         .AddSingleton<LocationSvc>()
+
+        // Loci
+        .AddSingleton<LociMemory>()
+        .AddSingleton<LociProcessor>()
+        .AddSingleton<FlyPopupTextProcessor>()
+        .AddSingleton<FocusTargetInfoProcessor>()
+        .AddSingleton<PartyListProcessor>()
+        .AddSingleton<StatusProcessor>()
+        .AddSingleton<StatusCustomProcessor>()
+        .AddSingleton<TargetInfoProcessor>()
+        .AddSingleton<TargetInfoBuffDebuffProcessor>()
 
         // Misc. Services
         .AddSingleton<CosmeticService>()
@@ -205,6 +216,7 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<WhitelistTabs>()
         .AddSingleton<SundesmoTabs>()
         .AddSingleton<RequestTabs>()
+        .AddSingleton<LociTabs>()
 
         // WebAPI (Server stuff)
         .AddSingleton<MainHub>()
@@ -226,26 +238,37 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<IpcCallerGlamourer>()
         .AddSingleton<IpcCallerHeels>()
         .AddSingleton<IpcCallerHonorific>()
-        .AddSingleton<IpcCallerMoodles>()
         .AddSingleton<IpcCallerPenumbra>()
         .AddSingleton<IpcCallerPetNames>()
         .AddSingleton<IpcManager>()
-        .AddSingleton<IpcProvider>();
+        .AddSingleton<IpcProvider>()
+        .AddSingleton<IpcProviderLoci>();
 
     public static IServiceCollection AddSundouleiaConfigs(this IServiceCollection services)
     => services
-        .AddSingleton<MainConfig>()
-        .AddSingleton<FolderConfig>()
-        .AddSingleton<ModularActorsConfig>()
-        .AddSingleton<NicksConfig>()
-        .AddSingleton<FavoritesConfig>()
+        // Purely Client
         .AddSingleton<AccountConfig>()
+        .AddSingleton<MainConfig>()
+        .AddSingleton<FavoritesConfig>()
+        .AddSingleton<FolderConfig>()
+        .AddSingleton<LociManager>()
+        .AddSingleton<ModularActorsConfig>()
+        // DDS & CKFS
+        .AddSingleton<WhitelistDrawSystem>()
+        .AddSingleton<GroupsDrawSystem>()
+        .AddSingleton<RequestsDrawSystem>()
+        .AddSingleton<RadarDrawSystem>()
+        .AddSingleton<SmaDrawSystem>()
+        .AddSingleton<StatusesFS>() 
+        .AddSingleton<PresetsFS>()
+        // DataSync & Server Related
+        .AddSingleton<NicksConfig>()
         .AddSingleton<NoCrashFriendsConfig>()
         .AddSingleton<TransientCacheConfig>()
-        .AddSingleton<ConfigFileProvider>()
-        // Config Managers / Savers
+        // Managers / Savers
         .AddSingleton<GroupsManager>()
         .AddSingleton<AccountManager>()
+        .AddSingleton<ConfigFileProvider>()
         .AddSingleton<HybridSaveService>();
 
     #region ScopedServices
@@ -297,6 +320,17 @@ public static class SundouleiaServiceExtensions
         .AddScoped<ProfilesTab>()
         .AddScoped<DebugTab>()
 
+        .AddScoped<WindowMediatorSubscriberBase, LociUI>()
+        .AddScoped<StatusesTab>()
+        .AddScoped<PresetsTab>()
+        .AddScoped<LociManagersTab>()
+        .AddScoped<LociSettings>()
+        .AddScoped<IpcTesterTab>()
+        .AddScoped<IpcTesterRegistration>()
+        .AddScoped<IpcTesterStatusManagers>()
+        .AddScoped<IpcTesterStatuses>()
+        .AddScoped<IpcTesterPresets>()       
+
         // Scoped Standalones
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
         .AddScoped<WindowMediatorSubscriberBase, DebugStorageUI>()
@@ -317,18 +351,22 @@ public static class SundouleiaServiceExtensions
     public static IServiceCollection AddSundouleiaHosted(this IServiceCollection services)
     => services
         .AddHostedService(p => p.GetRequiredService<HybridSaveService>())   // Begins the SaveCycle task loop
-        .AddHostedService(p => p.GetRequiredService<CosmeticService>())     // Initializes our required textures so methods can work.
         .AddHostedService(p => p.GetRequiredService<SundouleiaMediator>())  // Runs the task for monitoring mediator events.
         .AddHostedService(p => p.GetRequiredService<NotificationService>()) // Important Background Monitor.
         .AddHostedService(p => p.GetRequiredService<OnTickService>())       // Starts & monitors the framework update cycle.
 
         // Cached Data That MUST be initialized before anything else for validity.
-        .AddHostedService(p => p.GetRequiredService<FileCacheManager>())      // Handle the csv cache for all file locations.
+        .AddHostedService(p => p.GetRequiredService<CharaWatcher>())        // Handle the csv cache for the SMA files.
+        .AddHostedService(p => p.GetRequiredService<FileCacheManager>())    // Handle the csv cache for all file locations.
         .AddHostedService(p => p.GetRequiredService<CosmeticService>())     // Provides all Textures necessary for the plugin.
 
         .AddHostedService(p => p.GetRequiredService<SundouleiaLoc>())       // Initializes Localization with the current language.
         .AddHostedService(p => p.GetRequiredService<EventAggregator>())     // Forcibly calls the constructor, subscribing to the monitors.
         .AddHostedService(p => p.GetRequiredService<IpcProvider>())         // Required for IPC calls to work properly.
+        .AddHostedService(p => p.GetRequiredService<IpcProviderLoci>())
+        // Loci
+        .AddHostedService(p => p.GetRequiredService<LociMemory>())          // Initializes the hooks for the memory module.
+        .AddHostedService(p => p.GetRequiredService<LociProcessor>())       // Starts the processing loop for the Loci module.
 
         .AddHostedService(p => p.GetRequiredService<MainHub>())             // Required for beyond obvious reasons.
         .AddHostedService(p => p.GetRequiredService<SundouleiaHost>());     // Make this always the final hosted service, initializing the startup.

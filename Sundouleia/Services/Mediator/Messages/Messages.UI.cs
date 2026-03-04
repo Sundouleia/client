@@ -22,7 +22,7 @@ public record UiToggleMessage(Type UiType, ToggleType ToggleType = ToggleType.To
 public record SwitchToIntroUiMessage : MessageBase;
 
 /// <summary> Forcefully opens Main UI, and closes the Introduction UI if opened. </summary>
-public record SwitchToMainUiMessage : MessageBase;
+public record IntoFinishedMessage : MessageBase;
 
 /// <summary> Requests to the popup handler to display a report profile prompt. </summary>
 public record OpenReportUIMessage(UserData UserToReport, ReportKind Kind) : MessageBase;

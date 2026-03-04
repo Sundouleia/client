@@ -35,23 +35,23 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushIpcSingle), dto).ConfigureAwait(false);
     }
 
-    // --- Moodle Updates ---
-    public async Task<HubResponse> UserPushMoodlesData(PushMoodlesData dto)
+    // --- Loci Updates ---
+    public async Task<HubResponse> UserPushLociData(PushLociData dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushMoodlesData), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushLociData), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> UserPushMoodlesStatuses(PushMoodlesStatuses dto)
+    public async Task<HubResponse> UserPushLociStatuses(PushLociStatuses dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushMoodlesStatuses), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushLociStatuses), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> UserPushMoodlesPresets(PushMoodlesPresets dto)
+    public async Task<HubResponse> UserPushLociPresets(PushLociPresets dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushMoodlesPresets), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushLociPresets), dto).ConfigureAwait(false);
     }
 
     public async Task<HubResponse> UserPushStatusModified(PushStatusModified dto)
@@ -170,28 +170,22 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserUnblock), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> UserApplyMoodles(ApplyMoodleId dto)
+    public async Task<HubResponse> UserApplyLociData(ApplyLociDataById dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserApplyMoodles), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserApplyLociData), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> UserApplyMoodleTuples(ApplyMoodleStatus dto)
+    public async Task<HubResponse> UserApplyLociStatusTuples(ApplyLociStatus dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserApplyMoodleTuples), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserApplyLociStatusTuples), dto).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> UserRemoveMoodles(RemoveMoodleId dto)
+    public async Task<HubResponse> UserRemoveLociData(RemoveLociData dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRemoveMoodles), dto).ConfigureAwait(false);
-    }
-
-    public async Task<HubResponse> UserClearMoodles(UserDto dto)
-    {
-        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError); ;
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserClearMoodles), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserRemoveLociData), dto).ConfigureAwait(false);
     }
 
     // -- Permission Changes ---

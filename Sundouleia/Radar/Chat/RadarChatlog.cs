@@ -361,7 +361,7 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         if (_isInside)
             return string.Empty;
 
-        var toSave = Messages.TakeLast(40).ToList();
+        var toSave = Messages.TakeLast(100).ToList();
         var logToSave = new SerializableChatLog(LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId, TimeCreated, toSave);
         try
         {

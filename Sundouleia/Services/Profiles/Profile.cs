@@ -40,7 +40,7 @@ public class Profile : DisposableMediatorSubscriberBase
 
     public ProfileContent Info;
 
-    public bool TempDisabled => Info.Disabled || Info.Flagged;
+    public bool TempDisabled => Info.Flagged;
 
     public string ProfileAvatar
     {

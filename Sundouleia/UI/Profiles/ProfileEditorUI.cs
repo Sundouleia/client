@@ -151,7 +151,7 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
         // below this, we should draw out the description editor
         ImGui.AlignTextToFramePadding();
         CkGui.ColorText("Description", ImGuiColors.ParsedGold);
-        using (ImRaii.Disabled(profile.Info.Disabled))
+        using (ImRaii.Disabled(!MainHub.Reputation.ProfileEditing))
         {
             var refText = profile.Info.Description.IsNullOrEmpty() ? "No Description Set..." : profile.Info.Description;
             var size = new Vector2(ImGui.GetContentRegionAvail().X, ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing());
@@ -160,7 +160,7 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
         }
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfileDescription, ImGui.GetWindowPos(), ImGui.GetWindowSize(),
             () => Mediator.Publish(new ProfileOpenMessage(MainHub.OwnUserData)));
-        if (profile.Info.Disabled || !MainHub.Reputation.ProfileEditing)
+        if (!MainHub.Reputation.ProfileEditing)
             CkGui.AttachToolTip("You're Profile Customization Access has been Revoked!--SEP--You will not be able to edit your Profile Description!");
 
         // draw the plate preview buttons.

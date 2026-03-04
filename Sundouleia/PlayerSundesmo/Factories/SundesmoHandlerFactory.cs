@@ -15,11 +15,11 @@ public class SundesmoHandlerFactory
     private readonly FileDownloader _downloader;
     private readonly FileCacheManager _fileCache;
     private readonly IpcManager _ipc;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
 
     public SundesmoHandlerFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
         AccountConfig account, FileCacheManager fileCache, FileDownloader downloads, 
-        IpcManager ipc, CharaObjectWatcher watcher)
+        IpcManager ipc, CharaWatcher watcher)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;

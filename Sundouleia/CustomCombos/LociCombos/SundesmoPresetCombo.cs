@@ -10,7 +10,7 @@ using SundouleiaAPI.Hub;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class SundesmoPresetCombo : MoodleComboBase<MoodlePresetInfo>
+public sealed class SundesmoPresetCombo : LociComboBase<LociPresetInfo>
 {
     private int _maxPresetCount => _sundesmo.SharedData.PresetList.Max(x => x.Statuses.Count);
     private float _iconWithPadding => IconSize.X + ImGui.GetStyle().ItemInnerSpacing.X;
@@ -20,8 +20,8 @@ public sealed class SundesmoPresetCombo : MoodleComboBase<MoodlePresetInfo>
     { }
 
     protected override bool DisableCondition()
-        => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOwn);
-    protected override string ToString(MoodlePresetInfo obj)
+        => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.LociAccess.HasAny(LociAccess.AllowOwn);
+    protected override string ToString(LociPresetInfo obj)
         => obj.Title.StripColorTags();
 
     public bool DrawPresets(string id, float width, string buttonTT)
@@ -33,31 +33,31 @@ public sealed class SundesmoPresetCombo : MoodleComboBase<MoodlePresetInfo>
 
     protected override bool DrawSelectable(int globalIdx, bool selected)
     {
-        var moodlePreset = Items[globalIdx];
+        var lociPreset = Items[globalIdx];
         var size = new Vector2(GetFilterWidth(), IconSize.Y);
-        var iconsSpace = (_iconWithPadding * moodlePreset.Statuses.Count);
+        var iconsSpace = (_iconWithPadding * lociPreset.Statuses.Count);
         var titleSpace = size.X - iconsSpace;
-        var ret = ImGui.Selectable($"##{moodlePreset.Title}", selected, ImGuiSelectableFlags.None, size);
+        var ret = ImGui.Selectable($"##{lociPreset.Title}", selected, ImGuiSelectableFlags.None, size);
 
         // Push the font first so the height is correct.
         using var _ = Fonts.Default150Percent.Push();
 
-        if (moodlePreset.Statuses.Count > 0)
+        if (lociPreset.Statuses.Count > 0)
         {
             ImGui.SameLine(titleSpace);
-            for (int i = 0, iconsDrawn = 0; i < moodlePreset.Statuses.Count; i++)
+            for (int i = 0; i < lociPreset.Statuses.Count; i++)
             {
-                var status = moodlePreset.Statuses[i];
+                var status = lociPreset.Statuses[i];
                 if (!_sundesmo.SharedData.Statuses.TryGetValue(status, out var info))
                 {
                     ImGui.SameLine(0, _iconWithPadding);
                     continue;
                 }
 
-                MoodleIcon.DrawMoodleIcon(info.IconID, info.Stacks, IconSize);
+                LociIcon.Draw((uint)info.IconID, info.Stacks, IconSize);
                 info.AttachTooltip(_sundesmo.SharedData.StatusList);
 
-                if (++iconsDrawn < moodlePreset.Statuses.Count)
+                if (i + 1 < lociPreset.Statuses.Count)
                     ImUtf8.SameLineInner();
             }
         }
@@ -65,26 +65,26 @@ public sealed class SundesmoPresetCombo : MoodleComboBase<MoodlePresetInfo>
         ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + adjust);
-        CkRichText.Text(titleSpace, moodlePreset.Title);
+        CkRichText.Text(titleSpace, lociPreset.Title);
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - adjust);
         return ret;
     }
 
-    protected override bool CanDoAction(MoodlePresetInfo item)
+    protected override bool CanDoAction(LociPresetInfo item)
     {
-        var toCheck = new List<MoodlesStatusInfo>(item.Statuses.Count);
+        var toCheck = new List<LociStatusInfo>(item.Statuses.Count);
         foreach (var guid in item.Statuses)
             if (_sundesmo.SharedData.Statuses.TryGetValue(guid, out var info))
                 toCheck.Add(info);
 
-        return MoodlesEx.CanApplyMoodles(_sundesmo.PairPerms, toCheck);
+        return LociEx.CanApply(_sundesmo.PairPerms, toCheck);
     }
 
-    protected override void OnApplyButton(MoodlePresetInfo item)
+    protected override void OnApplyButton(LociPresetInfo item)
     {
         UiService.SetUITask(async () =>
         {
-            var res = await _hub.UserApplyMoodles(new(_sundesmo.UserData, item.Statuses, true));
+            var res = await _hub.UserApplyLociData(new(_sundesmo.UserData, item.Statuses, true));
             if (res.ErrorCode is not SundouleiaApiEc.Success)
                 Log.LogWarning($"Failed to apply preset {item.Title} on {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
         });

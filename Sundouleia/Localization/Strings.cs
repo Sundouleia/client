@@ -229,6 +229,7 @@ namespace Sundouleia.Localization
         // Outline the tabs for each settings section and the sub-classes of their translations.
         public readonly string TabGeneral = Loc.Localize("Settings_TabsGeneral", "General");
         public readonly string TabPreferences = Loc.Localize("Settings_TabsPreferences", "Preferences");
+        public readonly string TabLoci = Loc.Localize("Settings_TabsLoci", "Loci");
         public readonly string TabAccounts = Loc.Localize("Settings_TabsAccounts", "My Account");
         public readonly string TabSmaStorage = Loc.Localize("Settings_TagSmaStorage", "My SMA Files");
         public readonly string TabStorage = Loc.Localize("Settings_TabsStorage", "Storage");
@@ -298,38 +299,38 @@ namespace Sundouleia.Localization
         public readonly string AllowVfxLabel = Loc.Localize("Preferences_AllowVfxLabel", "VFX");
         public readonly string AllowVfxTT = Loc.Localize("Preferences_AllowVfxTT", "The default --COL--Allow VFX--COL-- value to set on new pairs.");
 
-        public readonly string ShareMoodles = Loc.Localize("Preferences_ShareMoodles", "Globally share Moodles Data.");
-        public readonly string ShareMoodlesTT = Loc.Localize("Preferences_ShareMoodlesTT", "Whether others can see your list of Moodles when paired.");
+        public readonly string ShareStatuses = Loc.Localize("Preferences_ShareStatuses", "Globally share Loci Data.");
+        public readonly string ShareStatusesTT = Loc.Localize("Preferences_ShareStatusesTT", "Whether others can see your Loci Statuses and Presets when paired.");
 
-        public readonly string AllowPosMoodles = Loc.Localize("Preferences_AllowPositiveMoodles", "Positive");
-        public readonly string AllowPosMoodlesTT = Loc.Localize("Preferences_AllowPositiveMoodlesTT", "The default --COL--Allow Positive Moodles--COL-- permission set on new pairs.");
+        public readonly string AllowPosLociStatuses = Loc.Localize("Preferences_AllowPositiveLociStatuses", "Positive");
+        public readonly string AllowPosLociStatusesTT = Loc.Localize("Preferences_AllowPositiveLociStatusesTT", "The default --COL--Allow Positive Statuses--COL-- permission set on new pairs.");
 
-        public readonly string AllowNegMoodles = Loc.Localize("Preferences_AllowNegativeMoodles", "Negative");
-        public readonly string AllowNegMoodlesTT = Loc.Localize("Preferences_AllowNegativeMoodlesTT", "The default --COL--Allow Negative Moodles--COL-- permission set on new pairs.");
+        public readonly string AllowNegLociStatuses = Loc.Localize("Preferences_AllowNegativeLociStatuses", "Negative");
+        public readonly string AllowNegLociStatusesTT = Loc.Localize("Preferences_AllowNegativeLociStatusesTT", "The default --COL--Allow Negative Statuses--COL-- permission set on new pairs.");
 
-        public readonly string AllowSpecialMoodles = Loc.Localize("Preferences_AllowSpecialMoodles", "Special");
-        public readonly string AllowSpecialMoodlesTT = Loc.Localize("Preferences_AllowSpecialMoodlesTT", "The default --COL--Allow Special Moodles--COL-- permission set on new pairs.");
+        public readonly string AllowSpecialLociStatuses = Loc.Localize("Preferences_AllowSpecialLociStatuses", "Special");
+        public readonly string AllowSpecialLociStatusesTT = Loc.Localize("Preferences_AllowSpecialLociStatusesTT", "The default --COL--Allow Special Statuses--COL-- permission set on new pairs.");
 
-        public readonly string AllowOwnMoodles = Loc.Localize("Preferences_AllowOwnMoodles", "Your Moodles");
-        public readonly string AllowOwnMoodlesTT = Loc.Localize("Preferences_AllowOwnMoodlesTT", "The default --COL--Allow Application of Your Moodles--COL-- permission set on new pairs.");
+        public readonly string AllowOwnLociData = Loc.Localize("Preferences_AllowOwnLociData", "Your Loci Data");
+        public readonly string AllowOwnLociDataTT = Loc.Localize("Preferences_AllowOwnLociDataTT", "The default --COL--Allow Application of Your Loci Data--COL-- permission set on new pairs.");
 
-        public readonly string AllowOtherMoodles = Loc.Localize("Preferences_AllowOtherMoodles", "Their Moodles");
-        public readonly string AllowOtherMoodlesTT = Loc.Localize("Preferences_AllowOtherMoodlesTT", "The default --COL--Allow Application of Their Moodles--COL-- permission set on new pairs.");
+        public readonly string AllowOtherLociData = Loc.Localize("Preferences_AllowOtherLociData", "Their Loci Data");
+        public readonly string AllowOtherLociDataTT = Loc.Localize("Preferences_AllowOtherLociDataTT", "The default --COL--Allow Application of Their Loci Data--COL-- permission set on new pairs.");
 
-        public readonly string AllowPermanentMoodles = Loc.Localize("Preferences_AllowPermanentMoodles", "Any Duration");
-        public readonly string AllowPermanentMoodlesTT = Loc.Localize("Preferences_AllowPermanentMoodlesTT", "The default --COL--Allow Permanent Moodles--COL-- permission set on new pairs.");
+        public readonly string AllowPermanentLociStatuses = Loc.Localize("Preferences_AllowPermanentLociStatuses", "Any Duration");
+        public readonly string AllowPermanentLociStatusesTT = Loc.Localize("Preferences_AllowPermanentLociStatusesTT", "The default --COL--Allow Permanent LociStatuses--COL-- permission set on new pairs.");
 
-        public readonly string RemoveAppliedMoodles = Loc.Localize("Preferences_RemoveAppliedMoodles", "Moodles Applied by Others");
-        public readonly string RemoveAppliedMoodlesTT = Loc.Localize("Preferences_RemoveAppliedMoodlesTT", "The default --COL--Allow Removal of Moodles They Applied--COL-- permission set on new pairs.");
+        public readonly string RemoveAppliedLociStatuses = Loc.Localize("Preferences_RemoveAppliedLociStatuses", "Statuses Applied by Others");
+        public readonly string RemoveAppliedLociStatusesTT = Loc.Localize("Preferences_RemoveAppliedLociStatusesTT", "The default --COL--Allow Removal of Statuses They Applied--COL-- permission set on new pairs.");
 
-        public readonly string RemoveAnyMoodles = Loc.Localize("Preferences_RemoveAnyMoodles", "Any Moodle");
-        public readonly string RemoveAnyMoodlesTT = Loc.Localize("Preferences_RemoveAnyMoodlesTT", "The default --COL--Allow Removal of Any Moodles--COL-- permission set on new pairs.");
+        public readonly string RemoveAnyLociStatuses = Loc.Localize("Preferences_RemoveAnyLociStatuses", "Any Status");
+        public readonly string RemoveAnyLociStatusesTT = Loc.Localize("Preferences_RemoveAnyLociStatusesTT", "The default --COL--Allow Removal of Any Status--COL-- permission set on new pairs.");
 
-        public readonly string ClearAllMoodles = Loc.Localize("Preferences_ClearAllMoodles", "Others can clear all your Moodles");
-        public readonly string ClearAllMoodlesTT = Loc.Localize("Preferences_ClearAllMoodlesTT", "The default --COL--Allow Clearing All Moodles--COL-- permission set on new pairs.");
+        public readonly string ClearAllLociStatuses = Loc.Localize("Preferences_ClearAllLociStatuses", "Others can clear all your Statuses");
+        public readonly string ClearAllLociStatusesTT = Loc.Localize("Preferences_ClearAllLociStatusesTT", "The default --COL--Allow Clearing Statuses--COL-- permission set on new pairs.");
 
-        public readonly string MaxMoodleTime = Loc.Localize("Preferences_MaxMoodleTime", "Maximum Duration");
-        public readonly string MaxMoodleTimeTT = Loc.Localize("Preferences_MaxMoodleTimeTT", "The default --COL--Maximum Moodle Duration--COL-- to set on new pairs.");
+        public readonly string MaxStatusTime = Loc.Localize("Preferences_MaxStatusTime", "Maximum Duration");
+        public readonly string MaxStatusTimeTT = Loc.Localize("Preferences_MaxStatusTimeTT", "The default --COL--Maximum Status Duration--COL-- to set on new pairs.");
 
         // Radar Options
         public readonly string RadarEnabledLabel = Loc.Localize("Preferences_RadarEnabledLabel", "Enable Radar");

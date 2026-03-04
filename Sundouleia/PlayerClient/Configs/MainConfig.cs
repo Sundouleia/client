@@ -1,5 +1,6 @@
 using CkCommons;
 using CkCommons.HybridSaver;
+using Dalamud.Game.ClientState.Conditions;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using NAudio.Wave;
 using Sundouleia.Gui.Components;
@@ -28,7 +29,7 @@ public class ConfigStorage
     // Tab Selection Memory
     public MainMenuTabs.SelectedTab CurMainUiTab { get; set; } = MainMenuTabs.SelectedTab.BasicWhitelist;
     public SundesmoTabs.SelectedTab CurInteractionsTab { get; set; } = SundesmoTabs.SelectedTab.Interactions;
-    
+    public LociTabs.SelectedTab CurLociTab { get; set; } = LociTabs.SelectedTab.Statuses;
     // General
     public bool OpenUiOnStartup { get; set; } = true;
     public bool ShowContextMenus { get; set; } = true;
@@ -72,6 +73,18 @@ public class ConfigStorage
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
+
+    // Loci
+    public bool LociEnabled { get; set; } = true;
+    public bool LociSheVfxEnabled { get; set; } = true; // Enable SHE Status application
+    public bool LociSheVfxRestricted { get; set; } = true; // Restricted to party, friends, and nearby only.
+    public bool LociFlyText { get; set; } = true;
+    public int LociFlyTextLimit { get; set; } = 10; // Within 5-20
+    public bool LociOffInDuty { get; set; } = false;
+    public bool LociOffInCombat { get; set; } = false;
+    public int LociIconSelectorHeight { get; set; } = 33;
+    public bool LociAllowEsuna { get; set; } = true;
+    public bool LociOthersCanEsuna { get; set; } = true;
 }
 
 public class MainConfig : IHybridSavable, IDisposable
@@ -218,6 +231,21 @@ public class MainConfig : IHybridSavable, IDisposable
         _audioEvent!.Stop();
         _audioFile!.Position = 0;
         _audioEvent!.Play();
+        return true;
+    }
+
+    // Loci assistance.
+    public bool CanLociModifyUI()
+    {
+        if (!Current.LociEnabled)
+            return false;
+
+        if (!Current.LociOffInDuty && Svc.Condition[ConditionFlag.BoundByDuty] || Svc.Condition[ConditionFlag.BoundByDuty56] || Svc.ClientState.IsPvP)
+            return false;
+
+        if (!Current.LociOffInCombat && Svc.Condition[ConditionFlag.InCombat])
+            return false;
+        // Otherwise, valid!
         return true;
     }
 

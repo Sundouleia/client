@@ -87,7 +87,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
 
         CkGui.IconText(FAI.Copyright);
         CkGui.TextInline("C+ Data?");
-        CkGui.BooleanToColoredIcon(cur.CPlusData.Length > 0);
+        CkGui.BoolIconFramed(cur.CPlusData.Length > 0);
 
         DrawPenumbra(cur);
         DrawGlamourState(cur);
@@ -127,7 +127,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
 
         CkGui.IconText(FAI.Copyright);
         CkGui.TextInline("C+ Data?");
-        CkGui.BooleanToColoredIcon(cur.CPlusData.Length > 0);
+        CkGui.BoolIconFramed(cur.CPlusData.Length > 0);
 
         DrawPenumbra(cur);
         DrawGlamourState(cur);
@@ -166,7 +166,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
 
         CkGui.IconText(FAI.Copyright);
         CkGui.TextInline("C+ Data?");
-        CkGui.BooleanToColoredIcon(cur.CPlusData.Length > 0);
+        CkGui.BoolIconFramed(cur.CPlusData.Length > 0);
 
         DrawPenumbra(cur);
         DrawGlamourState(cur);
@@ -286,7 +286,7 @@ public class SMAManagerUI : WindowMediatorSubscriberBase
 
         CkGui.IconText(FAI.FilePen);
         CkGui.TextInline("ManipString?");
-        CkGui.BooleanToColoredIcon(string.IsNullOrEmpty(element.ManipString));
+        CkGui.BoolIconFramed(string.IsNullOrEmpty(element.ManipString));
 
         var replacements = element.FileReplacements;
 

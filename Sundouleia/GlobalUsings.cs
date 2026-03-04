@@ -18,39 +18,29 @@ global using FAI = Dalamud.Interface.FontAwesomeIcon;
 global using Bagagwa = System.Exception;
 
 // Used for Tuple-Based IPC calls and associated data transfers.
-global using MoodlesStatusInfo = (
+global using LociStatusInfo = (
     int Version,
     System.Guid GUID,
     int IconID,
     string Title,
     string Description,
     string CustomVFXPath,       // What VFX to show on application.
-    long ExpireTicks,           // Permanent if -1, referred to as 'NoExpire' in MoodleStatus
-    byte Type,                  // Moodles StatusType enum.
+    long ExpireTicks,           // Permanent if -1, referred to as 'NoExpire' in LociStatus
+    SundouleiaAPI.StatusType Type,  // Loci StatusType enum.
     int Stacks,                 // Usually 1 when no stacks are used.
     int StackSteps,             // How many stacks to add per reapplication.
     uint Modifiers,             // What can be customized, casted to uint from Modifiers (Dalamud IPC Rules)
     System.Guid ChainedStatus,  // What status is chained to this one.
-    byte ChainTrigger,          // What triggers the chained status.
-    string Applier,             // Who applied the moodle.
-    string Dispeller,           // When set, only this person can dispel your moodle.
-    bool Permanent              // Referred to as 'Sticky' in the Moodles UI
+    SundouleiaAPI.ChainTrigger ChainTrigger, // What triggers the chained status.
+    string Applier,             // Who applied the loci.
+    string Dispeller,           // When set, only this person can dispel your loci.
+    bool Permanent              // Referred to as 'Sticky' (Legacy)
 );
 
-
-
-global using MoodlePresetInfo = (
+global using LociPresetInfo = (
     System.Guid GUID,
     System.Collections.Generic.List<System.Guid> Statuses,
     byte ApplicationType,
-    string Title
+    string Title,
+    string Description
 );
-
-// The IPC Tuple used to define MoodleAccess permission between recipient and client.
-global using IPCMoodleAccessTuple = (
-    SundouleiaAPI.Enums.MoodleAccess ClientAccessFlags, long ClientMaxTime,
-    SundouleiaAPI.Enums.MoodleAccess RecipientAccessFlags, long RecipientMaxTime
-);
-
-// Dalamud's Newtonsoft-based converter for objects does not play nice with nested [Flag] Enums in tuples, inside dictionaries.
-global using ProviderMoodleAccessTuple = (short ClientAccessFlags, long ClientMaxTime, short RecipientAccessFlags, long RecipientMaxTime);

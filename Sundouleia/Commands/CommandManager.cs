@@ -7,6 +7,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using OtterGui.Classes;
 using Sundouleia.Gui;
+using Sundouleia.Gui.Loci;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -27,6 +28,7 @@ public sealed class CommandManager : IDisposable
     private const string MainCommand = "/sundouleia";
     private const string ActionCommand = "/sund";
     private const string ChatCommand = "/schat";
+    private const string LociCommand = "/loci";
 
     private CommandParser _parser;
 
@@ -59,18 +61,53 @@ public sealed class CommandManager : IDisposable
         // Init the parser with our builder
         _parser = new CommandParser(InitDefinitions());
 
-        // Add handlers to the main commands
+        // Add Host command handlers.
+        Svc.Commands.AddHandler(LociCommand, new CommandInfo(OnStatuses) { HelpMessage = "Perform loci related commands." });
+
+        // Login-Scoped handlers
+        Svc.ClientState.Login += OnLogin;
+        Svc.ClientState.Logout += OnLogout;
+
+        if (Svc.ClientState.IsLoggedIn)
+             OnLogin();
+    }
+
+    private void OnLogin()
+    {
         Svc.Commands.AddHandler(MainCommand, new CommandInfo(OnSundouleia) { HelpMessage = "Toggles the UI. Use with 'help' or '?' to view sub-commands." });
         Svc.Commands.AddHandler(ActionCommand, new CommandInfo(OnSund) { HelpMessage = "Displays a help guide in chat on various action commands." });
         Svc.Commands.AddHandler(ChatCommand, new CommandInfo(OnChat) { HelpMessage = "Set or talk through a Sundouleia chat channel. (In Development)" });
     }
 
-    public void Dispose()
+    private void OnLogout(int _, int __)
     {
-        // Remove the handlers from the main commands
         Svc.Commands.RemoveHandler(MainCommand);
         Svc.Commands.RemoveHandler(ActionCommand);
         Svc.Commands.RemoveHandler(ChatCommand);
+    }
+
+    public void Dispose()
+    {
+        Svc.ClientState.Login -= OnLogin;
+        Svc.ClientState.Logout -= OnLogout;
+        if (Svc.ClientState.IsLoggedIn)
+        {
+            Svc.Commands.RemoveHandler(MainCommand);
+            Svc.Commands.RemoveHandler(ActionCommand);
+            Svc.Commands.RemoveHandler(ChatCommand);
+        }
+        Svc.Commands.RemoveHandler(LociCommand);
+    }
+
+    private void OnStatuses(string command, string args)
+    {
+        var splitArgs = args.ToLowerInvariant().Trim().Split(" ", StringSplitOptions.RemoveEmptyEntries);
+        if (splitArgs.Length is 0)
+        {
+            _mediator.Publish(new UiToggleMessage(typeof(LociUI)));
+        }
+
+        // Nothing else for now.
     }
 
     private void OnSundouleia(string command, string args)
@@ -224,7 +261,7 @@ public sealed class CommandManager : IDisposable
             var nearby = _radar.RadarUsers.Where(r => r.CanSendRequests);
             nearby = nearby.Where(u =>
             {
-                if (!CharaObjectWatcher.RenderedCharas.Contains(u.Address))
+                if (!CharaWatcher.RenderedCharas.Contains(u.Address))
                     return false;
 
                 return PlayerData.DistanceTo(((Character*)u.Address)->Position) <= 5;

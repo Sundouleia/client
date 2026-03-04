@@ -41,23 +41,25 @@ public class InteractionsCache : ISidePanelCache
     // Stored internally for regenerators.
     private readonly ILogger _log;
     private readonly MainHub _hub;
+    private readonly LociManager _loci;
 
     private OpenedInteraction _curOpened = OpenedInteraction.None;
-    public InteractionsCache(ILogger log, MainHub hub, Sundesmo sundesmo)
+    public InteractionsCache(ILogger log, MainHub hub, LociManager loci, Sundesmo sundesmo)
     {
         _log = log;
         _hub = hub;
+        _loci = loci;
 
         Sundesmo    = sundesmo;
-        OwnStatuses = new OwnStatusCombo(log, hub, Sundesmo, 1.3f);
-        OwnPresets  = new OwnPresetCombo(log, hub, Sundesmo, 1.3f);
+        OwnStatuses = new OwnStatusCombo(log, hub, loci, Sundesmo, 1.3f);
+        OwnPresets  = new OwnPresetCombo(log, hub, loci, Sundesmo, 1.3f);
         Statuses    = new SundesmoStatusCombo(log, hub, Sundesmo, 1.3f);
         Presets     = new SundesmoPresetCombo(log, hub, Sundesmo, 1.3f);
         Remover     = new SundesmoStatusCombo(log, hub, Sundesmo, 1.3f, () =>
         {
-            if (Sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveAny))
+            if (Sundesmo.PairPerms.LociAccess.HasAny(LociAccess.RemoveAny))
                 return [.. Sundesmo.SharedData.DataInfoList.OrderBy(x => x.Title)];
-            else if (Sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveApplied))
+            else if (Sundesmo.PairPerms.LociAccess.HasAny(LociAccess.RemoveApplied))
                 return [.. Sundesmo.SharedData.DataInfoList.Where(x => x.Applier == PlayerData.NameWithWorld).OrderBy(x => x.Title)];
             else
                 return [];
@@ -74,7 +76,7 @@ public class InteractionsCache : ISidePanelCache
     public OpenedInteraction OpenedInteraction => _curOpened;
     public string   DisplayName  => Sundesmo.GetNickAliasOrUid();
     public bool     IsValid      => Sundesmo is not null;
-    public float    DisplayWidth => (ImGui.CalcTextSize($"Preventing applying their moodles {DisplayName}.").X + ImGui.GetFrameHeightWithSpacing()).AddWinPadX();
+    public float    DisplayWidth => (ImGui.CalcTextSize($"Preventing applying their locis {DisplayName}.").X + ImGui.GetFrameHeightWithSpacing()).AddWinPadX();
 
     public void ToggleInteraction(OpenedInteraction interaction)
         => _curOpened = (_curOpened == interaction) ? OpenedInteraction.None : interaction;
@@ -82,15 +84,15 @@ public class InteractionsCache : ISidePanelCache
     public void UpdateSundesmo(Sundesmo sundesmo)
     {
         Sundesmo    = sundesmo;
-        OwnStatuses = new OwnStatusCombo(_log, _hub, Sundesmo, 1.3f);
-        OwnPresets  = new OwnPresetCombo(_log, _hub, Sundesmo, 1.3f);
+        OwnStatuses = new OwnStatusCombo(_log, _hub, _loci, Sundesmo, 1.3f);
+        OwnPresets  = new OwnPresetCombo(_log, _hub, _loci, Sundesmo, 1.3f);
         Statuses    = new SundesmoStatusCombo(_log, _hub, Sundesmo, 1.3f);
         Presets     = new SundesmoPresetCombo(_log, _hub, Sundesmo, 1.3f);
         Remover     = new SundesmoStatusCombo(_log, _hub, Sundesmo, 1.3f, () =>
         {
-            if (Sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveAny))
+            if (Sundesmo.PairPerms.LociAccess.HasAny(LociAccess.RemoveAny))
                 return [.. Sundesmo.SharedData.DataInfoList.OrderBy(x => x.Title)];
-            else if (Sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveApplied))
+            else if (Sundesmo.PairPerms.LociAccess.HasAny(LociAccess.RemoveApplied))
                 return [.. Sundesmo.SharedData.DataInfoList.Where(x => x.Applier == PlayerData.NameWithWorld).OrderBy(x => x.Title)];
             else
                 return [];
@@ -232,13 +234,15 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly FolderConfig _config;
+    private readonly LociManager _loci;
     private readonly SundesmoManager _sundesmos;
     public SidePanelService(ILogger<SidePanelService> logger, SundouleiaMediator mediator,
-        MainHub hub, FolderConfig config, SundesmoManager sundesmos)
+        MainHub hub, FolderConfig config, LociManager loci, SundesmoManager sundesmos)
         : base(logger, mediator)
     {
         _hub = hub;
         _config = config;
+        _loci = loci;
         _sundesmos = sundesmos;
 
         Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearDisplay());
@@ -331,7 +335,7 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
         // Was displaying something else, so make sure we update and open.
         else
         {
-            DisplayCache = new InteractionsCache(Logger, _hub, sundesmo);
+            DisplayCache = new InteractionsCache(Logger, _hub, _loci, sundesmo);
         }
     }
 

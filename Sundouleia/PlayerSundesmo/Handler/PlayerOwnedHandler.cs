@@ -28,7 +28,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 {
     private readonly AccountConfig _config;
     private readonly IpcManager _ipc;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
 
     // Helper Refs
     private RedrawManager _redrawer { get; init; }
@@ -47,7 +47,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     private bool _blockApplication => !_hasAlterations || !IsRendered || _config.ConnectionKind is ConnectionKind.StreamerMode;
 
     public PlayerOwnedHandler(OwnedObject kind, Sundesmo sundesmo, RedrawManager redrawer, ILogger<PlayerOwnedHandler> logger,
-        SundouleiaMediator mediator, AccountConfig config, IpcManager ipc, CharaObjectWatcher watcher)
+        SundouleiaMediator mediator, AccountConfig config, IpcManager ipc, CharaWatcher watcher)
         : base(logger, mediator)
     {
         _redrawer = redrawer;

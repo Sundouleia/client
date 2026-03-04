@@ -19,7 +19,7 @@ public class ClientDataCache
 
     public string ModManips     { get; set; } = string.Empty;
     public string HeelsOffset   { get; set; } = string.Empty;
-    public string Moodles       { get; set; } = string.Empty;
+    public string Loci       { get; set; } = string.Empty;
     public string TitleData     { get; set; } = string.Empty;
     public string PetNames      { get; set; } = string.Empty;
 
@@ -48,7 +48,7 @@ public class ClientDataCache
         CPlusState = new ConcurrentDictionary<OwnedObject, string>(other.CPlusState);
         ModManips = other.ModManips;
         HeelsOffset = other.HeelsOffset;
-        Moodles = other.Moodles;
+        Loci = other.Loci;
         TitleData = other.TitleData;
         PetNames = other.PetNames;
     }
@@ -63,14 +63,14 @@ public class ClientDataCache
     {
         return new VisualUpdate()
         {
-            PlayerChanges = new IpcDataPlayerUpdate(IpcKind.Glamourer | IpcKind.Heels | IpcKind.CPlus | IpcKind.Honorific | IpcKind.Moodles | IpcKind.ModManips | IpcKind.PetNames)
+            PlayerChanges = new IpcDataPlayerUpdate(IpcKind.Glamourer | IpcKind.Heels | IpcKind.CPlus | IpcKind.Honorific | IpcKind.Loci | IpcKind.ModManips | IpcKind.PetNames)
             {
                 GlamourState = GlamourerState[OwnedObject.Player],
                 CPlusState = CPlusState[OwnedObject.Player],
                 ModManips = ModManips,
                 HeelsOffset = HeelsOffset,
                 TitleData = TitleData,
-                Moodles = Moodles,
+                LociData = Loci,
                 PetNicks = PetNames
             },
             MinionMountChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus)
@@ -163,7 +163,7 @@ public class ClientDataCache
             case IpcKind.ModManips: ModManips = data;           break;
             case IpcKind.Heels:     HeelsOffset = data;         break;
             case IpcKind.Honorific: TitleData = data;           break;
-            case IpcKind.Moodles:   Moodles = data;             break;
+            case IpcKind.Loci:   Loci = data;             break;
             case IpcKind.PetNames:  PetNames = data;            break;
         }
         return true;
@@ -177,7 +177,7 @@ public class ClientDataCache
             IpcKind.ModManips => ModManips != data,
             IpcKind.Heels => HeelsOffset != data,
             IpcKind.Honorific => TitleData != data,
-            IpcKind.Moodles => Moodles != data,
+            IpcKind.Loci => Loci != data,
             IpcKind.PetNames => PetNames != data,
             _ => false
         };
@@ -209,10 +209,10 @@ public class ClientDataCache
             TitleData = other.TitleData;
             playerBuilder.WithTitle(TitleData);
         }
-        if (Moodles != other.Moodles)
+        if (Loci != other.Loci)
         {
-            Moodles = other.Moodles;
-            playerBuilder.WithMoodles(Moodles);
+            Loci = other.Loci;
+            playerBuilder.WithLoci(Loci);
         }
         if (PetNames != other.PetNames)
         {

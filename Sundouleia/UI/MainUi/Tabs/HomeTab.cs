@@ -6,6 +6,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Text;
+using Sundouleia.Gui.Loci;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
@@ -158,9 +159,10 @@ public class HomeTab
         var buttonWidth = (region.X - ImUtf8.ItemInnerSpacing.X) / 2;
         using (ImRaii.Group())
         {
-            if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", buttonWidth, false))
-                _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
-            CkGui.AttachToolTip("Inspect data of owned actors!");
+            if (CkGui.FancyButton(FAI.TheaterMasks, "Loci Module", buttonWidth, false))
+                _mediator.Publish(new UiToggleMessage(typeof(LociUI)));
+            CkGui.AttachToolTip("Custom Status Management, accessible to all, for all your needs." +
+                "--SEP----COL--Loci is not exclusive and can be used without an account.--COL--", ImGuiColors.DalamudGrey2);
 
             var noSMA = true;
 #if DEBUG
@@ -178,12 +180,9 @@ public class HomeTab
             //CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
             //    "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
 
-            if (CkGui.FancyButton(FAI.Trophy, "Achievements", buttonWidth, true))
-            {
-                // Something.
-            }
-            CkGui.AttachToolTip("View Achievement Progress & Rewards." +
-                "--SEP--Still WIP, Coming in future updates.");
+            if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", buttonWidth, false))
+                _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
+            CkGui.AttachToolTip("Inspect data of owned actors!");
         }
         ImUtf8.SameLineInner();
         using (ImRaii.Group())
@@ -191,18 +190,14 @@ public class HomeTab
             if (CkGui.FancyButton(FAI.Cog, "Open Settings", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
             CkGui.AttachToolTip("Opens the Settings UI.");
+
             _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConfigSettings, MainUI.LastPos, MainUI.LastSize);
 
-            if (CkGui.FancyButton(FAI.Bell, "Events Viewer", buttonWidth, false))
-                _mediator.Publish(new UiToggleMessage(typeof(DataEventsUI)));
-            CkGui.AttachToolTip("View fired events for pair updates.");
-
-            if (CkGui.FancyButton(FAI.Coffee, "Support Sundouleia", buttonWidth, false))
+            if (CkGui.FancyButton(FAI.Trophy, "Achievements", buttonWidth, true))
             {
-                try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/cw/Sundouleia", UseShellExecute = true }); }
-                catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Patreon link. {e.Message}"); }
+                // Something.
             }
-            CkGui.AttachToolTip("If you like my work, you can toss any support here ♥");
+            CkGui.AttachToolTip("View Achievement Progress & Rewards.--SEP--Still WIP, Coming in future updates.");
 
             if (CkGui.FancyButton(FAI.Wrench, "Open Config", buttonWidth, false))
             {
@@ -210,15 +205,22 @@ public class HomeTab
                 catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
             }
             CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
-            
+
+            if (CkGui.FancyButton(FAI.Coffee, "Support Sundouleia", buttonWidth, false))
+            {
+                try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/cw/Sundouleia", UseShellExecute = true }); }
+                catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Patreon link. {e.Message}"); }
+            }
+            CkGui.AttachToolTip("If you like my work, you can toss any support here ♥");            
         }
     }
 
     private void DrawButtonList(Vector2 region)
     {
-        if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", region.X, false))
-            _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
-        CkGui.AttachToolTip("Inspect data of owned actors!");
+        if (CkGui.FancyButton(FAI.TheaterMasks, "Loci Module", region.X, false))
+            _mediator.Publish(new UiToggleMessage(typeof(LociUI)));
+        CkGui.AttachToolTip("Custom Status Management, accessible to all, for all your needs." +
+            "--SEP----COL--Loci is not exclusive and can be used without an account.--COL--", ImGuiColors.DalamudGrey2);
 
         var noSMA = true;
 #if DEBUG
@@ -231,8 +233,17 @@ public class HomeTab
         if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", region.X, noSMA))
             _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
         CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Files (WIP)");
-        //CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
-        //    "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
+        CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
+            "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
+
+        if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", region.X, false))
+            _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
+        CkGui.AttachToolTip("Inspect data of owned actors!");
+
+        if (CkGui.FancyButton(FAI.Cog, "Open Settings", region.X, false))
+            _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
+        CkGui.AttachToolTip("Opens the Settings UI.");
+
 
         if (CkGui.FancyButton(FAI.Trophy, "Achievements", region.X, true))
         {
@@ -240,13 +251,12 @@ public class HomeTab
         }
         CkGui.AttachToolTip("View Achievement Progress & Rewards.--SEP--Still WIP, Coming in future updates.");
 
-        if (CkGui.FancyButton(FAI.Cog, "Open Settings", region.X, false))
-            _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
-        CkGui.AttachToolTip("Opens the Settings UI.");
-
-        if (CkGui.FancyButton(FAI.Bell, "Events Viewer", region.X, false))
-            _mediator.Publish(new UiToggleMessage(typeof(DataEventsUI)));
-        CkGui.AttachToolTip("View fired events for pair updates.");
+        if (CkGui.FancyButton(FAI.Wrench, "Open Config", region.X, false))
+        {
+            try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.SundouleiaDirectory, UseShellExecute = true }); }
+            catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
+        }
+        CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
 
         if (CkGui.FancyButton(FAI.Coffee, "Support Sundouleia", region.X, false))
         {
@@ -255,11 +265,5 @@ public class HomeTab
         }
         CkGui.AttachToolTip("If you like my work, you can toss any support here ♥");
 
-        if (CkGui.FancyButton(FAI.Wrench, "Open Config", region.X, false))
-        {
-            try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.SundouleiaDirectory, UseShellExecute = true }); }
-            catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
-        }
-        CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
     }
 }

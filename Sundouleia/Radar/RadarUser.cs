@@ -74,8 +74,6 @@ public unsafe class RadarUser
     /// </summary>
     public void UpdateVisibility(IntPtr address)
     {
-        if (address == IntPtr.Zero)
-            return;
         _player = (Character*)address;
     }
 

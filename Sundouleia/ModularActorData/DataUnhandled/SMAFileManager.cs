@@ -59,7 +59,7 @@ public class SMAFileManager
                 continue;
             }
 
-            _logger.LogInformation($"Loaded SMA Base Header: {fileMeta.FilePath}");
+            _logger.LogInformation($"Loaded SMA Base Header: {fileMeta.FilePath}", LoggerType.SmaManagment);
             var moddedDict = _fileHandler.GetModdedDict(header);
             // Create a new OwnedModularActorBase object and append it to the list.
             // (Likely need something here to associate loaded bases with a matching loaded data or whatever)
@@ -77,7 +77,7 @@ public class SMAFileManager
             // Do stuff
         }
 
-        _logger.LogInformation($"SMA File Manager Integrity Check Complete. Found {InvalidFiles.Count} invalid files.");
+        _logger.LogInformation($"SMA File Manager Integrity Check Complete. Found {InvalidFiles.Count} invalid files.", LoggerType.SmaManagment);
     }
 
     public void AddSavedBase(BaseFileDataSummary summary, string filePath, string fileKey, string? password = "")
@@ -89,7 +89,7 @@ public class SMAFileManager
         if (_smaConfig.AddSMABFile(summary, filePath, dataHash, fileKey, password))
         {
             Bases.Add(new ModularActorBase(summary, _smaConfig.Current.OwnedSMABFiles[summary.FileId]));
-            _logger.LogInformation($"Added new SMAB file to config and manager: {filePath}");
+            _logger.LogInformation($"Added new SMAB file to config and manager: {filePath}", LoggerType.SmaManagment);
         }
     }
 

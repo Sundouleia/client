@@ -29,7 +29,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private readonly FileCacheManager _fileCache;
     private readonly FileDownloader _downloader;
     private readonly IpcManager _ipc;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
 
     // Parent References
     private RedrawManager _redrawer { get; init; }
@@ -41,12 +41,14 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private Task? _dlWaiterTask;
     
     private unsafe Character* _player = null;
+
     // cached data for appearance.
     private Guid _tempCollection;
     // Could maybe include a second copy if this for the filtered output, but for now filter them on accept.
     private Dictionary<string, ValidFileHash> _moddedFiles = [];
     private Dictionary<string, FileSwapData>  _swappedFiles = [];
     private Guid _tempProfile; // CPlus temp profile id.
+    private bool _lociRegistered = false; // Loci actor management
     private IpcDataPlayerCache? _appearanceData = null;
 
     private readonly SemaphoreSlim _dataLock = new(1, 1);
@@ -57,7 +59,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     public PlayerHandler(Sundesmo sundesmo, RedrawManager redrawer, ILogger<PlayerHandler> logger, 
         SundouleiaMediator mediator, AccountConfig config, FileCacheManager fileCache, 
-        FileDownloader downloads, IpcManager ipc, CharaObjectWatcher watcher)
+        FileDownloader downloads, IpcManager ipc, CharaWatcher watcher)
         : base(logger, mediator)
     {
         _redrawer = redrawer;
@@ -260,7 +262,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     #region Altaration Control
 
     /// <inheritdoc cref="RevertAlterations(string, nint, ushort, CancellationToken)"/>
-    public async Task RevertAlterations(CancellationToken ct = default)
+    public async Task  RevertAlterations(CancellationToken ct = default)
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
@@ -274,13 +276,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 // Revert glamourer by name if possible.
                 if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                     await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
+                // release by name if possible
+                if (_lociRegistered)
+                    await _ipc.LociReleaseByName(NameString).ConfigureAwait(false);
                 return;
             }
 
             // Ensure we have a valid address before we process a revert.
             // (Helps safegaurd cases where a Sundesmo is disposed of before its handlers are finished)
             // (Can touch this up later)
-            if (!CharaObjectWatcher.RenderedCharas.Contains(Address))
+            if (!CharaWatcher.RenderedCharas.Contains(Address))
                 return;
 
             // We can care about parallel execution here if we really want to but i dont care atm.
@@ -288,7 +293,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await _ipc.Glamourer.ReleaseActor(ObjIndex).ConfigureAwait(false);
             await _ipc.Heels.RestoreUserOffset(ObjIndex).ConfigureAwait(false);
             await _ipc.Honorific.ClearTitleAsync(ObjIndex).ConfigureAwait(false);
-            await _ipc.Moodles.ClearByPtr(Address).ConfigureAwait(false);
+            await _ipc.LociRelease(Address).ConfigureAwait(false);
         }
         catch (AccessViolationException)
         {
@@ -323,6 +328,8 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 // Revert glamourer by name if possible.
                 if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                     await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
+                if (_lociRegistered)
+                    await _ipc.LociReleaseByName(NameString).ConfigureAwait(false);
                 return;
             }
 
@@ -331,7 +338,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
             await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
             await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
-            await _ipc.Moodles.ClearByPtr(address).ConfigureAwait(false);
+            await _ipc.LociRelease(address).ConfigureAwait(false);
 
             _ipc.Penumbra.RedrawGameObject(objIdx);
         }
@@ -384,6 +391,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         _appearanceData = null;
         _tempCollection = Guid.Empty;
         _tempProfile = Guid.Empty;
+        _lociRegistered = false;
 
         _dataLock.Release();
     }
@@ -541,7 +549,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     }
 
     // Can add a force-redraw if needed.
-    private async Task ReapplyAlterationsInternal()
+    private async Task  ReapplyAlterationsInternal()
     {
         await _redrawer.RunOnPendingRedrawSlim(this, async () =>
         {
@@ -876,7 +884,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (changes.HasAny(IpcKind.Heels))      toApply.Add(ApplyHeels());
         if (changes.HasAny(IpcKind.CPlus))      toApply.Add(ApplyCPlus());
         if (changes.HasAny(IpcKind.Honorific))  toApply.Add(ApplyHonorific());
-        if (changes.HasAny(IpcKind.Moodles))    toApply.Add(ApplyMoodles());
+        if (changes.HasAny(IpcKind.Loci))       toApply.Add(ApplyLoci());
         if (changes.HasAny(IpcKind.ModManips))  toApply.Add(ApplyModManips());
         if (changes.HasAny(IpcKind.PetNames))   toApply.Add(ApplyPetNames());
 
@@ -904,7 +912,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             IpcKind.Heels => ApplyHeels(),
             IpcKind.CPlus => ApplyCPlus(),
             IpcKind.Honorific => ApplyHonorific(),
-            IpcKind.Moodles => ApplyMoodles(),
+            IpcKind.Loci => ApplyLoci(),
             IpcKind.ModManips => ApplyModManips(),
             IpcKind.PetNames => ApplyPetNames(),
             _ => Task.CompletedTask
@@ -929,7 +937,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Heels]))     toApply.Add(ApplyHeels());
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))     toApply.Add(ApplyCPlus());
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Honorific])) toApply.Add(ApplyHonorific());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Moodles]))   toApply.Add(ApplyMoodles());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Loci]))      toApply.Add(ApplyLoci());
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.ModManips])) toApply.Add(ApplyModManips());
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.PetNames]))  toApply.Add(ApplyPetNames());
         
@@ -944,14 +952,22 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private async Task ApplyGlamourer() => await _ipc.Glamourer.ApplyBase64StateByIdx(ObjIndex, _appearanceData!.Data[IpcKind.Glamourer]).ConfigureAwait(false);
     private async Task ApplyHeels() => await _ipc.Heels.SetUserOffset(ObjIndex, _appearanceData!.Data[IpcKind.Heels]).ConfigureAwait(false);
     private async Task ApplyHonorific() => await _ipc.Honorific.SetTitleAsync(ObjIndex, _appearanceData!.Data[IpcKind.Honorific]).ConfigureAwait(false);
-    private async Task ApplyMoodles() => await _ipc.Moodles.SetByPtr(Address, _appearanceData!.Data[IpcKind.Moodles]).ConfigureAwait(false);
     private async Task ApplyModManips() => await _ipc.Penumbra.SetSundesmoManipulations(_tempCollection, _appearanceData!.Data[IpcKind.ModManips]).ConfigureAwait(false);
+    private async Task ApplyLoci()
+    {
+        if (!_lociRegistered)
+            await _ipc.LociRegister(Address).ConfigureAwait(false);
+        // Then set by ptr
+        await _ipc.LociSetByPtr(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
+    }
+
     private Task ApplyPetNames()
     {
         var nickData = _appearanceData!.Data[IpcKind.PetNames];
         _ipc.PetNames.SetNamesByIdx(ObjIndex, nickData);
         return Task.CompletedTask;
     }
+
     private async Task ApplyCPlus()
     {
         if (string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.CPlus]) && _tempProfile != Guid.Empty)
@@ -1148,12 +1164,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         ImGui.Text(_appearanceData!.Data[IpcKind.Honorific]);
 
         ImGui.TableNextColumn();
-        ImGui.Text("Moodles");
+        ImGui.Text("LociData");
         ImGui.TableNextColumn();
-        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Moodles]), id: $"{Sundesmo.UserData.UID}-moodles-reapply"))
-            UiService.SetUITask(ApplyMoodles);
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Loci]), id: $"{Sundesmo.UserData.UID}-locis-reapply"))
+            UiService.SetUITask(ApplyLoci);
         ImGui.TableNextColumn();
-        ImGui.Text(_appearanceData!.Data[IpcKind.Moodles]);
+        ImGui.Text(_appearanceData!.Data[IpcKind.Loci]);
 
         ImGui.TableNextColumn();
         ImGui.Text("PetNames");

@@ -1,3 +1,4 @@
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
@@ -59,7 +60,7 @@ public record GPoseObjectCreated(IntPtr Address) : SameThreadMessage;
 /// <summary>
 ///     Whenever a GPose Actor is destroyed.
 /// </summary>
-public record GPoseObjectDestroyed(IntPtr Address, GameObject DataSnapshot) : SameThreadMessage;
+public record GPoseObjectDestroyed(IntPtr Address, Character DataSnapshot) : SameThreadMessage;
 
 
 

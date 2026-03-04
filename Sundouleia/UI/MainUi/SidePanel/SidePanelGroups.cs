@@ -55,7 +55,7 @@ public class SidePanelGroups
         _territories = new TerritoryCombo(logger);
         _usersCombo = new SundesmoForGroupCombo(logger, mediator, favorites, () => [
             ..sundesmos.DirectPairs
-                .OrderByDescending(p => favorites.SundesmoUids.Contains(p.UserData.UID))
+                .OrderByDescending(p => FavoritesConfig.SundesmoUids.Contains(p.UserData.UID))
                 .ThenByDescending(u => u.IsRendered)
                 .ThenByDescending(u => u.IsOnline)
                 .ThenBy(pair => pair.GetDisplayName())
@@ -633,6 +633,4 @@ public class SidePanelGroups
 
     private string ToName(ResidentialArea area)
         => LocationSvc.ResidentialNames.GetValueOrDefault(area) ?? area.ToString();
-
-
 }

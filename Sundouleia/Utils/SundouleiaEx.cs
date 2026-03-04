@@ -2,10 +2,13 @@ using CkCommons;
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.WebAPI;
+using System.Runtime.CompilerServices;
 
 namespace Sundouleia;
 public static class SundouleiaEx
@@ -25,6 +28,42 @@ public static class SundouleiaEx
     public static bool  IsPlayerFullyLoaded()
         => PlayerData.Interactable && IsScreenReady();
 
+    public static async Task WaitUntilFullyLoaded(IntPtr address, CancellationToken cts)
+    {
+        if (address == IntPtr.Zero)
+            throw new ArgumentException("Address cannot be null.", nameof(address));
+
+        while (!cts.IsCancellationRequested)
+        {
+            // Yes, our clients loading state also impacts anyone else's loading. (that or we are faster than dalamud's object table)
+            if (!PlayerData.IsZoning && IsObjectLoaded(address))
+                return;
+            await Task.Delay(100).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     There are conditions where an object can be rendered / created, but not drawable, or currently bring drawn. <para />
+    ///     This mainly occurs on login or when transferring between zones, but can also occur during redraws and such.
+    ///     We can get around this by checking for various draw conditions.
+    /// </summary>
+    public unsafe static bool IsObjectLoaded(IntPtr gameObjectAddress)
+    {
+        var gameObj = (GameObject*)gameObjectAddress;
+        // Invalid address.
+        if (gameObjectAddress == IntPtr.Zero) return false;
+        // DrawObject does not exist yet.
+        if ((IntPtr)gameObj->DrawObject == IntPtr.Zero) return false;
+        // RenderFlags are marked as 'still loading'.
+        if ((ulong)gameObj->RenderFlags == 2048) return false;
+        // There are models loaded into slots, still being applied.
+        if (((CharacterBase*)gameObj->DrawObject)->HasModelInSlotLoaded != 0) return false;
+        // There are model files loaded into slots, still being applied.
+        if (((CharacterBase*)gameObj->DrawObject)->HasModelFilesInSlotLoaded != 0) return false;
+        // Object is fully loaded.
+        return true;
+    }
+
     /// <summary>
     ///     There is a brief moment between when a player says they are interactable, 
     ///     and when they are actually available. <para />
@@ -32,29 +71,10 @@ public static class SundouleiaEx
     /// </summary>
     public static unsafe bool IsScreenReady()
     {
-        if (TryGetAddonByName<AtkUnitBase>("NowLoading", out var a) && a->IsVisible) return false;
-        if (TryGetAddonByName<AtkUnitBase>("FadeMiddle", out var b) && b->IsVisible) return false;
-        if (TryGetAddonByName<AtkUnitBase>("FadeBack", out var c) && c->IsVisible) return false;
+        if (AddonHelp.TryGetAddonByName<AtkUnitBase>("NowLoading", out var a) && a->IsVisible) return false;
+        if (AddonHelp.TryGetAddonByName<AtkUnitBase>("FadeMiddle", out var b) && b->IsVisible) return false;
+        if (AddonHelp.TryGetAddonByName<AtkUnitBase>("FadeBack", out var c) && c->IsVisible) return false;
         return true;
-    }
-
-    /// <summary>
-    ///     Obtain an addon* by its name alone. If it is not found, returns false.
-    /// </summary>
-    public static unsafe bool TryGetAddonByName<T>(string addon, out T* addonPtr) where T : unmanaged
-    {
-        // we can use a more direct approach now that we have access to static classes.
-        var a = Svc.GameGui.GetAddonByName(addon, 1);
-        if (a == IntPtr.Zero)
-        {
-            addonPtr = null;
-            return false;
-        }
-        else
-        {
-            addonPtr = (T*)a.Address;
-            return true;
-        }
     }
 
     // Can make this internal probably.
@@ -73,9 +93,14 @@ public static class SundouleiaEx
     public static bool HasValidSMACache(this MainConfig config)
         => !string.IsNullOrEmpty(config.Current.CacheFolder) && Directory.Exists(config.Current.SMACacheFolder);
 
-    public static bool DrawFavoriteStar(this FavoritesConfig config, string uid, bool framed)
+    public static bool DrawFavoriteStar(FavoritesConfig config, FavoriteType type, Guid id, bool framed = true)
     {
-        var isFavorite = config.SundesmoUids.Contains(uid);
+        var isFavorite = type switch
+        {
+            FavoriteType.Status => FavoritesConfig.Statuses.Contains(id),
+            FavoriteType.Preset => FavoritesConfig.Presets.Contains(id),
+            _ => false
+        };
         var pos = ImGui.GetCursorScreenPos();
         var hovering = ImGui.IsMouseHoveringRect(pos, pos + new Vector2(ImGui.GetTextLineHeight()));
         var col = hovering ? ImGuiColors.DalamudGrey2 : isFavorite ? ImGuiColors.ParsedGold : ImGuiColors.ParsedGrey;
@@ -88,8 +113,52 @@ public static class SundouleiaEx
 
         if (hovering && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
         {
-            if (isFavorite) config.RemoveUser(uid);
-            else config.TryAddUser(uid);
+            if (isFavorite) config.Unfavorite(type, id);
+            else config.Favorite(type, id);
+            return true;
+        }
+        return false;
+    }
+
+    public static bool DrawFavoriteStar(this FavoritesConfig config, string uid, bool framed)
+    {
+        var isFavorite = FavoritesConfig.SundesmoUids.Contains(uid);
+        var pos = ImGui.GetCursorScreenPos();
+        var hovering = ImGui.IsMouseHoveringRect(pos, pos + new Vector2(ImGui.GetTextLineHeight()));
+        var col = hovering ? ImGuiColors.DalamudGrey2 : isFavorite ? ImGuiColors.ParsedGold : ImGuiColors.ParsedGrey;
+
+        if (framed)
+            CkGui.FramedIconText(FAI.Star, col);
+        else
+            CkGui.IconText(FAI.Star, col);
+        CkGui.AttachToolTip((isFavorite ? "Remove" : "Add") + " from Favorites.");
+
+        if (hovering && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+        {
+            if (isFavorite) config.Unfavorite(uid);
+            else config.Favorite(uid);
+            return true;
+        }
+        return false;
+    }
+
+    public static bool DrawFavoriteStar(this FavoritesConfig config, uint iconId, bool framed)
+    {
+        var isFavorite = FavoritesConfig.IconIDs.Contains(iconId);
+        var pos = ImGui.GetCursorScreenPos();
+        var hovering = ImGui.IsMouseHoveringRect(pos, pos + new Vector2(ImGui.GetTextLineHeight()));
+        var col = hovering ? ImGuiColors.DalamudGrey2 : isFavorite ? ImGuiColors.ParsedGold : ImGuiColors.ParsedGrey;
+
+        if (framed)
+            CkGui.FramedIconText(FAI.Star, col);
+        else
+            CkGui.IconText(FAI.Star, col);
+        CkGui.AttachToolTip((isFavorite ? "Remove" : "Add") + " from Favorites.");
+
+        if (hovering && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+        {
+            if (isFavorite) config.Unfavorite(iconId);
+            else config.Favorite(iconId);
             return true;
         }
         return false;
@@ -144,6 +213,15 @@ public static class SundouleiaEx
             _ => "UNK"
         };
 
+    /// <summary>
+    ///     Serializes and then deserializes object, returning result of deserialization using <see cref="Newtonsoft.Json"/>
+    /// </summary>
+    /// <returns> A Deep copy of <paramref name="obj"/></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static T NewtonsoftDeepClone<T>(this T obj)
+        => JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(obj))!;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T DeepClone<T>(this T obj)
         => System.Text.Json.JsonSerializer.Deserialize<T>(System.Text.Json.JsonSerializer.Serialize(obj))!;
 

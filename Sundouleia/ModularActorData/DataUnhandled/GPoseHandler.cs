@@ -1,3 +1,4 @@
+using CkCommons;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
@@ -31,13 +32,15 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
     private readonly FileCacheManager _fileCache;
     private readonly SMAFileCacheManager _smaFileCache;
     private readonly IpcManager _ipc;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
+
+    private CancellationTokenSource _runtimeCTS = new();
 
     private Dictionary<nint, AttachedActor> _attachedActors = new();
 
     public GPoseHandler(ILogger<GPoseHandler> logger, SundouleiaMediator mediator,
         MainConfig mainConfig, FileCacheManager cacheManager, SMAFileCacheManager smaFileCache, 
-        IpcManager ipc, CharaObjectWatcher watcher)
+        IpcManager ipc, CharaWatcher watcher)
         : base(logger, mediator)
     {
         _mainConfig = mainConfig;
@@ -60,6 +63,7 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+        _runtimeCTS.SafeCancelDispose();
     }
 
     public IReadOnlyDictionary<nint, AttachedActor> AttachedActors => _attachedActors;
@@ -178,7 +182,7 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
         {
             // Now wait for the actor to be fully loaded.
             Logger.LogInformation($"Waiting for spawned Actor: {newActor.Name.TextValue} to be fully loaded.");
-            await _watcher.WaitForFullyLoadedGameObject(newActor.Address).ConfigureAwait(false);
+            await SundouleiaEx.WaitUntilFullyLoaded(newActor.Address, _runtimeCTS.Token).ConfigureAwait(false);
 
             // Assign the entry to the data.
             if (await AttachActor(data, newActor.Address).ConfigureAwait(false) is not { } entry)

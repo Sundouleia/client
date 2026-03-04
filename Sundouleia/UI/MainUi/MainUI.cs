@@ -84,9 +84,6 @@ public class MainUI : WindowMediatorSubscriberBase
             .AddTutorial(_guides, TutorialType.MainUi)
             .Build();
 
-        // Default to open if the user desires for it to be open.
-        if (_config.Current.OpenUiOnStartup)
-            Toggle();
         // Update the tab menu selection.
         _tabMenu.TabSelection = _config.Current.CurMainUiTab;
 
@@ -101,7 +98,7 @@ public class MainUI : WindowMediatorSubscriberBase
             _tabMenu.TabSelection = _.ToOpen;
         });
 
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
+        Mediator.Subscribe<IntoFinishedMessage>(this, (_) => IsOpen = true);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
     }
 
@@ -231,20 +228,13 @@ public class MainUI : WindowMediatorSubscriberBase
     {
         // Get the window pointer before we draw.
         var winPtr = ImGuiInternal.GetCurrentWindow();
-        // Expand the region of the topbar to cross the full width.
-        var winPadding = ImGui.GetStyle().WindowPadding;
-        // ImGui hides the actual possible clip-rect-min from going to 0,0.
-        // This is because the ClipRect skips over the titlebar, so if WinPadding is 8,8
-        // then the content region min returns 8,40
-        // Note to only subtract the X padding. ClipRectMin gets Y correctly.
-        var winClipX = winPadding.X / 2;
-        var minPos = winPtr.DrawList.GetClipRectMin() + new Vector2(-winClipX, winPadding.Y);
-        var maxPos = winPtr.DrawList.GetClipRectMax() + new Vector2(winClipX, 0);
+        var innerMinPos = winPtr.InnerRect.Min + new Vector2(0, ImGui.GetStyle().WindowPadding.Y);
+        var innerMaxPos = winPtr.InnerRect.Max;
         // Expand the area for our custom header.
-        winPtr.DrawList.PushClipRect(minPos, maxPos, false);
+        winPtr.DrawList.PushClipRect(innerMinPos, innerMaxPos, false);
 
         // Get the expanded width
-        var topBarWidth = maxPos.X - minPos.X;
+        var topBarWidth = innerMaxPos.X - innerMinPos.X;
         var offlineSize = CkGui.IconSize(FAI.Unlink);
         var tryonSize = CkGui.IconSize(FAI.Toilet);
         var streamerSize = CkGui.IconSize(FAI.BroadcastTower);
@@ -252,12 +242,12 @@ public class MainUI : WindowMediatorSubscriberBase
         var sideWidth = offlineSize.X + tryonSize.X + streamerSize.X + connectedSize.X + ImUtf8.ItemSpacing.X * 5;
         var height = CkGui.CalcFontTextSize("A", Fonts.Default150Percent).Y;
 
-        if (DrawAddUser(winPtr, new Vector2(sideWidth, height), minPos))
+        if (DrawAddUser(winPtr, new Vector2(sideWidth, height), innerMinPos))
             _creatingRequest = !_creatingRequest;
         CkGui.AttachToolTip("Add New User to Whitelist");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.AddingUsers, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => _creatingRequest = !_creatingRequest);
 
-        ImGui.SetCursorScreenPos(minPos + new Vector2(sideWidth, 0));
+        ImGui.SetCursorScreenPos(innerMinPos + new Vector2(sideWidth, 0));
         DrawConnectedUsers(winPtr, new Vector2(topBarWidth - sideWidth * 2, height), topBarWidth);
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.InitialWelcome, WindowPos, WindowSize);
 

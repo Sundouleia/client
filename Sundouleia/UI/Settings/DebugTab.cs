@@ -15,7 +15,7 @@ public class DebugTab
         ("Achievements", [ LoggerType.Achievements, LoggerType.AchievementEvents, LoggerType.AchievementInfo ]),
         ("Interop / IPC", [
             LoggerType.IpcSundouleia, LoggerType.IpcPenumbra, LoggerType.IpcGlamourer, LoggerType.IpcCustomize,
-            LoggerType.IpcMoodles, LoggerType.IpcHeels, LoggerType.IpcHonorific, LoggerType.IpcPetNames ]),
+            LoggerType.IpcLoci, LoggerType.IpcHeels, LoggerType.IpcHonorific, LoggerType.IpcPetNames ]),
         ("Client Data", [ 
             LoggerType.ResourceMonitor, LoggerType.PlayerMods, LoggerType.MinionMods, LoggerType.PetMods,
             LoggerType.CompanionMods, LoggerType.OwnedObjects, LoggerType.DataDistributor, LoggerType.ClientUpdates ]),
@@ -29,7 +29,9 @@ public class DebugTab
         ("Services", [
             LoggerType.UIManagement, LoggerType.Textures, LoggerType.DtrBar, LoggerType.Profiles, 
             LoggerType.Mediator, LoggerType.Combos ]),
-        ("SundouleiaHub", [ LoggerType.ApiCore, LoggerType.Callbacks, LoggerType.HubFactory, LoggerType.Health, LoggerType.JwtTokens ])
+        ("SundouleiaHub", [ LoggerType.ApiCore, LoggerType.Callbacks, LoggerType.HubFactory, LoggerType.Health, LoggerType.JwtTokens ]),
+        ("Loci", [ LoggerType.LociMemory, LoggerType.LociProcessors, LoggerType.LociData, LoggerType.LociIpc, LoggerType.LociSheVfx ]),
+        ("SMA Files", [ LoggerType.SmaManagment, LoggerType.SmaHandling, LoggerType.SmaGpose, LoggerType.SmaTransfer, LoggerType.SmaImportExport]),
     };
 
     private readonly MainConfig _mainConfig;

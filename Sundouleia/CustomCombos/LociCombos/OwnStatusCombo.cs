@@ -3,6 +3,7 @@ using CkCommons.RichText;
 using CkCommons.Textures;
 using Dalamud.Bindings.ImGui;
 using OtterGui.Text;
+using Sundouleia.Loci.Data;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
@@ -11,29 +12,32 @@ using SundouleiaAPI.Hub;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class OwnStatusCombo : MoodleComboBase<MoodlesStatusInfo>
+public sealed class OwnStatusCombo : LociComboBase<LociStatus>
 {
-    public OwnStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale)
-        : base(log, hub, sundesmo, scale, () => [.. ClientMoodles.Data.Statuses.Values.OrderBy(x => x.Title)])
-    { }
+    private readonly LociManager _loci;
+    public OwnStatusCombo(ILogger log, MainHub hub, LociManager loci, Sundesmo sundesmo, float scale)
+        : base(log, hub, sundesmo, scale, () => [.. loci.SavedStatuses.OrderBy(x => x.Title)])
+    {
+        _loci = loci;
+    }
 
     protected override bool DisableCondition()
-        => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOther);
+        => Guid.Empty.Equals(Current?.GUID) || !_sundesmo.PairPerms.LociAccess.HasAny(LociAccess.AllowOther);
 
-    protected override string ToString(MoodlesStatusInfo obj)
+    protected override string ToString(LociStatus obj)
         => obj.Title.StripColorTags();
 
     public bool DrawApplyStatuses(string id, float width, string buttonTT)
     {
         InnerWidth = width + IconSize.X + ImGui.GetStyle().ItemInnerSpacing.X;
-        var prevLabel = Current.GUID == Guid.Empty ? "Select Status.." : Current.Title.StripColorTags();
+        var prevLabel = Current is null ? "Select Status.." : Current.Title.StripColorTags();
         return DrawComboButton(id, prevLabel, width, true, buttonTT);
     }
 
     public bool DrawRemoveStatuses(string id, float width, string buttonTT)
     {
         InnerWidth = width + IconSize.X + ImGui.GetStyle().ItemInnerSpacing.X;
-        var prevLabel = Current.GUID == Guid.Empty ? "Select Status.." : Current.Title.StripColorTags();
+        var prevLabel = Current is null ? "Select Status.." : Current.Title.StripColorTags();
         return DrawComboButton(id, prevLabel, width, false, buttonTT);
     }
 
@@ -49,8 +53,8 @@ public sealed class OwnStatusCombo : MoodleComboBase<MoodlesStatusInfo>
         var ret = ImGui.Selectable($"##{myStatus.Title}", selected, ImGuiSelectableFlags.None, size);
 
         ImGui.SameLine(titleSpace);
-        MoodleIcon.DrawMoodleIcon(myStatus.IconID, myStatus.Stacks, IconSize);
-        myStatus.AttachTooltip(ClientMoodles.Data.StatusList);
+        LociIcon.Draw((uint)myStatus.IconID, myStatus.Stacks, IconSize);
+        LociEx.AttachTooltip(myStatus, _loci.SavedStatuses);
 
         ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;
@@ -61,14 +65,14 @@ public sealed class OwnStatusCombo : MoodleComboBase<MoodlesStatusInfo>
         return ret;
     }
 
-    protected override bool CanDoAction(MoodlesStatusInfo item)
-        => MoodlesEx.CanApplyMoodles(_sundesmo.PairPerms, [ item ]);
+    protected override bool CanDoAction(LociStatus item)
+        => LociEx.CanApply(_sundesmo.PairPerms, [ item ]);
 
-    protected override void OnApplyButton(MoodlesStatusInfo item)
+    protected override void OnApplyButton(LociStatus item)
     {
         UiService.SetUITask(async () =>
         {
-            var res = await _hub.UserApplyMoodleTuples(new(_sundesmo.UserData, [item]));
+            var res = await _hub.UserApplyLociStatusTuples(new(_sundesmo.UserData, [item.ToTuple()]));
             if (res.ErrorCode is not SundouleiaApiEc.Success)
                 Log.LogWarning($"Failed to apply status {item.Title} on {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
         });

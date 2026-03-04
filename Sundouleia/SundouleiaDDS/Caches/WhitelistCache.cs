@@ -6,7 +6,9 @@ using Sundouleia.PlayerClient;
 namespace Sundouleia.DrawSystem;
 
 // Cache for DDS's using Sundesmo items.
+#pragma warning disable CS9107
 public class WhitelistCache(DynamicDrawSystem<Sundesmo> dds) : DynamicFilterCache<Sundesmo>(dds)
+#pragma warning restore CS9107 
 {
     /// <summary>
     ///     If the config options under the filter bar should show.

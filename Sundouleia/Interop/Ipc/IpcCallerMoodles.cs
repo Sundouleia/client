@@ -1,200 +1,201 @@
-using CkCommons;
-using Dalamud.Plugin.Ipc;
-using Sundouleia.Services.Mediator;
+//using CkCommons;
+//using Dalamud.Plugin.Ipc;
+//using Sundouleia.Services.Mediator;
 
-namespace Sundouleia.Interop;
+//namespace Sundouleia.Interop;
 
-public sealed class IpcCallerMoodles : IIpcCaller
-{
-    private readonly ICallGateSubscriber<int> ApiVersion;
+//public sealed class IpcCallerMoodles : IIpcCaller
+//{
+//    private readonly ICallGateSubscriber<int> ApiVersion;
 
-    public readonly ICallGateSubscriber<nint, object>       OnStatusManagerModified;
-    public readonly ICallGateSubscriber<Guid, bool, object> OnStatusUpdated;
-    public readonly ICallGateSubscriber<Guid, bool, object> OnPresetUpdated;
+//    public readonly ICallGateSubscriber<nint, object> OnStatusManagerModified;
+//    public readonly ICallGateSubscriber<Guid, bool, object> OnStatusUpdated;
+//    public readonly ICallGateSubscriber<Guid, bool, object> OnPresetUpdated;
 
-    // API Getters
-    private readonly ICallGateSubscriber<string>                        GetOwnStatusManager;
-    private readonly ICallGateSubscriber<nint, string>                  GetStatusManagerByPtr;
-    private readonly ICallGateSubscriber<List<MoodlesStatusInfo>>       GetOwnStatusManagerInfo;
-    private readonly ICallGateSubscriber<nint, List<MoodlesStatusInfo>> GetStatusManagerInfoByPtr;
-    private readonly ICallGateSubscriber<Guid, MoodlesStatusInfo>       GetStatusInfo;
-    private readonly ICallGateSubscriber<List<MoodlesStatusInfo>>       GetStatusInfoList;
-    private readonly ICallGateSubscriber<Guid, MoodlePresetInfo>        GetPresetInfo;
-    private readonly ICallGateSubscriber<List<MoodlePresetInfo>>        GetPresetsInfoList;
+//    // API Getters
+//    private readonly ICallGateSubscriber<string> GetOwnStatusManager;
+//    private readonly ICallGateSubscriber<nint, string> GetStatusManagerByPtr;
+//    private readonly ICallGateSubscriber<List<LociStatusInfo>> GetOwnStatusManagerInfo;
+//    private readonly ICallGateSubscriber<nint, List<LociStatusInfo>> GetStatusManagerInfoByPtr;
+//    private readonly ICallGateSubscriber<Guid, LociStatusInfo> GetStatusInfo;
+//    private readonly ICallGateSubscriber<List<LociStatusInfo>> GetStatusInfoList;
+//    private readonly ICallGateSubscriber<Guid, LociPresetInfo> GetPresetInfo;
+//    private readonly ICallGateSubscriber<List<LociPresetInfo>> GetPresetsInfoList;
 
-    // API Enactors
-    private readonly ICallGateSubscriber<nint, string, object>          SetStatusManagerByPtr;
-    private readonly ICallGateSubscriber<nint, object>                  ClearStatusMangerByPtr;
-    private readonly ICallGateSubscriber<Guid, string, object>          ApplyStatusByName;
-    private readonly ICallGateSubscriber<Guid, string, object>          ApplyPresetByName;
-    private readonly ICallGateSubscriber<List<Guid>, string, object>    RemoveStatusesByName;
+//    // API Enactors
+//    private readonly ICallGateSubscriber<nint, string, object> SetStatusManagerByPtr;
+//    private readonly ICallGateSubscriber<nint, object> ClearStatusMangerByPtr;
+//    private readonly ICallGateSubscriber<Guid, string, object> ApplyStatusByName;
+//    private readonly ICallGateSubscriber<Guid, string, object> ApplyPresetByName;
+//    private readonly ICallGateSubscriber<List<Guid>, string, object> RemoveStatusesByName;
 
-    private readonly SundouleiaMediator _mediator;
+//    private readonly SundouleiaMediator _mediator;
 
-    public IpcCallerMoodles(SundouleiaMediator mediator)
-    {
-        _mediator = mediator;
+//    public IpcCallerMoodles(SundouleiaMediator mediator)
+//    {
+//        _mediator = mediator;
 
-        ApiVersion = Svc.PluginInterface.GetIpcSubscriber<int>("Moodles.Version");
+//        ApiVersion = Svc.PluginInterface.GetIpcSubscriber<int>("Moodles.Version");
 
-        // API Getters
-        GetOwnStatusManager = Svc.PluginInterface.GetIpcSubscriber<string>("Moodles.GetClientStatusManagerV2");
-        GetOwnStatusManagerInfo = Svc.PluginInterface.GetIpcSubscriber<List<MoodlesStatusInfo>>("Moodles.GetClientStatusManagerInfoV2");
-        GetStatusManagerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, string>("Moodles.GetStatusManagerByPtrV2");
-        GetStatusManagerInfoByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, List<MoodlesStatusInfo>>("Moodles.GetStatusManagerInfoByPtrV2");
+//        // API Getters
+//        GetOwnStatusManager = Svc.PluginInterface.GetIpcSubscriber<string>("Moodles.GetClientStatusManagerV2");
+//        GetOwnStatusManagerInfo = Svc.PluginInterface.GetIpcSubscriber<List<LociStatusInfo>>("Moodles.GetClientStatusManagerInfoV2");
+//        GetStatusManagerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, string>("Moodles.GetStatusManagerByPtrV2");
+//        GetStatusManagerInfoByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, List<LociStatusInfo>>("Moodles.GetStatusManagerInfoByPtrV2");
 
-        GetStatusInfo = Svc.PluginInterface.GetIpcSubscriber<Guid, MoodlesStatusInfo>("Moodles.GetStatusInfoV2");
-        GetStatusInfoList = Svc.PluginInterface.GetIpcSubscriber<List<MoodlesStatusInfo>>("Moodles.GetStatusInfoListV2");
-        GetPresetInfo = Svc.PluginInterface.GetIpcSubscriber<Guid, MoodlePresetInfo>("Moodles.GetPresetInfoV2");
-        GetPresetsInfoList = Svc.PluginInterface.GetIpcSubscriber<List<MoodlePresetInfo>>("Moodles.GetPresetsInfoListV2");
+//        GetStatusInfo = Svc.PluginInterface.GetIpcSubscriber<Guid, LociStatusInfo>("Moodles.GetStatusInfoV2");
+//        GetStatusInfoList = Svc.PluginInterface.GetIpcSubscriber<List<LociStatusInfo>>("Moodles.GetStatusInfoListV2");
+//        GetPresetInfo = Svc.PluginInterface.GetIpcSubscriber<Guid, LociPresetInfo>("Moodles.GetPresetInfoV2");
+//        GetPresetsInfoList = Svc.PluginInterface.GetIpcSubscriber<List<LociPresetInfo>>("Moodles.GetPresetsInfoListV2");
 
-        // API Enactors
-        SetStatusManagerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, string, object>("Moodles.SetStatusManagerByPtrV2");
-        ClearStatusMangerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, object>("Moodles.ClearStatusManagerByPtrV2");
-        ApplyStatusByName = Svc.PluginInterface.GetIpcSubscriber<Guid, string, object>("Moodles.AddOrUpdateStatusByNameV2");
-        ApplyPresetByName = Svc.PluginInterface.GetIpcSubscriber<Guid, string, object>("Moodles.ApplyPresetByNameV2");
-        RemoveStatusesByName = Svc.PluginInterface.GetIpcSubscriber<List<Guid>, string, object>("Moodles.RemoveStatusesByNameV2");
+//        // API Enactors
+//        SetStatusManagerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, string, object>("Moodles.SetStatusManagerByPtrV2");
+//        ClearStatusMangerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, object>("Moodles.ClearStatusManagerByPtrV2");
+//        ApplyStatusByName = Svc.PluginInterface.GetIpcSubscriber<Guid, string, object>("Moodles.AddOrUpdateStatusByNameV2");
+//        ApplyPresetByName = Svc.PluginInterface.GetIpcSubscriber<Guid, string, object>("Moodles.ApplyPresetByNameV2");
+//        RemoveStatusesByName = Svc.PluginInterface.GetIpcSubscriber<List<Guid>, string, object>("Moodles.RemoveStatusesByNameV2");
 
-        // API Action Events:
-        OnStatusManagerModified = Svc.PluginInterface.GetIpcSubscriber<nint, object>("Moodles.StatusManagerModified");
-        OnStatusUpdated = Svc.PluginInterface.GetIpcSubscriber<Guid, bool, object>("Moodles.StatusUpdated");
-        OnPresetUpdated = Svc.PluginInterface.GetIpcSubscriber<Guid, bool, object>("Moodles.PresetUpdated");
+//        // API Action Events:
+//        OnStatusManagerModified = Svc.PluginInterface.GetIpcSubscriber<nint, object>("Moodles.StatusManagerModified");
+//        OnStatusUpdated = Svc.PluginInterface.GetIpcSubscriber<Guid, bool, object>("Moodles.StatusUpdated");
+//        OnPresetUpdated = Svc.PluginInterface.GetIpcSubscriber<Guid, bool, object>("Moodles.PresetUpdated");
+//        CheckAPI();
+//    }
 
-        CheckAPI();
-    }
+//    public static bool APIAvailable { get; private set; } = false;
 
-    public static bool APIAvailable { get; private set; } = false;
+//    // Fail Moodles until fixed.
+//    public void CheckAPI()
+//    {
+//        APIAvailable = false;
+//        try
+//        {
+//            var result = ApiVersion.InvokeFunc() >= 4;
+//            if (!APIAvailable && result)
+//                _mediator.Publish(new MoodlesReady());
+//            APIAvailable = result;
+//        }
+//        catch
+//        {
+//            // Moodles was not ready yet / went offline. Set back to false. (Statuses are auto-cleared by locis)
+//            APIAvailable = false;
+//        }
+//    }
 
-    public void CheckAPI()
-    {
-        try
-        {
-            var result = ApiVersion.InvokeFunc() >= 4;
-            if(!APIAvailable && result)
-                _mediator.Publish(new MoodlesReady());
-            APIAvailable = result;
-        }
-        catch
-        {
-            // Moodles was not ready yet / went offline. Set back to false. (Statuses are auto-cleared by moodles)
-            APIAvailable = false;
-        }
-    }
+//    public void Dispose()
+//    { }
 
-    public void Dispose()
-    { }
+//    /// <summary> 
+//    ///     Gets the ClientPlayer's StatusManager string.
+//    /// </summary>
+//    public async Task<string> GetOwnDataStr()
+//    {
+//        if (!APIAvailable) return string.Empty;
+//        return await Svc.Framework.RunOnFrameworkThread(() => GetOwnStatusManager.InvokeFunc() ?? string.Empty).ConfigureAwait(false);
+//    }
 
-    /// <summary> 
-    ///     Gets the ClientPlayer's StatusManager string.
-    /// </summary>
-    public async Task<string> GetOwnDataStr()
-    {
-        if (!APIAvailable) return string.Empty;
-        return await Svc.Framework.RunOnFrameworkThread(() => GetOwnStatusManager.InvokeFunc() ?? string.Empty).ConfigureAwait(false);
-    }
+//    /// <summary>
+//    ///     Gets the ClientPlayer's StatusManager in tuple format.
+//    /// </summary>
+//    public async Task<List<LociStatusInfo>> GetOwnDataInfo()
+//    {
+//        if (!APIAvailable) return new List<LociStatusInfo>();
+//        return await Svc.Framework.RunOnFrameworkThread(GetOwnStatusManagerInfo.InvokeFunc).ConfigureAwait(false);
+//    }
 
-    /// <summary>
-    ///     Gets the ClientPlayer's StatusManager in tuple format.
-    /// </summary>
-    public async Task<List<MoodlesStatusInfo>> GetOwnDataInfo()
-    {
-        if (!APIAvailable) return new List<MoodlesStatusInfo>();
-        return await Svc.Framework.RunOnFrameworkThread(GetOwnStatusManagerInfo.InvokeFunc).ConfigureAwait(false);
-    }
+//    /// <summary> 
+//    ///     Gets the StatusManager by pointer.
+//    /// </summary>
+//    public async Task<string?> GetDataStrByPtr(nint charaAddr)
+//    {
+//        if (!APIAvailable) return null;
+//        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusManagerByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
+//    }
 
-    /// <summary> 
-    ///     Gets the StatusManager by pointer.
-    /// </summary>
-    public async Task<string?> GetDataStrByPtr(nint charaAddr)
-    {
-        if (!APIAvailable) return null;
-        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusManagerByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
-    }
+//    /// <summary>
+//    ///     Gets another player's StatusManager in tuple format by pointer.
+//    /// </summary>
+//    public async Task<List<LociStatusInfo>> GetDataInfoByPtr(nint charaAddr)
+//    {
+//        if (!APIAvailable) return new List<LociStatusInfo>();
+//        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusManagerInfoByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
+//    }
 
-    /// <summary>
-    ///     Gets another player's StatusManager in tuple format by pointer.
-    /// </summary>
-    public async Task<List<MoodlesStatusInfo>> GetDataInfoByPtr(nint charaAddr)
-    {
-        if (!APIAvailable) return new List<MoodlesStatusInfo>();
-        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusManagerInfoByPtr.InvokeFunc(charaAddr)).ConfigureAwait(false);
-    }
+//    /// <summary>
+//    ///     Gets the StatusTuple for a specified GUID.
+//    /// </summary>
+//    public async Task<LociStatusInfo> GetStatusDetails(Guid guid)
+//    {
+//        if (!APIAvailable) return new LociStatusInfo();
+//        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusInfo.InvokeFunc(guid)).ConfigureAwait(false);
+//    }
 
-    /// <summary>
-    ///     Gets the StatusTuple for a specified GUID.
-    /// </summary>
-    public async Task<MoodlesStatusInfo> GetStatusDetails(Guid guid)
-    {
-        if (!APIAvailable) return new MoodlesStatusInfo();
-        return await Svc.Framework.RunOnFrameworkThread(() => GetStatusInfo.InvokeFunc(guid)).ConfigureAwait(false);
-    }
+//    /// <summary> 
+//    ///     Gets the list of all our clients Moodles Info
+//    /// </summary>
+//    public async Task<IEnumerable<LociStatusInfo>> GetStatusListDetails()
+//    {
+//        if (!APIAvailable) return Enumerable.Empty<LociStatusInfo>();
+//        return await Svc.Framework.RunOnFrameworkThread(GetStatusInfoList.InvokeFunc).ConfigureAwait(false);
+//    }
 
-    /// <summary> 
-    ///     Gets the list of all our clients Moodles Info
-    /// </summary>
-    public async Task<IEnumerable<MoodlesStatusInfo>> GetStatusListDetails()
-    {
-        if (!APIAvailable) return Enumerable.Empty<MoodlesStatusInfo>();
-        return await Svc.Framework.RunOnFrameworkThread(GetStatusInfoList.InvokeFunc).ConfigureAwait(false);
-    }
+//    /// <summary> 
+//    ///     Gets the preset info for a provided GUID from the client.
+//    /// </summary>
+//    public async Task<LociPresetInfo> GetPresetDetails(Guid guid)
+//    {
+//        if (!APIAvailable) return new LociPresetInfo();
+//        return await Svc.Framework.RunOnFrameworkThread(() => GetPresetInfo.InvokeFunc(guid)).ConfigureAwait(false);
+//    }
 
-    /// <summary> 
-    ///     Gets the preset info for a provided GUID from the client.
-    /// </summary>
-    public async Task<MoodlePresetInfo> GetPresetDetails(Guid guid)
-    {
-        if (!APIAvailable) return new MoodlePresetInfo();
-        return await Svc.Framework.RunOnFrameworkThread(() => GetPresetInfo.InvokeFunc(guid)).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    ///     Gets the list of all our clients Presets Info 
-    /// </summary>
-    public async Task<IEnumerable<MoodlePresetInfo>> GetPresetListDetails()
-    {
-        if (!APIAvailable) return Enumerable.Empty<MoodlePresetInfo>();
-        return await Svc.Framework.RunOnFrameworkThread(GetPresetsInfoList.InvokeFunc).ConfigureAwait(false);
-    }
+//    /// <summary>
+//    ///     Gets the list of all our clients Presets Info 
+//    /// </summary>
+//    public async Task<IEnumerable<LociPresetInfo>> GetPresetListDetails()
+//    {
+//        if (!APIAvailable) return Enumerable.Empty<LociPresetInfo>();
+//        return await Svc.Framework.RunOnFrameworkThread(GetPresetsInfoList.InvokeFunc).ConfigureAwait(false);
+//    }
 
 
-    /// <summary>
-    ///     Sets the StatusManager by pointer.
-    /// </summary>
-    public async Task SetByPtr(nint charaAddr, string statusString)
-    {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => SetStatusManagerByPtr.InvokeAction(charaAddr, statusString)).ConfigureAwait(false);
-    }
+//    /// <summary>
+//    ///     Sets the StatusManager by pointer.
+//    /// </summary>
+//    public async Task SetByPtr(nint charaAddr, string statusString)
+//    {
+//        if (!APIAvailable) return;
+//        await Svc.Framework.RunOnFrameworkThread(() => SetStatusManagerByPtr.InvokeAction(charaAddr, statusString)).ConfigureAwait(false);
+//    }
 
-    /// <summary>
-    ///     Clears a players StatusManager by pointer.
-    /// </summary>
-    public async Task ClearByPtr(nint charaAddr)
-    {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => ClearStatusMangerByPtr.InvokeAction(charaAddr)).ConfigureAwait(false);
-    }
+//    /// <summary>
+//    ///     Clears a players StatusManager by pointer.
+//    /// </summary>
+//    public async Task ClearByPtr(nint charaAddr)
+//    {
+//        if (!APIAvailable) return;
+//        await Svc.Framework.RunOnFrameworkThread(() => ClearStatusMangerByPtr.InvokeAction(charaAddr)).ConfigureAwait(false);
+//    }
 
-    public async Task ApplyStatuses(IEnumerable<Guid> toApply)
-    {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            var clientNameWorld = PlayerData.NameWithWorld;
-            foreach (var guid in toApply)
-                ApplyStatusByName.InvokeAction(guid, clientNameWorld);
-        }).ConfigureAwait(false);
-    }
+//    public async Task ApplyStatuses(IEnumerable<Guid> toApply)
+//    {
+//        if (!APIAvailable) return;
+//        await Svc.Framework.RunOnFrameworkThread(() =>
+//        {
+//            var clientNameWorld = PlayerData.NameWithWorld;
+//            foreach (var guid in toApply)
+//                ApplyStatusByName.InvokeAction(guid, clientNameWorld);
+//        }).ConfigureAwait(false);
+//    }
 
-    public async Task ApplyPreset(Guid id)
-    {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => ApplyPresetByName.InvokeAction(id, PlayerData.NameWithWorld)).ConfigureAwait(false);
-    }
+//    public async Task ApplyPreset(Guid id)
+//    {
+//        if (!APIAvailable) return;
+//        await Svc.Framework.RunOnFrameworkThread(() => ApplyPresetByName.InvokeAction(id, PlayerData.NameWithWorld)).ConfigureAwait(false);
+//    }
 
-    public async Task RemoveStatuses(IEnumerable<Guid> toRemove)
-    {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => RemoveStatusesByName.InvokeAction(toRemove.ToList(), PlayerData.NameWithWorld)).ConfigureAwait(false);
-    }
-}
+//    public async Task RemoveStatuses(IEnumerable<Guid> toRemove)
+//    {
+//        if (!APIAvailable) return;
+//        await Svc.Framework.RunOnFrameworkThread(() => RemoveStatusesByName.InvokeAction(toRemove.ToList(), PlayerData.NameWithWorld)).ConfigureAwait(false);
+//    }
+//}

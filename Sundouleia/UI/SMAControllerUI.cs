@@ -28,7 +28,7 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
     private readonly GPoseHandler _handler;
     private readonly GPoseManager _manager;
     private readonly IpcManager _ipc;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
     private readonly UiFileDialogService _dialog;
 
     // Used to validate an imported file for decryption.
@@ -40,7 +40,7 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
 
     public SMAControllerUI(ILogger<SMAControllerUI> logger, SundouleiaMediator mediator,
         SMAFileHandler fileHandler, GPoseHandler handler, GPoseManager manager,
-        IpcManager ipc, CharaObjectWatcher watcher, UiFileDialogService dialog)
+        IpcManager ipc, CharaWatcher watcher, UiFileDialogService dialog)
         : base(logger, mediator, "GPOSE - Modular Actor Control")
     {
         _fileHandler = fileHandler;
@@ -194,7 +194,7 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
         using var _ = ImRaii.ListBox("##gposers", new Vector2(125, ImGui.GetContentRegionAvail().Y));
         if (!_) return;
 
-        foreach (var address in CharaObjectWatcher.GPoseActors)
+        foreach (var address in CharaWatcher.GPoseActors)
         {
             var gposeActor = (GameObject*)address;
             if (ImGui.Selectable($"{gposeActor->NameString}##{gposeActor->NameString}{address}", gposeActor == _selectedGPoseActor))

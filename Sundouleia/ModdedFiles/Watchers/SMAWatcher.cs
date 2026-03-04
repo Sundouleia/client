@@ -36,7 +36,7 @@ public sealed class ModularActorWatcher : IDisposable
 
     public void StopMonitoring()
     {
-        _logger.LogInformation("Stopping monitoring of the SMA storage folders");
+        _logger.LogInformation("Stopping monitoring of the SMA storage folders", LoggerType.FileWatcher);
         Watcher?.Dispose();
         Watcher = null;
     }
@@ -57,7 +57,7 @@ public sealed class ModularActorWatcher : IDisposable
         if (!Directory.Exists(smaCachePath))
         {
             Directory.CreateDirectory(smaCachePath);
-            _logger.LogInformation($"Created missing SMA cache directory at: {smaCachePath}");
+            _logger.LogInformation($"Created missing SMA cache directory at: {smaCachePath}", LoggerType.FileWatcher);
         }
 
         // Otherwise get the drive information on the defined cache folder. (not the one we passed in)
@@ -65,10 +65,10 @@ public sealed class ModularActorWatcher : IDisposable
 
         // Check if the storage is NTFS drive format and log it.
         StorageisNTFS = string.Equals("NTFS", di.DriveFormat, StringComparison.OrdinalIgnoreCase);
-        _logger.LogInformation($"Storage is on NTFS drive: {StorageisNTFS}");
+        _logger.LogInformation($"Storage is on NTFS drive: {StorageisNTFS}", LoggerType.FileWatcher);
 
         // Begin the FileSystemWatcher for the defined path we have passed in.
-        _logger.LogDebug($"Initializing SMA FileSystemWatcher for: {smaCachePath}");
+        _logger.LogDebug($"Initializing SMA FileSystemWatcher for: {smaCachePath}", LoggerType.FileWatcher);
         Watcher = new()
         {
             Path = smaCachePath,
@@ -97,7 +97,7 @@ public sealed class ModularActorWatcher : IDisposable
             return;
         // Enqueue the change for processing. (Avoid fire-and-forget)
         _changeQueue.Enqueue(new(e.FullPath, new WatcherChange(e.ChangeType)));
-        _logger.LogDebug($"FS-Watcher Event: {e.ChangeType} on {e.FullPath}");
+        _logger.LogDebug($"FS-Watcher Event: {e.ChangeType} on {e.FullPath}", LoggerType.FileWatcher);
     }
 
     /// <summary>
@@ -138,13 +138,13 @@ public sealed class ModularActorWatcher : IDisposable
             var remainingEntries = changes.Where(c => c.Value.ChangeType != WatcherChangeTypes.Deleted).Select(c => c.Key);
 
             foreach (var entry in deletedEntries)
-                _logger.LogDebug($"FSW Change: Deletion - {entry}");
+                _logger.LogDebug($"FSW Change: Deletion - {entry}", LoggerType.FileWatcher);
 
             foreach (var entry in renamedEntries)
-                _logger.LogDebug($"FSW Change: Renamed - {entry.Value.OldPath} => {entry.Key}");
+                _logger.LogDebug($"FSW Change: Renamed - {entry.Value.OldPath} => {entry.Key}", LoggerType.FileWatcher);
 
             foreach (var entry in remainingEntries)
-                _logger.LogDebug($"FSW Change: Creation or Change - {entry}");
+                _logger.LogDebug($"FSW Change: Creation or Change - {entry}", LoggerType.FileWatcher);
 
             var allChanges = deletedEntries
                 .Concat(renamedEntries.Select(c => c.Value.OldPath!))

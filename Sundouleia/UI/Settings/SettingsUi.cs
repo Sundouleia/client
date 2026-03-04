@@ -10,10 +10,12 @@ using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using OtterGui;
 using OtterGui.Text;
+using Sundouleia.Gui.Loci;
 using Sundouleia.Interop;
 using Sundouleia.Localization;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
+using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
@@ -27,18 +29,20 @@ public class SettingsUi : WindowMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly MainConfig _config;
+    private readonly LociSettings _lociSettings;
     private readonly ProfilesTab _accountsTab;
     private readonly DebugTab _debugTab;
     private readonly UiDataStorageShared _storageShared;
     private readonly DtrService _dtr;
 
     public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, 
-        MainHub hub, MainConfig config, ProfilesTab accounts, DebugTab debug, 
-        UiDataStorageShared dataStorage, DtrService dtr)
+        MainHub hub, MainConfig config, LociSettings lociSettings, ProfilesTab accounts,
+        DebugTab debug, UiDataStorageShared dataStorage, DtrService dtr)
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;
         _config = config;
+        _lociSettings = lociSettings;
         _accountsTab = accounts;
         _debugTab = debug;
         _storageShared = dataStorage;
@@ -54,6 +58,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             .Add(FAI.PersonRays, "Open Personal Data Debugger", () => Mediator.Publish(new UiToggleMessage(typeof(DebugPersonalDataUI))))
             .Add(FAI.Database, "Open Storages Debugger", () => Mediator.Publish(new UiToggleMessage(typeof(DebugStorageUI))))
 #endif
+            .Add(FAI.Bell, "Actions Notifier", () => Mediator.Publish(new UiToggleMessage(typeof(DataEventsUI))))
             .Build();
     }
 
@@ -65,6 +70,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
+        var minPos = ImGui.GetCursorPos();
+        var buttonPos = minPos + new Vector2(ImGui.GetContentRegionAvail().X - 150f, 0);
         ImGui.Text(CkLoc.Settings.OptionalPlugins);
 
         ImGui.SameLine();
@@ -76,12 +83,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         CkGui.AttachToolTip(IpcCallerGlamourer.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
-        CkGui.ColorTextBool("Customize+", IpcCallerCustomize.APIAvailable);
+        CkGui.ColorTextBool("C+", IpcCallerCustomize.APIAvailable);
         CkGui.AttachToolTip(IpcCallerCustomize.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
-
-        ImGui.SameLine();
-        CkGui.ColorTextBool("Moodles", IpcCallerMoodles.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerMoodles.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
         CkGui.ColorTextBool("Heels", IpcCallerHeels.APIAvailable);
@@ -129,6 +132,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     ImGui.EndTabItem();
                 }
             }
+            if (ImGui.BeginTabItem(CkLoc.Settings.TabLoci))
+            {
+                _lociSettings.DrawSettings();
+                ImGui.EndTabItem();
+            }
 
             if (ImGui.BeginTabItem(CkLoc.Settings.TabAccounts))
             {
@@ -165,6 +173,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
             }
 
             ImGui.EndTabBar();
+        }
+
+        ImGui.SetCursorPos(buttonPos);
+        using (ImRaii.Group())
+        {
+            if (CkGui.FancyButton(FAI.Folder, "Plugin Config", 150f, false))
+            {
+                try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.SundouleiaDirectory, UseShellExecute = true }); }
+                catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
+            }
+            CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
         }
     }
 
@@ -252,10 +271,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowVfx), vfxGlobal));
         CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowVfxTT);
 
-        var curShare = MainHub.GlobalPerms.DefaultShareOwnMoodles;
-        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.ShareMoodles, ref curShare, UiService.DisableUI))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultShareOwnMoodles), curShare));
-        CkGui.HelpText(CkLoc.Settings.MainOptions.ShareMoodlesTT);
+        var curShare = MainHub.GlobalPerms.DefaultShareOwnLociData;
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.ShareStatuses, ref curShare, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultShareOwnLociData), curShare));
+        CkGui.HelpText(CkLoc.Settings.MainOptions.ShareStatusesTT);
 
         var height = ImUtf8.FrameHeight * 4 + ImGui.GetStyle().CellPadding.Y * 8;
         using var _ = CkRaii.FramedChildPaddedW("access", ImGui.GetContentRegionAvail().X, height, 0, ImGui.GetColorU32(ImGuiCol.Separator), CkStyle.ChildRounding(), 2f);
@@ -266,89 +285,89 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ImGui.TableSetupColumn("##values", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableNextRow();
 
-        var curAccess = MainHub.GlobalPerms.DefaultMoodleAccess;
+        var curAccess = MainHub.GlobalPerms.DefaultLociAccess;
 
-        // Moodle Status Types.
+        // Loci Status Types.
         ImGui.TableNextColumn();
-        CkGui.TextFrameAligned($"Allowed Status Types:    ");
+        CkGui.TextFrameAligned($"Allowed Status Types:");
         ImGui.TableNextColumn();
-        var curPos = curAccess.HasAny(MoodleAccess.Positive);
-        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowPosMoodles, ref curPos, UiService.DisableUI))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.Positive));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowPosMoodlesTT);
+        var curPos = curAccess.HasAny(LociAccess.Positive);
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowPosLociStatuses, ref curPos, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.Positive));
+        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowPosLociStatusesTT);
 
         ImGui.SameLine();
-        var curNeg = curAccess.HasAny(MoodleAccess.Negative);
-        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowNegMoodles, ref curNeg, UiService.DisableUI))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.Negative));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowNegMoodlesTT);
+        var curNeg = curAccess.HasAny(LociAccess.Negative);
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowNegLociStatuses, ref curNeg, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.Negative));
+        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowNegLociStatusesTT);
 
         ImGui.SameLine();
-        var curSpecial = curAccess.HasAny(MoodleAccess.Special);
-        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowSpecialMoodles, ref curSpecial, UiService.DisableUI))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.Special));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowSpecialMoodlesTT);
+        var curSpecial = curAccess.HasAny(LociAccess.Special);
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowSpecialLociStatuses, ref curSpecial, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.Special));
+        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowSpecialLociStatusesTT);
         ImGui.TableNextRow();
 
-        // Moodle Time
+        // Loci Time
         ImGui.TableNextColumn();
         CkGui.TextFrameAligned("Maximum Duration:");
         ImGui.TableNextColumn();
-        var refPermAccess = curAccess.HasAny(MoodleAccess.Permanent);
-        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowPermanentMoodles, ref refPermAccess))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.Permanent));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowPermanentMoodlesTT);
+        var refPermAccess = curAccess.HasAny(LociAccess.Permanent);
+        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowPermanentLociStatuses, ref refPermAccess))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.Permanent));
+        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowPermanentLociStatusesTT);
 
         // Display inline, the icon input text field for setting a maximum duration, if we are not permanent.
         if (!refPermAccess)
         {
-            var str = _timespanStrCache ?? MainHub.GlobalPerms.DefaultMaxMoodleTime.ToTimeSpanStr();
+            var str = _timespanStrCache ?? MainHub.GlobalPerms.DefaultMaxLociTime.ToTimeSpanStr();
             ImGui.SameLine();
-            if (CkGui.IconInputText(FAI.HourglassHalf, "Maximum Time", "0d0h0m0s", ref str, 32, 100f, true, !IpcCallerMoodles.APIAvailable || UiService.DisableUI))
+            if (CkGui.IconInputText(FAI.HourglassHalf, "Maximum Time", "0d0h0m0s", ref str, 32, 100f, true, UiService.DisableUI))
             {
-                if (str != MainHub.GlobalPerms.DefaultMaxMoodleTime.ToTimeSpanStr() && CkTimers.TryParseTimeSpan(str, out var newTime))
+                if (str != MainHub.GlobalPerms.DefaultMaxLociTime.ToTimeSpanStr() && CkTimers.TryParseTimeSpan(str, out var newTime))
                 {
                     var ticks = (ulong)newTime.Ticks;
-                    _logger.LogInformation($"Changing OwnGlobals MaxMoodleTime to {ticks} ticks.", LoggerType.PairDataTransfer);
-                    UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMaxMoodleTime), ticks));
+                    _logger.LogInformation($"Changing OwnGlobals MaxLociTime to {ticks} ticks.", LoggerType.PairDataTransfer);
+                    UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMaxLociTime), ticks));
                 }
                 _timespanStrCache = null;
             }
-            CkGui.AttachToolTip($"The longest duration a timed moodle can be applied to you.");
+            CkGui.AttachToolTip($"The longest duration a timed loci can be applied to you.");
         }
         ImGui.TableNextRow();
 
-        // Moodle Application Types
+        // Loci Application Types
         ImGui.TableNextColumn();
         CkGui.TextFrameAligned("Let Others Apply:");
         
         ImGui.TableNextColumn();
-        var canApplyOwn = curAccess.HasAny(MoodleAccess.AllowOwn);
-        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowOwnMoodles, ref canApplyOwn, UiService.DisableUI))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.AllowOwn));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowOwnMoodlesTT);
+        var canApplyOwn = curAccess.HasAny(LociAccess.AllowOwn);
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowOwnLociData, ref canApplyOwn, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.AllowOwn));
+        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowOwnLociDataTT);
 
         ImGui.SameLine();
-        var canApplyOthers = curAccess.HasAny(MoodleAccess.AllowOther);
-        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowOtherMoodles, ref canApplyOthers, UiService.DisableUI))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.AllowOther));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowOtherMoodlesTT);
+        var canApplyOthers = curAccess.HasAny(LociAccess.AllowOther);
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowOtherLociData, ref canApplyOthers, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.AllowOther));
+        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowOtherLociDataTT);
         ImGui.TableNextRow();
 
         // Removal
         ImGui.TableNextColumn();
         CkGui.TextFrameAligned("Let Others Remove:");
         ImGui.TableNextColumn();
-        var canRemoveApplied = curAccess.HasAny(MoodleAccess.RemoveApplied);
-        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.RemoveAppliedMoodles, ref canRemoveApplied, UiService.DisableUI))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.RemoveApplied));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.RemoveAppliedMoodlesTT);
+        var canRemoveApplied = curAccess.HasAny(LociAccess.RemoveApplied);
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.RemoveAppliedLociStatuses, ref canRemoveApplied, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.RemoveApplied));
+        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.RemoveAppliedLociStatusesTT);
 
         ImGui.SameLine();
-        var canRemoveAny = curAccess.HasAny(MoodleAccess.RemoveAny);
-        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.RemoveAnyMoodles, ref canRemoveAny, UiService.DisableUI))
-            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultMoodleAccess), curAccess ^ MoodleAccess.RemoveAny));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.RemoveAnyMoodlesTT);
+        var canRemoveAny = curAccess.HasAny(LociAccess.RemoveAny);
+        if (CkGui.Checkbox(CkLoc.Settings.MainOptions.RemoveAnyLociStatuses, ref canRemoveAny, UiService.DisableUI))
+            UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.RemoveAny));
+        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.RemoveAnyLociStatusesTT);
     }
 
 

@@ -4,10 +4,12 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using Microsoft.Extensions.Hosting;
 using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using System.Diagnostics.CodeAnalysis;
+using static Sundouleia.DrawSystem.SorterExtensions;
 
 namespace Sundouleia.Watchers;
 
@@ -17,35 +19,38 @@ namespace Sundouleia.Watchers;
 ///     This allows us to cache an address that we can guarantee will always be the current 
 ///     valid state without checking every tick. <para />
 /// </summary>
-public class CharaObjectWatcher : DisposableMediatorSubscriberBase
+public unsafe class CharaWatcher : IHostedService
 {
     internal Hook<Character.Delegates.OnInitialize> OnCharaInitializeHook;
     internal Hook<Character.Delegates.Dtor> OnCharaDestroyHook;
     internal Hook<Character.Delegates.Terminate> OnCharaTerminateHook;
 
+    private readonly ILogger<CharaWatcher> _logger;
+    private readonly SundouleiaMediator _mediator;
+
     private readonly CancellationTokenSource _runtimeCTS = new();
 
-    public unsafe CharaObjectWatcher(ILogger<CharaObjectWatcher> logger, SundouleiaMediator mediator)
-        : base(logger, mediator)
+    public unsafe CharaWatcher(ILogger<CharaWatcher> logger, SundouleiaMediator mediator)
     {
+        _logger = logger;
+        _mediator = mediator;
+
         OnCharaInitializeHook = Svc.Hook.HookFromAddress<Character.Delegates.OnInitialize>((nint)Character.StaticVirtualTablePointer->OnInitialize, InitializeCharacter);
         OnCharaTerminateHook = Svc.Hook.HookFromAddress<Character.Delegates.Terminate>((nint)Character.StaticVirtualTablePointer->Terminate, TerminateCharacter);
         OnCharaDestroyHook = Svc.Hook.HookFromAddress<Character.Delegates.Dtor>((nint)Character.StaticVirtualTablePointer->Dtor, DestroyCharacter);
-
+        
         OnCharaInitializeHook.SafeEnable();
         OnCharaTerminateHook.SafeEnable();
         OnCharaDestroyHook.SafeEnable();
-
-        // Collect data from existing objects
-        CollectInitialData();
     }
 
     // A persistent static cache holding all rendered Character pointers.
     public static HashSet<nint> RenderedCharas { get; private set; } = new();
-    public static HashSet<nint> RenderedCompanions { get; private set; } = new();
+    public static HashSet<nint> RenderedCompanions { get; private set; } = new(); // Unused ATM
     public static HashSet<nint> GPoseActors { get; private set; } = new();
 
     // Public, Accessible, Managed pointer address to Owned Object addresses
+    // (Revise this maybe. I dont really like it.)
     public ConcurrentDictionary<nint, OwnedObject> WatchedTypes { get; private set; } = new();
     public HashSet<nint> CurrentOwned { get; private set; } = new();
     public nint WatchedPlayerAddr { get; private set; } = IntPtr.Zero;
@@ -53,9 +58,15 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     public nint WatchedPetAddr { get; private set; } = IntPtr.Zero;
     public nint WatchedCompanionAddr { get; private set; } = IntPtr.Zero;
 
-    protected override void Dispose(bool disposing)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        base.Dispose(disposing);
+        // Collect data from existing objects
+        CollectInitialData();
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
         // Cancel, but do not dispose, the token.
         _runtimeCTS.SafeCancel();
 
@@ -66,8 +77,50 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         RenderedCharas.Clear();
         RenderedCompanions.Clear();
         WatchedTypes.Clear();
+        return Task.CompletedTask;
     }
 
+    public static bool TryGetFirst(Func<Character, bool> predicate, [NotNullWhen(true)] out nint charaAddr)
+    {
+        foreach (Character* addr in RenderedCharas)
+        {
+            if (predicate(*addr))
+            {
+                charaAddr = (nint)addr;
+                return true;
+            }
+        }
+        charaAddr = nint.Zero;
+        return false;
+    }
+
+    public static unsafe bool TryGetFirstUnsafe(Func<Character, bool> predicate, [NotNullWhen(true)] out Character* character)
+    {
+        foreach (Character* addr in RenderedCharas)
+        {
+            if (predicate(*addr))
+            {
+                character = addr;
+                return true;
+            }
+        }
+        character = null;
+        return false;
+    }
+
+    /// <summary>
+    ///     Obtain a Character* if rendered, returning false otherwise.
+    /// </summary>
+    public static unsafe bool TryGetValue(nint address, [NotNullWhen(true)] out Character* character)
+    {
+        if (RenderedCharas.Contains(address))
+        {
+            character = (Character*)address;
+            return true;
+        }
+        character = null;
+        return false;
+    }
 
     /// <summary>
     ///     Determine if the Sundesmo PlayerHandler is currently rendered. <para />
@@ -171,9 +224,13 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         {
             GameObject* obj = objManager->Objects.IndexSorted[i];
             if (obj is null) continue;
+            // Only process characters.
+            if (!obj->IsCharacter()) continue;
+
+            Character* chara = (Character*)obj;
             // this is confusing because sometimes these can be either?
-            if (obj->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
-                NewCharacterRendered(obj);
+            if (chara->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
+                NewCharacterRendered(chara);
         }
 
         // If in GPose, collect all GPose actors.
@@ -183,9 +240,13 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
             {
                 GameObject* obj = objManager->Objects.IndexSorted[i];
                 if (obj is null) continue;
+                // Only process characters.
+                if (!obj->IsCharacter()) continue;
+
+                Character* chara = (Character*)obj;
                 // Look into further maybe, idk.
-                if (obj->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
-                    NewCharacterRendered(obj);
+                if (chara->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
+                    NewCharacterRendered(chara);
             }
         }
     }
@@ -195,25 +256,52 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
     ///     wishing to detect created objects. <para />
     ///     Doing so will ensure any final lines are processed prior to the address invalidating.
     /// </summary>
-    private unsafe void NewCharacterRendered(GameObject* chara)
+    private unsafe void NewCharacterRendered(Character* chara)
     {
         var address = (nint)chara;
-
         // Do not track if not a valid object type. (Maybe move to after gpose actor adding)
         if (chara->GetObjectKind() is not (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
             return;
-        
         // For GPose actors.
-        if (chara->ObjectIndex > 200 && GameMain.IsInGPose())
-        {
-            Logger.LogDebug($"New GPose Character Rendered: {(nint)chara:X} - {chara->NameString}", LoggerType.OwnedObjects);
-            GPoseActors.Add(address);
-            Mediator.Publish(new GPoseObjectCreated(address));
+        if (TryAddGPoseActor(chara))
             return;
-        }
 
-        // Other Actors.
-        Logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}", LoggerType.OwnedObjects);
+        // Other Actors
+        _logger.LogDebug($"New Character Rendered: {(nint)chara:X} - {chara->GetName()}", LoggerType.OwnedObjects);
+        MaybeAddOwnedObject(chara);
+        RenderedCharas.Add(address);
+        _mediator.Publish(new WatchedObjectCreated(address));
+    }
+
+    private unsafe void CharacterRemoved(Character* chara)
+    {
+        var address = (nint)chara;
+        // For GPose actors.
+        if (TryRemoveGPoseActor(chara))
+            return;
+
+        // Other Actors
+        MaybeRemOwnedObject(chara);
+        _logger.LogDebug($"Character Removed: {(nint)chara:X} - {chara->GetName()}", LoggerType.OwnedObjects);
+        RenderedCharas.Remove(address);
+        _mediator.Publish(new WatchedObjectDestroyed(address));
+    }
+
+    #region Add Helpers
+    private unsafe bool TryAddGPoseActor(Character* chara)
+    {
+        if (chara->ObjectIndex <= 200 || !GameMain.IsInGPose())
+            return false;
+        if (!GPoseActors.Add((nint)chara))
+            return false;
+        _logger.LogDebug($"GPose Chara Rendered: {(nint)chara:X} - {chara->NameString}", LoggerType.OwnedObjects);
+        _mediator.Publish(new GPoseObjectCreated((nint)chara));
+        return true;
+    }
+
+    private unsafe void MaybeAddOwnedObject(Character* chara)
+    {
+        var address = (nint)chara;
         if (address == OwnedObjects.PlayerAddress)
         {
             AddOwnedObject(OwnedObject.Player, address);
@@ -234,30 +322,31 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
             AddOwnedObject(OwnedObject.Companion, address);
             WatchedCompanionAddr = address;
         }
-        // Otherwise, it is a non-client owned object.
-        else
+
+        void AddOwnedObject(OwnedObject kind, nint address)
         {
-            RenderedCharas.Add(address);
-            Mediator.Publish(new WatchedObjectCreated(address));
+            if (WatchedTypes.TryAdd(address, kind))
+            {
+                CurrentOwned.Add(address);
+                _mediator.Publish(new OwnedObjectCreated(kind, address));
+            }
         }
     }
+    #endregion Add Helpers
 
-    private unsafe void CharacterRemoved(GameObject* chara)
+    #region Remove Helpers
+    private unsafe bool TryRemoveGPoseActor(Character* chara)
+    {
+        if (!GPoseActors.Remove((nint)chara))
+            return false;
+        _logger.LogDebug($"GPose Chara Removed: {(nint)chara:X} - {chara->NameString}", LoggerType.OwnedObjects);
+        _mediator.Publish(new GPoseObjectDestroyed((nint)chara, *chara));
+        return true;
+    }
+
+    private unsafe void MaybeRemOwnedObject(Character* chara)
     {
         var address = (nint)chara;
-
-        // For GPose actors.
-        if (GPoseActors.Remove(address))
-        {
-            Logger.LogDebug($"GPose Character Removed: {(nint)chara:X} - {chara->NameString}", LoggerType.OwnedObjects);
-            // Include a snapshot of the data at time of destruction so we can properly get data
-            // such as the namestring after destruction.
-            Mediator.Publish(new GPoseObjectDestroyed(address, *chara));
-            return;
-        }
-
-        // Other Actors.
-        Logger.LogDebug($"Character Removed: {(nint)chara:X} - {chara->GetName()}", LoggerType.OwnedObjects);
         if (address == WatchedPlayerAddr)
         {
             RemoveOwnedObject(OwnedObject.Player, address);
@@ -278,54 +367,39 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
             RemoveOwnedObject(OwnedObject.Companion, address);
             WatchedCompanionAddr = IntPtr.Zero;
         }
-        // For other actors.
-        else
+
+        // Could lead to some WatchedXAddr being out of state?
+        void RemoveOwnedObject(OwnedObject kind, nint address)
         {
-            RenderedCharas.Remove(address);
-            Mediator.Publish(new WatchedObjectDestroyed(address));
+            if (WatchedTypes.TryRemove(address, out _))
+            {
+                CurrentOwned.Remove(address);
+                _mediator.Publish(new OwnedObjectDestroyed(kind, address));
+            }
         }
     }
 
-    private void AddOwnedObject(OwnedObject kind, nint address)
-    {
-        Logger.LogDebug($"OwnedObject Rendered: {kind} - {address:X}", LoggerType.OwnedObjects);
-        if (WatchedTypes.TryAdd(address, kind))
-        {
-            CurrentOwned.Add(address);
-            Mediator.Publish(new OwnedObjectCreated(kind, address));
-        }
-    }
-
-    private void RemoveOwnedObject(OwnedObject kind, nint address)
-    {
-        Logger.LogDebug($"OwnedObject Removed: {kind} - {address:X}", LoggerType.OwnedObjects);
-        if (WatchedTypes.TryRemove(address, out _))
-        {
-            CurrentOwned.Remove(address);
-            Mediator.Publish(new OwnedObjectDestroyed(kind, address));
-        }
-    }
-
+    #endregion Remove Helpers
     // Init with original first, than handle so it is present in our other lookups.
     private unsafe void InitializeCharacter(Character* chara)
     {
         try { OnCharaInitializeHook!.OriginalDisposeSafe(chara); }
-        catch (Exception e) { Logger.LogError($"Error: {e}"); }
-        Svc.Framework.Run(() => NewCharacterRendered((GameObject*)chara));
+        catch (Exception e) { _logger.LogError($"Error: {e}"); }
+        Svc.Framework.Run(() => NewCharacterRendered(chara));
     }
 
     private unsafe void TerminateCharacter(Character* chara)
     {
-        CharacterRemoved((GameObject*)chara);
+        CharacterRemoved(chara);
         try { OnCharaTerminateHook!.OriginalDisposeSafe(chara); }
-        catch (Exception e) { Logger.LogError($"Error: {e}"); }
+        catch (Exception e) { _logger.LogError($"Error: {e}"); }
     }
 
     private unsafe GameObject* DestroyCharacter(Character* chara, byte freeMemory)
     {
-        CharacterRemoved((GameObject*)chara);
+        CharacterRemoved(chara);
         try { return OnCharaDestroyHook!.OriginalDisposeSafe(chara, freeMemory); }
-        catch (Exception e) { Logger.LogError($"Error: {e}"); return null; }
+        catch (Exception e) { _logger.LogError($"Error: {e}"); return null; }
     }
 
     public unsafe bool TryFindOwnedObjectByIdx(ushort objectIdx, [MaybeNullWhen(false)] out OwnedObject ownedObject)
@@ -352,41 +426,5 @@ public class CharaObjectWatcher : DisposableMediatorSubscriberBase
         }
         ownedObject = default;
         return false;
-    }
-
-    public async Task WaitForFullyLoadedGameObject(IntPtr address, CancellationToken timeoutToken = default)
-    {
-        if (address == IntPtr.Zero) throw new ArgumentException("Address cannot be null.", nameof(address));
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(timeoutToken, _runtimeCTS.Token);
-        while (!cts.IsCancellationRequested)
-        {
-            // Yes, our clients loading state also impacts anyone else's loading. (that or we are faster than dalamud's object table)
-            if (!PlayerData.IsZoning && IsObjectLoaded(address))
-                return;
-            await Task.Delay(100).ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>
-    ///     There are conditions where an object can be rendered / created, but not drawable, or currently bring drawn. <para />
-    ///     This mainly occurs on login or when transferring between zones, but can also occur during redraws and such.
-    ///     We can get around this by checking for various draw conditions.
-    /// </summary>
-    public unsafe bool IsObjectLoaded(IntPtr gameObjectAddress)
-    {
-        var gameObj = (GameObject*)gameObjectAddress;
-        // Invalid address.
-        if (gameObjectAddress == IntPtr.Zero) return false;
-        // DrawObject does not exist yet.
-        if ((IntPtr)gameObj->DrawObject == IntPtr.Zero) return false;
-        // RenderFlags are marked as 'still loading'.
-        if ((ulong)gameObj->RenderFlags == 2048) return false;
-        // There are models loaded into slots, still being applied.
-        if(((CharacterBase*)gameObj->DrawObject)->HasModelInSlotLoaded != 0) return false;
-        // There are model files loaded into slots, still being applied.
-        if (((CharacterBase*)gameObj->DrawObject)->HasModelFilesInSlotLoaded != 0) return false;
-        // Object is fully loaded.
-        return true;
     }
 }

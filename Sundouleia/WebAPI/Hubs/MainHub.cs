@@ -30,8 +30,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly RadarManager _radar;
-    private readonly IpcCallerMoodles _moodles;
-    private readonly IpcProvider _ipcProvider;
+    private readonly IpcManager _ipc;
 
     // Static private accessors (persistent across singleton instantiations for other static accessors.)
     private static ServerState _serverStatus = ServerState.Offline;
@@ -59,8 +58,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         RequestsManager requests,
         SundesmoManager sundesmos,
         RadarManager radar,
-        IpcCallerMoodles moodles,
-        IpcProvider ipcProvider)
+        IpcManager ipc)
         : base(logger, mediator)
     {
         _folders = folders;
@@ -70,8 +68,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         _requests = requests;
         _sundesmos = sundesmos;
         _radar = radar;
-        _moodles = moodles;
-        _ipcProvider = ipcProvider;
+        _ipc = ipc;
 
         // Subscribe to the things.
         Mediator.Subscribe<ClosedMessage>(this, _ => HubInstanceOnClosed(_.Exception));
@@ -203,15 +200,15 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         OnBlocked(dto => _ = Callback_Blocked(dto));
         OnUnblocked(dto => _ = Callback_Unblocked(dto));
 
-        OnPairMoodleDataUpdated(dto => _ = Callback_PairMoodleDataUpdated(dto));
-        OnPairMoodleStatusesUpdate(dto => _ = Callback_PairMoodleStatusesUpdate(dto));
-        OnPairMoodlePresetsUpdate(dto => _ = Callback_PairMoodlePresetsUpdate(dto));
-        OnPairMoodleStatusModified(dto => _ = Callback_PairMoodleStatusModified(dto));
-        OnPairMoodlePresetModified(dto => _ = Callback_PairMoodlePresetModified(dto));
+        OnPairLociDataUpdated(dto => _ = Callback_PairLociDataUpdated(dto));
+        OnPairLociStatusesUpdate(dto => _ = Callback_PairLociStatusesUpdate(dto));
+        OnPairLociPresetsUpdate(dto => _ = Callback_PairLociPresetsUpdate(dto));
+        OnPairLociStatusModified(dto => _ = Callback_PairLociStatusModified(dto));
+        OnPairLociPresetModified(dto => _ = Callback_PairLociPresetModified(dto));
 
-        OnApplyMoodleId(dto => _ = Callback_ApplyMoodleId(dto));
-        OnApplyMoodleStatus(dto => _ = Callback_ApplyMoodleStatus(dto));
-        OnRemoveMoodleId(dto => _ = Callback_RemoveMoodleId(dto));
+        OnApplyLociDataById(dto => _ = Callback_ApplyLociDataById(dto));
+        OnApplyLociStatus(dto => _ = Callback_ApplyLociStatus(dto));
+        OnRemoveLociData(dto => _ = Callback_RemoveLociData(dto));
 
         OnIpcUpdateFull(dto => _ = Callback_IpcUpdateFull(dto));
         OnIpcUpdateMods(dto => _ = Callback_IpcUpdateMods(dto));

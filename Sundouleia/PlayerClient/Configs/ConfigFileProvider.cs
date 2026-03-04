@@ -1,9 +1,6 @@
 using CkCommons.HybridSaver;
 
-namespace Sundouleia.Services.Configs;
-
-/// <summary> Any file type that we want to let the HybridSaveService handle </summary>
-public interface IHybridSavable : IHybridConfig<ConfigFileProvider> { }
+namespace Sundouleia;
 
 /// <summary> Helps encapsulate all the configuration file names into a single place. </summary>
 public class ConfigFileProvider : IConfigFileProvider
@@ -20,6 +17,7 @@ public class ConfigFileProvider : IConfigFileProvider
     
     // Shared Configs
     public readonly string MainConfig;
+    public readonly string LociConfig;
     public readonly string OwnedSMAFilesConfig;
     public readonly string RecentChatLog;
     public readonly string Favorites;
@@ -34,10 +32,11 @@ public class ConfigFileProvider : IConfigFileProvider
     // Shared FileSystem Configs.
     public string DDS_Requests => Path.Combine(FileSysDirectory, "dds-requests.json");
     public string DDS_Whitelist => Path.Combine(FileSysDirectory, "dds-whitelist.json");
-
+    public string DDS_Radar => Path.Combine(FileSysDirectory, "dds-radar.json");
+    public string CKFS_Statuses => Path.Combine(FileSysDirectory, "fs-statuses.json");
+    public string CKFS_Presets => Path.Combine(FileSysDirectory, "fs-presets.json");
     // Maybe Maybe not? Unsure how I want to display this yet.
     public string DDS_MCDFData => Path.Combine(FileSysDirectory, "dds-mcdfdata.json");
-    public string DDS_Radar => Path.Combine(FileSysDirectory, "dds-radar.json");
 
     // Per Account-Profile Configs.
     public string DDS_Groups => Path.Combine(CurrentProfileDirectory, "dds-groups.json");
@@ -64,6 +63,7 @@ public class ConfigFileProvider : IConfigFileProvider
 
         // Configs.
         MainConfig = Path.Combine(SundouleiaDirectory, "config.json");
+        LociConfig = Path.Combine(SundouleiaDirectory, "lociData.json");
         OwnedSMAFilesConfig = Path.Combine(SundouleiaDirectory, "ownedsmafiles.json");
         TransientCache = Path.Combine(SundouleiaDirectory, "transientcache.json");
         PlzNoCrashFriends = Path.Combine(SundouleiaDirectory, "plznocrashfriends.json");

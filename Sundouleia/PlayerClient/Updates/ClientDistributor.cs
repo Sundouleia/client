@@ -1,4 +1,5 @@
 using CkCommons;
+using NAudio.SoundFont;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
@@ -22,11 +23,13 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     private readonly MainConfig _config;
     private readonly AccountConfig _account;
     private readonly IpcManager _ipc;
+    private readonly IpcProvider _ipcProvider;
     private readonly FileUploader _fileUploader;
     private readonly LimboStateManager _limbo;
+    private readonly LociManager _loci;
     private readonly ModdedStateManager _moddedState;
     private readonly SundesmoManager _sundesmos;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
     private readonly ClientUpdateService _updater;
 
     /// <summary>
@@ -35,24 +38,23 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     private bool _hubConnectionSent = false;
 
     public ClientDistributor(ILogger<ClientDistributor> logger, SundouleiaMediator mediator,
-        MainHub hub, MainConfig config, AccountConfig account, IpcManager ipc, 
-        FileUploader fileUploader, LimboStateManager limbo, ModdedStateManager moddedState, 
-        SundesmoManager sundesmos, CharaObjectWatcher watcher, ClientUpdateService updater)
+        MainHub hub, MainConfig config, AccountConfig account, IpcManager ipc, IpcProvider provider, 
+        FileUploader fileUploader, LimboStateManager limbo, ModdedStateManager moddedState,
+        LociManager loci, SundesmoManager sundesmos, CharaWatcher watcher, ClientUpdateService updater)
         : base(logger, mediator)
     {
         _hub = hub;
         _config = config;
         _account = account;
         _ipc = ipc;
+        _ipcProvider = provider;
         _fileUploader = fileUploader;
         _limbo = limbo;
+        _loci = loci;
         _moddedState = moddedState;
         _sundesmos = sundesmos;
         _watcher = watcher;
         _updater = updater;
-
-        // Process applyToPair change.
-        Mediator.Subscribe<MoodlesApplyStatusToPair>(this, _ => ApplyStatusTuplesToSundesmo(_.ApplyStatusTupleDto).ConfigureAwait(false));
         // Process connections.
         Mediator.Subscribe<ConnectedMessage>(this, _ =>
         {
@@ -81,40 +83,69 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, _ => UpdateCheck());
     }
 
-    #region Moodles
-    private async Task ApplyStatusTuplesToSundesmo(ApplyMoodleStatus dto)
+    #region Loci
+    // Effectively a relay from our client's ApplyToTarget -> Over to the server telling the Sundesmo to apply it to themselves.
+    public async Task PushLociApplyToTarget(UserData user, IEnumerable<LociStatusInfo> data)
     {
-        Logger.LogDebug($"Pushing ApplyMoodlesByStatus to: {dto.User.AliasOrUID}", LoggerType.DataDistributor);
-        if (await _hub.UserApplyMoodleTuples(dto).ConfigureAwait(false) is { } res && res.ErrorCode is not SundouleiaApiEc.Success)
-            Logger.LogError($"Failed to push ApplyMoodlesByStatus to server. [{res.ErrorCode}]");
+        Logger.LogDebug($"Pushing ApplyLociStatus to: {user.AliasOrUID}", LoggerType.DataDistributor);
+        if (await _hub.UserApplyLociStatusTuples(new(user, data)).ConfigureAwait(false) is { } res && res.ErrorCode is not SundouleiaApiEc.Success)
+            Logger.LogError($"Failed to push ApplyLociStatus to server. [{res.ErrorCode}]");
         else
-            Logger.LogDebug($"Successfully pushed ApplyMoodlesByStatus to the server", LoggerType.DataDistributor);
+            Logger.LogDebug($"Successfully pushed ApplyLociStatus to the server", LoggerType.DataDistributor);
     }
 
-    public async Task PushMoodlesData(List<UserData> trustedUsers)
+    public async Task PushLociData(List<UserData> trustedUsers)
     {
         if (!MainHub.IsConnectionDataSynced)
             return;
-        Logger.LogDebug($"Pushing MoodlesData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-        await _hub.UserPushMoodlesData(new(trustedUsers, ClientMoodles.Data));
+        // Compile to sharable data
+        var toSend = new LociData()
+        {
+            DataInfo = LociManager.ClientSM.Statuses.Select(s => s.ToTuple()).ToDictionary(s => s.GUID),
+            Statuses = _loci.SavedStatuses.Select(s => s.ToTuple()).ToDictionary(s => s.GUID),
+            Presets = _loci.SavedPresets.Select(p => p.ToTuple()).ToDictionary(p => p.GUID)
+        };
+        try
+        {
+            Logger.LogDebug($"Pushing LociData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+            await _hub.UserPushLociData(new(trustedUsers, toSend));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error pushing LociData: {ex}");
+        }
     }
 
-    public async Task PushMoodleStatusUpdate(List<UserData> trustedUsers, MoodlesStatusInfo status, bool wasDeleted)
+    public async Task PushLociStatusUpdate(List<UserData> trustedUsers, LociStatusInfo status, bool wasDeleted)
     {
         if (!MainHub.IsConnectionDataSynced)
             return;
-        Logger.LogTrace($"Pushing StatusUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-        await _hub.UserPushStatusModified(new(trustedUsers, status, wasDeleted));
+        try
+        {
+            Logger.LogTrace($"Pushing StatusUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+            await _hub.UserPushStatusModified(new(trustedUsers, status, wasDeleted));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during PushStatusUpdate: {ex}");
+        }
     }
 
-    public async Task PushMoodlePresetUpdate(List<UserData> trustedUsers, MoodlePresetInfo preset, bool wasDeleted)
+    public async Task PushLociPresetUpdate(List<UserData> trustedUsers, LociPresetInfo preset, bool wasDeleted)
     {
         if (!MainHub.IsConnectionDataSynced)
             return;
-        Logger.LogTrace($"Pushing PresetUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-        await _hub.UserPushPresetModified(new(trustedUsers, preset, wasDeleted));
+        try
+        {
+            Logger.LogTrace($"Pushing PresetUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+            await _hub.UserPushPresetModified(new(trustedUsers, preset, wasDeleted));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error during PushPresetUpdate: {ex}");
+        }
     }
-    #endregion Moodles
+    #endregion Loci
 
     // Only entry point where we ignore timeout states.
     // If this gets abused through we can very easily add timeout functionality here too.
@@ -127,7 +158,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             _updater.LatestData.GlamourerState[OwnedObject.Player] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.CPlusState[OwnedObject.Player] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-            _updater.LatestData.Moodles = await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.Loci = await _ipc.LociGetOwnManager().ConfigureAwait(false);
             _updater.LatestData.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
             _updater.LatestData.GlamourerState[OwnedObject.MinionOrMount] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
@@ -215,11 +246,11 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             if (res.ErrorCode is 0 && res.Value is { } toUpload && toUpload.Count > 0)
                 _ = UploadAndPushMissingMods(recipients, toUpload).ConfigureAwait(false);
 
-            // If the IPC had moodles in it, send that too.
-            if (_sundesmos.GetMoodleTrusted(recipients) is { } moodleUsers && moodleUsers.Count > 0)
+            // If the IPC had locis in it, send that too.
+            if (_sundesmos.GetLociTrustedUsers(recipients) is { } users && users.Count > 0)
             {
-                Logger.LogDebug($"(ResendAll) Pushing MoodlesData to {moodleUsers.Count} trusted users.", LoggerType.DataDistributor);
-                await PushMoodlesData(moodleUsers).ConfigureAwait(false);
+                Logger.LogDebug($"(ResendAll) Pushing LociData to {users.Count} trusted users.", LoggerType.DataDistributor);
+                await PushLociData(users).ConfigureAwait(false);
             }
         });
     }
@@ -409,7 +440,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         if (toUpdate.HasAny(IpcKind.ModManips)) data.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
 
         if (toUpdate.HasAny(IpcKind.Heels)) data.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-        if (toUpdate.HasAny(IpcKind.Moodles)) data.Moodles = await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false) ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.Loci)) data.Loci = await _ipc.LociGetOwnManager().ConfigureAwait(false);
         if (toUpdate.HasAny(IpcKind.Honorific)) data.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.PetNames)) data.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
     }
@@ -422,7 +453,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             IpcKind.Glamourer => await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty,
             IpcKind.CPlus => await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty,
             IpcKind.Heels => await _ipc.Heels.GetClientOffset().ConfigureAwait(false),
-            IpcKind.Moodles => await _ipc.Moodles.GetOwnDataStr().ConfigureAwait(false),
+            IpcKind.Loci => await _ipc.LociGetOwnManager().ConfigureAwait(false),
             IpcKind.Honorific => await _ipc.Honorific.GetTitle().ConfigureAwait(false),
             IpcKind.PetNames => _ipc.PetNames.GetPetNicknames(),
             _ => string.Empty,

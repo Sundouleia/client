@@ -17,12 +17,12 @@ namespace Sundouleia.Services;
 public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
 {
     private readonly IpcManager _ipc;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
     private readonly ClientUpdateService _updater;
     private readonly ClientDistributor _distributor;
 
     public ClientUpdateHandler(ILogger<ClientUpdateHandler> logger, SundouleiaMediator mediator,
-        IpcManager ipc, CharaObjectWatcher watcher, ClientUpdateService updater,
+        IpcManager ipc, CharaWatcher watcher, ClientUpdateService updater,
         ClientDistributor distributor)
         : base(logger, mediator)
     {
@@ -40,10 +40,10 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _ipc.Glamourer.OnStateChanged.Enable();
         _ipc.CustomizePlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
         _ipc.Heels.OnOffsetUpdate.Subscribe(OnHeelsOffsetUpdate);
-        _ipc.Moodles.OnStatusManagerModified.Subscribe(OnMoodlesUpdate);
         _ipc.Honorific.OnTitleChange.Subscribe(OnHonorificUpdate);
         _ipc.PetNames.OnNicknamesChanged.Subscribe(OnPetNamesUpdate);
 
+        IpcProviderLoci.OnSMModifiedCalled += OnLociUpdate;
         Svc.Framework.Update += OnUpdateTick;
     }
 
@@ -56,10 +56,10 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _ipc.Glamourer.OnStateChanged?.Dispose();
         _ipc.CustomizePlus.OnProfileUpdate.Unsubscribe(OnCPlusProfileUpdate);
         _ipc.Heels.OnOffsetUpdate.Unsubscribe(OnHeelsOffsetUpdate);
-        _ipc.Moodles.OnStatusManagerModified.Unsubscribe(OnMoodlesUpdate);
         _ipc.Honorific.OnTitleChange.Unsubscribe(OnHonorificUpdate);
         _ipc.PetNames.OnNicknamesChanged.Unsubscribe(OnPetNamesUpdate);
         Svc.Framework.Update -= OnUpdateTick;
+        IpcProviderLoci.OnSMModifiedCalled -= OnLociUpdate;
     }
 
 
@@ -169,7 +169,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
     private void OnCPlusProfileUpdate(ushort objIdx, Guid id)
     {
         var address = Svc.Objects[objIdx]?.Address ?? IntPtr.Zero;
-        Svc.Logger.Warning($"CPlus Update on objIdx {objIdx} with id {id}, resolved address {address}");
+        Logger.LogTrace($"CPlus Update on objIdx {objIdx} with id {id}, resolved address {address}", LoggerType.IpcCustomize);
         if (!_watcher.WatchedTypes.TryGetValue(address, out var type))
             return;
         _updater.AddPendingUpdate(type, IpcKind.CPlus);
@@ -182,11 +182,11 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Heels);
     }
 
-    private void OnMoodlesUpdate(nint playerAddr)
+    private void OnLociUpdate(nint playerAddr)
     {
         if (playerAddr != _watcher.WatchedPlayerAddr)
             return;
-        _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Moodles);
+        _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Loci);
     }
 
     private void OnHonorificUpdate(string newTitle)

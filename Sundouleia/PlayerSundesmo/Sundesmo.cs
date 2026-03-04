@@ -26,10 +26,9 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
 {
     private readonly MainConfig _config;
     private readonly FolderConfig _folderConfig;
-    private readonly FavoritesConfig _favorites;
     private readonly NicksConfig _nicks;
     private readonly LimboStateManager _limboManager;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
     private readonly RedrawManager _redrawer;
 
     // Associated Player Data (Created once online).
@@ -42,13 +41,12 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     private PlayerOwnedHandler _companion;
 
     public Sundesmo(UserPair userPairInfo, ILogger<Sundesmo> logger, SundouleiaMediator mediator,
-        MainConfig config, FolderConfig folderConfig, FavoritesConfig favorites, NicksConfig nicks,
-        SundesmoHandlerFactory factory, LimboStateManager limbo, CharaObjectWatcher watcher)
+        MainConfig config, FolderConfig folderConfig, NicksConfig nicks, SundesmoHandlerFactory factory, 
+        LimboStateManager limbo, CharaWatcher watcher)
         : base(logger, mediator)
     {
         _config = config;
         _folderConfig = folderConfig;
-        _favorites = favorites;
         _nicks = nicks;
         _limboManager = limbo;
         _watcher = watcher;
@@ -93,8 +91,8 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     public GlobalPerms  PairGlobals => UserPair.Globals;
     public PairPerms    PairPerms   => UserPair.Perms;
 
-    // Shared MoodleData. Fresh / empty if not shared.
-    public MoodleData   SharedData { get; private set; } = new();
+    // Shared LociData. Fresh / empty if not shared.
+    public LociData SharedData { get; private set; } = new();
 
     // Internal Helpers
     public bool IsReloading { get; private set; } = false;
@@ -102,7 +100,7 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     public bool IsTemporary => UserPair.IsTemporary;
     public bool IsRendered => _player.IsRendered;
     public bool IsOnline => _onlineUser != null;
-    public bool IsFavorite => _favorites.SundesmoUids.Contains(UserData.UID);
+    public bool IsFavorite => FavoritesConfig.SundesmoUids.Contains(UserData.UID);
     public bool IsPaused => OwnPerms.PauseVisuals;
     public string Ident => _onlineUser?.Ident ?? string.Empty;
     public string PlayerName => _player.NameString;
@@ -132,17 +130,13 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
         return condition ? PlayerName : GetNickAliasOrUid();
     }
 
-    public string? GetNickname() => _nicks.GetNicknameForUid(UserData.UID);
-    public string GetNickAliasOrUid() => _nicks.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
+    public string? GetNickname()
+        => _nicks.GetNicknameForUid(UserData.UID);
+    
+    public string GetNickAliasOrUid()
+        => _nicks.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
 
-    public IPCMoodleAccessTuple ToAccessTuple()
-    {
-        return new IPCMoodleAccessTuple(
-            OwnPerms.MoodleAccess, (long)OwnPerms.MaxMoodleTime.TotalMilliseconds,
-            PairPerms.MoodleAccess, (long)PairPerms.MaxMoodleTime.TotalMilliseconds);
-    }
-
-    public void SetMoodleData(MoodleData newData)
+    public void SetLociData(LociData newData)
         => SharedData = newData;
 
     public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)

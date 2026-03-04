@@ -6,13 +6,13 @@ using Sundouleia.WebAPI;
 
 namespace Sundouleia.CustomCombos;
 
-public abstract class MoodleComboBase<T> : CkFilterComboCache<T>
+public abstract class LociComboBase<T> : CkFilterComboCache<T>
 {
     protected readonly MainHub _hub;
     protected readonly Sundesmo _sundesmo;
     protected float IconScale;
 
-    protected MoodleComboBase(ILogger log, MainHub hub, Sundesmo sundesmo, float scale, 
+    protected LociComboBase(ILogger log, MainHub hub, Sundesmo sundesmo, float scale, 
         Func<IReadOnlyList<T>> generator) : base(generator, log)
     {
         _hub = hub;
@@ -22,7 +22,7 @@ public abstract class MoodleComboBase<T> : CkFilterComboCache<T>
         Current = default;
     }
 
-    protected virtual Vector2 IconSize => MoodleIcon.Size * IconScale;
+    protected virtual Vector2 IconSize => LociIcon.Size * IconScale;
 
     /// <summary> The condition that when met, prevents the combo from being interacted. </summary>
     protected abstract bool DisableCondition();

@@ -24,12 +24,9 @@ public record HonorificTitleChanged(string NewTitle) : MessageBase;
 public record PetNamesReady : MessageBase;
 public record PetNamesDataChanged(string NicknamesData) : MessageBase;
 
-public record MoodlesReady : MessageBase;
-public record MoodlesSMChanged(IntPtr Address) : MessageBase;
-public record MoodleSharePermChanged(Sundesmo Sundesmo) : MessageBase; // Whenever we enable the moodle share permission for another user.
-public record MoodlePermsChanged(Sundesmo Sundesmo) : MessageBase; // The MoodleAccess changes for either side.
-public record MoodlesApplyStatusToPair(ApplyMoodleStatus ApplyStatusTupleDto) : MessageBase;
-
+public record LociStatusManagerChanged(IntPtr Address) : SameThreadMessage; // Could user over actions if we wanted.
+public record LociSharePermChanged(Sundesmo Sundesmo) : MessageBase; // Whenever we enable the loci share permission for another user.
+public record LociPermsChanged(Sundesmo Sundesmo) : MessageBase; // The LociAccess changes for either side.
 
 public record ModelRelatedResourceLoaded(OwnedObject Object) : MessageBase;
 public record TransientResourceLoaded(OwnedObject Object) : MessageBase;

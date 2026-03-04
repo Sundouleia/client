@@ -1,7 +1,9 @@
 using System.Reflection;
 using CkCommons;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Sundouleia.Gui.MainWindow;
 using Sundouleia.ModFiles;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
@@ -14,7 +16,9 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
     private readonly MainConfig _config;
     private readonly AccountConfig _accountConfig;
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private IServiceScope? _runtimeServiceScope;
+
+    private IServiceScope? _lifetimeScope;
+    private IServiceScope? _loginScope;
     private Task? _launchTask;
     public SundouleiaHost(ILogger<SundouleiaHost> logger, SundouleiaMediator mediator, MainConfig mainConfig,
         AccountConfig accounts, IServiceScopeFactory scopeFactory) : base(logger, mediator)
@@ -29,30 +33,29 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
     /// </summary>
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // set the version to the current assembly version
-        var version = Assembly.GetExecutingAssembly().GetName().Version!;
-        // log our version
-        Logger.LogInformation("Launching {name} {major}.{minor}.{build}", "Sundouleia", version.Major, version.Minor, version.Build);
+        var ver = Assembly.GetExecutingAssembly().GetName().Version!;
+        Logger.LogInformation($"Starting Sundouleia v{ver.Major}.{ver.Minor}.{ver.Build}.{ver.Revision}");
 
-        // subscribe to the login and logout messages
+        // Init the plugin lifetime scope.
+        _lifetimeScope = _serviceScopeFactory.CreateScope();
+
+        // Force the construction once on startup.
+        _lifetimeScope.ServiceProvider.GetRequiredService<UiService>();
+        _lifetimeScope.ServiceProvider.GetRequiredService<CommandManager>();
+
+        // Get Login Scoped service events configured
         Svc.ClientState.Login += DalamudUtilOnLogIn;
         Svc.ClientState.Logout += (_, _) => DalamudUtilOnLogOut();
 
-        // subscribe to the main UI message window for making the primary UI be the main UI interface.
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (msg) =>
-        {
-            if (_launchTask is null || _launchTask.IsCompleted)
-                _launchTask = Task.Run(WaitForPlayerAndLaunchCharacterManager);
-        });
+        // Ensure proper startup occurs on the MainUI switch message.
+        Mediator.Subscribe<IntoFinishedMessage>(this, _ => DalamudUtilOnLogIn());
 
         // start processing the mediator queue.
         Mediator.StartQueueProcessing();
 
-        // If already logged in, begin.
         if (PlayerData.IsLoggedIn)
             DalamudUtilOnLogIn();
 
-        // return that the startAsync has been completed.
         return Task.CompletedTask;
     }
 
@@ -62,91 +65,102 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         UnsubscribeAll();
-
         DalamudUtilOnLogOut();
 
         Svc.ClientState.Login -= DalamudUtilOnLogIn;
         Svc.ClientState.Logout -= (_, _) => DalamudUtilOnLogOut();
 
-        Logger.LogDebug("Halting SundouleiaPlugin");
+        Logger.LogDebug("Shutting down Sundouleia");
+        // This could cause some issues.
+        // If it does, just ensure the respective processors stop on the framework thread.
+        _lifetimeScope?.Dispose();
         return Task.CompletedTask;
     }
 
-
+    /// <summary>
+    ///     Ensures all login-scoped services are properly launched on login. <para />
+    /// </summary>
     private void DalamudUtilOnLogIn()
     {
-        Svc.Logger.Debug("Client login");
-        if (_launchTask == null || _launchTask.IsCompleted) _launchTask = Task.Run(WaitForPlayerAndLaunchCharacterManager);
+        if (_launchTask is null || _launchTask.IsCompleted)
+            _launchTask = Task.Run(WaitForPlayerAndLaunchCharacterManager);
     }
 
+    /// <summary>
+    ///     Ensures all login-scoped services are properly disposed of on logout.
+    /// </summary>
     private void DalamudUtilOnLogOut()
     {
-        Svc.Logger.Debug("Client logout");
-        _runtimeServiceScope?.Dispose();
+        Logger.LogDebug("Client logout");
+        _loginScope?.Dispose();
     }
 
-    /// <summary> The Task executed by the launchTask var from the main plugin.cs 
-    /// <para>
-    /// This task will await for the player to be present (they are logged in and visible),
-    /// then will dispose of the runtime service scope and create a new one to fetch
-    /// the required services for our plugin to function as a base level.
-    /// </para>
+    /// <summary>
+    ///     Awaits for the player to become available, then initializes all intended login-scoped services.
     /// </summary>
     private async Task WaitForPlayerAndLaunchCharacterManager()
     {
         // wait for the player to be present
         while (!PlayerData.Available)
         {
-            Svc.Logger.Debug("Waiting for player to be present");
+            Logger.LogDebug("Waiting for player to be present");
             await Task.Delay(100).ConfigureAwait(false);
         }
 
         // then launch the managers for the plugin to function at a base level
         try
         {
-            Svc.Logger.Debug("Launching Managers");
+            Logger.LogDebug("Launching Managers");
             // before we do lets recreate the runtime service scope
-            _runtimeServiceScope?.Dispose();
-            _runtimeServiceScope = _serviceScopeFactory.CreateScope();
+            _loginScope?.Dispose();
+            _loginScope = _serviceScopeFactory.CreateScope();
 
-            // startup services that have no other services that call on them, yet are essential.
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<UiService>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<CommandManager>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<CacheMonitor>();
+            _loginScope.ServiceProvider.GetRequiredService<CacheMonitor>();
 
-            // display changelog if we should.
-            if (_config.Current.LastRunVersion != Assembly.GetExecutingAssembly().GetName().Version!)
-            {
-                // update the version and toggle the UI.
-                Logger?.LogInformation("Version was different, displaying UI");
-                _config.Current.LastRunVersion = Assembly.GetExecutingAssembly().GetName().Version!;
-                _config.Save();
-                // Mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
-            }
-
-            // if the client does not have a valid setup or config, switch to the intro ui
-            if (!_config.HasValidSetup() || !_accountConfig.IsConfigValid())
-            {
-                Logger?.LogDebug("Has Valid Setup: {setup} Has Valid Config: {config}", _config.HasValidSetup(), _accountConfig.IsConfigValid());
-                // publish the switch to intro ui message to the mediator
-                _config.Current.ButtonUsed = false;
-
-                Mediator.Publish(new SwitchToIntroUiMessage());
-            }
+            TryDisplayChangelog();
+            TrySwitchIntroUI();
 
             // get the required service for the online player manager (and notification service if we add it)
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientUpdateService>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientUpdateHandler>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientDistributor>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<RadarDistributor>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<LocationSvc>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<ClientMoodles>();
-            // stuff that should probably be a hosted service but isn't yet.
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<DtrService>();
+            _loginScope.ServiceProvider.GetRequiredService<ClientUpdateService>();
+            _loginScope.ServiceProvider.GetRequiredService<ClientUpdateHandler>();
+            _loginScope.ServiceProvider.GetRequiredService<ClientDistributor>();
+            _loginScope.ServiceProvider.GetRequiredService<RadarDistributor>();
+            _loginScope.ServiceProvider.GetRequiredService<LocationSvc>();
+            _loginScope.ServiceProvider.GetRequiredService<LociMonitor>();
         }
         catch (Bagagwa ex)
         {
             Logger?.LogCritical(ex, "Error during launch of managers");
+        }
+    }
+
+    private void TryDisplayChangelog()
+    {
+        // display changelog if we should.
+        if (_config.Current.LastRunVersion != Assembly.GetExecutingAssembly().GetName().Version!)
+        {
+            // update the version and toggle the UI.
+            Logger?.LogInformation("Version was different, displaying UI");
+            _config.Current.LastRunVersion = Assembly.GetExecutingAssembly().GetName().Version!;
+            _config.Save();
+            // Mediator.Publish(new UiToggleMessage(typeof(ChangelogUI)));
+        }
+    }
+
+    private void TrySwitchIntroUI()
+    {
+        // if the client does not have a valid setup or config, switch to the intro ui
+        if (!_config.HasValidSetup() || !_accountConfig.IsConfigValid())
+        {
+            Logger?.LogDebug("Has Valid Setup: {setup} Has Valid Config: {config}", _config.HasValidSetup(), _accountConfig.IsConfigValid());
+            // publish the switch to intro ui message to the mediator
+            _config.Current.ButtonUsed = false;
+
+            Mediator.Publish(new SwitchToIntroUiMessage());
+        }
+        else if (_config.Current.OpenUiOnStartup)
+        {
+            Mediator.Publish(new UiToggleMessage(typeof(MainUI)));
         }
     }
 }

@@ -18,10 +18,10 @@ public class RadarDistributor : DisposableMediatorSubscriberBase
     private readonly MainHub _hub;
     private readonly MainConfig _config;
     private readonly RadarManager _manager;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
 
     public RadarDistributor(ILogger<RadarDistributor> logger, SundouleiaMediator mediator,
-        MainHub hub, MainConfig config, RadarManager manager, CharaObjectWatcher watcher)
+        MainHub hub, MainConfig config, RadarManager manager, CharaWatcher watcher)
         : base(logger, mediator)
     {
         _hub = hub;

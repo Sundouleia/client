@@ -3,7 +3,7 @@
     <!--Basic Plugin Definitions-->
     <PropertyGroup>
         <Copyright>Copyright © 2025</Copyright>
-        <Version>0.4.2.1</Version>
+        <Version>0.5.0.0</Version>
         <WarningLevel>4</WarningLevel>
         <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     </PropertyGroup>
@@ -21,6 +21,10 @@
         <Content Include=".\Assets\**\*.*">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+    </ItemGroup>
+    
+    <ItemGroup>
+      <None Include="Loci\LociReadme.md" />
     </ItemGroup>
 
     <!--As Now that we use Dalamud.SDK, most Dalamud Sources are not needed, but some must stay.-->
@@ -54,6 +58,12 @@
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.1" />
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.1" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+	    
+	   <!--For MemoryPacking of Loci data and transfer (And SMA Data possibly)-->
+	   <PackageReference Include="MemoryPack" Version="1.21.4" />
+	   <PackageReference Include="MemoryPack.Core" Version="1.21.4" />
+	   <PackageReference Include="MemoryPack.Generator" Version="1.21.4" /> 
+	    
     </ItemGroup>
     
     <!-- If i could use Sundouleia.json i would, but sadly dalamud prevents this lol.-->

@@ -18,12 +18,12 @@ public class SundesmoFactory
     private readonly FavoritesConfig _favorites;
     private readonly NicksConfig _nicks;
     private readonly LimboStateManager _limbo;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
 
     public SundesmoFactory(ILoggerFactory loggerFactory, SundouleiaMediator mediator,
         SundesmoHandlerFactory factory, MainConfig config, FolderConfig folderConfig,
         FavoritesConfig favorites, NicksConfig nicks, LimboStateManager limbo,
-        CharaObjectWatcher watcher)
+        CharaWatcher watcher)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;
@@ -38,5 +38,5 @@ public class SundesmoFactory
 
     public Sundesmo Create(UserPair sundesmoInfo)
         => new Sundesmo(sundesmoInfo, _loggerFactory.CreateLogger<Sundesmo>(), _mediator, _config, 
-            _folders, _favorites, _nicks, _innerFactory, _limbo, _watcher);
+            _folders, _nicks, _innerFactory, _limbo, _watcher);
 }

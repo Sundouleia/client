@@ -181,81 +181,80 @@ public partial class MainHub
     }
     #endregion Moderation Callbacks
 
-    #region Moodles Callbacks
-    public Task Callback_PairMoodleDataUpdated(MoodlesDataUpdate dto)
+    #region Loci Callbacks
+    public Task Callback_PairLociDataUpdated(LociDataUpdate dto)
     {
-        Logger.LogDebug($"Callback_PairMoodleDataUpdated: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.ReceiveMoodleData(dto.User, dto.Data));
+        Logger.LogDebug($"Callback_PairLociDataUpdated: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveLociData(dto.User, dto.Data));
         return Task.CompletedTask;
     }
 
-    public Task Callback_PairMoodleStatusesUpdate(MoodlesStatusesUpdate dto)
+    public Task Callback_PairLociStatusesUpdate(LociStatusesUpdate dto)
     {
-        Logger.LogDebug($"Callback_PairMoodleStatusesUpdate: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.ReceiveMoodleStatuses(dto.User, dto.Statuses));
+        Logger.LogDebug($"Callback_PairLociStatusesUpdate: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveLociStatuses(dto.User, dto.Statuses));
         return Task.CompletedTask;
     }
 
-    public Task Callback_PairMoodlePresetsUpdate(MoodlesPresetsUpdate dto)
+    public Task Callback_PairLociPresetsUpdate(LociPresetsUpdate dto)
     {
-        Logger.LogDebug($"Callback_PairMoodlePresetsUpdate: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.ReceiveMoodlePresets(dto.User, dto.Presets));
+        Logger.LogDebug($"Callback_PairLociPresetsUpdate: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveLociPresets(dto.User, dto.Presets));
         return Task.CompletedTask;
     }
 
-    public Task Callback_PairMoodleStatusModified(MoodlesStatusModified dto)
+    public Task Callback_PairLociStatusModified(LociStatusModified dto)
     {
-        Logger.LogDebug($"Callback_PairMoodleStatusModified: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.ReceiveMoodleStatusUpdate(dto.User, dto.Status, dto.Deleted));
+        Logger.LogDebug($"Callback_PairLociStatusModified: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveLociStatusUpdate(dto.User, dto.Status, dto.Deleted));
         return Task.CompletedTask;
     }
 
-    public Task Callback_PairMoodlePresetModified(MoodlesPresetModified dto)
+    public Task Callback_PairLociPresetModified(LociPresetModified dto)
     {
-        Logger.LogDebug($"Callback_PairMoodlePresetModified: {dto.User.AliasOrUID}", LoggerType.Callbacks);
-        Generic.Safe(() => _sundesmos.ReceiveMoodlePresetUpdate(dto.User, dto.Preset, dto.Deleted));
+        Logger.LogDebug($"Callback_PairLociPresetModified: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.ReceiveLociPresetUpdate(dto.User, dto.Preset, dto.Deleted));
         return Task.CompletedTask;
     }
-    public async Task Callback_ApplyMoodleId(ApplyMoodleId dto)
+    public async Task Callback_ApplyLociDataById(ApplyLociDataById dto)
     {
-        Logger.LogDebug($"Callback_ApplyMoodlesById: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Callback_ApplyLociDataById: {dto.User.AliasOrUID}", LoggerType.Callbacks);
         // Fail if not a valid pair or not rendered.
         if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
-            Logger.LogWarning($"Received ApplyMoodlesById for an unpaired user: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received ApplyLociDataById for an unpaired user: {dto.User.AliasOrUID}");
         else if (!pair.IsRendered)
-            Logger.LogWarning($"Received ApplyMoodlesById for a sundesmo not rendered: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received ApplyLociDataById for a sundesmo not rendered: {dto.User.AliasOrUID}");
         else
-            await _moodles.ApplyStatuses(dto.Ids).ConfigureAwait(false);
+            await _ipc.LociApplyStatuses(dto.Ids.ToList()).ConfigureAwait(false);
     }
 
-    public Task Callback_ApplyMoodleStatus(ApplyMoodleStatus dto)
+    public async Task Callback_ApplyLociStatus(ApplyLociStatus dto)
     {
-        Logger.LogDebug($"Callback_ApplyMoodlesByStatus: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Callback_ApplyLociStatus: {dto.User.AliasOrUID}", LoggerType.Callbacks);
         // Fail if not a valid pair.
         if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
-            Logger.LogWarning($"Received ApplyStatusesToSelf for an unpaired user: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received ApplyLociStatus for an unpaired user: {dto.User.AliasOrUID}");
         else if (!pair.IsRendered)
-            Logger.LogWarning($"Received ApplyStatusesToSelf for a sundesmo not rendered: {dto.User.AliasOrUID}" );
+            Logger.LogWarning($"Received ApplyLociStatus for a sundesmo not rendered: {dto.User.AliasOrUID}" );
         else
         {
-            Mediator.Publish(new EventMessage(new(pair.GetNickAliasOrUid(), pair.UserData.UID, DataEventType.MoodleApplied, "Applied by Pair.")));
-            _ipcProvider.ApplyStatusTuples(dto.Statuses);
+            Mediator.Publish(new EventMessage(new(pair.GetNickAliasOrUid(), pair.UserData.UID, DataEventType.LociDataApplied, "Applied by Pair.")));
+            await _ipc.LociApplyStatusInfos(dto.Statuses.ToList()).ConfigureAwait(false);
         }
-        return Task.CompletedTask;
     }
 
-    public async Task Callback_RemoveMoodleId(RemoveMoodleId dto)
+    public async Task Callback_RemoveLociData(RemoveLociData dto)
     {
-        Logger.LogDebug($"Callback_RemoveMoodlesById: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Callback_RemoveLociData: {dto.User.AliasOrUID}", LoggerType.Callbacks);
         // Fail if not a valid pair or not rendered.
         if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
-            Logger.LogWarning($"Received RemoveMoodlesById for an unpaired user: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received RemoveLociData for an unpaired user: {dto.User.AliasOrUID}");
         else if (!pair.IsRendered)
-            Logger.LogWarning($"Received RemoveMoodlesById for a sundesmo not rendered: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received RemoveLociData for a sundesmo not rendered: {dto.User.AliasOrUID}");
         else
-            await _moodles.RemoveStatuses(dto.Ids).ConfigureAwait(false);
+            await _ipc.LociRemoveStatuses(dto.Ids.ToList()).ConfigureAwait(false);
     }
-    #endregion Moodles Callbacks
+    #endregion Locis Callbacks
 
     #region Data Update Callbacks
     /// <summary>
@@ -516,52 +515,52 @@ public partial class MainHub
         _hubConnection!.On(nameof(Callback_Unblocked), act);
     }
 
-    public void OnPairMoodleDataUpdated(Action<MoodlesDataUpdate> act)
+    public void OnPairLociDataUpdated(Action<LociDataUpdate> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_PairMoodleDataUpdated), act);
+        _hubConnection!.On(nameof(Callback_PairLociDataUpdated), act);
     }
 
-    public void OnPairMoodleStatusesUpdate(Action<MoodlesStatusesUpdate> act)
+    public void OnPairLociStatusesUpdate(Action<LociStatusesUpdate> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_PairMoodleStatusesUpdate), act);
+        _hubConnection!.On(nameof(Callback_PairLociStatusesUpdate), act);
     }
 
-    public void OnPairMoodlePresetsUpdate(Action<MoodlesPresetsUpdate> act)
+    public void OnPairLociPresetsUpdate(Action<LociPresetsUpdate> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_PairMoodlePresetsUpdate), act);
+        _hubConnection!.On(nameof(Callback_PairLociPresetsUpdate), act);
     }
 
-    public void OnPairMoodleStatusModified(Action<MoodlesStatusModified> act)
+    public void OnPairLociStatusModified(Action<LociStatusModified> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_PairMoodleStatusModified), act);
+        _hubConnection!.On(nameof(Callback_PairLociStatusModified), act);
     }
 
-    public void OnPairMoodlePresetModified(Action<MoodlesPresetModified> act)
+    public void OnPairLociPresetModified(Action<LociPresetModified> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_PairMoodlePresetModified), act);
+        _hubConnection!.On(nameof(Callback_PairLociPresetModified), act);
     }
 
-    public void OnApplyMoodleId(Action<ApplyMoodleId> act)
+    public void OnApplyLociDataById(Action<ApplyLociDataById> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_ApplyMoodleId), act);
+        _hubConnection!.On(nameof(Callback_ApplyLociDataById), act);
     }
 
-    public void OnApplyMoodleStatus(Action<ApplyMoodleStatus> act)
+    public void OnApplyLociStatus(Action<ApplyLociStatus> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_ApplyMoodleStatus), act);
+        _hubConnection!.On(nameof(Callback_ApplyLociStatus), act);
     }
 
-    public void OnRemoveMoodleId(Action<RemoveMoodleId> act)
+    public void OnRemoveLociData(Action<RemoveLociData> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_RemoveMoodleId), act);
+        _hubConnection!.On(nameof(Callback_RemoveLociData), act);
     }
 
     public void OnIpcUpdateFull(Action<IpcUpdateFull> act)

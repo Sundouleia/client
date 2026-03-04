@@ -19,8 +19,8 @@ internal class VerificationPopupHandler : IPopupHandler
     public Vector2 PopupSize => new(600, 160);
     public bool ShowClosed => false;
     public bool CloseHovered { get; set; } = false;
-    public Vector2? WindowPadding => null;
-    public float? WindowRounding => null;
+    public Vector2 WindowPadding => Vector2.Zero;
+    public float WindowRounding => ImGui.GetStyle().WindowRounding;
 
     public void DrawContent()
     {

@@ -19,11 +19,11 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
 {
     private readonly LimboStateManager _limboManager;
     private readonly ModdedStateManager _transients;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
     private readonly ClientUpdateService _updater;
 
     public DebugActiveStateUI(ILogger<DebugActiveStateUI> logger, SundouleiaMediator mediator,
-        LimboStateManager limboManager, ModdedStateManager transients, CharaObjectWatcher watcher, 
+        LimboStateManager limboManager, ModdedStateManager transients, CharaWatcher watcher, 
         ClientUpdateService updater)
         : base(logger, mediator, "Active State Debug")
     {
@@ -52,20 +52,24 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         if (ImGui.CollapsingHeader("Transient Resources"))
             DrawTransients();
 
-        using (var t = ImRaii.Table("Location Data", 2, ImGuiTableFlags.BordersOuter | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame))
+        if (ImGui.CollapsingHeader("Location Info"))
         {
-            if (!t) return;
 
-            ImGui.TableSetupColumn("Previous");
-            ImGui.TableSetupColumn("Current");
-            ImGui.TableHeadersRow();
+            using (var t = ImRaii.Table("Location Data", 2, ImGuiTableFlags.BordersOuter | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame))
+            {
+                if (!t) return;
 
-            ImGui.TableNextColumn();
-            LocationSvc.DebugArea(LocationSvc.Previous);
+                ImGui.TableSetupColumn("Previous");
+                ImGui.TableSetupColumn("Current");
+                ImGui.TableHeadersRow();
 
-            ImGui.TableNextColumn();
-            LocationSvc.DebugArea(LocationSvc.Current);
-            ImGui.TableNextRow();
+                ImGui.TableNextColumn();
+                LocationSvc.DebugArea(LocationSvc.Previous);
+
+                ImGui.TableNextColumn();
+                LocationSvc.DebugArea(LocationSvc.Current);
+                ImGui.TableNextRow();
+            }
         }
     }
 
@@ -185,9 +189,9 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         ImGui.Text(dataCache.TitleData);
 
         ImGui.TableNextColumn();
-        ImGui.Text("Moodles");
+        ImGui.Text("LociData");
         ImGui.TableNextColumn();
-        ImGui.Text(dataCache.Moodles);
+        ImGui.Text(dataCache.Loci);
 
         ImGui.TableNextColumn();
         ImGui.Text("PetNames");
@@ -427,7 +431,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                 ImGui.TableSetupColumn("OwnerId");
                 ImGui.TableHeadersRow();
 
-                foreach (var addr in CharaObjectWatcher.RenderedCharas.ToList())
+                foreach (var addr in CharaWatcher.RenderedCharas.ToList())
                 {
                     Character* obj = (Character*)addr;
                     ImGui.TableNextColumn();
@@ -456,7 +460,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
 
                 if (GameMain.IsInGPose())
                 {
-                    foreach (var addr in CharaObjectWatcher.GPoseActors.ToList())
+                    foreach (var addr in CharaWatcher.GPoseActors.ToList())
                     {
                         GameObject* obj = (GameObject*)addr;
                         ImGui.TableNextColumn();
@@ -503,7 +507,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                 ImGui.TableSetupColumn("OwnerId");
                 ImGui.TableHeadersRow();
 
-                foreach (var addr in CharaObjectWatcher.RenderedCompanions.ToList())
+                foreach (var addr in CharaWatcher.RenderedCompanions.ToList())
                 {
                     Companion* obj = (Companion*)addr;
                     ImGui.TableNextColumn();

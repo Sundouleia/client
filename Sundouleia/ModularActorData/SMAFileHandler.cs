@@ -29,13 +29,13 @@ public class SMAFileHandler : IDisposable
     private readonly SMAFileCacheManager _smaFileCache;
     private readonly IpcManager _ipc;
     private readonly ModdedStateManager _moddedState;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
 
     private Progress<(string fileName, int percent)> _saveProgress = new();
     public SMAFileHandler(ILogger<SMAFileHandler> logger, MainConfig mainConfig,
         ModularActorsConfig smaConfig, FileCacheManager cacheManager,
         SMAFileCacheManager smaFileCache, IpcManager ipc,
-        ModdedStateManager moddedState, CharaObjectWatcher watcher)
+        ModdedStateManager moddedState, CharaWatcher watcher)
     {
         _logger = logger;
         _mainConfig = mainConfig;
@@ -94,7 +94,7 @@ public class SMAFileHandler : IDisposable
 
         // Hold written data in a temporary file.
         var tmpFile = $"{filePath}.tmp";
-        _logger.LogInformation($"Writing SMAB to temp FilePath: {tmpFile}");
+        _logger.LogInformation($"Writing SMAB to temp FilePath: {tmpFile}", LoggerType.SmaHandling);
         try
         {
             using var fs = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
@@ -109,7 +109,7 @@ public class SMAFileHandler : IDisposable
             writer.Flush();
             await lz4.FlushAsync().ConfigureAwait(false);
             await fs.FlushAsync().ConfigureAwait(false);
-            _logger.LogInformation($"SMAB Compressed Size: {writer.BaseStream.Length} bytes.");
+            _logger.LogInformation($"SMAB Compressed Size: {writer.BaseStream.Length} bytes.", LoggerType.SmaImportExport);
             fs.Close();
 
             // Update file and return.
@@ -178,7 +178,7 @@ public class SMAFileHandler : IDisposable
 
             // Identify the file we are saving so we can locate its resolved filepath and write.
             var file = _fileCache.GetFileCacheByHash(fileItem.FileHash)!;
-            _logger.LogDebug($"Saving to SMAB: {fileItem.FileHash}:{file.ResolvedFilepath}");
+            _logger.LogDebug($"Saving to SMAB: {fileItem.FileHash}:{file.ResolvedFilepath}", LoggerType.SmaImportExport);
 
             var fsRead = File.OpenRead(file.ResolvedFilepath);
             await using (fsRead.ConfigureAwait(false))
@@ -199,14 +199,14 @@ public class SMAFileHandler : IDisposable
 
     public BaseFileDataSummary? LoadSmabFileHeader(string filePath)
     {
-        _logger.LogInformation($"Loading SMAB File Header from Disk: {filePath}");
+        _logger.LogInformation($"Loading SMAB File Header from Disk: {filePath}", LoggerType.SmaHandling);
         try
         {
             using var fs = File.OpenRead(filePath);
             using var lz4 = new LZ4Stream(fs, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
             using var br = new BinaryReader(lz4);
             var fileSummary = BaseFileDataSummary.FromHeader(br, filePath);
-            _logger.LogInformation($"SMAB FileDataSummary created. (Version: {fileSummary.Version})");
+            _logger.LogInformation($"SMAB FileDataSummary created. (Version: {fileSummary.Version})", LoggerType.SmaHandling);
             return fileSummary;
         }
         catch (Exception ex)
@@ -235,7 +235,7 @@ public class SMAFileHandler : IDisposable
                 foreach (var gamepath in fileData.GamePaths)
                 {
                     moddedPathDict[gamepath] = fileEntity.ResolvedFilepath;
-                    _logger.LogTrace($"{gamepath} => {fileEntity.ResolvedFilepath} [{hash}] (sundouleia cache)");
+                    _logger.LogTrace($"{gamepath} => {fileEntity.ResolvedFilepath} [{hash}] (sundouleia cache)", LoggerType.SmaImportExport);
                 }
             }
             else
@@ -245,7 +245,7 @@ public class SMAFileHandler : IDisposable
                 foreach (var gamepath in fileData.GamePaths)
                 {
                     moddedPathDict[gamepath] = fileName;
-                    _logger.LogTrace($"{gamepath} => {fileName} [{fileData.FileHash}] (SMA cache)");
+                    _logger.LogTrace($"{gamepath} => {fileName} [{fileData.FileHash}] (SMA cache)", LoggerType.SmaImportExport);
                 }
             }
         }
@@ -254,7 +254,7 @@ public class SMAFileHandler : IDisposable
         foreach (var entry in summary.FileSwaps.SelectMany(k => k.GamePaths, (k, p) => new KeyValuePair<string, string>(p, k.FileSwapPath)))
         {
             moddedPathDict[entry.Key] = entry.Value;
-            _logger.LogTrace($"[Swap] {entry.Key} => {entry.Value}");
+            _logger.LogTrace($"[Swap] {entry.Key} => {entry.Value}", LoggerType.SmaImportExport);
         }
 
         return moddedPathDict;
@@ -264,7 +264,7 @@ public class SMAFileHandler : IDisposable
     public ModularActorBase? LoadSmabFile(string filePath)
     {
         // Obtain the file header and encrypted contents.
-        _logger.LogInformation($"Loading SMAB File from Disk: {filePath}");
+        _logger.LogInformation($"Loading SMAB File from Disk: {filePath}", LoggerType.SmaImportExport);
 
         // Once we add protected files we can perform decryption prior to this.
         try
@@ -274,12 +274,12 @@ public class SMAFileHandler : IDisposable
             using var br = new BinaryReader(lz4);
 
             var fileSummary = BaseFileDataSummary.FromHeader(br, filePath);
-            _logger.LogInformation($"SMAB FileDataSummary created. (Version: {fileSummary.Version})");
+            _logger.LogInformation($"SMAB FileDataSummary created. (Version: {fileSummary.Version})", LoggerType.SmaImportExport);
 
             // Import the file contents, updating their references to our existing cache, or
             // a temporary cache, writing new files during gpose lifetime.
             var moddedDict = CreateModdedDictionary(br, fileSummary);
-            _logger.LogInformation("SMAB Modded Dictionary Created.");
+            _logger.LogInformation("SMAB Modded Dictionary Created.", LoggerType.SmaImportExport);
 
             return new ModularActorBase(fileSummary, moddedDict);
         }
@@ -318,14 +318,14 @@ public class SMAFileHandler : IDisposable
                 foreach (var gamepath in fileData.GamePaths)
                 {
                     moddedPathDict[gamepath] = fileEntity.ResolvedFilepath;
-                    _logger.LogTrace($"{gamepath} => {fileEntity.ResolvedFilepath} [{hash}] (sundouleia cache)");
+                    _logger.LogTrace($"{gamepath} => {fileEntity.ResolvedFilepath} [{hash}] (sundouleia cache)", LoggerType.SmaImportExport);
                 }
                 // We still must consume the bytes from the compressed stream so the reader is positioned correctly.
                 var buffer = reader.ReadBytes(fileLength);
                 if (buffer.Length is 0)
                     throw new EndOfStreamException("Unexpected EOF while skipping cached file data");
                 totalRead += buffer.Length;
-                _logger.LogTrace($"Skipped {SundouleiaEx.ByteToString(buffer.Length)} bytes for cached file {hash}");
+                _logger.LogTrace($"Skipped {SundouleiaEx.ByteToString(buffer.Length)} bytes for cached file {hash}", LoggerType.SmaImportExport);
                 continue;
             }
             else
@@ -335,7 +335,7 @@ public class SMAFileHandler : IDisposable
                 // Open for writestream to write out the file data.
                 using var fs = File.OpenWrite(fileName);
                 using var wr = new BinaryWriter(fs);
-                _logger.LogTrace($"Writing {SundouleiaEx.ByteToString(fileLength)} bytes into {fileName}");
+                _logger.LogTrace($"Writing {SundouleiaEx.ByteToString(fileLength)} bytes into {fileName}", LoggerType.SmaImportExport);
                 var buffer = reader.ReadBytes(fileLength);
                 // write the buffer to the file then flush and close streams.
                 wr.Write(buffer);
@@ -348,11 +348,11 @@ public class SMAFileHandler : IDisposable
                 foreach (var gamepath in fileData.GamePaths)
                 {
                     moddedPathDict[gamepath] = fileName;
-                    _logger.LogTrace($"{gamepath} => {fileName} [{fileData.FileHash}] (SMA cache)");
+                    _logger.LogTrace($"{gamepath} => {fileName} [{fileData.FileHash}] (SMA cache)", LoggerType.SmaImportExport);
                 }
                 // Inc the total read and report progress.
                 totalRead += buffer.Length;
-                _logger.LogDebug($"Read {SundouleiaEx.ByteToString(totalRead)}/{SundouleiaEx.ByteToString(contentsLength)} bytes");
+                _logger.LogDebug($"Read {SundouleiaEx.ByteToString(totalRead)}/{SundouleiaEx.ByteToString(contentsLength)} bytes", LoggerType.SmaImportExport);
             }
         }
 
@@ -360,7 +360,7 @@ public class SMAFileHandler : IDisposable
         foreach (var entry in summary.FileSwaps.SelectMany(k => k.GamePaths, (k, p) => new KeyValuePair<string, string>(p, k.FileSwapPath)))
         {
             moddedPathDict[entry.Key] = entry.Value;
-            _logger.LogTrace($"[Swap] {entry.Key} => {entry.Value}");
+            _logger.LogTrace($"[Swap] {entry.Key} => {entry.Value}", LoggerType.SmaImportExport);
         }
 
         return moddedPathDict;

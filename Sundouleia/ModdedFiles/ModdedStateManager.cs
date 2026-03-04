@@ -42,7 +42,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     private readonly PlzNoCrashFrens _noCrashPlz;
     private readonly FileCacheManager _fileDb;
     private readonly IpcManager _ipc;
-    private readonly CharaObjectWatcher _watcher; // saves my sanity.
+    private readonly CharaWatcher _watcher; // saves my sanity.
 
     // I very much dislike this but whatever. Until we find a better method I guess.
     private string CurrentClientKey = string.Empty;
@@ -71,7 +71,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
 
     public ModdedStateManager(ILogger<ModdedStateManager> logger, SundouleiaMediator mediator, MainConfig config, 
         TransientCacheConfig cacheConfig, PlzNoCrashFrens noCrashPlz, FileCacheManager fileDb, IpcManager ipc, 
-        CharaObjectWatcher watcher) : base(logger, mediator)
+        CharaWatcher watcher) : base(logger, mediator)
     {
         _config = config;
         _cacheConfig = cacheConfig;
@@ -543,7 +543,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
     private async Task<HashSet<ModdedFile>> CollectPlayerModdedFiles(Dictionary<string, HashSet<string>> onScreenPaths, CancellationToken ct)
     {
         // await until we are present and visible.
-        await _watcher.WaitForFullyLoadedGameObject(_watcher.WatchedPlayerAddr, ct).ConfigureAwait(false);
+        await SundouleiaEx.WaitUntilFullyLoaded(_watcher.WatchedPlayerAddr, ct).ConfigureAwait(false);
 
         ct.ThrowIfCancellationRequested();
 
@@ -571,7 +571,7 @@ public sealed class ModdedStateManager : DisposableMediatorSubscriberBase
 
     private async Task<HashSet<ModdedFile>> CollectOtherModdedFiles(OwnedObject obj, Dictionary<string, HashSet<string>> onScreenPaths, CancellationToken ct)
     {
-        await _watcher.WaitForFullyLoadedGameObject(_watcher.FromOwned(obj), ct).ConfigureAwait(false);
+        await SundouleiaEx.WaitUntilFullyLoaded(_watcher.FromOwned(obj), ct).ConfigureAwait(false);
 
         ct.ThrowIfCancellationRequested();
 

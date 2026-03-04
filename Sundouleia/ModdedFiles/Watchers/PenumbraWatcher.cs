@@ -31,7 +31,7 @@ public sealed class PenumbraWatcher : IDisposable
 
     public void StopMonitoring()
     {
-        _logger.LogInformation("Stopping monitoring of the Penumbra storage folder");
+        _logger.LogInformation("Stopping monitoring of the Penumbra storage folder", LoggerType.FileWatcher);
         Watcher?.Dispose();
         Watcher = null;
     }
@@ -48,7 +48,7 @@ public sealed class PenumbraWatcher : IDisposable
             return;
         }
 
-        _logger.LogDebug($"Initializing Penumbra FSW on: {penumbraPath}");
+        _logger.LogDebug($"Initializing Penumbra FSW on: {penumbraPath}", LoggerType.FileWatcher);
         Watcher = new()
         {
             Path = penumbraPath,
@@ -80,7 +80,7 @@ public sealed class PenumbraWatcher : IDisposable
 
         // Enqueue the change for processing. (Avoid fire-and-forget)
         _changeQueue.Enqueue(new(e.FullPath, new WatcherChange(e.ChangeType)));
-        _logger.LogTrace($"FS-Watcher Event: {e.ChangeType} on {e.FullPath}");
+        _logger.LogTrace($"FS-Watcher Event: {e.ChangeType} on {e.FullPath}", LoggerType.FileWatcher);
     }
 
     /// <summary>
@@ -103,7 +103,7 @@ public sealed class PenumbraWatcher : IDisposable
                 var oldPath = file.Replace(e.FullPath, e.OldFullPath, StringComparison.OrdinalIgnoreCase);
                 // Enqueue the change for processing. (Avoid fire-and-forget)
                 _changeQueue.Enqueue(new(file, new WatcherChange(WatcherChangeTypes.Renamed, oldPath)));
-                _logger.LogTrace($"FSW Renamed: {oldPath} -> {file}");
+                _logger.LogTrace($"FSW Renamed: {oldPath} -> {file}", LoggerType.FileWatcher);
             }
         }
         else
@@ -113,7 +113,7 @@ public sealed class PenumbraWatcher : IDisposable
                 return;
             // Enqueue the change for processing. (Avoid fire-and-forget)
             _changeQueue.Enqueue(new(e.FullPath, new WatcherChange(WatcherChangeTypes.Renamed, e.OldFullPath)));
-            _logger.LogTrace($"FSW Renamed: {e.OldFullPath} -> {e.FullPath}");
+            _logger.LogTrace($"FSW Renamed: {e.OldFullPath} -> {e.FullPath}", LoggerType.FileWatcher);
         }
     }
 
@@ -159,13 +159,13 @@ public sealed class PenumbraWatcher : IDisposable
             var remainingEntries = changes.Where(c => c.Value.ChangeType != WatcherChangeTypes.Deleted).Select(c => c.Key);
 
             foreach (var entry in deletedEntries)
-                _logger.LogDebug($"FSW Change: Deletion - {entry}");
+                _logger.LogDebug($"FSW Change: Deletion - {entry}", LoggerType.FileWatcher);
 
             foreach (var entry in renamedEntries)
-                _logger.LogDebug($"FSW Change: Renamed - {entry.Value.OldPath} => {entry.Key}");
+                _logger.LogDebug($"FSW Change: Renamed - {entry.Value.OldPath} => {entry.Key}", LoggerType.FileWatcher);
 
             foreach (var entry in remainingEntries)
-                _logger.LogDebug($"FSW Change: Creation or Change - {entry}");
+                _logger.LogDebug($"FSW Change: Creation or Change - {entry}", LoggerType.FileWatcher);
 
             var allChanges = deletedEntries
                 .Concat(renamedEntries.Select(c => c.Value.OldPath!))

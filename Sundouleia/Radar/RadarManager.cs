@@ -21,7 +21,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     private readonly MainConfig _config;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
-    private readonly CharaObjectWatcher _watcher;
+    private readonly CharaWatcher _watcher;
 
     // Keep keyed UserData private, preventing unwanted access.
     private ConcurrentDictionary<UserData, RadarUser> _allRadarUsers = new(UserDataComparer.Instance);
@@ -29,7 +29,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
 
     public RadarManager(ILogger<RadarManager> logger, SundouleiaMediator mediator,
         MainConfig config, RequestsManager requests, SundesmoManager sundesmos, 
-        CharaObjectWatcher watcher)
+        CharaWatcher watcher)
         : base(logger, mediator)
     {
         _config = config;

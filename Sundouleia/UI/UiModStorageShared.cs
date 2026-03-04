@@ -188,7 +188,7 @@ public partial class UiDataStorageShared
         CkGui.FramedHoverIconText(FAI.QuestionCircle, ImGuiColors.TankBlue.ToUint(), ImGui.GetColorU32(ImGuiCol.TextDisabled));
         CkGui.AttachToolTip("Sundouleia's Cache is --COL--self-regulated--COL-- for downloaded mod files." +
             "--NL--It helps improve performance when loading mods and reduces download requirements." +
-            "--SEP--Cleans are ran regularily to remove any files unused for 6+ weeks to keep things tidy!", SundCol.Light.Vec4());
+            "--SEP--Cleans are ran regularily to remove any files unused for 6+ weeks to keep things tidy!", SundCol.Silver.Vec4());
     }
 
     public void DrawCacheMonitoring(bool showRescan, bool showPenumbraControls, bool showSundouleiaControls)

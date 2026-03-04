@@ -36,6 +36,7 @@ public class SidePanelInteractions
     private readonly ILogger<SidePanelInteractions> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly MainHub _hub;
+    private readonly LociManager _loci;
     private readonly SundesmoManager _sundesmos;
     private readonly RadarManager _radar;
     private readonly SidePanelService _service;
@@ -43,12 +44,14 @@ public class SidePanelInteractions
     // internal storage.
     private Dictionary<SIID, string> _timespanCache = new();
 
-    public SidePanelInteractions(ILogger<SidePanelInteractions> logger, SundouleiaMediator mediator,
-        MainHub hub, SundesmoManager sundesmos, RadarManager radar, SidePanelService service)
+    public SidePanelInteractions(ILogger<SidePanelInteractions> logger,
+        SundouleiaMediator mediator, MainHub hub, LociManager loci, 
+        SundesmoManager sundesmos, RadarManager radar, SidePanelService service)
     {
         _logger = logger;
         _mediator = mediator;
         _hub = hub;
+        _loci = loci;
         _sundesmos = sundesmos;
         _radar = radar;
         _service = service;
@@ -63,9 +66,9 @@ public class SidePanelInteractions
         DrawCommon(sundesmo, dispName, width);
         ImGui.Separator();
 
-        ImGui.Text("Moodles");
-        DrawApplyMoodleOwn(cache, sundesmo, dispName, width);
-        DrawApplyMoodleOther(cache, sundesmo, dispName, width);
+        ImGui.Text("Loci");
+        DrawApplyOwnLociData(cache, sundesmo, dispName, width);
+        DrawApplyOtherLociData(cache, sundesmo, dispName, width);
     }
 
     public void DrawPermissions(InteractionsCache cache, Sundesmo s, string dispName, float width)
@@ -81,17 +84,17 @@ public class SidePanelInteractions
         DrawPermRow(s, dispName, width, SIID.DataSyncVfx, nameof(PairPerms.AllowVfx), s.OwnPerms.AllowVfx);
         ImGui.Separator();
 
-        ImGui.Text("Moodles Permissions");
-        DrawPermRow(s, dispName, width, SIID.ShareMoodles, nameof(PairPerms.ShareOwnMoodles), s.OwnPerms.ShareOwnMoodles, () => _mediator.Publish(new MoodleSharePermChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.AllowPositve, s.OwnPerms.MoodleAccess, MoodleAccess.Positive, () => _mediator.Publish(new MoodlePermsChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.AllowNegative, s.OwnPerms.MoodleAccess, MoodleAccess.Negative, () => _mediator.Publish(new MoodlePermsChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.AllowSpecial, s.OwnPerms.MoodleAccess, MoodleAccess.Special, () => _mediator.Publish(new MoodlePermsChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.AllowOwnMoodles, s.OwnPerms.MoodleAccess, MoodleAccess.AllowOwn, () => _mediator.Publish(new MoodlePermsChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.AllowOtherMoodles, s.OwnPerms.MoodleAccess, MoodleAccess.AllowOther, () => _mediator.Publish(new MoodlePermsChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.MaxMoodleTime, nameof(PairPerms.MaxMoodleTime), s.OwnPerms.MaxMoodleTime, () => _mediator.Publish(new MoodlePermsChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.AllowPermanent, s.OwnPerms.MoodleAccess, MoodleAccess.Permanent, () => _mediator.Publish(new MoodlePermsChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.RemoveApplied, s.OwnPerms.MoodleAccess, MoodleAccess.RemoveApplied, () => _mediator.Publish(new MoodlePermsChanged(s)));
-        DrawPermRow(s, dispName, width, SIID.RemoveAny, s.OwnPerms.MoodleAccess, MoodleAccess.RemoveAny, () => _mediator.Publish(new MoodlePermsChanged(s)));
+        ImGui.Text("Loci Permissions");
+        DrawPermRow(s, dispName, width, SIID.ShareLociData, nameof(PairPerms.ShareOwnLociData), s.OwnPerms.ShareOwnLociData, () => _mediator.Publish(new LociSharePermChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowPositve, s.OwnPerms.LociAccess, LociAccess.Positive, () => _mediator.Publish(new LociPermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowNegative, s.OwnPerms.LociAccess, LociAccess.Negative, () => _mediator.Publish(new LociPermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowSpecial, s.OwnPerms.LociAccess, LociAccess.Special, () => _mediator.Publish(new LociPermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowOwnLociData, s.OwnPerms.LociAccess, LociAccess.AllowOwn, () => _mediator.Publish(new LociPermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowOtherLociData, s.OwnPerms.LociAccess, LociAccess.AllowOther, () => _mediator.Publish(new LociPermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.MaxStatusTime, nameof(PairPerms.MaxLociTime), s.OwnPerms.MaxLociTime, () => _mediator.Publish(new LociPermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.AllowPermanent, s.OwnPerms.LociAccess, LociAccess.Permanent, () => _mediator.Publish(new LociPermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.RemoveApplied, s.OwnPerms.LociAccess, LociAccess.RemoveApplied, () => _mediator.Publish(new LociPermsChanged(s)));
+        DrawPermRow(s, dispName, width, SIID.RemoveAny, s.OwnPerms.LociAccess, LociAccess.RemoveAny, () => _mediator.Publish(new LociPermsChanged(s)));
     }
 
     private void DrawHeader(Sundesmo s, string dispName)
@@ -111,63 +114,63 @@ public class SidePanelInteractions
         CkGui.IconTextAligned(FAI.PersonBurst, vfx ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
         CkGui.AttachToolTip($"{dispName} {(vfx ? "can see your modded VFX." : "disabled your modded VFX.")}");
 
-        // Moodles Row
+        // Loci Row
         var iconsW = CkGui.IconsSize([FAI.TheaterMasks, FAI.SmileBeam, FAI.FrownOpen, FAI.WandMagicSparkles,
             FAI.PersonArrowUpFromLine, FAI.PersonArrowDownToLine, FAI.Stopwatch, FAI.Infinity, FAI.Eraser]).X;
-        var moodlesW = iconsW + ImUtf8.ItemInnerSpacing.X * 8;
+        var locisW = iconsW + ImUtf8.ItemInnerSpacing.X * 8;
 
-        CkGui.SetCursorXtoCenter(moodlesW);
-        var sharing = s.PairPerms.ShareOwnMoodles;
-        var pos = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.Positive);
-        var neg = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.Negative);
-        var spec = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.Special);
-        var own = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOwn);
-        var other = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOther);
-        var perm = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.Permanent);
-        var remApp = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveApplied);
-        var remAny = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveAny);
+        CkGui.SetCursorXtoCenter(locisW);
+        var sharing = s.PairPerms.ShareOwnLociData;
+        var pos = s.PairPerms.LociAccess.HasAny(LociAccess.Positive);
+        var neg = s.PairPerms.LociAccess.HasAny(LociAccess.Negative);
+        var spec = s.PairPerms.LociAccess.HasAny(LociAccess.Special);
+        var own = s.PairPerms.LociAccess.HasAny(LociAccess.AllowOwn);
+        var other = s.PairPerms.LociAccess.HasAny(LociAccess.AllowOther);
+        var perm = s.PairPerms.LociAccess.HasAny(LociAccess.Permanent);
+        var remApp = s.PairPerms.LociAccess.HasAny(LociAccess.RemoveApplied);
+        var remAny = s.PairPerms.LociAccess.HasAny(LociAccess.RemoveAny);
         CkGui.IconTextAligned(FAI.TheaterMasks, sharing ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(sharing ? "is sharing their Moodles with you." : "is not sharing their Moodles with you.")}");
+        CkGui.AttachToolTip($"{dispName} {(sharing ? "is sharing Loci data with you." : "is not sharing Loci data with you.")}");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.SmileBeam, pos ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Positive Moodles." : "prevents Positive Moodles.")}");
+        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Positive statuses." : "prevents Positive statuses.")}");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.FrownOpen, neg ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Negative Moodles." : "prevents Negative Moodles.")}");
+        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Negative statuses." : "prevents Negative statuses.")}");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.WandMagicSparkles, spec ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Special Moodles." : "prevents Special Moodles.")}");
+        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Special statuses." : "prevents Special statuses.")}");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.PersonArrowUpFromLine, own ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip(pos ? $"You can apply {dispName}'s own Moodles." : $"Applying {dispName}'s Moodles is forbidden.");
+        CkGui.AttachToolTip(pos ? $"You can apply {dispName}'s statuses." : $"Applying {dispName}'s statuses is forbidden.");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.PersonArrowDownToLine, other ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip(other ? $"You can apply your Moodles" : "Applying of your Moodles is forbidden.");
+        CkGui.AttachToolTip(other ? $"You can apply your statuses" : "Applying your statuses is forbidden.");
 
         ImUtf8.SameLineInner();
-        CkGui.IconTextAligned(FAI.Stopwatch, s.PairPerms.MaxMoodleTime != TimeSpan.Zero ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip(s.PairPerms.MaxMoodleTime != TimeSpan.Zero ? $"{dispName}'s Maximum Moodle Duration is: {s.PairPerms.MaxMoodleTime.ToTimeSpanStr()}." : "You can not apply timed Moodles.");
+        CkGui.IconTextAligned(FAI.Stopwatch, s.PairPerms.MaxLociTime != TimeSpan.Zero ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
+        CkGui.AttachToolTip(s.PairPerms.MaxLociTime != TimeSpan.Zero ? $"{dispName}'s Max status time is: {s.PairPerms.MaxLociTime.ToTimeSpanStr()}." : "Cannot apply timed statuses.");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.Infinity, perm ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip(perm ? $"{dispName} allows Permanent Moodles." : $"{dispName} prevents Permanent Moodles.");
+        CkGui.AttachToolTip(perm ? $"{dispName} allows Permanent statuses." : $"{dispName} prevents Permanent statuses.");
 
         if (remAny)
         {
             ImUtf8.SameLineInner();
             CkGui.IconTextAligned(FAI.Eraser, remAny ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-            CkGui.AttachToolTip(remAny ? $"You can remove {dispName}'s Moodles." : $"You cannot remove {dispName}'s Moodles.");
+            CkGui.AttachToolTip(remAny ? $"You can remove {dispName}'s statuses." : $"You cannot remove {dispName}'s statuses.");
         }
         else
         {
             ImUtf8.SameLineInner();
             CkGui.IconTextAligned(FAI.Eraser, remApp ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-            CkGui.AttachToolTip(remApp ? $"You can remove Moodles applied by you." : $"You cannot remove {dispName}'s Moodles.");
+            CkGui.AttachToolTip(remApp ? $"You can remove statuses applied by you." : $"You cannot remove {dispName}'s statuses.");
         }
 
     }
@@ -259,18 +262,18 @@ public class SidePanelInteractions
         ImGui.Text(".");
     }
 
-    private void DrawApplyMoodleOwn(InteractionsCache cache, Sundesmo s, string dispName, float width)
+    private void DrawApplyOwnLociData(InteractionsCache cache, Sundesmo s, string dispName, float width)
     {
-        var hasStatuses = ClientMoodles.Data.Statuses.Count > 0;
-        var hasPresets = ClientMoodles.Data.Presets.Count > 0;
-        var isAllowed = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOther);
+        var hasStatuses = _loci.SavedStatuses.Count > 0;
+        var hasPresets = _loci.SavedPresets.Count > 0;
+        var isAllowed = s.PairPerms.LociAccess.HasAny(LociAccess.AllowOther);
 
         var statusTxt = hasStatuses ? $"Apply a status to {dispName}" : $"No statuses to apply";
-        var statusTT = isAllowed ? $"Applies a status to {dispName}." : $"Cannot apply your own moodles to {dispName}. --COL--(Permission Denied)--COL--";
+        var statusTT = isAllowed ? $"Applies a status to {dispName}." : $"Cannot apply your statuses to {dispName}. --COL--(Permission Denied)--COL--";
         var presetTxt = hasStatuses ? $"Apply a preset to {dispName}" : $"No presets to apply";
-        var presetTT = isAllowed ? $"Applies a preset to {dispName}." : $"Cannot apply your own moodles to {dispName}. --COL--(Permission Denied)--COL--";
+        var presetTT = isAllowed ? $"Applies a preset to {dispName}." : $"Cannot apply your presets to {dispName}. --COL--(Permission Denied)--COL--";
 
-        // Applying own moodles
+        // Applying own locis
         if (CkGui.IconTextButton(FAI.UserPlus, statusTxt, width, true, !isAllowed || !hasStatuses))
             cache.ToggleInteraction(OpenedInteraction.ApplyOwnStatus);
         CkGui.AttachToolTip(statusTT);
@@ -295,18 +298,18 @@ public class SidePanelInteractions
         }
     }
 
-    private void DrawApplyMoodleOther(InteractionsCache cache, Sundesmo s, string dispName, float width)
+    private void DrawApplyOtherLociData(InteractionsCache cache, Sundesmo s, string dispName, float width)
     {
         var hasStatuses = s.SharedData.Statuses.Count > 0;
         var hasPresets = s.SharedData.Presets.Count > 0;
-        var isAllowed = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOwn);
+        var isAllowed = s.PairPerms.LociAccess.HasAny(LociAccess.AllowOwn);
 
         var statusTxt = hasStatuses ? $"Apply a status from {dispName}'s list" : "No statuses to apply.";
         var statusTT = isAllowed ? $"Applies a chosen status to {dispName}." : $"Cannot apply {dispName}'s statuses. --COL--(Permission Denied)--COL--";
         var presetTxt = hasPresets ? $"Apply a preset from {dispName}'s list" : "No presets to apply.";
         var presetTT = isAllowed ? $"Applies a chosen preset to {dispName}." : $"Cannot apply {dispName}'s presets. --COL--(Permission Denied)--COL--";
 
-        // Applying sundesmo's moodles
+        // Applying sundesmo's locis
         if (CkGui.IconTextButton(FAI.UserPlus, statusTxt, width, true, !isAllowed || !hasStatuses))
             cache.ToggleInteraction(OpenedInteraction.ApplyOtherStatus);
         CkGui.AttachToolTip(statusTT);
@@ -331,8 +334,8 @@ public class SidePanelInteractions
         }
 
         // For removing. (Of note, we will need to make a seperate combo for removals if we want to distinguish between applied vs any.)
-        var canRemApplied = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveApplied);
-        var canRemAny = s.PairPerms.MoodleAccess.HasAny(MoodleAccess.RemoveAny);
+        var canRemApplied = s.PairPerms.LociAccess.HasAny(LociAccess.RemoveApplied);
+        var canRemAny = s.PairPerms.LociAccess.HasAny(LociAccess.RemoveAny);
         var canRemove = canRemApplied || canRemAny;
         var remText = canRemove ? $"Remove a status from {dispName}." : "Cannot remove statuses.";
         var remTT = canRemove ? $"Removes a status from {dispName}." : $"Cannot remove statuses from {dispName}. --COL--(Permission Denied)--COL--";
@@ -348,8 +351,8 @@ public class SidePanelInteractions
         }
     }
 
-    private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, MoodleAccess curState, MoodleAccess option, Action? onChange = null)
-        => DrawPermInternal(sundesmo, dispName, width, id, nameof(PairPerms.MoodleAccess), curState.HasAny(option), () => curState ^ option, onChange);
+    private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, LociAccess curState, LociAccess option, Action? onChange = null)
+        => DrawPermInternal(sundesmo, dispName, width, id, nameof(PairPerms.LociAccess), curState.HasAny(option), () => curState ^ option, onChange);
 
     private void DrawPermRow(Sundesmo sundesmo, string dispName, float width, SIID id, string permName, bool current, Action? onChange = null)
         => DrawPermInternal(sundesmo, dispName, width, id, permName, current, () => !current, onChange);
@@ -370,7 +373,7 @@ public class SidePanelInteractions
             }
             _timespanCache.Remove(id);
         }
-        CkGui.AttachToolTip($"The Maximum Time {dispName} can apply a moodle on you for.");
+        CkGui.AttachToolTip($"The Maximum Time {dispName} can apply a loci on you for.");
     }
 
     private void DrawPermInternal<T>(Sundesmo sundesmo, string dispName, float width, SIID id, string permName, bool current, Func<T> toNewState, Action? onChange = null)
@@ -422,13 +425,13 @@ public class SidePanelInteractions
         DataSyncSounds,
         DataSyncVfx,
         
-        ShareMoodles,
+        ShareLociData,
         AllowPositve,
         AllowNegative,
         AllowSpecial,
-        AllowOwnMoodles,
-        AllowOtherMoodles,
-        MaxMoodleTime,
+        AllowOwnLociData,
+        AllowOtherLociData,
+        MaxStatusTime,
         AllowPermanent,
         RemoveApplied,
         RemoveAny,
@@ -441,16 +444,16 @@ public class SidePanelInteractions
         .Add(SIID.DataSyncAnimations,   new PermInfo(FAI.Running,               FAI.Ban,        "Allowing", "Preventing",   "animations from ",      false))
         .Add(SIID.DataSyncSounds,       new PermInfo(FAI.VolumeUp,              FAI.VolumeMute, "Allowing", "Preventing",   "sounds from ",          false))
         .Add(SIID.DataSyncVfx,          new PermInfo(FAI.PersonBurst,           FAI.Ban,        "Allowing", "Preventing",   "VFX from ",             false))
-        .Add(SIID.ShareMoodles,         new PermInfo(FAI.PeopleArrows,          FAI.Ban,        "Sharing",  "Not sharing",  "moodles with ",         false))
-        .Add(SIID.AllowOwnMoodles,      new PermInfo(FAI.PersonArrowUpFromLine, FAI.Ban,        "Allowing", "Preventing",   "use of your moodles",   true))
-        .Add(SIID.AllowOtherMoodles,    new PermInfo(FAI.PersonArrowDownToLine, FAI.Ban,        "Allowing", "Preventing",   "use of their moodles",  true))
-        .Add(SIID.AllowPositve,         new PermInfo(FAI.SmileBeam,             FAI.Ban,        "Allowing", "Preventing",   "positive moodles",      true))
-        .Add(SIID.AllowNegative,        new PermInfo(FAI.FrownOpen,             FAI.Ban,        "Allowing", "Preventing",   "negative moodles",      true))
-        .Add(SIID.AllowSpecial,         new PermInfo(FAI.WandMagicSparkles,     FAI.Ban,        "Allowing", "Preventing",   "special moodles",       true))
-        .Add(SIID.AllowPermanent,       new PermInfo(FAI.Infinity,              FAI.Ban,        "Allowing", "Preventing",   "permanent moodles",     true))
-        .Add(SIID.RemoveApplied,        new PermInfo(FAI.Eraser,                FAI.Ban,        "Allowing", "Preventing",   "removing moodles by them",true))
-        .Add(SIID.RemoveAny,            new PermInfo(FAI.Eraser,                FAI.Ban,        "Allowing", "Preventing",   "removing moodles by anyone",true))
-        .Add(SIID.MaxMoodleTime,        new PermInfo(FAI.HourglassHalf,         FAI.None,       "",         "",             "Max moodle duration",   true));
+        .Add(SIID.ShareLociData,         new PermInfo(FAI.PeopleArrows,          FAI.Ban,        "Sharing",  "Not sharing",  "loci data with ",         false))
+        .Add(SIID.AllowOwnLociData,      new PermInfo(FAI.PersonArrowUpFromLine, FAI.Ban,        "Allowing", "Preventing",   "use of your loci data",   true))
+        .Add(SIID.AllowOtherLociData,    new PermInfo(FAI.PersonArrowDownToLine, FAI.Ban,        "Allowing", "Preventing",   "use of their loci data", true))
+        .Add(SIID.AllowPositve,         new PermInfo(FAI.SmileBeam,             FAI.Ban,        "Allowing", "Preventing",   "positive statuses",      true))
+        .Add(SIID.AllowNegative,        new PermInfo(FAI.FrownOpen,             FAI.Ban,        "Allowing", "Preventing",   "negative statuses",      true))
+        .Add(SIID.AllowSpecial,         new PermInfo(FAI.WandMagicSparkles,     FAI.Ban,        "Allowing", "Preventing",   "special statuses",       true))
+        .Add(SIID.AllowPermanent,       new PermInfo(FAI.Infinity,              FAI.Ban,        "Allowing", "Preventing",   "permanent statuses",     true))
+        .Add(SIID.RemoveApplied,        new PermInfo(FAI.Eraser,                FAI.Ban,        "Allowing", "Preventing",   "removing statuses by them",true))
+        .Add(SIID.RemoveAny,            new PermInfo(FAI.Eraser,                FAI.Ban,        "Allowing", "Preventing",   "status removal",true))
+        .Add(SIID.MaxStatusTime,        new PermInfo(FAI.HourglassHalf,         FAI.None,       "",         "",             "Max status length",   true));
 
 
 

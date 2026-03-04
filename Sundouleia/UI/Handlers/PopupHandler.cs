@@ -58,14 +58,8 @@ public class PopupHandler : WindowMediatorSubscriberBase
         {
             if (_currentHandler != null)
             {
-                if (_currentHandler.WindowPadding.HasValue)
-                {
-                    ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, _currentHandler.WindowPadding.Value);
-                }
-                if (_currentHandler.WindowRounding.HasValue)
-                {
-                    ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, _currentHandler.WindowRounding.Value);
-                }
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, _currentHandler.WindowPadding);
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, _currentHandler.WindowRounding);
             }
             ThemePushed = true;
         }
@@ -76,14 +70,7 @@ public class PopupHandler : WindowMediatorSubscriberBase
         {
             if (_currentHandler != null)
             {
-                if (_currentHandler.WindowPadding.HasValue)
-                {
-                    ImGui.PopStyleVar();
-                }
-                if (_currentHandler.WindowRounding.HasValue)
-                {
-                    ImGui.PopStyleVar();
-                }
+                ImGui.PopStyleVar(2);
             }
             ThemePushed = false;
         }

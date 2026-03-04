@@ -55,11 +55,10 @@ public class IntroUi : WindowMediatorSubscriberBase
         this.PinningClickthroughFalse();
         this.SetBoundaries(new(630, 800));
 
-        ShowCloseButton = false;
         RespectCloseHotkey = false;
         Flags = WFlags.NoScrollbar | WFlags.NoResize;
 
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<IntoFinishedMessage>(this, (_) => IsOpen = false);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
 
         // Make initial page assumptions.
@@ -88,9 +87,6 @@ public class IntroUi : WindowMediatorSubscriberBase
 
     protected override void PreDrawInternal()
     {
-        // Center window on first appearance.
-        // ImGui.SetNextWindowPos(new((ImGui.GetIO().DisplaySize.X - Size!.Value.X) / 2, (ImGui.GetIO().DisplaySize.Y - Size!.Value.Y) / 2), ImGuiCond.Appearing);
-
         if (!ThemePushed)
         {
             ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 12f);
@@ -115,7 +111,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         if (_furthestPage is IntroUiPage.Initialized)
         {
             _logger.LogDebug("Switching to main UI");
-            Mediator.Publish(new SwitchToMainUiMessage());
+            Mediator.Publish(new IntoFinishedMessage());
             IsOpen = false;
             return;
         }
@@ -477,7 +473,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
             ImGui.Spacing();
             CkGui.FontText("Data Distribution", Fonts.Default150Percent, SundCol.Gold.Uint());
-            CkGui.TextWrapped("Data from Penumbra, Glamourer, CPlus, Heels, Honorific, Moodles, and PetNames are shared to pairs visible to you.");
+            CkGui.TextWrapped("Data from Penumbra, Glamourer, CPlus, Heels, Honorific, Loci, and PetNames are shared to pairs visible to you.");
             CkGui.BulletText("Only the files used to render your on-screen actor at any given point are shared. (not full mods)");
             CkGui.BulletText("Shared files are cached on our FileHost servers temporarily for retrievals.");
             CkGui.ColorTextInline("*See Below", ImGuiColors.DalamudYellow);
@@ -536,7 +532,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         
         CkGui.FramedIconText(FAI.Folder);
         CkGui.TextFrameAlignedInline("FileCache set to valid location");
-        CkGui.BooleanToColoredIcon(_fileCacheShared.IsCachePathValid);
+        CkGui.BoolIconFramed(_fileCacheShared.IsCachePathValid);
         CkGui.HelpText("Setup requires a valid FileCache Storage folder path. You can assign this via:" +
             "--SEP----COL--[@ Drive Root]--COL-- adds a \"SundouleiaCache\" folder in your drive's root directory." +
             "--NL----COL--[@ Penumbra Parent]--COL-- adds a \"SundouleiaCache\" folder in the folder your Penumbra folder is in." +
@@ -544,7 +540,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
         CkGui.FramedIconText(FAI.BarsProgress);
         CkGui.TextFrameAlignedInline("Initial Scan Completed");
-        CkGui.BooleanToColoredIcon(_config.HasValidCacheFolderSetup());
+        CkGui.BoolIconFramed(_config.HasValidCacheFolderSetup());
         CkGui.HelpText("This runs automatically once the above path is valid. " +
             "--NL--This initial scan caches all penumbra mod file paths for quick access.");
 

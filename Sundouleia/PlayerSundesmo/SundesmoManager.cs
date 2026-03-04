@@ -321,9 +321,9 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public List<UserData> GetVisibleConnected() => _allSundesmos.Where(p => p.Value.IsRendered && p.Value.IsOnline).Select(p => p.Key).ToList();
 
     /// <summary>
-    ///     Gets the MoodlesTrusted sundesmos to share off moodle data to.
+    ///     Gets the users who we share our LociData with.
     /// </summary>
-    public List<UserData> GetMoodleTrusted(IEnumerable<UserData> users) => users.Where(u => _allSundesmos.TryGetValue(u, out var s) && s.OwnPerms.ShareOwnMoodles).ToList();
+    public List<UserData> GetLociTrustedUsers(IEnumerable<UserData> users) => users.Where(u => _allSundesmos.TryGetValue(u, out var s) && s.OwnPerms.ShareOwnLociData).ToList();
 
     /// <summary>
     ///     If a Sundesmo exists given their UID.
@@ -354,46 +354,46 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     #endregion Manager Helpers
 
     #region Updates    
-    public void ReceiveMoodleData(UserData target, MoodleData newMoodleData)
+    public void ReceiveLociData(UserData target, LociData newLociData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
 
-        Logger.LogTrace($"Received moodle update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
-        sundesmo.SetMoodleData(newMoodleData);
+        Logger.LogTrace($"Received loci update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        sundesmo.SetLociData(newLociData);
     }
 
-    public void ReceiveMoodleStatuses(UserData target, List<MoodlesStatusInfo> newStatuses)
+    public void ReceiveLociStatuses(UserData target, List<LociStatusInfo> newStatuses)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
-        Logger.LogTrace($"Received moodle status update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        Logger.LogTrace($"Received loci status update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         sundesmo.SharedData.SetStatuses(newStatuses);
     }
 
-    public void ReceiveMoodlePresets(UserData target, List<MoodlePresetInfo> newPresets)
+    public void ReceiveLociPresets(UserData target, List<LociPresetInfo> newPresets)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
-        Logger.LogTrace($"Received moodle preset update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        Logger.LogTrace($"Received loci preset update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         sundesmo.SharedData.SetPresets(newPresets);
     }
 
-    public void ReceiveMoodleStatusUpdate(UserData target, MoodlesStatusInfo status, bool deleted)
+    public void ReceiveLociStatusUpdate(UserData target, LociStatusInfo status, bool deleted)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
-        Logger.LogTrace($"Received moodle status single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        Logger.LogTrace($"Received loci status single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         
         if (deleted) sundesmo.SharedData.Statuses.Remove(status.GUID);
         else sundesmo.SharedData.TryUpdateStatus(status);
     }
 
-    public void ReceiveMoodlePresetUpdate(UserData target, MoodlePresetInfo preset, bool deleted)
+    public void ReceiveLociPresetUpdate(UserData target, LociPresetInfo preset, bool deleted)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
-        Logger.LogTrace($"Received moodle preset single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
+        Logger.LogTrace($"Received loci preset single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
 
         if (deleted) sundesmo.SharedData.Presets.Remove(preset.GUID);
         else sundesmo.SharedData.TryUpdatePreset(preset);
@@ -474,7 +474,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (!PropertyChanger.TrySetProperty(sundesmo.PairPerms, permName, newValue, out var finalVal) || finalVal is null)
             throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
 
-        // Inform of a permission change here for moodles!
+        // Inform of a permission change here for locis!
         Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s PairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
         // Post permission change logic.
         switch (permName)
@@ -484,22 +484,22 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
                 Mediator.Publish(new ClearProfileDataMessage(target));
                 break;
 
-            case nameof(PairPerms.ShareOwnMoodles):
+            case nameof(PairPerms.ShareOwnLociData):
                 // Clear Shared Info if cleared.
-                if (!sundesmo.PairPerms.ShareOwnMoodles)
+                if (!sundesmo.PairPerms.ShareOwnLociData)
                 {
                     sundesmo.SharedData.Statuses.Clear();
                     sundesmo.SharedData.Presets.Clear();
                 }
                 break;
 
-            case nameof(PairPerms.MoodleAccess):
-            case nameof(PairPerms.MaxMoodleTime):
-                Mediator.Publish(new MoodlePermsChanged(sundesmo));
+            case nameof(PairPerms.LociAccess):
+            case nameof(PairPerms.MaxLociTime):
+                Mediator.Publish(new LociPermsChanged(sundesmo));
                 break;
         }
-        // Clear Moodles if share perms was turned off.
-        if (permName == nameof(PairPerms.ShareOwnMoodles) && !sundesmo.PairPerms.ShareOwnMoodles)
+        // Clear Locis if share perms was turned off.
+        if (permName == nameof(PairPerms.ShareOwnLociData) && !sundesmo.PairPerms.ShareOwnLociData)
         {
             sundesmo.SharedData.Statuses.Clear();
             sundesmo.SharedData.Presets.Clear();
@@ -515,7 +515,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         {
             if (!PropertyChanger.TrySetProperty(sundesmo.PairPerms, permName, newValue, out var finalVal) || finalVal is null)
                 throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
-            // Inform of a permission change here for moodles!
+            // Inform of a permission change here for locis!
             Logger.LogDebug($"[{sundesmo.GetNickAliasOrUid()}'s PairPerm {{{permName}}} is now {{{finalVal}}}]", LoggerType.PairDataTransfer);
         }
 
@@ -524,17 +524,17 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         {
             Mediator.Publish(new ClearProfileDataMessage(target));
         }
-        else if (changes.ContainsKey(nameof(PairPerms.ShareOwnMoodles)))
+        else if (changes.ContainsKey(nameof(PairPerms.ShareOwnLociData)))
         {
-            if (!sundesmo.PairPerms.ShareOwnMoodles)
+            if (!sundesmo.PairPerms.ShareOwnLociData)
             {
                 sundesmo.SharedData.Statuses.Clear();
                 sundesmo.SharedData.Presets.Clear();
             }
         }
-        else if (changes.ContainsKey(nameof(PairPerms.MoodleAccess)) || changes.ContainsKey(nameof(PairPerms.MaxMoodleTime)))
+        else if (changes.ContainsKey(nameof(PairPerms.LociAccess)) || changes.ContainsKey(nameof(PairPerms.MaxLociTime)))
         {
-            Mediator.Publish(new MoodlePermsChanged(sundesmo));
+            Mediator.Publish(new LociPermsChanged(sundesmo));
         }
     }
 
@@ -553,18 +553,18 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         {
             Mediator.Publish(new ClearProfileDataMessage(target));
         }
-        else if (prevPerms.ShareOwnMoodles != sundesmo.PairPerms.ShareOwnMoodles)
+        else if (prevPerms.ShareOwnLociData != sundesmo.PairPerms.ShareOwnLociData)
         {
-            if (!sundesmo.PairPerms.ShareOwnMoodles)
+            if (!sundesmo.PairPerms.ShareOwnLociData)
             {
                 sundesmo.SharedData.Statuses.Clear();
                 sundesmo.SharedData.Presets.Clear();
             }
         }
-        else if (prevPerms.MoodleAccess != sundesmo.PairPerms.MoodleAccess
-            || prevPerms.MaxMoodleTime != sundesmo.PairPerms.MaxMoodleTime)
+        else if (prevPerms.LociAccess != sundesmo.PairPerms.LociAccess
+            || prevPerms.MaxLociTime != sundesmo.PairPerms.MaxLociTime)
         {
-            Mediator.Publish(new MoodlePermsChanged(sundesmo));
+            Mediator.Publish(new LociPermsChanged(sundesmo));
         }
     }
 

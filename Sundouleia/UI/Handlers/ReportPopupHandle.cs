@@ -18,6 +18,8 @@ namespace Sundouleia.Gui.Components;
 
 internal class ReportPopupHandler : IPopupHandler
 {
+    private const string DEFAULT_REASON = "Describe your report here...";
+
     private readonly MainHub _hub;
     private readonly SundesmoManager _sundesmos;
     private readonly ProfileService _profiles;
@@ -26,9 +28,7 @@ internal class ReportPopupHandler : IPopupHandler
     private UserData _reportedUser = new("BlankUser");
     private string _reportedDisplayName = "User-XXX";
     private ReportKind _reportType = ReportKind.Profile;
-    private string _reportReason = DefaultReportReason;
-
-    private const string DefaultReportReason = "Describe your report here...";
+    private string _reportReason = DEFAULT_REASON;
 
     public ReportPopupHandler(MainHub hub, SundesmoManager pairs, ProfileService profiles, RadarChatLog radarChat)
     {
@@ -41,15 +41,15 @@ internal class ReportPopupHandler : IPopupHandler
     public Vector2 PopupSize => new(800, 450);
     public bool ShowClosed => false;
     public bool CloseHovered { get; set; } = false;
-    public Vector2? WindowPadding => Vector2.Zero;
-    public float? WindowRounding => 35f * ImGuiHelpers.GlobalScale;
+    public Vector2 WindowPadding => Vector2.Zero;
+    public float WindowRounding => 35f;
 
     public void DrawContent()
     {
         var drawList = ImGui.GetWindowDrawList();
         var rectMin = drawList.GetClipRectMin();
         var rectMax = drawList.GetClipRectMax();
-        var PlateSize = rectMax - rectMin;
+        var size = rectMax - rectMin;
         var frameH = ImUtf8.FrameHeight;
         var outerPadding = Vector2.One * 12f;
         var borderSize = Vector2.One * 8;
@@ -58,18 +58,18 @@ internal class ReportPopupHandler : IPopupHandler
         var pfpPos = rectMin + Vector2.One * 16f;
         var pfpSize = Vector2.One * 192;
         var descPos = pfpBorderPos + new Vector2(0, pfpBorderSize.Y + outerPadding.Y);
-        var descSize = pfpBorderSize with { Y = PlateSize.Y - outerPadding.Y * 3 - pfpBorderSize.Y };
+        var descSize = pfpBorderSize with { Y = size.Y - outerPadding.Y * 3 - pfpBorderSize.Y };
 
         // grab our profile image and draw the baseline.
-        var Profile = _profiles.GetProfile(_reportedUser);
-        var pfpWrap = Profile.GetAvatarOrDefault();
+        var profile = _profiles.GetProfile(_reportedUser);
+        var pfpWrap = profile.GetAvatarOrDefault();
 
         // draw out the background for the window.
         if (CosmeticService.CoreTextures.Cache[CoreTexture.ReportBg] is { } reportBG)
-            drawList.AddDalamudImageRounded(reportBG, rectMin, PlateSize, 30f);
+            drawList.AddDalamudImageRounded(reportBG, rectMin, size, 30f);
         // draw out the border on top of that.
         if (CosmeticService.CoreTextures.Cache[CoreTexture.ReportBorder] is { } reportBorder)
-            drawList.AddDalamudImageRounded(reportBorder, rectMin, PlateSize, 20f);
+            drawList.AddDalamudImageRounded(reportBorder, rectMin, size, 20f);
 
         // Draw out the left group.
         using (ImRaii.Group())
@@ -82,7 +82,7 @@ internal class ReportPopupHandler : IPopupHandler
             // Close Button
             var btnPos = rectMin + Vector2.One * 16;
             var btnSize = Vector2.One * 20;
-            var closeButtonColor = ImGui.GetColorU32(CloseHovered ? uint.MaxValue :SundCol.Silver.Uint());
+            var closeButtonColor = ImGui.GetColorU32(CloseHovered ? uint.MaxValue : SundCol.Silver.Uint());
             drawList.AddLine(btnPos, btnPos + btnSize, closeButtonColor, 3);
             drawList.AddLine(new Vector2(btnPos.X + btnSize.X, btnPos.Y), new Vector2(btnPos.X, btnPos.Y + btnSize.Y), closeButtonColor, 3);
             ImGui.SetCursorScreenPos(btnPos);
@@ -95,7 +95,7 @@ internal class ReportPopupHandler : IPopupHandler
                 drawList.AddDalamudImageRounded(descBorder, descPos, descSize, 2f);
             // The text for it.
             ImGui.SetCursorScreenPos(descPos + borderSize);
-            var desc = Profile.Info.Description;
+            var desc = profile.Info.Description;
             DrawLimitedDescription(desc, ImGuiColors.DalamudWhite, new Vector2(230, 185));
             CkGui.AttachToolTip("The Description being Reported");
 
@@ -150,7 +150,7 @@ internal class ReportPopupHandler : IPopupHandler
 
             using var font = Fonts.UidFont.Push();
             // Get the center of this screen.
-            var disableButton = _reportReason.IsNullOrWhitespace() || string.Equals(_reportReason, DefaultReportReason, StringComparison.OrdinalIgnoreCase);
+            var disableButton = _reportReason.IsNullOrWhitespace() || string.Equals(_reportReason, DEFAULT_REASON, StringComparison.OrdinalIgnoreCase);
             var buttonSize = ImGuiHelpers.GetButtonSize($"Report {_reportedDisplayName} To Sundouleia");
             var buttonOffset = (ImGui.GetContentRegionAvail() - buttonSize) / 2;
 
@@ -233,8 +233,7 @@ internal class ReportPopupHandler : IPopupHandler
         _reportedUser = msg.UserToReport;
         _reportType = msg.Kind;
         _reportedDisplayName = _sundesmos.DirectPairs.Any(x => x.UserData.UID == _reportedUser.UID)
-            ? _reportedUser.AliasOrUID
-            : "User-" + _reportedUser.UID.Substring(_reportedUser.UID.Length - 4);
-        _reportReason = DefaultReportReason;
+            ? _reportedUser.AliasOrUID : "User-" + _reportedUser.UID.Substring(_reportedUser.UID.Length - 4);
+        _reportReason = DEFAULT_REASON;
     }
 }

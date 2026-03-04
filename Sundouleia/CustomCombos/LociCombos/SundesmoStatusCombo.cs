@@ -11,20 +11,20 @@ using SundouleiaAPI.Hub;
 namespace Sundouleia.CustomCombos;
 
 // Could maybe split between an applier and remover but idk.
-public sealed class SundesmoStatusCombo : MoodleComboBase<MoodlesStatusInfo>
+public sealed class SundesmoStatusCombo : LociComboBase<LociStatusInfo>
 {
     public SundesmoStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale)
         : base(log, hub, sundesmo, scale, () => [ .. sundesmo.SharedData.Statuses.Values.OrderBy(x => x.Title)])
     { }
 
-    public SundesmoStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale, Func<IReadOnlyList<MoodlesStatusInfo>> generator)
+    public SundesmoStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale, Func<IReadOnlyList<LociStatusInfo>> generator)
         : base(log, hub, sundesmo, scale, generator)
     { }
 
     protected override bool DisableCondition()
-        => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.MoodleAccess.HasAny(MoodleAccess.AllowOwn);
+        => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.LociAccess.HasAny(LociAccess.AllowOwn);
 
-    protected override string ToString(MoodlesStatusInfo obj)
+    protected override string ToString(LociStatusInfo obj)
         => obj.Title.StripColorTags();
 
     public bool DrawStatuses(string id, float width, bool isApplying, string buttonTT)
@@ -46,7 +46,7 @@ public sealed class SundesmoStatusCombo : MoodleComboBase<MoodlesStatusInfo>
         var ret = ImGui.Selectable("##" + myStatus.Title, selected, ImGuiSelectableFlags.None, size);
 
         ImGui.SameLine(titleSpace);
-        MoodleIcon.DrawMoodleIcon(myStatus.IconID, myStatus.Stacks, IconSize);
+        LociIcon.Draw((uint)myStatus.IconID, myStatus.Stacks, IconSize);
         myStatus.AttachTooltip(_sundesmo.SharedData.StatusList);
 
         ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
@@ -57,26 +57,26 @@ public sealed class SundesmoStatusCombo : MoodleComboBase<MoodlesStatusInfo>
         return ret;
     }
 
-    protected override bool CanDoAction(MoodlesStatusInfo item)
-        => MoodlesEx.CanApplyMoodles(_sundesmo.PairPerms, [ item ]);
+    protected override bool CanDoAction(LociStatusInfo item)
+        => LociEx.CanApply(_sundesmo.PairPerms, [ item ]);
 
-    protected override void OnApplyButton(MoodlesStatusInfo item)
+    protected override void OnApplyButton(LociStatusInfo item)
     {
         UiService.SetUITask(async () =>
         {
-            var res = await _hub.UserApplyMoodles(new(_sundesmo.UserData, [item.GUID], false));
+            var res = await _hub.UserApplyLociData(new(_sundesmo.UserData, [item.GUID], false));
             if (res.ErrorCode is not SundouleiaApiEc.Success)
-                Log.LogWarning($"Failed to apply moodle status {item.Title} on {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
+                Log.LogWarning($"Failed to apply loci status {item.Title} on {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
         });
     }
 
-    protected override void OnRemoveButton(MoodlesStatusInfo item)
+    protected override void OnRemoveButton(LociStatusInfo item)
     {
         UiService.SetUITask(async () =>
         {
-            var res = await _hub.UserRemoveMoodles(new (_sundesmo.UserData, [item.GUID]));
+            var res = await _hub.UserRemoveLociData(new (_sundesmo.UserData, [item.GUID]));
             if (res.ErrorCode is not SundouleiaApiEc.Success)
-                Log.LogWarning($"Failed to remove moodle status {item.Title} from {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
+                Log.LogWarning($"Failed to remove loci status {item.Title} from {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
         });
     }
 }

@@ -20,12 +20,12 @@ public interface IPopupHandler
     /// <summary>
     /// Spesifies the rounding measurement for the window.
     /// </summary>
-    float? WindowRounding { get; }
+    float WindowRounding { get; }
 
     /// <summary>
     /// Specifies the padding for the window.
     /// </summary>
-    Vector2? WindowPadding { get; }
+    Vector2 WindowPadding { get; }
 
     /// <summary>
     /// Required to draw the popup contents.
