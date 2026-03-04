@@ -174,6 +174,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             // Create/Assign this ObjectIdx to the Penumbra Temp Collection if necessary.
             await TryCreateAssignTempCollection().ConfigureAwait(false);
+            // Assign Sundesmo as monitored in Loci
+            if (await _ipc.LociRegister(Address).ConfigureAwait(false))
+                _lociRegistered = true;
 
             // If they are online and have alterations, reapply them. Otherwise, exit.
             if (!Sundesmo.IsOnline || (!_hasAlterations))
@@ -956,7 +959,10 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private async Task ApplyLoci()
     {
         if (!_lociRegistered)
-            await _ipc.LociRegister(Address).ConfigureAwait(false);
+        {
+            if (await _ipc.LociRegister(Address).ConfigureAwait(false))
+                _lociRegistered = true;
+        }
         // Then set by ptr
         await _ipc.LociSetByPtr(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
     }
