@@ -10,6 +10,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using NAudio.SoundFont;
 using OtterGui.Extensions;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
@@ -147,7 +148,7 @@ public class StatusesTab : IDisposable
             if (!sm.EphemeralHosts.Contains(_selectedBinder))
                 _selectedBinder = string.Empty;
 
-            if (CkGuiUtils.StringCombo("##binders", 100f, _selectedBinder, out string newHost, sm.EphemeralHosts, "Select Host.."))
+            if (CkGuiUtils.StringCombo("##binders", 125f, _selectedBinder, out string newHost, sm.EphemeralHosts, "Select Host..", CFlags.NoArrowButton))
                 _selectedBinder = newHost;
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
                 _selectedBinder = string.Empty;
@@ -260,6 +261,7 @@ public class StatusesTab : IDisposable
 
             ImGui.TableNextColumn();
             _tmpDesc ??= status.Description;
+            var descPos = ImGui.GetCursorPos();
             ImGui.InputTextMultiline("##desc", ref _tmpDesc, 500, new Vector2(ImGui.GetContentRegionAvail().X, ImGui.CalcTextSize("A").Y * Math.Clamp(_tmpDesc.Split("\n").Length + 1, 2, 10)));
             if (ImGui.IsItemDeactivatedAfterEdit())
             {
@@ -268,8 +270,9 @@ public class StatusesTab : IDisposable
                 // null temp
                 _tmpDesc = null;
             }
-            ImGui.SameLine();
-            CkGui.RightFrameAlignedColor($"{status.Description.Length}/500", ImGuiColors.DalamudGrey2.ToUint(), ImUtf8.ItemSpacing.X);
+            var boxSize = ImGui.GetItemRectSize();
+            ImGui.SetCursorPos(descPos + new Vector2(boxSize.X - ImGui.CalcTextSize($"{status.Description.Length}/500").X, boxSize.Y - ImUtf8.FrameHeight));
+            CkGui.ColorTextFrameAlignedInline($"{status.Description.Length}/500", ImGuiColors.DalamudGrey2.ToUint());
 
             // Category
             ImGui.TableNextColumn();
@@ -368,7 +371,7 @@ public class StatusesTab : IDisposable
 
         ImGui.TableNextColumn();
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-        if (ImGui.BeginCombo("##initStk", StackText(status.StackSteps)))
+        if (ImGui.BeginCombo("##initStk", StackText(status.Stacks)))
         {
             for (var i = 1; i <= maxStacks; i++)
             {

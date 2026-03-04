@@ -36,6 +36,9 @@ public sealed class HybridSaveService : HybridSaveServiceBase<ConfigFileProvider
     public bool MarkForSaveOnDispose(IHybridSavable savable)
         => _toSaveOnDispose.Add(savable);
 
+    public bool ReleaseFromSaveOnDispose(IHybridSavable savable)
+        => _toSaveOnDispose.Remove(savable);
+
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Stopping HybridSaveService...");

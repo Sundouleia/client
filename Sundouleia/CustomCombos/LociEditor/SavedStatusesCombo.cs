@@ -48,7 +48,7 @@ public sealed class SavedStatusesCombo : CkFilterComboCache<LociStatus>
     {
         InnerWidth = width * scaler;
         _current = curr;
-        var preview = Items.FirstOrDefault(i => i.GUID == curr)?.Title ?? HintText;
+        var preview = Items.FirstOrDefault(i => i.GUID == curr) is { } cur ? cur.Title.StripColorTags() : HintText;
         return Draw(label, preview, string.Empty, width, _iconSize.Y, flags);
     }
 

@@ -13,8 +13,7 @@ public class ConfigFileProvider : IConfigFileProvider
     public static string SundouleiaDirectory    => Svc.PluginInterface.ConfigDirectory.FullName;
     public static string ChatDirectory      { get; private set; } = string.Empty;
     public static string EventDirectory     { get; private set; } = string.Empty;
-    public static string FileSysDirectory   { get; private set; } = string.Empty;
-    
+    public static string FileSysDirectory   { get; private set; } = string.Empty;    
     // Shared Configs
     public readonly string MainConfig;
     public readonly string LociConfig;

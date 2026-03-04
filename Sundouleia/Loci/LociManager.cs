@@ -10,7 +10,6 @@ using Sundouleia.PlayerClient;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
-using System.Threading.Tasks;
 
 namespace Sundouleia.Pairs;
 
@@ -23,6 +22,9 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
     private readonly MainConfig _config;
     private readonly ConfigFileProvider _fileNames;
     private readonly HybridSaveService _saver;
+
+    // Stores the ClientSM's of all our client's created characters
+    private static Dictionary<string, LociSM> _clientSMs = new();
 
     private static Dictionary<string, LociSM> _statusManagers = new();
     private List<LociStatus> _statuses = [];
@@ -71,29 +73,7 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
 
     private unsafe void InitializeData()
     {
-        // Then retrieve their status manager and set it.
-        var playerName = PlayerData.NameWithWorld;
-        if (_statusManagers.TryGetValue(playerName, out var existing))
-        {
-            Logger.LogDebug($"Found existing status manager for player {playerName}, assigning owner.", LoggerType.LociData);
-            ClientSM = existing;
-        }
-        // If the ClientSM has data inside it, we should assign that instead of creating a new one.
-        else if (ClientSM.Statuses.Count is not 0)
-        {
-            Logger.LogDebug($"ClientSM already has data, assigning to player {playerName}.", LoggerType.LociData);
-            ClientSM.Owner = PlayerData.Character;
-            _statusManagers.TryAdd(playerName, ClientSM);
-        }
-        // Otherwise, create and assign
-        else
-        {
-            Logger.LogDebug($"No existing status manager for player {playerName}, creating new one.", LoggerType.LociData); 
-            var manager = new LociSM() { Owner = PlayerData.Character };
-            _statusManagers.TryAdd(playerName, manager);
-            ClientSM = manager;
-        }
-
+        InitClientSM();
         // Then also do this for all other characters
         foreach (var charaAddr in CharaWatcher.RenderedCharas)
         {
@@ -114,6 +94,38 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
                 _statusManagers.TryAdd(nameWorld, newSM);
                 Logger.LogTrace($"Created and Assigned {{{nameWorld}}} to a new LociSM", LoggerType.LociData);
             }
+        }
+    }
+
+    private unsafe void InitClientSM()
+    {
+        var playerName = PlayerData.NameWithWorld;
+        // If we have a stored clientSM
+        if (_clientSMs.TryGetValue(playerName, out var existing))
+        {
+            Logger.LogDebug($"Found existing client status manager for player {playerName}, assigning ClientSM.", LoggerType.LociData);
+            ClientSM = existing;
+            ClientSM.Owner = PlayerData.Character;
+            // If one exists in the StatusManagers, dictionary, overwrite the value.
+            _statusManagers[playerName] = existing;
+        }
+        // Otherwise, if it exists, we need to ensure sync.
+        else if (_statusManagers.TryGetValue(playerName, out var existingSM))
+        {
+            Logger.LogDebug($"Found existing status manager for player {playerName}, assigning to ClientSM and syncing data.", LoggerType.LociData);
+            ClientSM = existingSM;
+            ClientSM.Owner = PlayerData.Character;
+            // Add to then tracked clientSM's mimicing the value from the status managers.
+            _clientSMs.TryAdd(playerName, existingSM);
+        }
+        // Otherwise, we need to create a new entry for both.
+        else
+        {
+            Logger.LogDebug($"No existing client status manager for player {playerName}, creating new one and assigning to ClientSM and StatusManagers.", LoggerType.LociData);
+            var manager = new LociSM() { Owner = PlayerData.Character };
+            _clientSMs.TryAdd(playerName, manager);
+            _statusManagers.TryAdd(playerName, manager);
+            ClientSM = manager;
         }
     }
 
@@ -357,7 +369,7 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
         }
     }
 
-    public void Save() 
+    public void Save()
         => _saver.Save(this);
 
     public void MigrateStatusesFromConfig(JObject jObj)
@@ -456,8 +468,7 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
             ["Version"] = ConfigVersion,
             ["Statuses"] = JArray.FromObject(_statuses),
             ["Presets"] = JArray.FromObject(_presets),
-            // Make this work for multiple characters
-            ["ClientSM"] = JObject.FromObject(ClientSM),
+            ["ClientManagers"] = JObject.FromObject(_clientSMs),
         }.ToString(Formatting.None); // No pretty formatting here.
     }
 
@@ -482,15 +493,15 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
 
         _statuses = jObject["Statuses"]?.ToObject<List<LociStatus>>() ?? new List<LociStatus>();
         _presets = jObject["Presets"]?.ToObject<List<LociPreset>>() ?? new List<LociPreset>();
-
-        var clientSM = jObject["ClientSM"]?.ToObject<LociSM>() ?? new LociSM();
-        // clear locks and ephemeral hosts
-        clientSM.LockedStatuses.Clear();
-        clientSM.EphemeralHosts.Clear();
-        // remove all add text to get visual verification
-        clientSM.AddTextShown.Clear();
-        // Assign it
-        ClientSM = clientSM;
+        _clientSMs = jObject["ClientManagers"]?.ToObject<Dictionary<string, LociSM>>() ?? new Dictionary<string, LociSM>();
+        // Clear out all data aside from statuses from the clientManagers.
+        foreach (var (name, data) in _clientSMs.ToList())
+        {
+            data.AddTextShown.Clear();
+            data.RemTextShown.Clear();
+            data.LockedStatuses.Clear();
+            data.EphemeralHosts.Clear();
+        }
         // Update the saved data.
         _saver.Save(this);
     }
