@@ -180,11 +180,11 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
             if (lociSM.OwnerValid)
                 lociSM.Owner = null;
 
-            // If ephemeral, we can assume they will apply things right away after, so remove them.
-            if (lociSM.Ephemeral)
+            // If not ephemeral, remove them.
+            if (!lociSM.Ephemeral)
             {
                 _statusManagers.Remove(nameWorld);
-                Logger.LogDebug($"Removed LociSM for {nameWorld}, as it was controlled by external sources.", LoggerType.LociData);
+                Logger.LogDebug($"Removed LociSM for {nameWorld}", LoggerType.LociData);
 
             }
         }
