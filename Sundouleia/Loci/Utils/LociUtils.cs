@@ -4,8 +4,10 @@ using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Party;
 using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Group;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.System.Framework;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 using Lumina.Excel.Sheets;
 using Lumina.Extensions;
@@ -82,25 +84,54 @@ public unsafe static partial class LociUtils
             return [PlayerData.Address];
         else
         {
-            List<nint> ret = [PlayerData.Address];
-            for (var i = 1; i < Math.Min(8, Svc.Party.Length); i++)
+            var ret = new List<nint>();
+            // Get the specially ordered party members here.
+            var hud = AgentHUD.Instance();
+            var partyMembers = hud->PartyMembers.ToArray();
+            var count = Math.Min((short)8, hud->PartyMemberCount);
+            // Note the first person is always the player
+            var sorted = partyMembers.OrderByDescending(m => (nint)m.Object != nint.Zero).ThenBy(m => m.Index).ToList();
+            // Svc.Logger.Information($"Hud Members: {string.Join(", ", sorted.Select(m => $"{((nint)m.Object):X8} (idx {m.Index})"))}");
+            // Sort them by the index that they appear in.
+            for (var i = 0; i < Math.Min((short)8, hud->PartyMemberCount); i++)
             {
-                // Attempt to fetch the object.
-                if (Svc.Party[i] is not IPartyMember member)
+                if (sorted[i].Object is null || !sorted[i].Object->IsCharacter())
                 {
                     ret.Add(nint.Zero);
                     continue;
                 }
+                // Add in the actor.
+                ret.Add((nint)sorted[i].Object);
+            }
+            return ret;
+        }
+    }
 
-                // Otherwise, attempt to get their object.
-                var obj = GameObjectManager.Instance()->Objects.GetObjectByEntityId(member.EntityId);
-                if (obj is null)
+    public static List<nint> GetNodeOrderedVisibleParty()
+    {
+        if (Svc.Party.Length < 2)
+            return [PlayerData.Address];
+        else
+        {
+            var ret = new List<nint>();
+            // Get the specially ordered party members here.
+            var hud = AgentHUD.Instance();
+            var partyMembers = hud->PartyMembers.ToArray();
+            var count = Math.Min((short)8, hud->PartyMemberCount);
+
+            var sorted = partyMembers.Skip(1).OrderByDescending(m => (nint)m.Object != nint.Zero).ThenBy(m => m.Index).ToList();
+            sorted.Insert(0, partyMembers[0]);
+            // Svc.Logger.Information($"Hud Members: {string.Join(", ", sorted.Select(m => $"{((nint)m.Object):X8} (idx {m.Index})"))}");
+            // Sort them by the index that they appear in.
+            for (var i = 0; i < Math.Min((short)8, hud->PartyMemberCount); i++)
+            {
+                if (sorted[i].Object is null || !sorted[i].Object->IsCharacter())
                 {
                     ret.Add(nint.Zero);
                     continue;
                 }
-                // Otherwise, add if character or not.
-                ret.Add(obj->IsCharacter() ? (nint)obj : nint.Zero);
+                // Add in the actor.
+                ret.Add((nint)sorted[i].Object);
             }
             return ret;
         }

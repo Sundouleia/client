@@ -1,7 +1,9 @@
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Party;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.DrawSystem;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -72,6 +74,35 @@ public class LociSettings
         }
 
         DrawMigrate();
+
+        ImGui.Separator();
+        try
+        {
+            unsafe
+            {
+                for (var i = 0; i < Math.Min(8, Svc.Party.Length); i++)
+                {
+                    // Attempt to fetch the object.
+                    if (Svc.Party[i] is not IPartyMember member)
+                    {
+                        ImGui.Text($"No Party member entry for index {i}");
+                        continue;
+                    }
+
+                    ImGui.Text($"Party Member {i}: {member.Name} - EntityId: {member.EntityId}");
+                    // Otherwise, attempt to get their object.
+                    var obj = GameObjectManager.Instance()->Objects.GetObjectByEntityId(member.EntityId);
+                    if (obj != null && obj->IsCharacter())
+                    {
+                        ImGui.Text($"Object Type: Character - Address: {(nint)obj:X8}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch party member objects for settings tab.");
+        }
     }
 
     private void DrawIndentedEnables()

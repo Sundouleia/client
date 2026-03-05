@@ -30,12 +30,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using CkCommons;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
-using Dalamud.Game.ClientState.Party;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Sundouleia.Loci.Data;
 using Sundouleia.PlayerClient;
+using TerraFX.Interop.WinRT;
 
 namespace Sundouleia.Loci.Processors;
 public unsafe class PartyListProcessor : IDisposable
@@ -87,6 +86,9 @@ public unsafe class PartyListProcessor : IDisposable
 
         var index = 23;
         var storeIndex = 0;
+        var visibleParty = LociUtils.GetVisibleParty();
+        // _logger.LogTrace($"PartyList found {visibleParty.Count} members!", LoggerType.LociProcessors);
+        // _logger.LogTrace($"Partylist had {visibleParty.Count(m => m != nint.Zero)} valid members", LoggerType.LociProcessors);
         foreach (nint player in LociUtils.GetVisibleParty())
         {
             if (player != nint.Zero)
@@ -115,7 +117,8 @@ public unsafe class PartyListProcessor : IDisposable
 
         // We can update, so update
         var partyMemberNodeIndex = 23;
-        var party = LociUtils.GetVisibleParty();
+        var party = LociUtils.GetNodeOrderedVisibleParty();
+        // _logger.LogDebug($"PartyMembers:\n - {string.Join("\n - ", party.Select(x => $"{x:X} - {((Character*)x)->GetNameWithWorld()}"))}");
 
         for (var n = 0; n < party.Count; n++)
         {
@@ -128,7 +131,7 @@ public unsafe class PartyListProcessor : IDisposable
 
             // Get the icon node array
             var iconArray = AddonHelp.GetNodeIconArray(addon->UldManager.NodeList[partyMemberNodeIndex]);
-            //InternalLog.Information($"Icon array length for {player} is {iconArray.Length}");
+            // _logger.LogInformation($"Icon array length for {player} is {iconArray.Length}");
             for (var i = NumStatuses[n]; i < iconArray.Length; i++)
             {
                 var c = iconArray[i];
@@ -144,7 +147,9 @@ public unsafe class PartyListProcessor : IDisposable
 
             // Otherwise, update the statuses
             var curIndex = NumStatuses[n];
-            foreach (var status in ((Character*)player)->GetManager().Statuses)
+            var sm = ((Character*)player)->GetManager();
+            // _logger.LogTrace($"Found SM for idx {curIndex}, with iconArray length of {iconArray.Length} with {sm.Statuses.Count} statuses.");
+            foreach (var status in sm.Statuses)
             {
                 if (status.Type == StatusType.Special)
                     continue;
