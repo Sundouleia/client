@@ -32,6 +32,8 @@ using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Sundouleia.Loci.Data;
 using Sundouleia.PlayerClient;
@@ -81,8 +83,6 @@ public unsafe class TargetInfoBuffDebuffProcessor
             if (c->IsVisible())
                 NumStatuses++;
         }
-
-        _logger.LogTrace($"TargetInfo Requested update: {NumStatuses}", LoggerType.LociProcessors);
     }
 
     private void OnTargetInfoBuffDebuffUpdate(AddonEvent type, AddonArgs args)
@@ -97,12 +97,15 @@ public unsafe class TargetInfoBuffDebuffProcessor
     // Didn't really know how to transfer to get the DalamudStatusList from here, so had to use IPlayerCharacter.
     public unsafe void UpdateAddon(AtkUnitBase* addon, bool hideAll = false)
     {
-        var target = Svc.Targets.SoftTarget! ?? Svc.Targets.Target!;
-        if (addon is null || !AddonHelp.IsAddonReady(addon) || target is not IPlayerCharacter pc)
+        var ts = TargetSystem.Instance();
+        var target = ts->SoftTarget is not null ? ts->SoftTarget : ts->Target;
+        if (target is null || !target->IsCharacter() || target->ObjectKind is not ObjectKind.Pc)
             return;
 
-        var baseCnt = LociProcessor.NewMethod ? 3 + NumStatuses : 3 + pc.StatusList.Count(x => x.StatusId != 0);
+        if (addon is null || !AddonHelp.IsAddonReady(addon))
+            return;
 
+        var baseCnt = 3 + NumStatuses;
         for (var i = baseCnt; i <= 32; i++)
         {
             var c = addon->UldManager.SearchNodeById((uint)i);
@@ -112,8 +115,9 @@ public unsafe class TargetInfoBuffDebuffProcessor
 
         if (hideAll)
             return;
-        
-        var sm = ((Character*)pc.Address)->GetManager();
+
+        // Update the statuses
+        var sm = ((Character*)target)->GetManager();
         foreach (var x in sm.Statuses)
         {
             if (baseCnt > 32)

@@ -32,10 +32,15 @@ using CkCommons.Helpers;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Statuses;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using Penumbra.GameData.Interop;
 using Sundouleia.Loci.Data;
 using Sundouleia.PlayerClient;
+using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Loci.Processors;
 
@@ -49,36 +54,39 @@ public unsafe class TargetInfoProcessor
     {
         _logger = logger;
         _config = config;
-
-        Svc.AddonLifecycle.RegisterListener(AddonEvent.PostUpdate, "_TargetInfo", OnTargetInfoUpdate);
+        Svc.AddonLifecycle.RegisterListener(AddonEvent.PreUpdate, "_TargetInfo", OnTargetInfoUpdate);
         Svc.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "_TargetInfo", OnTargetInfoRequestedUpdate);
-        if (PlayerData.Available && AddonHelp.TryGetAddonByName<AtkUnitBase>("_TargetInfo", out var addon) && AddonHelp.IsAddonReady(addon))
-            AddonRequestedUpdate(addon);
+        unsafe
+        {
+            if (PlayerData.Available && AddonHelp.TryGetAddonByName<AtkUnitBase>("_TargetInfo", out var addon) && AddonHelp.IsAddonReady(addon))
+                AddonRequestedUpdate(addon);
+        }
     }
 
     public void Dispose()
     {
-        Svc.AddonLifecycle.UnregisterListener(AddonEvent.PostUpdate, "_TargetInfo", OnTargetInfoUpdate);
+        Svc.AddonLifecycle.UnregisterListener(AddonEvent.PreUpdate, "_TargetInfo", OnTargetInfoUpdate);
         Svc.AddonLifecycle.UnregisterListener(AddonEvent.PostRequestedUpdate, "_TargetInfo", OnTargetInfoRequestedUpdate);
     }
 
-    public void HideAll()
+    public unsafe void HideAll()
     {
         if(AddonHelp.TryGetAddonByName<AtkUnitBase>("_TargetInfo", out var addon) && AddonHelp.IsAddonReady(addon))
-            UpdateAddon(addon, true);
+            UpdateAddon((nint)addon, true);
     }
 
     // Func helper to get around 7.4's internal AddonArgs while removing ArtificialAddonArgs usage
-    private void OnTargetInfoRequestedUpdate(AddonEvent t, AddonArgs args)
+    private unsafe void OnTargetInfoRequestedUpdate(AddonEvent t, AddonArgs args)
         => AddonRequestedUpdate((AtkUnitBase*)args.Addon.Address);
 
-    private void AddonRequestedUpdate(AtkUnitBase* addonBase)
+    private unsafe void AddonRequestedUpdate(AtkUnitBase* addonBase)
     {
         if(addonBase is not null && AddonHelp.IsAddonReady(addonBase))
         {
             NumStatuses = 0;
             for(var i = 32; i >= 3; i--)
             {
+                // Ensure we count the number of vanilla statuses.
                 var c = addonBase->UldManager.NodeList[i];
                 if(c->IsVisible())
                     NumStatuses++;
@@ -90,25 +98,25 @@ public unsafe class TargetInfoProcessor
     private void OnTargetInfoUpdate(AddonEvent type, AddonArgs args)
     {
         if (!PlayerData.Available)
-        {
-            _logger.LogDebug($"Player not available for target update!");
             return;
-        }
         if (!_config.CanLociModifyUI())
-        {
-            _logger.LogDebug($"Config prevented target update!");
             return;
-        }
-        UpdateAddon((AtkUnitBase*)args.Addon.Address);
+        UpdateAddon(args.Addon.Address);
     }
 
-    public void UpdateAddon(AtkUnitBase* addon, bool hideAll = false)
+    public unsafe void UpdateAddon(nint addonAddr, bool hideAll = false)
     {
-        var target = Svc.Targets.SoftTarget! ?? Svc.Targets.Target!;
-        if (addon is null || !AddonHelp.IsAddonReady(addon) || target is not IPlayerCharacter pc)
+        var addon = (AtkUnitBase*)addonAddr;
+        var ts = TargetSystem.Instance();
+        var target = ts->SoftTarget is not null ? ts->SoftTarget : ts->Target;
+        if (target is null || !target->IsCharacter() || target->ObjectKind is not ObjectKind.Pc)
             return;
 
-        var baseCnt = LociProcessor.NewMethod ? 32 - NumStatuses : 32 - pc.StatusList.Count(x => x.StatusId != 0);
+        if (addon is null || !AddonHelp.IsAddonReady(addon))
+            return;
+
+        // Get the base count by combining the statuses from Moodles with the vanilla ones.
+        var baseCnt = 32 - NumStatuses;
 
         for(var i = baseCnt; i >= 3; i--)
         {
@@ -120,7 +128,7 @@ public unsafe class TargetInfoProcessor
         if (hideAll)
             return;
 
-        var sm = ((Character*)pc.Address)->GetManager();
+        var sm = ((Character*)target)->GetManager();
         foreach (var x in sm.Statuses)
         {
             if (baseCnt < 3)
@@ -134,7 +142,7 @@ public unsafe class TargetInfoProcessor
         }
     }
 
-    private void SetIcon(AtkUnitBase* addon, int index, LociStatus status)
+    private unsafe void SetIcon(AtkUnitBase* addon, int index, LociStatus status)
     {
         var container = addon->UldManager.NodeList[index];
         LociProcessor.SetIcon(addon, container, status);

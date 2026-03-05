@@ -32,6 +32,8 @@ using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Sundouleia.Loci.Data;
 using Sundouleia.PlayerClient;
@@ -54,8 +56,8 @@ public unsafe class FocusTargetInfoProcessor
         Svc.AddonLifecycle.RegisterListener(AddonEvent.PostUpdate, "_FocusTargetInfo", OnFocusTargetInfoUpdate);
         Svc.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "_FocusTargetInfo", OnFocusTargetInfoRequestedUpdate);
         if(PlayerData.Available && AddonHelp.TryGetAddonByName<AtkUnitBase>("_FocusTargetInfo", out var addon) && AddonHelp.IsAddonReady(addon))
-            AddonRequestedUpdate(addon);
-    }
+                AddonRequestedUpdate(addon);
+        }
 
     public void Dispose()
     {
@@ -97,14 +99,16 @@ public unsafe class FocusTargetInfoProcessor
 
     public unsafe void UpdateAddon(AtkUnitBase* addon, bool hideAll = false)
     {
-        if (addon is null || !AddonHelp.IsAddonReady(addon) || Svc.Targets.FocusTarget is not IPlayerCharacter pc)
+        var target = TargetSystem.Instance()->FocusTarget;
+        if (target is null || !target->IsCharacter() || target->ObjectKind is not ObjectKind.Pc)
+            return;
+
+        if (addon is null || !AddonHelp.IsAddonReady(addon))
             return;
         
-        var baseCnt = LociProcessor.NewMethod
-            ? 8 - NumStatuses 
-            : 8 - PlayerData.StatusList.Count(x => x.StatusId != 0 && !LociProcessor.SpecialStatuses.Contains(x.StatusId));
-
-        for(var i = baseCnt; i >= 4; i--)
+        // Determine the base count by combining the Moodles statuses with the statuses from the base game.
+        var baseCnt = 8 - NumStatuses;
+        for (var i = baseCnt; i >= 4; i--)
         {
             var c = addon->UldManager.NodeList[i];
             if(c->IsVisible())
@@ -113,9 +117,9 @@ public unsafe class FocusTargetInfoProcessor
 
         if (hideAll)
             return;
-        
+
         // Update the displays.
-        var sm = ((Character*)pc.Address)->GetManager();
+        var sm = ((Character*)target)->GetManager();
         foreach (var x in sm.Statuses)
         {
             if (x.Type is StatusType.Special)
@@ -133,7 +137,7 @@ public unsafe class FocusTargetInfoProcessor
         }
     }
 
-    private void SetIcon(AtkUnitBase* addon, int index, LociStatus status)
+    private unsafe void SetIcon(AtkUnitBase* addon, int index, LociStatus status)
     {
         var container = addon->UldManager.NodeList[index];
         LociProcessor.SetIcon(addon, container, status);

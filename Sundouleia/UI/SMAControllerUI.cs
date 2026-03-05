@@ -69,16 +69,9 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
             }
         });
 
-        Mediator.Subscribe<GPoseStartMessage>(this, _ =>
-        {
-#if DEBUG
-            IsOpen = true;
-#endif
-        });
-
-# if DEBUG
-        IsOpen = true;
-# endif
+//# if DEBUG
+//        IsOpen = true;
+//# endif
     }
 
     /// <summary>

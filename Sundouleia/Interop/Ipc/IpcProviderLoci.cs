@@ -39,16 +39,16 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
     private static ICallGateProvider<nint, string, LociStatusInfo, object>       OnTargetApplyStatus;
     private static ICallGateProvider<nint, string, List<LociStatusInfo>, object> OnTargetApplyStatuses;
 
-    // ------ Loci Actor SM Control -----
-    // Inform Loci you are managing this actor via an identifier. Returns if successful.
-    // Note this has no impact on access, but informs Loci if it should be ephemeral.
+    // ------ Actor SM Control -----
+    // Inform you are managing this actor via an identifier. Returns if successful.
+    // Note this has no impact on access, but informs if it should be ephemeral.
     // You are responsible for ensuring they are unregistered when done so target application can work properly.
     private static ICallGateProvider<nint, string, bool>?   RegisterActorByPtr;     // Mark an actor for use by pointer using an identification code.
     private static ICallGateProvider<string, string, bool>? RegisterActorByName;    // Mark an actor for use by name using an identification code.
     private static ICallGateProvider<nint, string, bool>?   UnregisterActorByPtr;   // Unmark an actor by pointer.
     private static ICallGateProvider<string, string, bool>? UnregisterActorByName;  // Unmark an actor by name.
 
-    // Locks a LociStatus with a code.
+    // Locks a Status with a code.
     // The status cannot be removed unless unlocked with the same code (or plugin disable)
     // Can only be applied to the client player statuses.
     private static ICallGateProvider<Guid, uint, bool>?                     LockStatus;     // Returns if locked successfully.
@@ -131,8 +131,9 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
     {
         try
         {
-            OnManagerModified?.SendMessage(charaAddr);
             OnSMModifiedCalled?.Invoke(charaAddr);
+            OnManagerModified?.SendMessage(charaAddr);
+            IpcProviderMoodles.InvokeManagerModified(charaAddr);
         }
         catch (Bagagwa ex)
         {
@@ -144,8 +145,9 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
     {
         try
         {
-            OnStatusUpdated?.SendMessage(status.GUID, removed);
             OnStatusModifiedCalled?.Invoke(status, removed);
+            OnStatusUpdated?.SendMessage(status.GUID, removed);
+            IpcProviderMoodles.InvokeStatusUpdated(status.GUID, removed);
         }
         catch (Bagagwa ex)
         {
@@ -157,8 +159,9 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
     {
         try
         {
-            OnPresetUpdated?.SendMessage(preset.GUID, removed);
             OnPresetModifiedCalled?.Invoke(preset, removed);
+            OnPresetUpdated?.SendMessage(preset.GUID, removed);
+            IpcProviderMoodles.InvokePresetUpdated(preset.GUID, removed);
         }
         catch (Bagagwa ex)
         {

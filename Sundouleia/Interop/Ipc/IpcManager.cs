@@ -17,13 +17,17 @@ public sealed partial class IpcManager : DisposableMediatorSubscriberBase
     public IpcCallerHonorific   Honorific { get; }
     public IpcCallerPenumbra    Penumbra { get; }
     public IpcCallerPetNames    PetNames { get; }
-    public IpcProviderLoci      Loci { get; }
+
+    
+    public IpcProviderMoodles   Moodles { get; } // Peudo-Provider
+    public IpcProviderLoci      Loci    { get; }
 
     public IpcManager(ILogger<IpcManager> logger, SundouleiaMediator mediator,
         IpcCallerBrio brio,
         IpcCallerCustomize customizePlus,
         IpcCallerGlamourer glamourer,
         IpcCallerHeels heels,
+        IpcProviderMoodles moodles,
         IpcCallerHonorific honorific,
         IpcCallerPenumbra penumbra,
         IpcCallerPetNames petNames,
@@ -35,6 +39,7 @@ public sealed partial class IpcManager : DisposableMediatorSubscriberBase
         Glamourer = glamourer;
         Heels = heels;
         Honorific = honorific;
+        Moodles = moodles;
         Penumbra = penumbra;
         PetNames = petNames;
         Loci = lociProvider;

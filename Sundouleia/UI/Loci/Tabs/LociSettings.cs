@@ -6,21 +6,24 @@ using Sundouleia.DrawSystem;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
+using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.Gui.Loci;
 
 public class LociSettings
 {
     private readonly ILogger<LociSettings> _logger;
+    private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
     private readonly LociManager _manager;
     private readonly StatusesFS _statusFileSystem;
     private readonly PresetsFS _presetFileSystem;
 
-    public LociSettings(ILogger<LociSettings> logger, MainConfig config, 
-        LociManager manager, StatusesFS statusFS, PresetsFS presetFS)
+    public LociSettings(ILogger<LociSettings> logger, SundouleiaMediator mediator,
+        MainConfig config, LociManager manager, StatusesFS statusFS, PresetsFS presetFS)
     {
         _logger = logger;
+        _mediator = mediator;
         _config = config;
         _manager = manager;
         _statusFileSystem = statusFS;
@@ -35,6 +38,7 @@ public class LociSettings
         {
             _config.Current.LociEnabled = enabled;
             _config.Save();
+            _mediator.Publish(new LociEnabledStateChanged(enabled));
         }
         DrawIndentedEnables();
 

@@ -31,6 +31,7 @@ using CkCommons;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Sundouleia.Loci.Data;
 using Sundouleia.Pairs;
@@ -196,17 +197,9 @@ public unsafe class StatusCustomProcessor : IDisposable
     {
         if (addon is null || !AddonHelp.IsAddonReady(addon))
             return;
-        
+
         // Update the base count
-        int baseCnt;
-        if (LociProcessor.NewMethod)
-            baseCnt = 24 - statusCnt;
-        else
-        {
-            baseCnt = 24 - PlayerData.StatusList.Count(x => x.StatusId != 0 && userStatuses.Contains(x.StatusId));
-            if (Svc.Condition[ConditionFlag.Mounted] && addon->NameString == "StatusCustom2")
-                baseCnt--;
-        }
+        int baseCnt = 24 - statusCnt;
 
         // Update visibility
         for (var i = baseCnt; i >= 5; i--)

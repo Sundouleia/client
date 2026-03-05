@@ -34,6 +34,7 @@ using Dalamud.Memory;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Lumina.Excel.Sheets;
 using Microsoft.Extensions.Hosting;
@@ -51,10 +52,8 @@ namespace Sundouleia.Loci.Processors;
 /// <summary>
 ///     The core processor for the Loci Module
 /// </summary>
-public class LociProcessor : IHostedService
+public class LociProcessor : DisposableMediatorSubscriberBase, IHostedService
 {
-    private readonly ILogger<LociProcessor> _logger;
-    private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
     private readonly LociMemory _lociMemory;
     private readonly PartyListProcessor _partyList;
@@ -68,13 +67,12 @@ public class LociProcessor : IHostedService
 
     private static nint _tooltipMemory;
 
-    public LociProcessor(ILogger<LociProcessor> logger, SundouleiaMediator mediator, MainConfig config, 
+    public LociProcessor(ILogger<LociProcessor> logger, SundouleiaMediator mediator, MainConfig config,
         LociMemory memory, PartyListProcessor party, StatusProcessor statuses, StatusCustomProcessor customs,
         TargetInfoProcessor targetInfo, FocusTargetInfoProcessor ftInfo, TargetInfoBuffDebuffProcessor bdtInfo,
         FlyPopupTextProcessor flyPopupText, LociManager manager)
+        : base(logger, mediator)
     {
-        _logger = logger;
-        _mediator = mediator;
         _config = config;
         _lociMemory = memory;
         _partyList = party;
@@ -85,6 +83,15 @@ public class LociProcessor : IHostedService
         _targetInfoBuffDebuff = bdtInfo;
         _flyText = flyPopupText;
         _manager = manager;
+
+        Mediator.Subscribe<LociEnabledStateChanged>(this, _ => 
+        {
+            unsafe
+            {
+                if (!_.NewState)
+                    HideAll();
+            }
+        });
 
         _tooltipMemory = Marshal.AllocHGlobal(2 * 1024);
         Svc.Framework.Update += OnTick;
@@ -102,7 +109,6 @@ public class LociProcessor : IHostedService
     public static nint HoveringOver = 0;
     public static List<nint> CancelRequests = [];
     public static bool WasRightMousePressed = false;
-    public static bool NewMethod = true;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -142,7 +148,7 @@ public class LociProcessor : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Disposing LociProcessor...");
+        Logger.LogInformation("Disposing LociProcessor...");
         Svc.Framework.Update -= OnTick;
 
         Svc.Framework.RunOnFrameworkThread(() =>
@@ -260,7 +266,7 @@ public class LociProcessor : IHostedService
                     }
                     catch (Bagagwa e)
                     {
-                        _logger.LogWarning($"Something went wrong on LociSMModified IPCEvent!\n{e.Message}\n" +
+                        Logger.LogWarning($"Something went wrong on LociSMModified IPCEvent!\n{e.Message}\n" +
                             $"One of your Plugins may have outdated IPC parameters for this IPCEvent");
                     }
                 }
@@ -278,7 +284,7 @@ public class LociProcessor : IHostedService
                 Character* chara = (Character*)x.PlayerAddr;
                 if (ShouldSpawnHitEffect(chara, x.customPath))
                 {
-                    _logger.LogDebug($"StatusHitEffect on: {chara->NameString} / {x.customPath}");
+                    Logger.LogDebug($"StatusHitEffect on: {chara->NameString} / {x.customPath}");
                     if (x.customPath == "kill")
                         _lociMemory.SpawnSHE("dk04ht_canc0h", x.PlayerAddr, x.PlayerAddr, -1, char.MinValue, 0, char.MinValue);
                     else
@@ -286,7 +292,7 @@ public class LociProcessor : IHostedService
                 }
                 else
                 {
-                    _logger.LogDebug($"SHE skipped on: {chara->NameString} / {x.customPath}", LoggerType.LociProcessors);
+                    Logger.LogDebug($"SHE skipped on: {chara->NameString} / {x.customPath}", LoggerType.LociProcessors);
                 }
             }
             SHECandidates.Clear();

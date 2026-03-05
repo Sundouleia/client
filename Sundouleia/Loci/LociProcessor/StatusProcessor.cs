@@ -35,6 +35,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using Sundouleia.Loci.Data;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Loci.Processors;
 public unsafe class StatusProcessor : IDisposable
@@ -82,7 +83,7 @@ public unsafe class StatusProcessor : IDisposable
             return;
         if(!_config.CanLociModifyUI())
             return;
-        
+
         var validStatuses = LociManager.GetStatusManager(PlayerData.NameWithWorld).Statuses;
         UpdateStatus((AtkUnitBase*)args.Addon.Address, validStatuses, NumStatuses);
     }
@@ -106,15 +107,7 @@ public unsafe class StatusProcessor : IDisposable
         if (addon is null || !AddonHelp.IsAddonReady(addon))
             return;
 
-        int baseCnt;
-        if(LociProcessor.NewMethod)
-            baseCnt = 25 - statusCnt;
-        else
-        {
-            baseCnt = 25 - PlayerData.StatusList.Count(x => x.StatusId != 0);
-            if(Svc.Condition[ConditionFlag.Mounted])
-                baseCnt--;
-        }
+        int baseCnt = 25 - statusCnt;
 
         // Update visibility
         for (var i = baseCnt; i >= 1; i--)

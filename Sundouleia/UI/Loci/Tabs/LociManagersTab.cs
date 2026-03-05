@@ -1,5 +1,6 @@
 using CkCommons;
 using CkCommons.Gui;
+using CkCommons.Helpers;
 using CkCommons.Raii;
 using CkCommons.RichText;
 using CkCommons.Textures;
@@ -63,18 +64,21 @@ public class LociManagersTab
         }
 
         CkGui.FontText(selected.NameWorld, Fonts.Default150Percent);
-        CkGui.IconTextAligned(FAI.Eye);
-        CkGui.TextFrameAlignedInline("Is Owner Valid (Present)");
-        ImGui.SameLine();
-        CkGui.ColorTextBool(selected.Manager.OwnerValid ? "Valid" : "Invalid", selected.Manager.OwnerValid);
-
-        CkGui.IconTextAligned(FAI.Link);
-        CkGui.TextFrameAlignedInline("Managed by External Plugins (Ephemeral):");
-        CkGui.BoolIconFramed(selected.Manager.Ephemeral, true);
-        if (selected.Manager.Ephemeral)
+        using (ImRaii.Group())
         {
-            foreach (var hostKey in selected.Manager.EphemeralHosts)
-                CkGui.BulletText(hostKey, ImGuiColors.DalamudGrey2.ToUint());
+            CkGui.IconTextAligned(FAI.Eye);
+            CkGui.TextFrameAlignedInline("Is Owner Valid (Present)");
+            ImGui.SameLine();
+            CkGui.ColorTextBool(selected.Manager.OwnerValid ? "Valid" : "Invalid", selected.Manager.OwnerValid);
+
+            CkGui.IconTextAligned(FAI.Link);
+            CkGui.TextFrameAlignedInline("Managed by Plugins (Ephemeral):");
+            CkGui.BoolIconFramed(selected.Manager.Ephemeral, true);
+            if (selected.Manager.Ephemeral)
+            {
+                foreach (var hostKey in selected.Manager.EphemeralHosts)
+                    CkGui.BulletText(hostKey, ImGuiColors.DalamudGrey2.ToUint());
+            }
         }
 
         DrawStatuses(selected.Manager);

@@ -242,7 +242,8 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<IpcCallerPetNames>()
         .AddSingleton<IpcManager>()
         .AddSingleton<IpcProvider>()
-        .AddSingleton<IpcProviderLoci>();
+        .AddSingleton<IpcProviderLoci>()
+        .AddSingleton<IpcProviderMoodles>();
 
     public static IServiceCollection AddSundouleiaConfigs(this IServiceCollection services)
     => services
@@ -364,6 +365,7 @@ public static class SundouleiaServiceExtensions
         .AddHostedService(p => p.GetRequiredService<EventAggregator>())     // Forcibly calls the constructor, subscribing to the monitors.
         .AddHostedService(p => p.GetRequiredService<IpcProvider>())         // Required for IPC calls to work properly.
         .AddHostedService(p => p.GetRequiredService<IpcProviderLoci>())
+        .AddHostedService(p => p.GetRequiredService<IpcProviderMoodles>())        // Initializes the hooks for the radar module.
         // Loci
         .AddHostedService(p => p.GetRequiredService<LociMemory>())          // Initializes the hooks for the memory module.
         .AddHostedService(p => p.GetRequiredService<LociProcessor>())       // Starts the processing loop for the Loci module.

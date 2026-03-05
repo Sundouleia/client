@@ -116,7 +116,7 @@ public unsafe class PartyListProcessor : IDisposable
         // We can update, so update
         var partyMemberNodeIndex = 23;
         var party = LociUtils.GetVisibleParty();
-        
+
         for (var n = 0; n < party.Count; n++)
         {
             var player = party[n];
