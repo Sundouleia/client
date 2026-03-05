@@ -90,7 +90,7 @@ public unsafe class StatusProcessor : IDisposable
 
     private void AddonRequestedUpdate(AtkUnitBase* addonBase)
     {
-        if (addonBase is null || !AddonHelp.IsAddonReady(addonBase) || _config.CanLociModifyUI())
+        if (addonBase is null || !AddonHelp.IsAddonReady(addonBase) || !_config.CanLociModifyUI())
             return;
         
         NumStatuses = 0;
