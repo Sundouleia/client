@@ -49,7 +49,7 @@ public class StatusesTab : IDisposable
     private string? _tmpDesc = null;
     private string? _tmpTimeStr = null;
     private string _chainStatusFilter = string.Empty;
-    private string _selectedBinder = string.Empty;
+    private string _selectedHost = string.Empty;
 
     public void Dispose()
     {
@@ -62,7 +62,7 @@ public class StatusesTab : IDisposable
         _tmpDesc = null;
         _tmpTimeStr = null;
         _chainStatusFilter = string.Empty;
-        _selectedBinder = string.Empty;
+        _selectedHost = string.Empty;
     }
 
     public void DrawSection(Vector2 region)
@@ -145,19 +145,19 @@ public class StatusesTab : IDisposable
         else
         {
             // reset the target binder if no longer part of the subset.
-            if (!sm.EphemeralHosts.Contains(_selectedBinder))
-                _selectedBinder = string.Empty;
+            if (!sm.EphemeralHosts.Contains(_selectedHost))
+                _selectedHost = string.Empty;
 
-            if (CkGuiUtils.StringCombo("##binders", 125f, _selectedBinder, out string newHost, sm.EphemeralHosts, "Select Host..", CFlags.NoArrowButton))
-                _selectedBinder = newHost;
+            if (CkGuiUtils.StringCombo("##binders", 125f, _selectedHost, out string newHost, sm.EphemeralHosts, "Select Host..", CFlags.NoArrowButton))
+                _selectedHost = newHost;
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-                _selectedBinder = string.Empty;
+                _selectedHost = string.Empty;
 
             ImUtf8.SameLineInner();
-            var buttonTxt = $"Apply to Target {(_selectedBinder.Length is 0 ? "(No Host Chosen)" : $"(Authorized by {_selectedBinder})")}";
+            var buttonTxt = $"{(_selectedHost.Length is 0 ? "(No Host Chosen)" : $"Apply to Target ({_selectedHost})")}";
             // Sends an event to listeners of the actor address, the host it is intended for, and the tuple data being applied.
-            if (CkGui.IconTextButton(FAI.PersonBurst, buttonTxt))
-                IpcProviderLoci.OnApplyToTarget((nint)chara, _selectedBinder, status.ToTuple());
+            if (CkGui.IconTextButton(FAI.PersonBurst, buttonTxt, disabled: _selectedHost.Length is 0))
+                IpcProviderLoci.OnApplyToTarget((nint)chara, _selectedHost, status.ToTuple());
         }
     }
 
@@ -266,7 +266,10 @@ public class StatusesTab : IDisposable
             if (ImGui.IsItemDeactivatedAfterEdit())
             {
                 if (_tmpDesc != status.Description)
+                {
+                    status.Description = _tmpDesc;
                     _loci.MarkStatusModified(status);
+                }
                 // null temp
                 _tmpDesc = null;
             }

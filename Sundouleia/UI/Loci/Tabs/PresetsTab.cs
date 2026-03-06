@@ -336,9 +336,9 @@ public class PresetsTab : IDisposable
                 _selectedHost = string.Empty;
 
             ImUtf8.SameLineInner();
-            var buttonTxt = $"Apply to Target {(_selectedHost.Length is 0 ? "(No Host Chosen)" : $"(Authorized by {_selectedHost})")}";
+            var buttonTxt = $"{(_selectedHost.Length is 0 ? "(No Host Chosen)" : $"Apply to Target ({_selectedHost})")}";
             // Sends an event to listeners of the actor address, the host it is intended for, and the tuple data being applied.
-            if (CkGui.IconTextButton(FAI.PersonBurst, buttonTxt))
+            if (CkGui.IconTextButton(FAI.PersonBurst, buttonTxt, disabled: _selectedHost.Length is 0))
             {
                 Generic.Safe(() =>
                 {
