@@ -11,22 +11,23 @@ using Sundouleia.Services;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class SavedStatusesCombo : CkFilterComboCache<LociStatus>
+public sealed class SavedPresetsCombo : CkFilterComboCache<LociPreset>
 {
     private readonly LociManager _manager;
     
     private Guid _current;
     private static Vector2 _iconSize => LociIcon.Size;
 
-    public SavedStatusesCombo(ILogger log, LociManager manager, Func<IReadOnlyList<LociStatus>> generator) : base(generator, log)
+    public SavedPresetsCombo(ILogger log, LociManager manager, Func<IReadOnlyList<LociPreset>> generator)
+        : base(generator, log)
     {
         _manager = manager;
         _current = Guid.Empty;
         SearchByParts = true;
     }
 
-    public string HintText { get; set; } = "Status to Chain... (Optional)";
-    protected override string ToString(LociStatus status)
+    public string HintText { get; set; } = "Preset to Chain... (Optional)";
+    protected override string ToString(LociPreset status)
         => status.Title.StripColorTags();
 
     protected override int UpdateCurrentSelected(int currentSelected)
@@ -55,23 +56,42 @@ public sealed class SavedStatusesCombo : CkFilterComboCache<LociStatus>
     protected override bool DrawSelectable(int globalIdx, bool selected)
     {
         var size = new Vector2(GetFilterWidth(), _iconSize.Y);
-        var titleSpace = size.X - _iconSize.X;
-        var myStatus = Items[globalIdx];
-        using var dis = ImRaii.Disabled(myStatus.GUID == _current);
+        var myPreset = Items[globalIdx];
+        var iconsSpace = ((_iconSize.X + ImUtf8.ItemInnerSpacing.X) * myPreset.Statuses.Count);
+        var titleSpace = size.X - iconsSpace;
+        
+        using var dis = ImRaii.Disabled(myPreset.GUID == _current);
 
         // Push the font first so the height is correct.
         using var _ = Fonts.Default150Percent.Push();
 
-        var ret = ImGui.Selectable($"##{myStatus.Title}", selected, ImGuiSelectableFlags.None, size);
+        var ret = ImGui.Selectable($"##{myPreset.Title}", selected, ImGuiSelectableFlags.None, size);
 
-        ImGui.SameLine(titleSpace);
-        LociIcon.Draw((uint)myStatus.IconID, myStatus.Stacks, _iconSize);
-        LociEx.AttachTooltip(myStatus, _manager);
+        if (_manager.SavedStatuses.Count > 0)
+        {
+            ImGui.SameLine(titleSpace);
+            for (int i = 0; i < myPreset.Statuses.Count; i++)
+            {
+                var status = myPreset.Statuses[i];
+                // Maybe save on drawtime by doing internal referencing here or something.
+                if (_manager.SavedStatuses.FirstOrDefault(s => s.GUID == status) is not { } info)
+                {
+                    ImGui.SameLine(0, (_iconSize.X + ImUtf8.ItemInnerSpacing.X));
+                    continue;
+                }
+
+                LociIcon.Draw((uint)info.IconID, info.Stacks, _iconSize);
+                LociEx.AttachTooltip(info, _manager);
+
+                if (i < myPreset.Statuses.Count)
+                    ImUtf8.SameLineInner();
+            }
+        }
 
         ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + adjust);
-        CkRichText.Text(titleSpace, myStatus.Title);
+        CkRichText.Text(titleSpace, myPreset.Title);
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - adjust);
         return ret;
     }

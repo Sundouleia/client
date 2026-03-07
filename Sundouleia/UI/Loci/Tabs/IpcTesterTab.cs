@@ -131,7 +131,7 @@ public class IpcTesterTab
         CkGui.TextFrameAligned("Status Info:");
         ImGui.SameLine();
         LociIcon.Draw((uint)_lastSingleRequest.Data.IconID, _lastSingleRequest.Data.Stacks, LociIcon.SizeFramed);
-        LociEx.AttachTooltip(_lastSingleRequest.Data, []);
+        LociEx.AttachTooltip(_lastSingleRequest.Data, [], []);
     }
 
     private void LatestTargetApplyBulk()
@@ -158,7 +158,7 @@ public class IpcTesterTab
                 continue;
 
             LociIcon.Draw((uint)_lastBulkRequest.Data[i].IconID, _lastBulkRequest.Data[i].Stacks, LociIcon.SizeFramed);
-            LociEx.AttachTooltip(_lastBulkRequest.Data[i], _lastBulkRequest.Data);
+            LociEx.AttachTooltip(_lastBulkRequest.Data[i], _lastBulkRequest.Data, []);
 
             if (i < _lastBulkRequest.Data.Count)
                 ImUtf8.SameLineInner();
@@ -259,7 +259,7 @@ public class IpcTesterTab
             ImGui.TableNextColumn();
             ImGui.Text($"{status.StackSteps}");
             ImGui.TableNextColumn();
-            ImGui.Text($"{status.ChainedStatus}");
+            ImGui.Text($"{status.ChainedGUID}");
             ImGui.TableNextColumn();
             ImGui.Text(status.ChainTrigger.ToString());
         }

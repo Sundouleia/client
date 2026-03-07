@@ -93,7 +93,7 @@ public class PresetsTab : IDisposable
         }
 
         // Do some fancy way of displaying the LociStatus later.
-        if (ImGui.Button("Apply to Yourself"))
+        if (ImGui.Button("Apply"))
             LociManager.GetStatusManager(PlayerData.NameWithWorld).ApplyPreset(preset, _manager);
         CkGui.FrameSeparatorV();
         DrawTargetApplication(preset);
@@ -265,7 +265,7 @@ public class PresetsTab : IDisposable
             ImGui.SetCursorPos(pos);
             ImGui.Image(wrap.Handle, IconSize);
 
-            LociEx.AttachTooltip(status, _manager.SavedStatuses);
+            LociEx.AttachTooltip(status, _manager);
         }
     }
 

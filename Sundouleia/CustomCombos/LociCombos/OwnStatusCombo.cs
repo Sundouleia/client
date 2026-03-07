@@ -54,7 +54,7 @@ public sealed class OwnStatusCombo : LociComboBase<LociStatus>
 
         ImGui.SameLine(titleSpace);
         LociIcon.Draw((uint)myStatus.IconID, myStatus.Stacks, IconSize);
-        LociEx.AttachTooltip(myStatus, _loci.SavedStatuses);
+        LociEx.AttachTooltip(myStatus, _loci);
 
         ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;

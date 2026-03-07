@@ -84,7 +84,7 @@ public unsafe partial class LociMemory
 
                                     // Perform the dispel, expiring the timer. Also apply the chain if desired.
                                     status.ExpiresAt = 0;
-                                    if (status.ChainedStatus != Guid.Empty && status.ChainTrigger is ChainTrigger.Dispel)
+                                    if (status.ChainedGUID != Guid.Empty && status.ChainTrigger is ChainTrigger.Dispel)
                                     {
                                         status.ApplyChain = true;
                                     }

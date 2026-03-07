@@ -16,7 +16,7 @@ public sealed class OwnPresetCombo : LociComboBase<LociPreset>
 {
     private readonly LociManager _loci;
     private int _maxPresetCount => _loci.SavedPresets.Max(x => x.Statuses.Count);
-    private float _iconWithPadding => IconSize.X + ImGui.GetStyle().ItemInnerSpacing.X;
+    private float _iconWithPadding => IconSize.X + ImUtf8.ItemInnerSpacing.X;
     public OwnPresetCombo(ILogger log, MainHub hub, LociManager loci, Sundesmo sundesmo, float scale)
         : base(log, hub, sundesmo, scale, () => [.. loci.SavedPresets.OrderBy(x => x.Title.StripColorTags())])
     {
@@ -61,7 +61,7 @@ public sealed class OwnPresetCombo : LociComboBase<LociPreset>
                 }
 
                 LociIcon.Draw((uint)info.IconID, info.Stacks, IconSize);
-                LociEx.AttachTooltip(info, _loci.SavedStatuses);
+                LociEx.AttachTooltip(info, _loci);
 
                 if (i < lociPreset.Statuses.Count)
                     ImUtf8.SameLineInner();

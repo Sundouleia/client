@@ -46,6 +46,7 @@ using Sundouleia.Services.Mediator;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Loci.Processors;
 
@@ -176,10 +177,11 @@ public class LociProcessor : DisposableMediatorSubscriberBase, IHostedService
         _targetInfoBuffDebuff.HideAll();
     }
 
+    private List<(nint PlayerAddr, string customPath)> SHECandidates = [];
     private unsafe void OnTick(IFramework _)
     {
         // List of VFX that should be handled by the StatusHitEffect.
-        List<(nint PlayerAddr, string customPath)> SHECandidates = [];
+        SHECandidates.Clear();
 
         if (HoveringOver != 0)
         {
@@ -221,7 +223,7 @@ public class LociProcessor : DisposableMediatorSubscriberBase, IHostedService
                 // Process status removal.
                 if (timeExpired || x.ClickedOff)
                 {
-                    EnsureRemTextWasShown(sm, x, SHECandidates);
+                    EnsureRemTextWasShown(sm, x);
                     removed.Add(x);
                 }
                 else
@@ -247,7 +249,7 @@ public class LociProcessor : DisposableMediatorSubscriberBase, IHostedService
             // Handle any status chaining logic.
             if (doChainApply.Count > 0)
                 foreach (var status in doChainApply)
-                    HandleStatusChaining(sm, status);
+                    HandleChaining(sm, status);
 
             // Handle any other SHECandidates processing removed and chain applications.
             if (removed.Count > 0 || doChainApply.Count > 0)
@@ -275,112 +277,146 @@ public class LociProcessor : DisposableMediatorSubscriberBase, IHostedService
 
         // Clear any remaining Cancel Requests not yet processed before iterating SHECandidates
         CancelRequests.Clear();
+    }
 
-        // Helper function to process the SHECandidates.
-        void HandleSHECandidates()
+    // Helper function to process the SHECandidates.
+    private unsafe void HandleSHECandidates()
+    {
+        foreach (var x in SHECandidates)
         {
-            foreach (var x in SHECandidates)
+            Character* chara = (Character*)x.PlayerAddr;
+            if (ShouldSpawnHitEffect(chara, x.customPath))
             {
-                Character* chara = (Character*)x.PlayerAddr;
-                if (ShouldSpawnHitEffect(chara, x.customPath))
-                {
-                    Logger.LogDebug($"StatusHitEffect on: {chara->NameString} / {x.customPath}");
-                    if (x.customPath == "kill")
-                        _lociMemory.SpawnSHE("dk04ht_canc0h", x.PlayerAddr, x.PlayerAddr, -1, char.MinValue, 0, char.MinValue);
-                    else
-                        _lociMemory.SpawnSHE(x.customPath, x.PlayerAddr, x.PlayerAddr, -1, char.MinValue, 0, char.MinValue);
-                }
+                Logger.LogDebug($"StatusHitEffect on: {chara->NameString} / {x.customPath}");
+                if (x.customPath == "kill")
+                    _lociMemory.SpawnSHE("dk04ht_canc0h", x.PlayerAddr, x.PlayerAddr, -1, char.MinValue, 0, char.MinValue);
                 else
+                    _lociMemory.SpawnSHE(x.customPath, x.PlayerAddr, x.PlayerAddr, -1, char.MinValue, 0, char.MinValue);
+            }
+            else
+            {
+                Logger.LogDebug($"SHE skipped on: {chara->NameString} / {x.customPath}", LoggerType.LociProcessors);
+            }
+        }
+        SHECandidates.Clear();
+    }
+
+    // Helper function to ensure the add text is shown for a status, if it should be.
+    private unsafe void EnsureAddTextWasShown(LociSM manager, LociStatus status)
+    {
+        if (manager.AddTextShown.Contains(status.GUID))
+            return;
+
+        if (_config.CanLociModifyUI() && manager.OwnerValid)
+        {
+            if (manager.Owner->CanSpawnFlyText())
+                _flyText.Enqueue(new(status, true, manager.Owner->EntityId));
+
+            if (manager.Owner->CanSpawnVFX())
+            {
+                if (!SHECandidates.Any(s => s.PlayerAddr == (nint)manager.Owner))
                 {
-                    Logger.LogDebug($"SHE skipped on: {chara->NameString} / {x.customPath}", LoggerType.LociProcessors);
+                    var vfxPath = string.IsNullOrWhiteSpace(status.CustomFXPath) ? GameDataHelp.GetVfxPathByID((uint)status.IconID) : status.CustomFXPath;
+                    SHECandidates.Add(((nint)manager.Owner, vfxPath));
                 }
             }
-            SHECandidates.Clear();
+        }
+        manager.AddTextShown.Add(status.GUID);
+    }
+
+    private unsafe void EnsureRemTextWasShown(LociSM manager, LociStatus status)
+    {
+        if (manager.RemTextShown.Contains(status.GUID))
+            return;
+
+        if (_config.CanLociModifyUI() && manager.Owner is not null)
+        {
+            if (manager.Owner->CanSpawnFlyText())
+                _flyText.Enqueue(new(status, false, manager.Owner->EntityId));
+
+            if (manager.Owner->CanSpawnVFX())
+                if (!SHECandidates.Any(s => s.PlayerAddr == (nint)manager.Owner))
+                    SHECandidates.Add(((nint)manager.Owner, "kill"));
         }
 
-        void HandleStatusChaining(LociSM manager, LociStatus cur)
+        manager.RemTextShown.Add(status.GUID);
+    }
+
+    private void HandleChaining(LociSM manager, LociStatus cur)
+    {
+        switch (cur.ChainedType)
         {
-            // Search for the chained status.
-            foreach (var s in _manager.SavedStatuses)
-            {
-                if (s.GUID != cur.ChainedStatus) continue;
-
-                int oldMax = IconStackCounts.TryGetValue((uint)cur.IconID, out var oCount) ? (int)oCount : 1;
-
-                // Aquire the new chained status to be applied.
-                LociStatus? newStatus = manager.AddOrUpdate(s.PreApply());
-                // If the new status if not valid just fail this process.
-                if (newStatus is null) return;
-
-                // Get the new max stacks, and if stackable, transfer stack logic.
-                int newMaxStacks = IconStackCounts.TryGetValue((uint)newStatus.IconID, out var nCount) ? (int)nCount : 1;
-                if (newMaxStacks > 1)
-                {
-                    if (cur.Modifiers.Has(Modifiers.StacksCarryToChain))
-                    {
-                        // Use (oldMax - 1) here because our stacks always start at 1, not 0. So if it has 8 stacks, it can only increment 7 times.
-                        var toCarryOver = (cur.Stacks + cur.StackSteps) - (oldMax - 1);
-                        newStatus.Stacks = Math.Min(newStatus.Stacks - newStatus.StackSteps + toCarryOver, newMaxStacks);
-                    }
-                    else if (cur.Modifiers.Has(Modifiers.StacksMoveToChain))
-                    {
-                        newStatus.Stacks = Math.Min(oldMax, newMaxStacks);
-                    }
-                }
-
-                // Fix ensuring cap is hit when the chain trigger is max stacks.
-                if (cur.ChainTrigger is ChainTrigger.HitMaxStacks)
-                {
-                    cur.Stacks = cur.Modifiers.Has(Modifiers.StacksRollOver) ? Math.Clamp((cur.Stacks + cur.StackSteps) - oldMax, 1, oldMax) : oldMax;
-                    manager.AddTextShown.Remove(cur.GUID);
-                    EnsureAddTextWasShown(manager, cur);
-                }
-
-                // Ensure the add text is shown for this newly chained status, and then break out.
-                EnsureAddTextWasShown(manager, s);
+            case ChainType.Status:
+                ChainStatus(manager, cur);
                 break;
-            }
+            case ChainType.Preset:
+                ChainPreset(manager, cur);
+                break;
+            default:
+                break;
         }
+    }
 
-        void EnsureAddTextWasShown(LociSM manager, LociStatus status)
+    private unsafe void ChainStatus(LociSM manager, LociStatus cur)
+    {
+        // Fail if not found
+        if (_manager.SavedStatuses.FirstOrDefault(s => s.GUID == cur.ChainedGUID) is not { } status)
+            return;
+
+        // Get old max stacks
+        int oldMax = IconStackCounts.TryGetValue((uint)cur.IconID, out var oCount) ? (int)oCount : 1;
+        // Aquire the new chained status to be applied.
+        LociStatus? newStatus = manager.AddOrUpdate(status.PreApply());
+        // If the new status if not valid just fail this process.
+        if (newStatus is null)
+            return;
+        // Get the new max stacks, and if stackable, transfer stack logic.
+        int newMaxStacks = IconStackCounts.TryGetValue((uint)newStatus.IconID, out var nCount) ? (int)nCount : 1;
+        if (newMaxStacks > 1)
         {
-            if (manager.AddTextShown.Contains(status.GUID))
-                return;
-
-            if (_config.CanLociModifyUI() && manager.OwnerValid)
+            if (cur.Modifiers.Has(Modifiers.StacksCarryToChain))
             {
-                if (manager.Owner->CanSpawnFlyText())
-                    _flyText.Enqueue(new(status, true, manager.Owner->EntityId));
-
-                if (manager.Owner->CanSpawnVFX())
-                {
-                    if (!SHECandidates.Any(s => s.PlayerAddr == (nint)manager.Owner))
-                    {
-                        var vfxPath = string.IsNullOrWhiteSpace(status.CustomFXPath) ? GameDataHelp.GetVfxPathByID((uint)status.IconID) : status.CustomFXPath;
-                        SHECandidates.Add(((nint)manager.Owner, vfxPath));
-                    }
-                }
+                // Use (oldMax - 1) here because our stacks always start at 1, not 0. So if it has 8 stacks, it can only increment 7 times.
+                var toCarryOver = (cur.Stacks + cur.StackSteps) - (oldMax - 1);
+                newStatus.Stacks = Math.Min(newStatus.Stacks - newStatus.StackSteps + toCarryOver, newMaxStacks);
             }
-            manager.AddTextShown.Add(status.GUID);
+            else if (cur.Modifiers.Has(Modifiers.StacksMoveToChain))
+                newStatus.Stacks = Math.Min(oldMax, newMaxStacks);
         }
 
-        void EnsureRemTextWasShown(LociSM manager, LociStatus status, List<(nint PlayerAddr, string customPath)> SHECandidates)
+        // Fix ensuring cap is hit when the chain trigger is max stacks.
+        if (cur.ChainTrigger is ChainTrigger.HitMaxStacks)
         {
-            if (manager.RemTextShown.Contains(status.GUID))
-                return;
-
-            if (_config.CanLociModifyUI() && manager.Owner is not null)
-            {
-                if (manager.Owner->CanSpawnFlyText())
-                    _flyText.Enqueue(new(status, false, manager.Owner->EntityId));
-
-                if (manager.Owner->CanSpawnVFX())
-                    if (!SHECandidates.Any(s => s.PlayerAddr == (nint)manager.Owner))
-                        SHECandidates.Add(((nint)manager.Owner, "kill"));
-            }
-
-            manager.RemTextShown.Add(status.GUID);
+            cur.Stacks = cur.Modifiers.Has(Modifiers.StacksRollOver) ? Math.Clamp((cur.Stacks + cur.StackSteps) - oldMax, 1, oldMax) : oldMax;
+            manager.AddTextShown.Remove(cur.GUID);
+            EnsureAddTextWasShown(manager, cur);
         }
+
+        // Ensure the add text is shown for this newly chained status, and then break out.
+        EnsureAddTextWasShown(manager, status);
+    }
+
+    private unsafe void ChainPreset(LociSM manager, LociStatus cur)
+    {
+        // Fail if not found
+        if (_manager.SavedPresets.FirstOrDefault(p => p.GUID == cur.ChainedGUID) is not { } preset)
+            return;
+        // Get old max stacks
+        int oldMax = IconStackCounts.TryGetValue((uint)cur.IconID, out var oCount) ? (int)oCount : 1;
+        // Apply the new preset
+        manager.ApplyPreset(preset, _manager);
+
+        // Dont worry about rolling stacks over since we dont really control that here.
+
+        // But do worry about hitting max stacks.
+        if (cur.ChainTrigger is ChainTrigger.HitMaxStacks)
+        {
+            cur.Stacks = cur.Modifiers.Has(Modifiers.StacksRollOver) ? Math.Clamp((cur.Stacks + cur.StackSteps) - oldMax, 1, oldMax) : oldMax;
+            manager.AddTextShown.Remove(cur.GUID);
+            EnsureAddTextWasShown(manager, cur);
+        }
+
+        // Ensuring the add text for the preset statuses is already handled here.
     }
 
     private unsafe bool ShouldSpawnHitEffect(Character* chara, string vfxPath)

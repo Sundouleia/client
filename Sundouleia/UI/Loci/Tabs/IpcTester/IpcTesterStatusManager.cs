@@ -110,7 +110,7 @@ public class IpcTesterStatusManagers : IIpcTesterGroup
                         continue;
 
                     LociIcon.Draw((uint)_lastManagerInfo[i].IconID, _lastManagerInfo[i].Stacks, LociIcon.Size);
-                    LociEx.AttachTooltip(_lastManagerInfo[i], savedTuples);
+                    LociEx.AttachTooltip(_lastManagerInfo[i], savedTuples, []);
 
                     if (i < _lastManagerInfo.Count)
                         ImUtf8.SameLineInner();

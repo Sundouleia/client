@@ -104,7 +104,7 @@ public class LociManagersTab
             using var id = ImRaii.PushId(status.ID);
             using var entry = ImRaii.Group();
             LociIcon.Draw((uint)status.IconID, status.Stacks, LociIcon.Size);
-            LociEx.AttachTooltip(status, _manager.SavedStatuses);
+            LociEx.AttachTooltip(status, _manager);
 
             ImGui.SameLine();
             using (Fonts.Default150Percent.Push())

@@ -50,6 +50,8 @@ public static class SundouleiaEx
     public unsafe static bool IsObjectLoaded(IntPtr gameObjectAddress)
     {
         var gameObj = (GameObject*)gameObjectAddress;
+        // Conversion must be valid
+        if (gameObj == null) return false;
         // Invalid address.
         if (gameObjectAddress == IntPtr.Zero) return false;
         // DrawObject does not exist yet.

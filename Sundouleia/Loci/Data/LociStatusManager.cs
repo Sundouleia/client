@@ -214,22 +214,33 @@ public class LociSM
     private void UpdateStackLogic(LociStatus ns, LociStatus cur, int max)
     {
         var curStacks = cur.Stacks;
-        // Current + Increase < max. (Just add it)
+        var hasChainId = cur.ChainedGUID != Guid.Empty;
+        // Current + Increase < max, so Just add.
         if (curStacks + ns.StackSteps < max)
         {
             // Update stacks, ensure text will be shown.
             ns.Stacks = curStacks + ns.StackSteps;
+            // Condition to fire the trigger for chaining on SetStack.
+            if (hasChainId && cur.ChainTrigger is ChainTrigger.HitSetStacks && curStacks < cur.StackToChain && ns.Stacks >= cur.StackToChain)
+                ns.ApplyChain = true;
+            // Ensure add text is shown for the update.
             AddTextShown.Remove(ns.GUID);
         }
         // Current stacks are not max, but adding it will go over.
         else if (curStacks != max && curStacks + ns.StackSteps >= max)
         {
-            // If the chain trigger is set and we want to do it on max stacks, update.
-            if (cur.ChainedStatus != Guid.Empty && cur.ChainTrigger is ChainTrigger.HitMaxStacks)
+            if (hasChainId && cur.ChainTrigger is (ChainTrigger.HitMaxStacks or ChainTrigger.HitSetStacks))
             {
-                // Set ApplyChain to true.
-                ns.ApplyChain = true;
-                ns.Stacks = curStacks;
+                if (cur.ChainTrigger is ChainTrigger.HitMaxStacks)
+                {
+                    ns.ApplyChain = true;
+                    ns.Stacks = curStacks;
+                }
+                else if (cur.ChainTrigger is ChainTrigger.HitSetStacks && curStacks < cur.StackToChain && curStacks + ns.StackSteps >= cur.StackToChain)
+                {
+                    ns.ApplyChain = true;
+                    ns.Stacks = curStacks;
+                }
             }
             else
             {

@@ -55,7 +55,7 @@ public sealed class SundesmoPresetCombo : LociComboBase<LociPresetInfo>
                 }
 
                 LociIcon.Draw((uint)info.IconID, info.Stacks, IconSize);
-                info.AttachTooltip(_sundesmo.SharedData.StatusList);
+                info.AttachTooltip(_sundesmo.SharedData.StatusList, _sundesmo.SharedData.PresetList);
 
                 if (i + 1 < lociPreset.Statuses.Count)
                     ImUtf8.SameLineInner();

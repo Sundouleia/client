@@ -45,6 +45,7 @@ public sealed class StatusSelector : CkFileSystemSelector<LociStatus, StatusSele
 
         SubscribeRightClickLeaf(CopyToClipboard);
         SubscribeRightClickLeaf(DeleteStatus);
+        SubscribeRightClickLeaf(RenameLeaf);
         SubscribeRightClickLeaf(RenameStatus);
     }
 
@@ -74,22 +75,19 @@ public sealed class StatusSelector : CkFileSystemSelector<LociStatus, StatusSele
 
     private void RenameStatus(StatusesFS.Leaf leaf)
     {
-        using (ImRaii.Group())
+        ImGui.Separator();
+        var currentName = leaf.Value.Title;
+        if (ImGui.IsWindowAppearing())
+            ImGui.SetKeyboardFocusHere(0);
+        ImGui.TextUnformatted("Rename Status:");
+        if (ImGui.InputText("##RenameStatus", ref currentName, 256, ImGuiInputTextFlags.EnterReturnsTrue))
         {
-            var currentName = leaf.Value.Title;
-            if (ImGui.IsWindowAppearing())
-                ImGui.SetKeyboardFocusHere(0);
-            ImGui.TextUnformatted("Rename Status:");
-            if (ImGui.InputText("##RenameStatus", ref currentName, 256, ImGuiInputTextFlags.EnterReturnsTrue))
-            {
-                _manager.RenameStatus(leaf.Value, currentName);
-                ImGui.CloseCurrentPopup();
-            }
-            CkGui.AttachToolTip("Enter a new status name..");
-
-            CkRichText.Text(currentName, 6);
+            _manager.RenameStatus(leaf.Value, currentName);
+            ImGui.CloseCurrentPopup();
         }
-        ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ImGui.GetColorU32(ImGuiCol.Border), 1);
+        CkGui.AttachToolTip("Enter a new status name..");
+
+        CkRichText.Text(currentName, 6);
     }
 
     public override void Dispose()
@@ -123,7 +121,7 @@ public sealed class StatusSelector : CkFileSystemSelector<LociStatus, StatusSele
         if (LociIcon.TryGetGameIcon((uint)leaf.Value.IconID, false, out var wrap))
         {
             ImGui.Image(wrap.Handle, LociIcon.SizeFramed);
-            LociEx.AttachTooltip(leaf.Value, _manager.SavedStatuses);
+            LociEx.AttachTooltip(leaf.Value, _manager);
         }
         // Go back to the beginning 
         ImGui.SameLine(ImUtf8.FrameHeight + ImUtf8.ItemInnerSpacing.X);

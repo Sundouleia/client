@@ -37,8 +37,8 @@ public sealed class IpcProviderMoodles : IHostedService
     private static ICallGateProvider<List<MoodlesProfileInfo>> GetRegisteredProfiles;
 
     // Status Manager
-    private static ICallGateProvider<List<LociStatusInfo>> GetOwnManagerInfo;
-    private static ICallGateProvider<nint, List<LociStatusInfo>> GetManagerInfoByPtr;
+    private static ICallGateProvider<List<MoodlesStatusInfo>> GetOwnManagerInfo;
+    private static ICallGateProvider<nint, List<MoodlesStatusInfo>> GetManagerInfoByPtr;
 
     private static ICallGateProvider<string> GetOwnManager;
     private static ICallGateProvider<nint, string> GetManagerByPtr;

@@ -172,16 +172,12 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
         var nameWorld = chara->GetNameWithWorld();
         if (_statusManagers.TryGetValue(nameWorld, out var lociSM))
         {
-            // Do not de-init client SM
-            if (lociSM == ClientSM)
-                return;
-
             // We dont want to remove the status manager, but we do want to unassign the owner.
             if (lociSM.OwnerValid)
                 lociSM.Owner = null;
 
             // If not ephemeral, remove them.
-            if (!lociSM.Ephemeral)
+            if (!lociSM.Ephemeral && lociSM != ClientSM)
             {
                 _statusManagers.Remove(nameWorld);
                 Logger.LogDebug($"Removed LociSM for {nameWorld}", LoggerType.LociData);
@@ -408,7 +404,9 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
                     Modifiers = (Modifiers)(statusObj["Modifiers"]?.ToObject<int>() ?? 0),
                     Stacks = statusObj["Stacks"]?.ToObject<int>() ?? 1,
                     StackSteps = statusObj["StackSteps"]?.ToObject<int>() ?? 0,
-                    ChainedStatus = statusObj["ChainedStatus"]?.ToObject<Guid>() ?? Guid.Empty,
+                    StackToChain = 0,
+                    ChainedGUID = statusObj["ChainedStatus"]?.ToObject<Guid>() ?? Guid.Empty,
+                    ChainedType = ChainType.Status,
                     ChainTrigger = (ChainTrigger)(statusObj["ChainTrigger"]?.ToObject<int>() ?? 0),
                     Applier = statusObj["Applier"]?.ToObject<string>() ?? "",
                     Dispeller = statusObj["Dispeller"]?.ToObject<string>() ?? "",
@@ -418,7 +416,6 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
                     Minutes = statusObj["Minutes"]?.ToObject<int>() ?? 0,
                     Seconds = statusObj["Seconds"]?.ToObject<int>() ?? 0,
                     NoExpire = statusObj["NoExpire"]?.ToObject<bool>() ?? false,
-                    AsPermanent = statusObj["AsPermanent"]?.ToObject<bool>() ?? false
                 };
                 // Ignore clones
                 if (SavedStatuses.Any(s => s.GUID == status.GUID))
@@ -449,7 +446,7 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
                     GUID = presetObj["GUID"]?.ToObject<Guid>() ?? Guid.NewGuid(),
                     Statuses = presetObj["Statuses"]?.ToObject<List<Guid>>() ?? new(),
                     ApplyType = (PresetApplyType)(presetObj["ApplicationType"]?.ToObject<byte>() ?? 0),
-                    Title = presetObj["Title"]?.ToObject<string>() ?? ""
+                    Title = presetObj["Title"]?.ToObject<string>() ?? "",
                 };
                 // Prevent duplicates
                 if (SavedPresets.Any(p => p.GUID == preset.GUID))
@@ -467,7 +464,7 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
     }
 
     #region HybridSavable
-    public int ConfigVersion => 0;
+    public int ConfigVersion => 1;
     public HybridSaveType SaveType => HybridSaveType.Json;
     public DateTime LastWriteTimeUTC { get; private set; } = DateTime.MinValue;
     public string GetFileName(ConfigFileProvider files, out bool isAccountUnique)
@@ -503,8 +500,73 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
         // Read the json from the file.
         var jsonText = File.ReadAllText(file);
         var jObject = JObject.Parse(jsonText);
-        var version = jObject["Version"]?.Value<int>() ?? 0;
+        var version = jObject["Version"]?.Value<int>() ?? 1;
 
+        switch (version)
+        {
+            case 0:
+                // Migrate to V1 first, then load V1.
+                MigrateV0ToV1(jObject);
+                LoadV1(jObject);
+                break;
+            case 1:
+                LoadV1(jObject);
+                break;
+            default:
+                Logger.LogError("Invalid Version!");
+                return;
+        }
+        // Update the saved data.
+        _saver.Save(this);
+    }
+
+    public void MigrateV0ToV1(JObject root)
+    {
+        root["Version"] = 1;
+
+        MigrateStatusArray(root["Statuses"] as JArray);
+
+        // Client Managers
+        if (root["ClientManagers"] is JObject managers)
+        {
+            foreach (var manager in managers.Properties())
+            {
+                if (manager.Value["Statuses"] is JArray managerStatuses)
+                    MigrateStatusArray(managerStatuses);
+            }
+        }
+    }
+
+    private void MigrateStatusArray(JArray? jArray)
+    {
+        if (jArray is not JArray statuses)
+            return;
+
+        foreach (var token in statuses)
+        {
+            if (token is not JObject status)
+                continue;
+
+            // Rename ChainedStatus -> ChainedGUID
+            if (status.TryGetValue("ChainedStatus", out var chained))
+            {
+                status["ChainedGUID"] = chained;
+                status.Remove("ChainedStatus");
+            }
+
+            // Add StackToChain
+            if (!status.ContainsKey("StackToChain"))
+                status["StackToChain"] = 0;
+
+            // Add ChainedType
+            if (!status.ContainsKey("ChainedType"))
+                status["ChainedType"] = 0; // ChainType.Status default
+        }
+    }
+
+    private void LoadV1(JObject jObject)
+    {
+        // Load in as normal.
         _statuses = jObject["Statuses"]?.ToObject<List<LociStatus>>() ?? new List<LociStatus>();
         _presets = jObject["Presets"]?.ToObject<List<LociPreset>>() ?? new List<LociPreset>();
         _clientSMs = jObject["ClientManagers"]?.ToObject<Dictionary<string, LociSM>>() ?? new Dictionary<string, LociSM>();
@@ -516,8 +578,6 @@ public sealed class LociManager : DisposableMediatorSubscriberBase, IHybridSavab
             data.LockedStatuses.Clear();
             data.EphemeralHosts.Clear();
         }
-        // Update the saved data.
-        _saver.Save(this);
     }
     #endregion HybridSavable
 }

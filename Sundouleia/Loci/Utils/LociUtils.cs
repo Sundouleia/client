@@ -19,8 +19,11 @@ namespace Sundouleia.Loci;
 
 public unsafe static partial class LociUtils
 {
+    internal static readonly IEnumerable<ChainTrigger> ChainTypes = Enum.GetValues<ChainTrigger>().ToHashSet();
+    internal static readonly IEnumerable<ChainTrigger> ChainTypesNoStk = [ChainTrigger.TimerExpired, ChainTrigger.Dispel];
+
     internal static Dictionary<uint, StatusIconData?> IconInfoCache = [];
-    
+
     /// <summary>
     ///     Attempt to get an analysis of the StatusIconData from the given IconID.
     /// </summary>

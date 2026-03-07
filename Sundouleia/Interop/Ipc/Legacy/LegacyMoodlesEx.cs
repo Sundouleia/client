@@ -51,7 +51,7 @@ public static class LegacyMoodlesEx
             Modifiers = s.Modifiers,
             Stacks = s.Stacks,
             StackSteps = s.StackSteps,
-            ChainedStatus = s.ChainedStatus,
+            ChainedStatus = s.ChainedType is ChainType.Status ? s.ChainedGUID : Guid.Empty,
             ChainTrigger = s.ChainTrigger,
             Applier = s.Applier,
             Dispeller = s.Dispeller
@@ -70,7 +70,8 @@ public static class LegacyMoodlesEx
             Modifiers = p.Modifiers,
             Stacks = p.Stacks,
             StackSteps = p.StackSteps,
-            ChainedStatus = p.ChainedStatus,
+            ChainedGUID = p.ChainedStatus,
+            ChainedType = ChainType.Status,
             ChainTrigger = p.ChainTrigger,
             Applier = p.Applier,
             Dispeller = p.Dispeller
@@ -89,7 +90,8 @@ public static class LegacyMoodlesEx
             Modifiers = t.Modifiers,
             Stacks = t.Stacks,
             StackSteps = t.StackSteps,
-            ChainedStatus = t.ChainedStatus,
+            ChainedGUID = t.ChainedStatus,
+            ChainType = ChainType.Status,
             ChainTrigger = t.ChainTrigger
         };
 
@@ -106,7 +108,7 @@ public static class LegacyMoodlesEx
             Modifiers = s.Modifiers,
             Stacks = s.Stacks,
             StackSteps = s.StackSteps,
-            ChainedStatus = s.ChainedStatus,
+            ChainedStatus = s.ChainedGUID,
             ChainTrigger = s.ChainTrigger
         };
 

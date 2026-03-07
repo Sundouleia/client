@@ -3,8 +3,10 @@ using CkCommons.RichText;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using NAudio.SoundFont;
 using Sundouleia.Loci;
 using Sundouleia.Loci.Data;
+using Sundouleia.Pairs;
 using SundouleiaAPI.Data.Permissions;
 
 namespace Sundouleia;
@@ -25,7 +27,7 @@ public static class LociEx
         return $"{list.Length} selected";
     }
 
-    public static void AttachTooltip(this LociStatus item, IEnumerable<LociStatus> otherStatuses)
+    public static void AttachTooltip(this LociStatus item, LociManager manager)
     {
         if (!ImGui.IsItemHovered(ImGuiHoveredFlags.RectOnly))
             return;
@@ -54,16 +56,26 @@ public static class LociEx
         ImGui.SameLine();
         ImGui.Text(item.Type.ToString());
 
-        if (item.ChainedStatus != Guid.Empty)
+        if (item.ChainedGUID != Guid.Empty)
         {
-            CkGui.ColorText("Chained Status:", ImGuiColors.ParsedGold);
-            ImGui.SameLine();
-            var chainStatTitle = otherStatuses.FirstOrDefault(x => x.GUID == item.ChainedStatus)?.Title ?? "Unknown";
-            CkRichText.Text(chainStatTitle, cloneId: 100);
+            if (item.ChainedType is ChainType.Status)
+            {
+                CkGui.ColorText("Chained Status:", ImGuiColors.ParsedGold);
+                ImGui.SameLine();
+                var status = manager.SavedStatuses.FirstOrDefault(x => x.GUID == item.ChainedGUID)?.Title ?? "Unknown";
+                CkRichText.Text(status, 100);
+            }
+            else
+            {
+                CkGui.ColorText("Chained Preset:", ImGuiColors.ParsedGold);
+                ImGui.SameLine();
+                var preset = manager.SavedPresets.FirstOrDefault(x => x.GUID == item.ChainedGUID)?.Title ?? "Unknown";
+                CkRichText.Text(preset, 100);
+            }
         }
     }
 
-    public static void AttachTooltip(this LociStatusInfo item, IEnumerable<LociStatusInfo> otherStatuses)
+    public static void AttachTooltip(this LociStatusInfo item, IEnumerable<LociStatusInfo> statuses, IEnumerable<LociPresetInfo> presets)
     {
         if (!ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             return;
@@ -92,12 +104,22 @@ public static class LociEx
         ImGui.SameLine();
         ImGui.Text(item.Type.ToString());
 
-        if (item.ChainedStatus != Guid.Empty)
+        if (item.ChainedGUID != Guid.Empty)
         {
-            CkGui.ColorText("Chained Status:", ImGuiColors.ParsedGold);
-            ImGui.SameLine();
-            var status = otherStatuses.FirstOrDefault(x => x.GUID == item.ChainedStatus).Title ?? "Unknown";
-            ImGui.Text(status);
+            if (item.ChainType is ChainType.Status)
+            {
+                CkGui.ColorText("Chained Status:", ImGuiColors.ParsedGold);
+                ImGui.SameLine();
+                var status = statuses.FirstOrDefault(x => x.GUID == item.ChainedGUID).Title ?? "Unknown";
+                CkRichText.Text(status, 100);
+            }
+            else
+            {
+                CkGui.ColorText("Chained Preset:", ImGuiColors.ParsedGold);
+                ImGui.SameLine();
+                var preset = presets.FirstOrDefault(x => x.GUID == item.ChainedGUID).Title ?? "Unknown";
+                CkRichText.Text(preset, 100);
+            }
         }
     }
 
@@ -122,11 +144,6 @@ public static class LociEx
             else if (status.Type is StatusType.Special && !perms.LociAccess.HasAny(LociAccess.Special))
             {
                 Svc.Toasts.ShowError("You do not have permission to apply Special Statuses.");
-                return false;
-            }
-            else if (status.Permanent && !perms.LociAccess.HasAny(LociAccess.Permanent))
-            {
-                Svc.Toasts.ShowError("You do not have permission to apply Permanent Statuses.");
                 return false;
             }
             else if (status.ExpireTicks > 0)

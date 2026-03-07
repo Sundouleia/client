@@ -39,7 +39,7 @@ public partial class LociStatus
     internal string ID => GUID.ToString();
 
     // Essential
-    public const int Version = 2;
+    public const int Version = 3;
     public Guid GUID = Guid.NewGuid();
     public int IconID;
     public string Title = "";
@@ -51,9 +51,11 @@ public partial class LociStatus
     public Modifiers Modifiers; // What can be customized with this loci.
     public int Stacks = 1;
     public int StackSteps = 0; // How many stacks to add per reapplication.
-
+    public int StackToChain = 0; // Only applicable when ChainTrigger is related to StackCount.
+    
     // Chaining Status (Applies when ChainTrigger condition is met)
-    public Guid ChainedStatus = Guid.Empty;
+    public Guid ChainedGUID = Guid.Empty;
+    public ChainType ChainedType = ChainType.Status;
     public ChainTrigger ChainTrigger;
 
     // Additional Behavior added overtime.
@@ -65,7 +67,6 @@ public partial class LociStatus
 
 
     #region Conditional Serialization/Deserialization
-
     // No longer needed, unless im missing something
     [MemoryPackIgnore] public bool Persistent = false;
 
@@ -79,7 +80,6 @@ public partial class LociStatus
     [MemoryPackIgnore] public int Minutes = 0;
     [MemoryPackIgnore] public int Seconds = 0;
     [MemoryPackIgnore] public bool NoExpire = false;
-    [MemoryPackIgnore] public bool AsPermanent = false;
 
     public bool ShouldSerializeGUID() => GUID != Guid.Empty;
     public bool ShouldSerializePersistent() => ShouldSerializeGUID();
@@ -146,12 +146,13 @@ public partial class LociStatus
             Type = Type,
             Stacks = Stacks,
             StackSteps = StackSteps,
+            StackToChain = StackToChain,
             Modifiers = (uint)Modifiers,
-            ChainedStatus = ChainedStatus,
+            ChainedGUID = ChainedGUID,
+            ChainType = ChainedType,
             ChainTrigger = ChainTrigger,
             Applier = Applier,
             Dispeller = Dispeller,
-            Permanent = AsPermanent
         };
 
     public static LociStatus FromTuple(LociStatusInfo statusInfo)
@@ -165,19 +166,20 @@ public partial class LociStatus
             Description = statusInfo.Description,
             CustomFXPath = statusInfo.CustomVFXPath,
 
-            Type = (StatusType)statusInfo.Type,
+            Type = statusInfo.Type,
             Stacks = statusInfo.Stacks,
             StackSteps = statusInfo.StackSteps,
+            StackToChain = statusInfo.StackToChain,
             Modifiers = (Modifiers)statusInfo.Modifiers,
 
-            ChainedStatus = statusInfo.ChainedStatus,
-            ChainTrigger = (ChainTrigger)statusInfo.ChainTrigger,
+            ChainedGUID = statusInfo.ChainedGUID,
+            ChainedType = statusInfo.ChainType,
+            ChainTrigger = statusInfo.ChainTrigger,
 
             Applier = statusInfo.Applier,
             Dispeller = statusInfo.Dispeller,
 
             // Additional variables we can run assumptions on.
-            Persistent = statusInfo.Permanent,
             Days = totalTime.Days,
             Hours = totalTime.Hours,
             Minutes = totalTime.Minutes,
@@ -197,7 +199,7 @@ public partial class LociStatus
         $"\nModifiers={Modifiers}" +
         $"\nStacks={Stacks}" +
         $"\nStackSteps={StackSteps}" +
-        $"\nChainedStatus={ChainedStatus}" +
+        $"\nChainedStatus={ChainedGUID}" +
         $"\nChainTrigger={ChainTrigger}" +
         $"\nApplier={Applier}" +
         $"\nDispeller={Dispeller}]";

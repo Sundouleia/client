@@ -159,7 +159,7 @@ public class IpcTesterStatuses : IIpcTesterGroup
             ImGui.Text("Stored Tuple:");
             ImUtf8.SameLineInner();
             LociIcon.Draw((uint)_lastStatusInfo.IconID, _lastStatusInfo.Stacks, LociIcon.Size);
-            LociEx.AttachTooltip(_lastStatusInfo, _allStatusInfo);
+            LociEx.AttachTooltip(_lastStatusInfo, _allStatusInfo, []);
         }
         // Key area
         KeyInput(ref _lockCode);
@@ -189,7 +189,7 @@ public class IpcTesterStatuses : IIpcTesterGroup
                         continue;
 
                     LociIcon.Draw((uint)_allStatusInfo[i].IconID, _allStatusInfo[i].Stacks, LociIcon.Size);
-                    LociEx.AttachTooltip(_allStatusInfo[i], _allStatusInfo);
+                    LociEx.AttachTooltip(_allStatusInfo[i], _allStatusInfo, []);
 
                     if (i < _allStatusInfo.Count)
                         ImUtf8.SameLineInner();

@@ -16,7 +16,7 @@ namespace Sundouleia.Interop;
 /// </summary>
 public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
 {
-    private const int LociApiVersion = 1;
+    private const int LociApiVersion = 2;
 
     private readonly LociManager _manager;
     private readonly CharaWatcher _watcher;

@@ -47,7 +47,7 @@ public sealed class SundesmoStatusCombo : LociComboBase<LociStatusInfo>
 
         ImGui.SameLine(titleSpace);
         LociIcon.Draw((uint)myStatus.IconID, myStatus.Stacks, IconSize);
-        myStatus.AttachTooltip(_sundesmo.SharedData.StatusList);
+        myStatus.AttachTooltip(_sundesmo.SharedData.StatusList, _sundesmo.SharedData.PresetList);
 
         ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;

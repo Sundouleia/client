@@ -33,6 +33,7 @@ public class StatusesTab : IDisposable
 
     private IconDataSelector _iconSelector;
     private SavedStatusesCombo _ownStatusCombo;
+    private SavedPresetsCombo _ownPresetsCombo; 
 
     public StatusesTab(ILogger<StatusesTab> logger, StatusSelector selector, LociManager loci, FavoritesConfig favorites)
     {
@@ -40,7 +41,7 @@ public class StatusesTab : IDisposable
         _loci = loci;
         _iconSelector = new IconDataSelector(favorites);
         _ownStatusCombo = new SavedStatusesCombo(logger, loci, () => [ .. loci.SavedStatuses.OrderBy(s => s.Title) ]);
-
+        _ownPresetsCombo = new SavedPresetsCombo(logger, loci, () => [ .. loci.SavedPresets.OrderBy(p => p.Title) ]);
         _selector.SelectionChanged += ResetTemps;
     }
 
@@ -48,7 +49,7 @@ public class StatusesTab : IDisposable
     private string? _tmpTitle = null;
     private string? _tmpDesc = null;
     private string? _tmpTimeStr = null;
-    private string _chainStatusFilter = string.Empty;
+    private string _chainDataFilter = string.Empty;
     private string _selectedHost = string.Empty;
 
     public void Dispose()
@@ -61,7 +62,7 @@ public class StatusesTab : IDisposable
         _tmpTitle = null;
         _tmpDesc = null;
         _tmpTimeStr = null;
-        _chainStatusFilter = string.Empty;
+        _chainDataFilter = string.Empty;
         _selectedHost = string.Empty;
     }
 
@@ -95,7 +96,7 @@ public class StatusesTab : IDisposable
         }
 
         // Do some fancy way of displaying the LociStatus later.
-        if (ImGui.Button("Apply to Yourself"))
+        if (ImGui.Button("Apply"))
             LociManager.GetStatusManager(PlayerData.NameWithWorld).AddOrUpdate(status.PreApply());
 
         CkGui.FrameSeparatorV();
@@ -103,10 +104,10 @@ public class StatusesTab : IDisposable
 
         // Store maxStacks before drawing further.
         var maxStacks = LociProcessor.IconStackCounts.TryGetValue((uint)status.IconID, out var count) ? (int)count : 1;
-        var leftW = ImGui.CalcTextSize("Chained Status Behaviors").X;
+        var leftW = ImGui.CalcTextSize("Chaining Behaviorm").X + ImUtf8.FrameHeight;
 
         DrawEssentials(status, leftW);
-        DrawChaining(status, leftW);
+        DrawChaining(status, leftW, maxStacks);
         DrawStacking(status, leftW, maxStacks);
         DrawDispelling(status, leftW);
 
@@ -356,6 +357,95 @@ public class StatusesTab : IDisposable
         }
     }
 
+    private void DrawChaining(LociStatus status, float leftW, int maxStacks)
+    {
+        ImGui.Spacing();
+        using var t = ImRaii.Table("##chaining", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchSame);
+        if (!t) return;
+
+        ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, leftW);
+        ImGui.TableSetupColumn("Field", ImGuiTableColumnFlags.WidthStretch);
+
+        ImGui.TableNextColumn();
+        CkGui.TextFrameAligned("Chained Data:");
+
+        ImGui.TableNextColumn();
+        var typeWidth = ImGui.CalcTextSize("statusmm").X + ImUtf8.FrameHeight;
+        if (CkGuiUtils.EnumCombo("##chainType", typeWidth, status.ChainedType, out var newType, flags: CFlags.NoArrowButton))
+        {
+            status.ChainedType = newType;
+            _loci.MarkStatusModified(status);
+        }
+
+        ImUtf8.SameLineInner();
+        if (status.ChainedType is ChainType.Status)
+        {
+            if (_ownStatusCombo.Draw("##chainStatus", status.ChainedGUID, ImGui.GetContentRegionAvail().X, 1f, CFlags.HeightLargest))
+            {
+                if (!status.ChainedGUID.Equals(_ownStatusCombo.Current?.GUID))
+                {
+                    status.ChainedGUID = _ownStatusCombo.Current?.GUID ?? Guid.Empty;
+                    _loci.MarkStatusModified(status);
+                }
+            }
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
+                status.ChainedGUID = Guid.Empty;
+                _loci.MarkStatusModified(status);
+            }
+        }
+        else
+        {
+            if (_ownPresetsCombo.Draw("##chainPreset", status.ChainedGUID, ImGui.GetContentRegionAvail().X, 1f, CFlags.HeightLargest))
+            {
+                if (!status.ChainedGUID.Equals(_ownPresetsCombo.Current?.GUID))
+                {
+                    status.ChainedGUID = _ownPresetsCombo.Current?.GUID ?? Guid.Empty;
+                    _loci.MarkStatusModified(status);
+                }
+            }
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
+                status.ChainedGUID = Guid.Empty;
+                _loci.MarkStatusModified(status);
+            }
+        }
+
+        // The Chain Trigger segment
+        if (status.ChainedGUID != Guid.Empty)
+        {
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn();
+            CkGui.TextFrameAligned("Chain Trigger:");
+
+            ImGui.TableNextColumn();
+            var comboW = ImGui.GetContentRegionAvail().X * (status.ChainTrigger is ChainTrigger.HitSetStacks ? .5f : 1f);
+            // var options = maxStacks <= 1 ? LociUtils.ChainTypesNoStk : LociUtils.ChainTypes; Find a more stable way later.
+            if (CkGuiUtils.EnumCombo("##chainTrigger", comboW, status.ChainTrigger, out var newTrigger, flags: CFlags.None))
+            {
+                status.ChainTrigger = newTrigger;
+                _loci.MarkStatusModified(status);
+            }
+            if (status.ChainTrigger is ChainTrigger.HitSetStacks)
+            {
+                ImUtf8.SameLineInner();
+                ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+                if (ImGui.BeginCombo("##triggerStk", StackText(status.StackToChain)))
+                {
+                    for (var i = 1; i <= maxStacks; i++)
+                    {
+                        if (ImGui.Selectable(StackText(i), status.StackToChain == i))
+                        {
+                            status.StackToChain = i;
+                            _loci.MarkStatusModified(status);
+                        }
+                    }
+                    ImGui.EndCombo();
+                }
+            }
+        }
+    }
+
     // Stacking based paramaters.
     private void DrawStacking(LociStatus status, float leftW, int maxStacks)
     {
@@ -418,11 +508,11 @@ public class StatusesTab : IDisposable
         CkGui.AttachToolTip("When a stack reaches its cap, it starts over and counts up again.", true);
 
         // Handle chained status behavior if configured.
-        if (status.ChainedStatus != Guid.Empty)
+        if (status.ChainedGUID != Guid.Empty)
         {
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
-            CkGui.TextFrameAligned($"Chained Status Behavior:");
+            CkGui.TextFrameAligned($"Chaining Behavior:");
             CkGui.HelpText("How stacks from this status carry to the chained status.", true);
             
             ImGui.TableNextColumn();
@@ -494,58 +584,6 @@ public class StatusesTab : IDisposable
         }
     }
 
-    private void DrawChaining(LociStatus status, float leftW)
-    {
-        ImGui.Spacing();
-        using var t = ImRaii.Table("##chaining", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchSame);
-        if (!t) return;
-        
-        ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, leftW);
-        ImGui.TableSetupColumn("Field", ImGuiTableColumnFlags.WidthStretch);
-
-        ImGui.TableNextColumn();
-        CkGui.TextFrameAligned("Chained Status:");
-        
-        ImGui.TableNextColumn();
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-        // For loci chaining... (Convert to custom combo later!)
-        if (_ownStatusCombo.Draw("##chainStatus", status.ChainedStatus, ImGui.GetContentRegionAvail().X, 1f, CFlags.HeightLargest))
-        {
-            if (!status.ChainedStatus.Equals(_ownStatusCombo.Current?.GUID))
-            {
-                status.ChainedStatus = _ownStatusCombo.Current?.GUID ?? Guid.Empty;
-                _loci.MarkStatusModified(status);
-            }
-        }
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-        {
-            status.ChainedStatus = Guid.Empty;
-            _loci.MarkStatusModified(status);
-        }
-
-        // The Chain Trigger segment
-        if (status.ChainedStatus != Guid.Empty)
-        {
-            ImGui.TableNextRow();
-            ImGui.TableNextColumn();
-            CkGui.TextFrameAligned("Chain Trigger:");
-
-            ImGui.TableNextColumn();
-            var options = Enum.GetValues<ChainTrigger>().ToList();
-            foreach (var (trigger, idx) in options.WithIndex())
-            {
-                if (ImGui.RadioButton(trigger.ToString(), status.ChainTrigger == trigger))
-                {
-                    status.ChainTrigger = trigger;
-                    _loci.MarkStatusModified(status);
-                }
-
-                if (idx < options.Count)
-                    ImUtf8.SameLineInner();
-            }
-        }
-    }
-
     private void DrawVfxCombo(LociStatus status, float width)
     {
         using var combo = ImRaii.Combo("##vfx", $"VFX: {status.CustomFXPath}", ImGuiComboFlags.HeightLargest);
@@ -577,6 +615,7 @@ public class StatusesTab : IDisposable
         var maxStacks = LociProcessor.IconStackCounts.TryGetValue((uint)status.IconID, out var count) ? (int)count : 1;
         status.Stacks = maxStacks < 1 ? 1 : Math.Min(status.Stacks, maxStacks);
         status.StackSteps = maxStacks < 1 ? 0 : Math.Min(status.StackSteps, maxStacks);
+        status.StackToChain = maxStacks;
         Svc.Logger.Information($"Max Stacks calculated: {maxStacks} | InitStacks: {status.Stacks} | Steps: {status.StackSteps}");
         // Ensure modifiers are correct.
         status.Modifiers = (status.StackSteps > 0)
