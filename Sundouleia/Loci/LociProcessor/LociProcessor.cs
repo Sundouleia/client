@@ -34,7 +34,6 @@ using Dalamud.Memory;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
-using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Lumina.Excel.Sheets;
 using Microsoft.Extensions.Hosting;
@@ -46,7 +45,6 @@ using Sundouleia.Services.Mediator;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.Loci.Processors;
 
