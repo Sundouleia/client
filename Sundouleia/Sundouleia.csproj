@@ -22,10 +22,6 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
     </ItemGroup>
-    
-    <ItemGroup>
-      <None Include="Loci\LociReadme.md" />
-    </ItemGroup>
 
     <!--As Now that we use Dalamud.SDK, most Dalamud Sources are not needed, but some must stay.-->
     <ItemGroup>
@@ -38,11 +34,12 @@
         <!--Submodules-->
         <PackageReference Include="ZstdSharp.Port" Version="0.8.6" />
         <ProjectReference Include="..\Submodules\CkCommons\CkCommons.csproj" />
-	   <ProjectReference Include="..\Submodules\GlamourerAPI\Glamourer.Api.csproj" />
         <ProjectReference Include="..\Submodules\OtterGui\OtterGui.csproj" />
         <ProjectReference Include="..\Submodules\Penumbra.Api\Penumbra.Api.csproj" />
 	   <ProjectReference Include="..\Submodules\Penumbra.String\Penumbra.String.csproj" />
 	   <ProjectReference Include="..\Submodules\Penumbra.GameData\Penumbra.GameData.csproj" />
+	   <ProjectReference Include="..\Submodules\GlamourerAPI\Glamourer.Api.csproj" />
+	   <ProjectReference Include="..\Submodules\LociAPI\Loci.Api.csproj" />
 	   <ProjectReference Include="..\Submodules\BrioAPI\Brio.API\Brio.API.csproj" />
         <!-- GlobalPropertiesToRemove is because of intentional platform mismatch, does not matter because it is only models, needed for vscode language server to be happy -->
 	   <ProjectReference Include="..\Submodules\SundouleiaAPI\SundouleiaAPI.csproj" GlobalPropertiesToRemove="platform" />

@@ -37,7 +37,7 @@ public class LociManagersTab
         _manager = manager;
     }
 
-    private (string NameWorld, LociSM Manager)? _selected;
+    private (string NameWorld, ActorSM Manager)? _selected;
 
     public void DrawSection(Vector2 region)
     {
@@ -84,7 +84,7 @@ public class LociManagersTab
         DrawStatuses(selected.Manager);
     }
 
-    private void DrawStatuses(LociSM manager)
+    private void DrawStatuses(ActorSM manager)
     {
         using var style = ImRaii.PushStyle(ImGuiStyleVar.ScrollbarSize, 10f);
         using var _ = CkRaii.FramedChildPaddedWH("active-statuses", ImGui.GetContentRegionAvail(), 0, SundCol.Gold.Uint());

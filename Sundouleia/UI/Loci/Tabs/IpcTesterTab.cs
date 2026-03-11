@@ -165,7 +165,7 @@ public class IpcTesterTab
         }
     }
 
-    private void DrawActorSM(string name, LociSM manager)
+    private void DrawActorSM(string name, ActorSM manager)
     {
         using var _ = ImRaii.TreeNode(name);
         if (!_) return;

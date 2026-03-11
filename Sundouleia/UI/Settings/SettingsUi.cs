@@ -95,6 +95,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
         CkGui.AttachToolTip(IpcCallerHonorific.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
+        CkGui.ColorTextBool("Loci", IpcCallerLoci.APIAvailable);
+        CkGui.AttachToolTip(IpcCallerLoci.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+
+        ImGui.SameLine();
         CkGui.ColorTextBool("PetNames", IpcCallerPetNames.APIAvailable);
         CkGui.AttachToolTip(IpcCallerPetNames.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 

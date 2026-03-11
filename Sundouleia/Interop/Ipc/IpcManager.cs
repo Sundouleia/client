@@ -15,23 +15,19 @@ public sealed partial class IpcManager : DisposableMediatorSubscriberBase
     public IpcCallerGlamourer   Glamourer { get; }
     public IpcCallerHeels       Heels { get; }
     public IpcCallerHonorific   Honorific { get; }
+    public IpcCallerLoci        Loci { get; }
     public IpcCallerPenumbra    Penumbra { get; }
     public IpcCallerPetNames    PetNames { get; }
-
-    
-    public IpcProviderMoodles   Moodles { get; } // Peudo-Provider
-    public IpcProviderLoci      Loci    { get; }
 
     public IpcManager(ILogger<IpcManager> logger, SundouleiaMediator mediator,
         IpcCallerBrio brio,
         IpcCallerCustomize customizePlus,
         IpcCallerGlamourer glamourer,
         IpcCallerHeels heels,
-        IpcProviderMoodles moodles,
         IpcCallerHonorific honorific,
+        IpcCallerLoci loci,
         IpcCallerPenumbra penumbra,
-        IpcCallerPetNames petNames,
-        IpcProviderLoci lociProvider)
+        IpcCallerPetNames petNames)
         : base(logger, mediator)
     {
         Brio = brio;
@@ -39,10 +35,9 @@ public sealed partial class IpcManager : DisposableMediatorSubscriberBase
         Glamourer = glamourer;
         Heels = heels;
         Honorific = honorific;
-        Moodles = moodles;
+        Loci = loci;
         Penumbra = penumbra;
         PetNames = petNames;
-        Loci = lociProvider;
 
         if (Initialized)
             Mediator.Publish(new PenumbraInitialized());
@@ -62,60 +57,9 @@ public sealed partial class IpcManager : DisposableMediatorSubscriberBase
         Glamourer.CheckAPI();
         CustomizePlus.CheckAPI();
         Heels.CheckAPI();
-        PetNames.CheckAPI();
         Honorific.CheckAPI();
+        Loci.CheckAPI();
+        PetNames.CheckAPI();
         Brio.CheckAPI();
     }
-
-    #region Loci-Async Calls
-    public async Task<string> LociGetOwnManager()
-    {
-        return await Svc.Framework.RunOnFrameworkThread(Loci.GetClientSM).ConfigureAwait(false);
-    }
-
-    public async Task<bool> LociRegister(nint addr)
-    {
-        return await Svc.Framework.RunOnFrameworkThread(() => Loci.RegisterByPtr(addr, LOCI_REGISTER_TAG)).ConfigureAwait(false);
-    }
-
-    public async Task LociRelease(nint addr)
-    { 
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            Loci.UnregisterByPtr(addr, LOCI_REGISTER_TAG);
-            Loci.ClearSMByPtr(addr);
-        }).ConfigureAwait(false);
-    }
-
-    public async Task LociReleaseByName(string nameWorld)
-    {
-        await Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            Loci.UnregisterByName(nameWorld, LOCI_REGISTER_TAG);
-            Loci.ClearSMByName(nameWorld);
-        }).ConfigureAwait(false);
-    }
-
-    public async Task LociApplyStatuses(List<Guid> ids)
-    {
-        await Svc.Framework.RunOnFrameworkThread(() => Loci.ApplyBulkStatuses(ids)).ConfigureAwait(false);
-    }
-    public async Task LociApplyStatusInfos(List<LociStatusInfo> tuples)
-    {
-        await Svc.Framework.RunOnFrameworkThread(() => Loci.ApplyBulkStatusInfos(tuples)).ConfigureAwait(false);
-    }
-    public async Task LociRemoveStatuses(List<Guid> ids)
-    {
-        await Svc.Framework.RunOnFrameworkThread(() => Loci.RemoveBulkStatuses(ids)).ConfigureAwait(false);
-    }
-    public async Task LociSetByPtr(nint addr, string data)
-    {
-        await Svc.Framework.RunOnFrameworkThread(() => Loci.SetSMByPtr(addr, data)).ConfigureAwait(false);
-    }
-    public async Task LociClearByPtr(nint addr)
-    {
-        await Svc.Framework.RunOnFrameworkThread(() => Loci.ClearSMByPtr(addr)).ConfigureAwait(false);
-    }
-
-    #endregion Loci-Async Calls
 }

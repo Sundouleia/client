@@ -1,9 +1,7 @@
 using CkCommons.Gui;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.ClientState.Party;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.DrawSystem;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -32,7 +30,7 @@ public class LociSettings
         _presetFileSystem = presetFS;
     }
 
-    public void DrawSettings()
+    public unsafe void DrawSettings()
     {
         CkGui.FontText("Functionality", Fonts.Default150Percent);
         var enabled = _config.Current.LociEnabled;

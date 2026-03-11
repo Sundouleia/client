@@ -133,7 +133,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         {
             OnSMModifiedCalled?.Invoke(charaAddr);
             OnManagerModified?.SendMessage(charaAddr);
-            IpcProviderMoodles.InvokeManagerModified(charaAddr);
+            // IpcProviderMoodles.InvokeManagerModified(charaAddr);
         }
         catch (Bagagwa ex)
         {
@@ -147,7 +147,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         {
             OnStatusModifiedCalled?.Invoke(status, removed);
             OnStatusUpdated?.SendMessage(status.GUID, removed);
-            IpcProviderMoodles.InvokeStatusUpdated(status.GUID, removed);
+            // IpcProviderMoodles.InvokeStatusUpdated(status.GUID, removed);
         }
         catch (Bagagwa ex)
         {
@@ -161,7 +161,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         {
             OnPresetModifiedCalled?.Invoke(preset, removed);
             OnPresetUpdated?.SendMessage(preset.GUID, removed);
-            IpcProviderMoodles.InvokePresetUpdated(preset.GUID, removed);
+            // IpcProviderMoodles.InvokePresetUpdated(preset.GUID, removed);
         }
         catch (Bagagwa ex)
         {
@@ -419,11 +419,11 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         return chara is null ? false : _manager.DetachIdFromActor(chara->GetNameWithWorld(), identifier);
     }
 
-    internal unsafe bool LockStatusSingle(Guid id, uint key) => PlayerData.Available ? PlayerData.Character->GetManager().LockStatus(id, key) : false;
-    internal unsafe (bool, List<Guid>) LockStatusesBulk(List<Guid> ids, uint key) => PlayerData.Available ? PlayerData.Character->GetManager().LockStatuses(ids, key) : (false, ids);
-    internal unsafe bool UnlockStatusSingle(Guid id, uint key) => PlayerData.Available ? PlayerData.Character->GetManager().UnlockStatus(id, key) : false;
-    internal unsafe (bool, List<Guid>) UnlockStatusesBulk(List<Guid> ids, uint key) => PlayerData.Available ? PlayerData.Character->GetManager().UnlockStatuses(ids, key) : (false, ids);
-    internal unsafe bool ClearMatchingLocks(uint key) => PlayerData.Available ? PlayerData.Character->GetManager().ClearLocks(key) : false;
+    internal unsafe bool LockStatusSingle(Guid id, uint key) => PlayerData.Available ? LociManager.GetFromChara(PlayerData.Character).LockStatus(id, key) : false;
+    internal unsafe (bool, List<Guid>) LockStatusesBulk(List<Guid> ids, uint key) => PlayerData.Available ? LociManager.GetFromChara(PlayerData.Character).LockStatuses(ids, key) : (false, ids);
+    internal unsafe bool UnlockStatusSingle(Guid id, uint key) => PlayerData.Available ? LociManager.GetFromChara(PlayerData.Character).UnlockStatus(id, key) : false;
+    internal unsafe (bool, List<Guid>) UnlockStatusesBulk(List<Guid> ids, uint key) => PlayerData.Available ? LociManager.GetFromChara(PlayerData.Character).UnlockStatuses(ids, key) : (false, ids);
+    internal unsafe bool ClearMatchingLocks(uint key) => PlayerData.Available ? LociManager.GetFromChara(PlayerData.Character).ClearLocks(key) : false;
 
 
     // Rets the Base64 encoded LociSM. Null if not rendered or accessible.
@@ -438,7 +438,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
             Logger.LogWarning("GetLociManager addr is NULL");
             return null!;
         }
-        return chara->GetManager().ToBase64();
+        return LociManager.GetFromChara(chara).ToBase64();
     }
 
     // Gets the LociSM of the player address in Tuple format. If not rendered, returns null.
@@ -448,7 +448,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
     internal unsafe List<LociStatusInfo> GetSMInfoInternal(nint charaAddr)
     {
         Character* chara = (Character*)charaAddr;
-        return chara is not null ? chara->GetManager().GetStatusInfoList() : new List<LociStatusInfo>();
+        return chara is not null ? LociManager.GetFromChara(chara).GetStatusInfoList() : new List<LociStatusInfo>();
     }
 
     // Updates the LociSM with a provided base64 string. Fails silently if not rendered or accessible.
@@ -467,7 +467,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
     {
         Character* chara = (Character*)charaAddr;
         if (chara is not null)
-            chara->GetManager().Apply(newData);
+            LociManager.GetFromChara(chara).Apply(newData);
     }
 
     // Clears the encoded base64 data to a visible player's StatusManager, if rendered.
@@ -488,7 +488,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         if (chara is null)
             return;
         // Grab the SM and cancel all non-persistent statuses that are not locked.
-        var mySM = chara->GetManager();
+        var mySM = LociManager.GetFromChara(chara);
         // TODO: Make this filter out locked statuses!
         foreach (var s in mySM.Statuses)
             if (!s.Persistent)
@@ -516,7 +516,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         if (_manager.SavedStatuses.FirstOrDefault(x => x.GUID == id) is not { } status)
             return false;
         
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
         if (!sm.Ephemeral)
         {
             Logger.LogDebug($"Adding or Updating Loci {status.Title} to {chara->GetNameWithWorld()}", LoggerType.LociIpc);
@@ -550,7 +550,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         if (toApply.Count is 0) return false;
 
         // Grab the manager and run an add or update to them.
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
         foreach (var status in toApply)
         {
             if (!sm.Ephemeral)
@@ -580,7 +580,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         if (chara is null) return false;
         // Grab the manager and run an add or update to them.
         Logger.LogDebug($"Applying status: ({info.Title})");
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
         sm.AddOrUpdate(LociStatus.FromTuple(info).PreApply(), true, true, lockKey);
         return true;
     }
@@ -603,7 +603,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         if (chara is null) return false;
         // Grab the manager and run an add or update to them.
         Logger.LogDebug($"Applying statuses: ({string.Join(",", infos.Select(s => s.Title))})");
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
         foreach (var statusInfo in infos)
             sm.AddOrUpdate(LociStatus.FromTuple(statusInfo).PreApply(), true, true, lockKey);
         // Ret the result.
@@ -629,7 +629,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         if (_manager.SavedPresets.FirstOrDefault(x => x.GUID == id) is not { } preset)
             return;
         // Grab the manager and run an add or update to them.
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
         if (!sm.Ephemeral)
             sm.ApplyPreset(preset, _manager);
     }
@@ -653,7 +653,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
         var toApply = _manager.SavedPresets.Where(s => lookup.Contains(s.GUID)).ToList();
         if (toApply.Count is 0) return;
         // Grab the manager and run an add or update to them.
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
         foreach (var preset in toApply)
         {
             if (!sm.Ephemeral)
@@ -668,7 +668,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
     {
         Character* chara = (Character*)charaAddr;
         if (chara is null) return false;
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
 
         if (sm.Statuses.FirstOrDefault(x => x.GUID == id) is not { } status)
             return false;
@@ -694,7 +694,7 @@ public class IpcProviderLoci : DisposableMediatorSubscriberBase, IHostedService
     {
         Character* chara = (Character*)charaAddr;
         if (chara is null) return;
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
 
         foreach (var guid in ids)
         {

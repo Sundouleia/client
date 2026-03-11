@@ -15,7 +15,7 @@ public enum LoggerType : long
     IpcPenumbra         = 1L << 4,
     IpcGlamourer        = 1L << 5,
     IpcCustomize        = 1L << 6,
-    IpcLoci          = 1L << 7,
+    IpcLoci             = 1L << 7,
     IpcHeels            = 1L << 8,
     IpcHonorific        = 1L << 9,
     IpcPetNames         = 1L << 10,
@@ -67,19 +67,12 @@ public enum LoggerType : long
     Health              = 1L << 44,
     JwtTokens           = 1L << 45,
 
-    // Loci Services
-    LociMemory          = 1L << 46,
-    LociProcessors      = 1L << 47,
-    LociData            = 1L << 48,
-    LociIpc             = 1L << 49,
-    LociSheVfx          = 1L << 50,
-
     // SMA Serviecs
-    SmaManagment        = 1L << 51,
-    SmaHandling         = 1L << 52,
-    SmaGpose            = 1L << 53,
-    SmaTransfer         = 1L << 54,
-    SmaImportExport     = 1L << 55,
+    SmaManagment        = 1L << 46,
+    SmaHandling         = 1L << 47,
+    SmaGpose            = 1L << 48,
+    SmaTransfer         = 1L << 49,
+    SmaImportExport     = 1L << 50,
 
 
     // All Recommended types.

@@ -10,7 +10,9 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using NAudio.SoundFont;
+using OtterGui;
 using OtterGui.Extensions;
 using OtterGui.Text;
 using Sundouleia.CustomCombos;
@@ -97,7 +99,7 @@ public class StatusesTab : IDisposable
 
         // Do some fancy way of displaying the LociStatus later.
         if (ImGui.Button("Apply"))
-            LociManager.GetStatusManager(PlayerData.NameWithWorld).AddOrUpdate(status.PreApply());
+            LociManager.GetFromName(PlayerData.NameWithWorld).AddOrUpdate(status.PreApply());
 
         CkGui.FrameSeparatorV();
         DrawTargetApplication(status);
@@ -135,13 +137,14 @@ public class StatusesTab : IDisposable
         }
 
         // We have a target, so get their sm
-        var sm = chara->GetManager();
+        var sm = LociManager.GetFromChara(chara);
         // If the manager is not ephemeral, simply draw the apply to target button.
         if (!sm.Ephemeral)
         {
             // Perform without any validation
-            if (ImGui.Button("Apply to Target"))
+            if (CkGui.IconTextButton(FAI.Crosshairs, $"Apply to {chara->NameString}", disabled: chara->ObjectKind is not (ObjectKind.Pc or ObjectKind.Companion)))
                 sm.AddOrUpdate(status.PreApply());
+            CkGui.AttachToolTip($"Applies the status to the target actor!--SEP----COL--Accepts Players and Minions--COL--", ImGuiColors.DalamudOrange);
         }
         else
         {
@@ -243,7 +246,11 @@ public class StatusesTab : IDisposable
             if (ImGui.IsItemDeactivatedAfterEdit())
             {
                 if (_tmpTitle != status.Title)
-                    _loci.MarkStatusModified(status, _tmpTitle);
+                {
+                    var prevTitle = status.Title;
+                    status.Title = _tmpTitle;
+                    _loci.MarkStatusModified(status, prevTitle);
+                }
                 // null temp
                 _tmpTitle = null;
             }
