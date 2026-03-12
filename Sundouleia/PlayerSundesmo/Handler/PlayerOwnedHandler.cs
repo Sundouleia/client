@@ -41,6 +41,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     // Internal Cache
     private unsafe GameObject* _gameObject = null;
     private Guid _tempProfile = Guid.Empty;
+    private bool _lociRegistered = false;
     private IpcDataCache? _appearanceData = new();
 
     private bool _hasAlterations => _appearanceData is not null;
@@ -58,6 +59,15 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         _ipc = ipc;
         _watcher = watcher;
 
+        Mediator.Subscribe<LociReady>(this, async _ =>
+        {
+            if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
+            if (!IsRendered) return;
+            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
+                _lociRegistered = true;
+            if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Loci]))
+                await ApplyLoci().ConfigureAwait(false);
+        });
         Mediator.Subscribe<WatchedObjectCreated>(this, msg => MarkVisibleForAddress(msg.Address));
         Mediator.Subscribe<WatchedObjectDestroyed>(this, msg => UnrenderObject(msg.Address));
     }
@@ -65,7 +75,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     // Public accessors.
     public GameObject DataState { get { unsafe { return *_gameObject; } } }
     public unsafe IntPtr Address => (nint)_gameObject;
-    public unsafe ushort ObjIndex => _gameObject->ObjectIndex;
+    public unsafe ushort ObjIndex => IsRendered ? _gameObject->ObjectIndex : ushort.MaxValue;
     public unsafe ulong EntityId => _gameObject->EntityId;
     public unsafe ulong GameObjectId => _gameObject->GetGameObjectId().ObjectId;
     public unsafe IntPtr DrawObjAddress => (nint)_gameObject->DrawObject;
@@ -134,6 +144,9 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
         // Await until we know the player has absolutely finished loading in.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
+        // Assign Sundesmo as monitored in Loci
+        if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
+            _lociRegistered = true;
 
         Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
         await ReapplyAlterations().ConfigureAwait(false);
@@ -184,22 +197,63 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
     /// <inheritdoc cref="RevertAlterations(string, ushort?, CancellationToken)"/>
     public async Task RevertAlterations(CancellationToken ct = default)
-        => await RevertAlterations(NameString, IsRendered ? ObjIndex : null, ct).ConfigureAwait(false);
+    {
+        try
+        {
+            // Revert penumbra collection and customize+ data if set.
+            await RevertAssignedAlterations();
+
+            // If not visible, skip all but GlamourerByName, since they won't be valid.
+            if (!IsRendered)
+            {
+                // Revert glamourer by name if possible.
+                if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
+                    await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
+                // release by name if possible
+                if (_lociRegistered)
+                    await _ipc.Loci.ClearBuddySM(Sundesmo.PlayerName, NameString).ConfigureAwait(false);
+                return;
+            }
+
+            // Ensure we have a valid address before we process a revert.
+            // (Helps safegaurd cases where a Sundesmo is disposed of before its handlers are finished)
+            // (Can touch this up later)
+            if (!CharaWatcher.RenderedCharas.Contains(Address))
+                return;
+
+            // We can care about parallel execution here if we really want to but i dont care atm.
+            await _ipc.Glamourer.ReleaseActor(ObjIndex).ConfigureAwait(false);
+            await _ipc.Loci.ClearActorSM(Address).ConfigureAwait(false);
+        }
+        catch (AccessViolationException)
+        { }
+        catch (Exception ex)
+        { }
+    }
 
     /// <summary>
     ///     Reverts the rendered alterations on the Sundesmo-owned object. <br/>
     ///     <b>This does not delete the alteration data. </b>
     /// </summary>
-    private async Task RevertAlterations(string name, ushort? objIdx = null, CancellationToken ct = default)
+    private async Task RevertAlterations(string name, IntPtr address, ushort objIdx, CancellationToken ct = default)
     {
         // Revert the customize+ alterations that do not require actor info.
         await RevertAssignedAlterations().ConfigureAwait(false);
 
         // Revert glamourer based on the rendered state.
-        if (objIdx is { } idx)
-            await _ipc.Glamourer.ReleaseActor(idx).ConfigureAwait(false);
-        else if (!string.IsNullOrEmpty(name))
-            await _ipc.Glamourer.ReleaseByName(name).ConfigureAwait(false);
+        if (address == IntPtr.Zero)
+        {
+            // Revert glamourer by name if possible.
+            if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
+                await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
+            if (_lociRegistered)
+                await _ipc.Loci.ClearBuddySM(Sundesmo.PlayerName, name).ConfigureAwait(false);
+            return;
+        }
+
+        // Otherwise clear normally.
+        await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
+        await _ipc.Loci.ClearActorSM(address).ConfigureAwait(false);
         // Otherwise do nothing.
     }
 
@@ -214,6 +268,11 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             await _ipc.CPlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
+        if (_lociRegistered)
+        {
+            await _ipc.Loci.UnregisterBuddy(Sundesmo.PlayerName, NameString).ConfigureAwait(false);
+            _lociRegistered = false;
+        }
     }
 
     public async Task ClearAlterations(CancellationToken ct = default)
@@ -227,6 +286,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
         _appearanceData = null;
         _tempProfile = Guid.Empty;
+        _lociRegistered = false;
     }
 
     public async Task UpdateAndApplyIpc(IpcDataUpdate ipcChanges, bool isInitialData)
@@ -305,6 +365,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             await ApplyGlamourer().ConfigureAwait(false);
         if (changes.HasAny(IpcKind.CPlus))
             await ApplyCPlus().ConfigureAwait(false);
+        if (changes.HasAny(IpcKind.Loci))
+            await ApplyLoci().ConfigureAwait(false);
 
         Logger.LogInformation($"{Sundesmo.GetNickAliasOrUid()}'s {ObjectType} had their visuals reapplied.", LoggerType.PairHandler);
         return changes.HasAny(IpcKind.Glamourer) ? RedrawKind.Reapply : RedrawKind.None;
@@ -327,6 +389,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             await ApplyGlamourer().ConfigureAwait(false);
         else if (kind.HasAny(IpcKind.CPlus))
             await ApplyCPlus().ConfigureAwait(false);
+        else if (kind.HasAny(IpcKind.Loci))
+            await ApplyLoci().ConfigureAwait(false);
 
         Logger.LogInformation($"{Sundesmo.GetNickAliasOrUid()}'s {ObjectType} had a single IPC change ({kind})", LoggerType.PairHandler);
     }
@@ -345,6 +409,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             await ApplyGlamourer().ConfigureAwait(false);
         if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))
             await ApplyCPlus().ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Loci]))
+            await ApplyLoci().ConfigureAwait(false);
 
         Logger.LogInformation($"{Sundesmo.GetNickAliasOrUid()}'s {ObjectType} reapplied alterations.", LoggerType.PairHandler);
         return !string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Glamourer]) ? RedrawKind.Reapply : RedrawKind.None;
@@ -372,6 +438,19 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             _tempProfile = await _ipc.CPlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
         }
     }
+
+    private async Task ApplyLoci()
+    {
+        if (!_lociRegistered)
+        {
+            // Could cause some confusion (due to clearing alterations), but should work for the most part.
+            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
+                _lociRegistered = true;
+        }
+        // Then set by ptr
+        await _ipc.Loci.SetActorSM(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
+    }
+
     #endregion Ipc Helpers
 
     /// <summary>
@@ -417,8 +496,9 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             finally
             {
                 // Clear internal data.
-                _tempProfile = Guid.Empty;
                 _appearanceData = null;
+                _tempProfile = Guid.Empty;
+                _lociRegistered = false;
                 NameString = string.Empty;
                 unsafe { _gameObject = null; }
             }
@@ -463,5 +543,13 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             UiService.SetUITask(ApplyCPlus);
         ImGui.TableNextColumn();
         ImGui.Text(_appearanceData!.Data[IpcKind.CPlus]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("Loci");
+        ImGui.TableNextColumn();
+        if (CkGui.IconTextButton(FAI.Sync, "Reapply", disabled: string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Loci]), id: $"{Sundesmo.UserData.UID}-{ObjectType}-loci-reapply"))
+            UiService.SetUITask(ApplyLoci);
+        ImGui.TableNextColumn();
+        ImGui.Text(_appearanceData!.Data[IpcKind.Loci]);
     }
 }
