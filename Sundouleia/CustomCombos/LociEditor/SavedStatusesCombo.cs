@@ -5,37 +5,35 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Extensions;
 using OtterGui.Text;
-using Sundouleia.Loci.Data;
-using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
+using SundouleiaAPI.Data;
+using TerraFX.Interop.Windows;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class SavedStatusesCombo : CkFilterComboCache<LociStatus>
-{
-    private readonly LociManager _manager;
-    
+public sealed class SavedStatusesCombo : CkFilterComboCache<LociStatusStruct>
+{   
     private Guid _current;
     private static Vector2 _iconSize => LociIcon.Size;
 
-    public SavedStatusesCombo(ILogger log, LociManager manager, Func<IReadOnlyList<LociStatus>> generator) : base(generator, log)
+    public SavedStatusesCombo(ILogger log, Func<IReadOnlyList<LociStatusStruct>> generator) : base(generator, log)
     {
-        _manager = manager;
         _current = Guid.Empty;
         SearchByParts = true;
     }
 
     public string HintText { get; set; } = "Status to Chain... (Optional)";
-    protected override string ToString(LociStatus status)
+    protected override string ToString(LociStatusStruct status)
         => status.Title.StripColorTags();
 
     protected override int UpdateCurrentSelected(int currentSelected)
     {
-        if (Current?.GUID == _current)
+        if (Current.GUID == _current)
             return currentSelected;
 
         CurrentSelectionIdx = Items.IndexOf(i => i.GUID == _current);
-        Current = CurrentSelectionIdx >= 0 ? Items[CurrentSelectionIdx] : null;
+        Current = CurrentSelectionIdx >= 0 ? Items[CurrentSelectionIdx] : default;
         return CurrentSelectionIdx;
     }
 
@@ -65,8 +63,8 @@ public sealed class SavedStatusesCombo : CkFilterComboCache<LociStatus>
         var ret = ImGui.Selectable($"##{myStatus.Title}", selected, ImGuiSelectableFlags.None, size);
 
         ImGui.SameLine(titleSpace);
-        LociIcon.Draw((uint)myStatus.IconID, myStatus.Stacks, _iconSize);
-        LociEx.AttachTooltip(myStatus, _manager);
+        LociIcon.Draw(myStatus.IconID, myStatus.Stacks, _iconSize);
+        SundouleiaEx.AttachTooltip(myStatus, LociData.Cache);
 
         ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;

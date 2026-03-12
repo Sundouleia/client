@@ -17,6 +17,11 @@ global using FAI = Dalamud.Interface.FontAwesomeIcon;
 // MERV! DON'T SUMMON BAGAGWA!
 global using Bagagwa = System.Exception;
 
+// ONLY use the enums from our API, this way we can go between
+// Client <-> API <-> Server without conflict.
+// Dalamut internally handles enum type conversion
+// in IPC transit so we don't need to worry about this.
+// (If we do we can just integrate support into the API layer anyways)
 global using LociStatusInfo = (
     int Version,
     System.Guid GUID,
@@ -54,29 +59,4 @@ global using LociEventInfo = (
     string Title,
     string Description,
     LociApi.Enums.LociEventType EventType
-);
-
-global using LociStatusSummary = (
-    System.Guid ID,
-    string FSPath,
-    uint IconID,
-    string Title,
-    string Description
-);
-
-global using LociPresetSummary = (
-    System.Guid ID,
-    string FSPath,
-    System.Collections.Generic.List<uint> IconIDs,
-    string Title,
-    string Description
-);
-
-global using LociEventSummary = (
-    System.Guid ID,
-    string FSPath,
-    bool Enabled,
-    LociApi.Enums.LociEventType EventType,
-    string Title,
-    string Description
 );

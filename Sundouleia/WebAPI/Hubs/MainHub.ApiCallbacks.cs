@@ -225,7 +225,7 @@ public partial class MainHub
         else if (!pair.IsRendered)
             Logger.LogWarning($"Received ApplyLociDataById for a sundesmo not rendered: {dto.User.AliasOrUID}");
         else
-            await _ipc.LociApplyStatuses(dto.Ids.ToList()).ConfigureAwait(false);
+            await _ipc.Loci.ApplyStatus(dto.Ids.ToList()).ConfigureAwait(false);
     }
 
     public async Task Callback_ApplyLociStatus(ApplyLociStatus dto)
@@ -239,7 +239,7 @@ public partial class MainHub
         else
         {
             Mediator.Publish(new EventMessage(new(pair.GetNickAliasOrUid(), pair.UserData.UID, DataEventType.LociDataApplied, "Applied by Pair.")));
-            await _ipc.LociApplyStatusInfos(dto.Statuses.ToList()).ConfigureAwait(false);
+            await _ipc.Loci.ApplyStatusInfo(dto.Statuses.Select(s => s.ToTuple()).ToList()).ConfigureAwait(false);
         }
     }
 
@@ -252,7 +252,7 @@ public partial class MainHub
         else if (!pair.IsRendered)
             Logger.LogWarning($"Received RemoveLociData for a sundesmo not rendered: {dto.User.AliasOrUID}");
         else
-            await _ipc.LociRemoveStatuses(dto.Ids.ToList()).ConfigureAwait(false);
+            await _ipc.Loci.BombStatus(dto.Ids.ToList()).ConfigureAwait(false);
     }
     #endregion Locis Callbacks
 

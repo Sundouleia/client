@@ -84,6 +84,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         });
 
         Mediator.Subscribe<PenumbraDisposed>(this, _ => _tempCollection = Guid.Empty);
+        Mediator.Subscribe<LociReady>(this, async _ =>
+        {
+            if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
+            if (!IsRendered) return;
+            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
+                _lociRegistered = true;
+            if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Loci]))
+                await ApplyLoci().ConfigureAwait(false);
+        });
         Mediator.Subscribe<HonorificReady>(this, async _ =>
         {
             if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
@@ -174,10 +183,6 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             // Create/Assign this ObjectIdx to the Penumbra Temp Collection if necessary.
             await TryCreateAssignTempCollection().ConfigureAwait(false);
-            // Assign Sundesmo as monitored in Loci
-            if (await _ipc.LociRegister(Address).ConfigureAwait(false))
-                _lociRegistered = true;
-
             // If they are online and have alterations, reapply them. Otherwise, exit.
             if (!Sundesmo.IsOnline || (!_hasAlterations))
             {
@@ -191,6 +196,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
             // Await until we know the player has absolutely finished loading in.
             await WaitUntilValidDrawObject().ConfigureAwait(false);
+            // Assign Sundesmo as monitored in Loci
+            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
+                _lociRegistered = true;
 
             Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
             await ReapplyAlterationsInternal().ConfigureAwait(false);
@@ -281,7 +289,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                     await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
                 // release by name if possible
                 if (_lociRegistered)
-                    await _ipc.LociReleaseByName(NameString).ConfigureAwait(false);
+                    await _ipc.Loci.ClearPlayerSM(NameWithWorld).ConfigureAwait(false);
                 return;
             }
 
@@ -296,7 +304,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await _ipc.Glamourer.ReleaseActor(ObjIndex).ConfigureAwait(false);
             await _ipc.Heels.RestoreUserOffset(ObjIndex).ConfigureAwait(false);
             await _ipc.Honorific.ClearTitleAsync(ObjIndex).ConfigureAwait(false);
-            await _ipc.LociRelease(Address).ConfigureAwait(false);
+            await _ipc.Loci.ClearActorSM(Address).ConfigureAwait(false);
         }
         catch (AccessViolationException)
         {
@@ -332,7 +340,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                     await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
                 if (_lociRegistered)
-                    await _ipc.LociReleaseByName(NameString).ConfigureAwait(false);
+                    await _ipc.Loci.ClearPlayerSM(NameWithWorld).ConfigureAwait(false);
                 return;
             }
 
@@ -341,7 +349,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
             await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
             await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
-            await _ipc.LociRelease(address).ConfigureAwait(false);
+            await _ipc.Loci.ClearActorSM(address).ConfigureAwait(false);
 
             _ipc.Penumbra.RedrawGameObject(objIdx);
         }
@@ -367,7 +375,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         if (_tempProfile != Guid.Empty)
         {
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            await _ipc.CPlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
         if (_tempCollection != Guid.Empty)
@@ -375,6 +383,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             Logger.LogTrace($"Removing {NameString}(({Sundesmo.GetNickAliasOrUid()})'s temporary collection.", LoggerType.PairHandler);
             await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
             _tempCollection = Guid.Empty;
+        }
+        if (_lociRegistered)
+        {
+            await _ipc.Loci.UnregisterPlayer(NameString).ConfigureAwait(false);
+            _lociRegistered = false;
         }
     }
 
@@ -961,11 +974,11 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         if (!_lociRegistered)
         {
             // Could cause some confusion (due to clearing alterations), but should work for the most part.
-            if (await _ipc.LociRegister(Address).ConfigureAwait(false))
+            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
                 _lociRegistered = true;
         }
         // Then set by ptr
-        await _ipc.LociSetByPtr(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
+        await _ipc.Loci.SetActorSM(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
     }
 
     private Task ApplyPetNames()
@@ -979,12 +992,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         if (string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.CPlus]) && _tempProfile != Guid.Empty)
         {
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            await _ipc.CPlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
         else
         {
-            _tempProfile = await _ipc.CustomizePlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
+            _tempProfile = await _ipc.CPlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
         }
     }
 

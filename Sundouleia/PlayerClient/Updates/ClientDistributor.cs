@@ -26,7 +26,6 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     private readonly IpcProvider _ipcProvider;
     private readonly FileUploader _fileUploader;
     private readonly LimboStateManager _limbo;
-    private readonly LociManager _loci;
     private readonly ModdedStateManager _moddedState;
     private readonly SundesmoManager _sundesmos;
     private readonly CharaWatcher _watcher;
@@ -40,7 +39,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     public ClientDistributor(ILogger<ClientDistributor> logger, SundouleiaMediator mediator,
         MainHub hub, MainConfig config, AccountConfig account, IpcManager ipc, IpcProvider provider, 
         FileUploader fileUploader, LimboStateManager limbo, ModdedStateManager moddedState,
-        LociManager loci, SundesmoManager sundesmos, CharaWatcher watcher, ClientUpdateService updater)
+        SundesmoManager sundesmos, CharaWatcher watcher, ClientUpdateService updater)
         : base(logger, mediator)
     {
         _hub = hub;
@@ -50,7 +49,6 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         _ipcProvider = provider;
         _fileUploader = fileUploader;
         _limbo = limbo;
-        _loci = loci;
         _moddedState = moddedState;
         _sundesmos = sundesmos;
         _watcher = watcher;
@@ -84,31 +82,15 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     }
 
     #region Loci
-    // Effectively a relay from our client's ApplyToTarget -> Over to the server telling the Sundesmo to apply it to themselves.
-    public async Task PushLociApplyToTarget(UserData user, IEnumerable<LociStatusInfo> data)
-    {
-        Logger.LogDebug($"Pushing ApplyLociStatus to: {user.AliasOrUID}", LoggerType.DataDistributor);
-        if (await _hub.UserApplyLociStatusTuples(new(user, data)).ConfigureAwait(false) is { } res && res.ErrorCode is not SundouleiaApiEc.Success)
-            Logger.LogError($"Failed to push ApplyLociStatus to server. [{res.ErrorCode}]");
-        else
-            Logger.LogDebug($"Successfully pushed ApplyLociStatus to the server", LoggerType.DataDistributor);
-    }
-
     public async Task PushLociData(List<UserData> trustedUsers)
     {
         if (!MainHub.IsConnectionDataSynced)
             return;
         // Compile to sharable data
-        var toSend = new LociData()
-        {
-            DataInfo = LociManager.ClientSM.Statuses.Select(s => s.ToTuple()).ToDictionary(s => s.GUID),
-            Statuses = _loci.SavedStatuses.Select(s => s.ToTuple()).ToDictionary(s => s.GUID),
-            Presets = _loci.SavedPresets.Select(p => p.ToTuple()).ToDictionary(p => p.GUID)
-        };
         try
         {
             Logger.LogDebug($"Pushing LociData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-            await _hub.UserPushLociData(new(trustedUsers, toSend));
+            await _hub.UserPushLociData(new(trustedUsers, LociData.Cache));
         }
         catch (Exception ex)
         {
@@ -116,7 +98,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task PushLociStatusUpdate(List<UserData> trustedUsers, LociStatusInfo status, bool wasDeleted)
+    public async Task PushLociStatusUpdate(List<UserData> trustedUsers, LociStatusStruct status, bool wasDeleted)
     {
         if (!MainHub.IsConnectionDataSynced)
             return;
@@ -131,7 +113,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task PushLociPresetUpdate(List<UserData> trustedUsers, LociPresetInfo preset, bool wasDeleted)
+    public async Task PushLociPresetUpdate(List<UserData> trustedUsers, LociPresetStruct preset, bool wasDeleted)
     {
         if (!MainHub.IsConnectionDataSynced)
             return;
@@ -145,6 +127,17 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             Logger.LogError($"Error during PushPresetUpdate: {ex}");
         }
     }
+
+    // Effectively a relay from our client's ApplyToTarget -> Over to the server telling the Sundesmo to apply it to themselves.
+    public async Task PushLociApplyToTarget(UserData user, IEnumerable<LociStatusInfo> data)
+    {
+        Logger.LogDebug($"Pushing ApplyLociStatus to: {user.AliasOrUID}", LoggerType.DataDistributor);
+        var apiData = data.Select(s => s.ToStruct()).ToList();
+        if (await _hub.UserApplyLociStatusTuples(new(user, apiData)).ConfigureAwait(false) is { } res && res.ErrorCode is not SundouleiaApiEc.Success)
+            Logger.LogError($"Failed to push ApplyLociStatus to server. [{res.ErrorCode}]");
+        else
+            Logger.LogDebug($"Successfully pushed ApplyLociStatus to the server", LoggerType.DataDistributor);
+    }
     #endregion Loci
 
     // Only entry point where we ignore timeout states.
@@ -156,17 +149,17 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         {
             _updater.LatestData.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
             _updater.LatestData.GlamourerState[OwnedObject.Player] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
-            _updater.LatestData.CPlusState[OwnedObject.Player] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.CPlusState[OwnedObject.Player] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.Loci[OwnedObject.Player] = await _ipc.Loci.GetOwnManagerStr().ConfigureAwait(false);
             _updater.LatestData.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-            _updater.LatestData.Loci = await _ipc.LociGetOwnManager().ConfigureAwait(false);
             _updater.LatestData.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
             _updater.LatestData.GlamourerState[OwnedObject.MinionOrMount] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
-            _updater.LatestData.CPlusState[OwnedObject.MinionOrMount] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.CPlusState[OwnedObject.MinionOrMount] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.GlamourerState[OwnedObject.Pet] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
-            _updater.LatestData.CPlusState[OwnedObject.Pet] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.CPlusState[OwnedObject.Pet] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.GlamourerState[OwnedObject.Companion] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
-            _updater.LatestData.CPlusState[OwnedObject.Companion] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.CPlusState[OwnedObject.Companion] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             // Cache mods.
             var moddedState = await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false);
             Logger.LogDebug($"(ReloadAndSendCache) Collected modded state. [{moddedState.AllFiles.Count} Mod Files]", LoggerType.DataDistributor);
@@ -432,15 +425,14 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     private async Task UpdateDataCache(OwnedObject obj, IpcKind toUpdate, ClientDataCache data)
     {
         if (toUpdate.HasAny(IpcKind.Glamourer)) data.GlamourerState[obj] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
-        if (toUpdate.HasAny(IpcKind.CPlus)) data.CPlusState[obj] = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.CPlus)) data.CPlusState[obj] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.Loci)) data.Loci[obj] = await _ipc.Loci.GetActorSMStr(_watcher.FromOwned(obj)).ConfigureAwait(false);
 
         if (obj is not OwnedObject.Player) return;
 
         // Special case, update regardless if the manips is an included change.
         if (toUpdate.HasAny(IpcKind.ModManips)) data.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
-
         if (toUpdate.HasAny(IpcKind.Heels)) data.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
-        if (toUpdate.HasAny(IpcKind.Loci)) data.Loci = await _ipc.LociGetOwnManager().ConfigureAwait(false);
         if (toUpdate.HasAny(IpcKind.Honorific)) data.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.PetNames)) data.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
     }
@@ -451,9 +443,9 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         {
             IpcKind.ModManips => _ipc.Penumbra.GetMetaManipulationsString(),
             IpcKind.Glamourer => await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty,
-            IpcKind.CPlus => await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty,
+            IpcKind.CPlus => await _ipc.CPlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty,
             IpcKind.Heels => await _ipc.Heels.GetClientOffset().ConfigureAwait(false),
-            IpcKind.Loci => await _ipc.LociGetOwnManager().ConfigureAwait(false),
+            IpcKind.Loci => await _ipc.Loci.GetOwnManagerStr().ConfigureAwait(false),
             IpcKind.Honorific => await _ipc.Honorific.GetTitle().ConfigureAwait(false),
             IpcKind.PetNames => _ipc.PetNames.GetPetNicknames(),
             _ => string.Empty,

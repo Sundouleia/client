@@ -16,10 +16,11 @@ public class ClientDataCache
     // Can be accessed by multiple tasks concurrently.
     public ConcurrentDictionary<OwnedObject, string> GlamourerState { get; set; } = [];
     public ConcurrentDictionary<OwnedObject, string> CPlusState { get; set; } = [];
+    public ConcurrentDictionary<OwnedObject, string> Loci { get; set; } = [];
 
     public string ModManips     { get; set; } = string.Empty;
     public string HeelsOffset   { get; set; } = string.Empty;
-    public string Loci       { get; set; } = string.Empty;
+    public string Moodles       { get; set; } = string.Empty;
     public string TitleData     { get; set; } = string.Empty;
     public string PetNames      { get; set; } = string.Empty;
 
@@ -33,6 +34,13 @@ public class ClientDataCache
             [OwnedObject.Companion] = string.Empty
         };
         CPlusState = new ConcurrentDictionary<OwnedObject, string>
+        {
+            [OwnedObject.Player] = string.Empty,
+            [OwnedObject.MinionOrMount] = string.Empty,
+            [OwnedObject.Companion] = string.Empty,
+            [OwnedObject.Pet] = string.Empty
+        };
+        Loci = new ConcurrentDictionary<OwnedObject, string>
         {
             [OwnedObject.Player] = string.Empty,
             [OwnedObject.MinionOrMount] = string.Empty,
@@ -67,10 +75,10 @@ public class ClientDataCache
             {
                 GlamourState = GlamourerState[OwnedObject.Player],
                 CPlusState = CPlusState[OwnedObject.Player],
+                Loci = Loci[OwnedObject.Player],
                 ModManips = ModManips,
                 HeelsOffset = HeelsOffset,
                 TitleData = TitleData,
-                LociData = Loci,
                 PetNicks = PetNames
             },
             MinionMountChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus)
@@ -78,15 +86,17 @@ public class ClientDataCache
                 GlamourState = GlamourerState[OwnedObject.MinionOrMount],
                 CPlusState = CPlusState[OwnedObject.MinionOrMount]
             },
+            // No loci support yet..
             PetChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus)
             {
                 GlamourState = GlamourerState[OwnedObject.Pet],
                 CPlusState = CPlusState[OwnedObject.Pet]
             },
-            CompanionChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus)
+            CompanionChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.Loci)
             {
                 GlamourState = GlamourerState[OwnedObject.Companion],
-                CPlusState = CPlusState[OwnedObject.Companion]
+                CPlusState = CPlusState[OwnedObject.Companion],
+                Loci = Loci[OwnedObject.Companion]
             }
         };
     }
@@ -160,10 +170,10 @@ public class ClientDataCache
         {
             case IpcKind.Glamourer: GlamourerState[obj] = data; break;
             case IpcKind.CPlus:     CPlusState[obj] = data;     break;
+            case IpcKind.Loci:      Loci[obj] = data;           break;
             case IpcKind.ModManips: ModManips = data;           break;
             case IpcKind.Heels:     HeelsOffset = data;         break;
             case IpcKind.Honorific: TitleData = data;           break;
-            case IpcKind.Loci:   Loci = data;             break;
             case IpcKind.PetNames:  PetNames = data;            break;
         }
         return true;
@@ -174,10 +184,10 @@ public class ClientDataCache
         {
             IpcKind.Glamourer => GlamourerState[obj] != data,
             IpcKind.CPlus => CPlusState[obj] != data,
+            IpcKind.Loci => Loci[obj] != data,
             IpcKind.ModManips => ModManips != data,
             IpcKind.Heels => HeelsOffset != data,
             IpcKind.Honorific => TitleData != data,
-            IpcKind.Loci => Loci != data,
             IpcKind.PetNames => PetNames != data,
             _ => false
         };
@@ -209,11 +219,6 @@ public class ClientDataCache
             TitleData = other.TitleData;
             playerBuilder.WithTitle(TitleData);
         }
-        if (Loci != other.Loci)
-        {
-            Loci = other.Loci;
-            playerBuilder.WithLoci(Loci);
-        }
         if (PetNames != other.PetNames)
         {
             PetNames = other.PetNames;
@@ -242,6 +247,17 @@ public class ClientDataCache
                     case OwnedObject.MinionOrMount: minionMountBuilder.WithCPlus(CPlusState[obj]); break;
                     case OwnedObject.Pet: petBuilder.WithCPlus(CPlusState[obj]); break;
                     case OwnedObject.Companion: companionBuilder.WithCPlus(CPlusState[obj]); break;
+                }
+            }
+            if (Loci[obj] != other.Loci[obj])
+            {
+                Loci[obj] = other.Loci[obj];
+                switch (obj)
+                {
+                    case OwnedObject.Player: playerBuilder.WithLoci(Loci[obj]); break;
+                    case OwnedObject.MinionOrMount: minionMountBuilder.WithLoci(Loci[obj]); break;
+                    case OwnedObject.Pet: petBuilder.WithLoci(Loci[obj]); break;
+                    case OwnedObject.Companion: companionBuilder.WithLoci(Loci[obj]); break;
                 }
             }
         }

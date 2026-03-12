@@ -17,8 +17,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
     private readonly AccountConfig _accountConfig;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    private IServiceScope? _lifetimeScope;
-    private IServiceScope? _loginScope;
+    private IServiceScope? _serviceScope;
     private Task? _launchTask;
     public SundouleiaHost(ILogger<SundouleiaHost> logger, SundouleiaMediator mediator, MainConfig mainConfig,
         AccountConfig accounts, IServiceScopeFactory scopeFactory) : base(logger, mediator)
@@ -37,11 +36,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
         Logger.LogInformation($"Starting Sundouleia v{ver.Major}.{ver.Minor}.{ver.Build}.{ver.Revision}");
 
         // Init the plugin lifetime scope.
-        _lifetimeScope = _serviceScopeFactory.CreateScope();
-
-        // Force the construction once on startup.
-        _lifetimeScope.ServiceProvider.GetRequiredService<UiService>();
-        _lifetimeScope.ServiceProvider.GetRequiredService<CommandManager>();
+        _serviceScope = _serviceScopeFactory.CreateScope();
 
         // Get Login Scoped service events configured
         Svc.ClientState.Login += DalamudUtilOnLogIn;
@@ -73,7 +68,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
         Logger.LogDebug("Shutting down Sundouleia");
         // This could cause some issues.
         // If it does, just ensure the respective processors stop on the framework thread.
-        _lifetimeScope?.Dispose();
+        _serviceScope?.Dispose();
         return Task.CompletedTask;
     }
 
@@ -92,7 +87,7 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
     private void DalamudUtilOnLogOut()
     {
         Logger.LogDebug("Client logout");
-        _loginScope?.Dispose();
+        _serviceScope?.Dispose();
     }
 
     /// <summary>
@@ -112,21 +107,23 @@ public class SundouleiaHost : MediatorSubscriberBase, IHostedService
         {
             Logger.LogDebug("Launching Managers");
             // before we do lets recreate the runtime service scope
-            _loginScope?.Dispose();
-            _loginScope = _serviceScopeFactory.CreateScope();
+            _serviceScope?.Dispose();
+            _serviceScope = _serviceScopeFactory.CreateScope();
 
-            _loginScope.ServiceProvider.GetRequiredService<CacheMonitor>();
+            _serviceScope.ServiceProvider.GetRequiredService<UiService>();
+            _serviceScope.ServiceProvider.GetRequiredService<CommandManager>();
+            _serviceScope.ServiceProvider.GetRequiredService<CacheMonitor>();
 
             TryDisplayChangelog();
             TrySwitchIntroUI();
 
             // get the required service for the online player manager (and notification service if we add it)
-            _loginScope.ServiceProvider.GetRequiredService<ClientUpdateService>();
-            _loginScope.ServiceProvider.GetRequiredService<ClientUpdateHandler>();
-            _loginScope.ServiceProvider.GetRequiredService<ClientDistributor>();
-            _loginScope.ServiceProvider.GetRequiredService<RadarDistributor>();
-            _loginScope.ServiceProvider.GetRequiredService<LocationSvc>();
-            _loginScope.ServiceProvider.GetRequiredService<LociMonitor>();
+            _serviceScope.ServiceProvider.GetRequiredService<ClientUpdateService>();
+            _serviceScope.ServiceProvider.GetRequiredService<ClientUpdateHandler>();
+            _serviceScope.ServiceProvider.GetRequiredService<ClientDistributor>();
+            _serviceScope.ServiceProvider.GetRequiredService<RadarDistributor>();
+            _serviceScope.ServiceProvider.GetRequiredService<LocationSvc>();
+            _serviceScope.ServiceProvider.GetRequiredService<LociData>();
         }
         catch (Bagagwa ex)
         {

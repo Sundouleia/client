@@ -7,12 +7,9 @@ using Microsoft.Extensions.Hosting;
 using Sundouleia.DrawSystem;
 using Sundouleia.Gui;
 using Sundouleia.Gui.Components;
-using Sundouleia.Gui.Loci;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.Interop;
-using Sundouleia.Loci;
-using Sundouleia.Loci.Processors;
 using Sundouleia.ModFiles;
 using Sundouleia.ModFiles.Cache;
 using Sundouleia.ModularActor;
@@ -140,8 +137,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<RequestsOutDrawer>()
         .AddSingleton<WhitelistDrawer>()
         .AddSingleton<RadarDrawSystem>()
-        .AddSingleton<PresetSelector>()
-        .AddSingleton<StatusSelector>()
 
         // Modular Actor Data
         .AddSingleton<SMAFileManager>()
@@ -164,7 +159,7 @@ public static class SundouleiaServiceExtensions
         // Player Client
         .AddSingleton<BlockedUserManager>()
         .AddSingleton<RequestsManager>()
-        .AddSingleton<LociMonitor>()
+        .AddSingleton<LociData>()
         .AddSingleton<ClientUpdateHandler>()
 
         // Player User
@@ -189,17 +184,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<RadarManager>()
         .AddSingleton<LocationSvc>()
 
-        // Loci
-        .AddSingleton<LociMemory>()
-        .AddSingleton<LociProcessor>()
-        .AddSingleton<FlyPopupTextProcessor>()
-        .AddSingleton<FocusTargetInfoProcessor>()
-        .AddSingleton<PartyListProcessor>()
-        .AddSingleton<StatusProcessor>()
-        .AddSingleton<StatusCustomProcessor>()
-        .AddSingleton<TargetInfoProcessor>()
-        .AddSingleton<TargetInfoBuffDebuffProcessor>()
-
         // Misc. Services
         .AddSingleton<CosmeticService>()
         .AddSingleton<DtrService>()
@@ -216,7 +200,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<WhitelistTabs>()
         .AddSingleton<SundesmoTabs>()
         .AddSingleton<RequestTabs>()
-        .AddSingleton<LociTabs>()
 
         // WebAPI (Server stuff)
         .AddSingleton<MainHub>()
@@ -238,11 +221,12 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<IpcCallerGlamourer>()
         .AddSingleton<IpcCallerHeels>()
         .AddSingleton<IpcCallerHonorific>()
+        .AddSingleton<IpcCallerLoci>()
+        .AddSingleton<IpcCallerMoodles>()
         .AddSingleton<IpcCallerPenumbra>()
         .AddSingleton<IpcCallerPetNames>()
         .AddSingleton<IpcManager>()
-        .AddSingleton<IpcProvider>()
-        .AddSingleton<IpcProviderLoci>();
+        .AddSingleton<IpcProvider>();
     public static IServiceCollection AddSundouleiaConfigs(this IServiceCollection services)
     => services
         // Purely Client
@@ -250,7 +234,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<MainConfig>()
         .AddSingleton<FavoritesConfig>()
         .AddSingleton<FolderConfig>()
-        .AddSingleton<LociManager>()
         .AddSingleton<ModularActorsConfig>()
         // DDS & CKFS
         .AddSingleton<WhitelistDrawSystem>()
@@ -258,8 +241,6 @@ public static class SundouleiaServiceExtensions
         .AddSingleton<RequestsDrawSystem>()
         .AddSingleton<RadarDrawSystem>()
         .AddSingleton<SmaDrawSystem>()
-        .AddSingleton<StatusesFS>() 
-        .AddSingleton<PresetsFS>()
         // DataSync & Server Related
         .AddSingleton<NicksConfig>()
         .AddSingleton<NoCrashFriendsConfig>()
@@ -317,18 +298,7 @@ public static class SundouleiaServiceExtensions
         // Scoped Settings
         .AddScoped<WindowMediatorSubscriberBase, SettingsUi>()
         .AddScoped<ProfilesTab>()
-        .AddScoped<DebugTab>()
-
-        .AddScoped<WindowMediatorSubscriberBase, LociUI>()
-        .AddScoped<StatusesTab>()
-        .AddScoped<PresetsTab>()
-        .AddScoped<LociManagersTab>()
-        .AddScoped<LociSettings>()
-        .AddScoped<IpcTesterTab>()
-        .AddScoped<IpcTesterRegistration>()
-        .AddScoped<IpcTesterStatusManagers>()
-        .AddScoped<IpcTesterStatuses>()
-        .AddScoped<IpcTesterPresets>()       
+        .AddScoped<DebugTab>()   
 
         // Scoped Standalones
         .AddScoped<WindowMediatorSubscriberBase, DataEventsUI>()
@@ -362,10 +332,6 @@ public static class SundouleiaServiceExtensions
         .AddHostedService(p => p.GetRequiredService<SundouleiaLoc>())       // Initializes Localization with the current language.
         .AddHostedService(p => p.GetRequiredService<EventAggregator>())     // Forcibly calls the constructor, subscribing to the monitors.
         .AddHostedService(p => p.GetRequiredService<IpcProvider>())         // Required for IPC calls to work properly.
-        .AddHostedService(p => p.GetRequiredService<IpcProviderLoci>())
-        // Loci
-        .AddHostedService(p => p.GetRequiredService<LociMemory>())          // Initializes the hooks for the memory module.
-        .AddHostedService(p => p.GetRequiredService<LociProcessor>())       // Starts the processing loop for the Loci module.
 
         .AddHostedService(p => p.GetRequiredService<MainHub>())             // Required for beyond obvious reasons.
         .AddHostedService(p => p.GetRequiredService<SundouleiaHost>());     // Make this always the final hosted service, initializing the startup.

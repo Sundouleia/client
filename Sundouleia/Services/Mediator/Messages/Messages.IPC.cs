@@ -21,6 +21,9 @@ public record HeelsOffsetChanged : MessageBase; // Whenever the client's Heel of
 public record HonorificReady : MessageBase;
 public record HonorificTitleChanged(string NewTitle) : MessageBase;
 
+public record MoodlesReady : MessageBase;
+public record MoodlesDisposed : MessageBase;
+
 public record LociReady : MessageBase;
 public record LociDisposed : MessageBase;
 

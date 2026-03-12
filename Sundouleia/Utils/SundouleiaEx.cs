@@ -1,13 +1,19 @@
 using CkCommons;
 using CkCommons.Gui;
+using CkCommons.RichText;
+using CkCommons.Textures;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using LociApi.Enums;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data;
+using SundouleiaAPI.Data.Permissions;
 using System.Runtime.CompilerServices;
 
 namespace Sundouleia;
@@ -247,5 +253,134 @@ public static class SundouleiaEx
             ServerState.ConnectedDataSynced => "Connected",
             _ => string.Empty
         };
+    }
+
+    public static void AttachTooltip(this LociStatusStruct item, LociContainer data)
+    {
+        if (!ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            return;
+
+        ImGui.SetNextWindowSizeConstraints(new Vector2(350f, 0f), new Vector2(350f, float.MaxValue));
+        using var s = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.One * 8f)
+            .Push(ImGuiStyleVar.WindowRounding, 4f)
+            .Push(ImGuiStyleVar.PopupBorderSize, 1f);
+        using var c = ImRaii.PushColor(ImGuiCol.Border, SundCol.Gold.Uint());
+        using var tt = ImRaii.Tooltip();
+
+        // push the title, converting all color tags into the actual label.
+        CkRichText.Text(item.Title, cloneId: 100);
+        if (!item.Description.IsNullOrWhitespace())
+        {
+            ImGui.Separator();
+            CkRichText.Text(350f, item.Description);
+        }
+
+        CkGui.ColorText("Duration:", ImGuiColors.ParsedGold);
+        var length = TimeSpan.FromTicks(item.ExpireTicks);
+        ImGui.SameLine();
+        ImGui.Text($"{length.Days}d {length.Hours}h {length.Minutes}m {length.Seconds}");
+
+        CkGui.ColorText("Category:", ImGuiColors.ParsedGold);
+        ImGui.SameLine();
+        ImGui.Text(item.Type.ToString());
+
+        if (item.ChainedGUID != Guid.Empty)
+        {
+            if (item.ChainType == (byte)ChainType.Status)
+            {
+                CkGui.ColorText("Chained Status:", ImGuiColors.ParsedGold);
+                ImGui.SameLine();
+                var status = data.Statuses.TryGetValue(item.ChainedGUID, out var match) ? match.Title : "Unknown";
+                CkRichText.Text(status, 100);
+            }
+            else
+            {
+                CkGui.ColorText("Chained Preset:", ImGuiColors.ParsedGold);
+                ImGui.SameLine();
+                var preset = data.Presets.TryGetValue(item.ChainedGUID, out var match) ? match.Title : "Unknown";
+                CkRichText.Text(preset, 100);
+            }
+        }
+    }
+
+    public static bool CanApply(PairPerms perms, IEnumerable<LociStatusInfo> statuses)
+    {
+        foreach (var status in statuses)
+        {
+            if (status.Type == StatusType.Positive && !perms.LociAccess.HasAny(LociAccess.Positive))
+            {
+                Svc.Toasts.ShowError("You do not have permission to apply Positive Statuses.");
+                return false;
+            }
+            else if (status.Type == StatusType.Negative && !perms.LociAccess.HasAny(LociAccess.Negative))
+            {
+                Svc.Toasts.ShowError("You do not have permission to apply Negative Statuses.");
+                return false;
+
+            }
+            else if (status.Type == StatusType.Special && !perms.LociAccess.HasAny(LociAccess.Special))
+            {
+                Svc.Toasts.ShowError("You do not have permission to apply Special Statuses.");
+                return false;
+            }
+            else if (status.ExpireTicks == -1 && !perms.LociAccess.HasAny(LociAccess.Permanent))
+            {
+                Svc.Toasts.ShowError("You do not have permission to apply Permanent Statuses.");
+                return false;
+            }
+            else if (status.ExpireTicks > 0)
+            {
+                var totalTime = TimeSpan.FromMilliseconds(status.ExpireTicks - DateTimeOffset.Now.ToUnixTimeMilliseconds());
+                if (totalTime > perms.MaxLociTime)
+                {
+                    Svc.Toasts.ShowError("You do not have permission to apply Statuses for that long.");
+                    return false;
+                }
+            }
+        }
+        // return true if reached here.
+        return true;
+    }
+
+    /// <summary>
+    ///     API Tuple format of if we can apply statuses or not.
+    /// </summary>
+    public static bool CanApply(PairPerms perms, IEnumerable<LociStatusStruct> statuses)
+    {
+        foreach (var status in statuses)
+        {
+            if (status.Type == 0 && !perms.LociAccess.HasAny(LociAccess.Positive))
+            {
+                Svc.Toasts.ShowError("You do not have permission to apply Positive Statuses.");
+                return false;
+            }
+            else if (status.Type == 1 && !perms.LociAccess.HasAny(LociAccess.Negative))
+            {
+                Svc.Toasts.ShowError("You do not have permission to apply Negative Statuses.");
+                return false;
+
+            }
+            else if (status.Type == 2 && !perms.LociAccess.HasAny(LociAccess.Special))
+            {
+                Svc.Toasts.ShowError("You do not have permission to apply Special Statuses.");
+                return false;
+            }
+            else if (status.ExpireTicks == -1 && !perms.LociAccess.HasAny(LociAccess.Permanent))
+            {
+                Svc.Toasts.ShowError("You do not have permission to apply Permanent Statuses.");
+                return false;
+            }
+            else if (status.ExpireTicks > 0)
+            {
+                var totalTime = TimeSpan.FromMilliseconds(status.ExpireTicks - DateTimeOffset.Now.ToUnixTimeMilliseconds());
+                if (totalTime > perms.MaxLociTime)
+                {
+                    Svc.Toasts.ShowError("You do not have permission to apply Statuses for that long.");
+                    return false;
+                }
+            }
+        }
+        // return true if reached here.
+        return true;
     }
 }

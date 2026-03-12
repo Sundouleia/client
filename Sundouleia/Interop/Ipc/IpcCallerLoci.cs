@@ -1,3 +1,4 @@
+using LociApi.Enums;
 using LociApi.Helpers;
 using LociApi.Ipc;
 using Sundouleia.Services.Mediator;
@@ -21,7 +22,7 @@ public sealed class IpcCallerLoci : IIpcCaller
     private readonly UnregisterByPtr Unregister;
     private readonly UnregisterByName UnregisterName;
     private readonly UnregisterAll UnregisterAll;
-    public readonly EventSubscriber<nint, string> ActorHostsChanged; // We dont need to track this.
+    // internal EventSubscriber<nint, string> ActorHostsChanged;
 
     // API StatusManagers
     private readonly GetManager GetManager;
@@ -31,8 +32,7 @@ public sealed class IpcCallerLoci : IIpcCaller
     private readonly SetManagerByPtr SetManagerByPtr;
     private readonly ClearManagerByPtr ClearManagerByPtr;
     private readonly ClearManagerByName ClearManagerByName;
-    public readonly EventSubscriber<nint> ManagerChanged;
-    public readonly EventSubscriber<nint, string, List<LociStatusInfo>> ApplyToTargetSent;
+    private readonly ConvertLegacyData ConvertLegacyData;
 
     // API Statuses
     private readonly GetStatusInfo GetStatusTuple;
@@ -43,14 +43,12 @@ public sealed class IpcCallerLoci : IIpcCaller
     private readonly ApplyStatusInfos ApplyStatusTuples;
     private readonly RemoveStatus RemoveStatus;
     private readonly RemoveStatuses RemoveStatuses;
-    public readonly EventSubscriber<Guid, bool> StatusUpdated;
 
     // API Presets
     private readonly GetPresetInfo GetPresetTuple;
     private readonly GetPresetInfoList GetAllPresetTuples;
     private readonly ApplyPreset ApplyPresetById;
     private readonly ApplyPresetInfo ApplyPresetTuple;
-    public readonly EventSubscriber<Guid, bool> PresetUpdated;
 
     // API Events (Later)
 
@@ -89,6 +87,7 @@ public sealed class IpcCallerLoci : IIpcCaller
         SetManagerByPtr = new SetManagerByPtr(Svc.PluginInterface);
         ClearManagerByPtr = new ClearManagerByPtr(Svc.PluginInterface);
         ClearManagerByName = new ClearManagerByName(Svc.PluginInterface);
+        ConvertLegacyData = new ConvertLegacyData(Svc.PluginInterface);
 
         // Statuses
         GetStatusTuple = new GetStatusInfo(Svc.PluginInterface);
@@ -135,10 +134,10 @@ public sealed class IpcCallerLoci : IIpcCaller
     // Assuming we know an actor is valid, these calls could all run syncronously.
 
     /// <inheritdoc cref="LociApi.Ipc.RegisterByPtr"/>
-    public async Task RegisterActor(nint address)
+    public async Task<bool> RegisterActor(nint address)
     {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => Register.Invoke(address, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        if (!APIAvailable) return false;
+        return await Svc.Framework.RunOnFrameworkThread(() => Register.Invoke(address, SUNDOULEIA_TAG)).ConfigureAwait(false) is LociApiEc.Success;
     }
 
     /// <inheritdoc cref="LociApi.Ipc.UnregisterByPtr"/>
@@ -225,6 +224,13 @@ public sealed class IpcCallerLoci : IIpcCaller
         await Svc.Framework.RunOnFrameworkThread(() => ClearManagerByName.Invoke(playerName, buddyName)).ConfigureAwait(false);
     }
 
+    /// <inheritdoc cref="LociApi.Ipc.ConvertLegacyData"/>
+    public string ConvertToLociData(string legacyStatusManagerBase64)
+    {
+        if (!APIAvailable) return string.Empty;
+        return ConvertLegacyData.Invoke(legacyStatusManagerBase64);
+    }
+
     /// <inheritdoc cref="LociApi.Ipc.GetStatusInfo"/>
     public async Task<LociStatusInfo> GetStatusInfo(Guid guid)
     {
@@ -282,14 +288,14 @@ public sealed class IpcCallerLoci : IIpcCaller
     }
 
     /// <inheritdoc cref="LociApi.Ipc.GetPresetInfo"/>
-    public async Task<LociPresetInfo> GetStatusPresetInfo(Guid guid)
+    public async Task<LociPresetInfo> GetPresetInfo(Guid guid)
     {
         if (!APIAvailable) return default;
         return await Svc.Framework.RunOnFrameworkThread(() => GetPresetTuple.Invoke(guid).Item2).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="LociApi.Ipc.GetPresetInfoList"/>
-    public async Task<List<LociPresetInfo>> GetStatusPresetInfos()
+    public async Task<List<LociPresetInfo>> GetPresetInfos()
     {
         if (!APIAvailable) return [];
         return await Svc.Framework.RunOnFrameworkThread(GetAllPresetTuples.Invoke).ConfigureAwait(false);

@@ -211,7 +211,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     {
         if (_tempProfile != Guid.Empty)
         {
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            await _ipc.CPlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
     }
@@ -363,13 +363,13 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         if (string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.CPlus]) && _tempProfile != Guid.Empty)
         {
             Logger.LogDebug($"Reverting ({Sundesmo.GetNickAliasOrUid()}'s {ObjectType}) CPlus profile", LoggerType.PairAppearance);
-            await _ipc.CustomizePlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
+            await _ipc.CPlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
         else
         {
             Logger.LogDebug($"Applying ({Sundesmo.GetNickAliasOrUid()}'s {ObjectType}) CPlus profile", LoggerType.PairAppearance);
-            _tempProfile = await _ipc.CustomizePlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
+            _tempProfile = await _ipc.CPlus.ApplyTempProfile(this, _appearanceData.Data[IpcKind.CPlus]).ConfigureAwait(false);
         }
     }
     #endregion Ipc Helpers

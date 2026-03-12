@@ -5,38 +5,35 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using OtterGui.Extensions;
 using OtterGui.Text;
-using Sundouleia.Loci.Data;
-using Sundouleia.Pairs;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services;
+using SundouleiaAPI.Data;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class SavedPresetsCombo : CkFilterComboCache<LociPreset>
-{
-    private readonly LociManager _manager;
-    
+public sealed class SavedPresetsCombo : CkFilterComboCache<LociPresetStruct>
+{  
     private Guid _current;
     private static Vector2 _iconSize => LociIcon.Size;
 
-    public SavedPresetsCombo(ILogger log, LociManager manager, Func<IReadOnlyList<LociPreset>> generator)
+    public SavedPresetsCombo(ILogger log, Func<IReadOnlyList<LociPresetStruct>> generator)
         : base(generator, log)
     {
-        _manager = manager;
         _current = Guid.Empty;
         SearchByParts = true;
     }
 
     public string HintText { get; set; } = "Preset to Chain... (Optional)";
-    protected override string ToString(LociPreset status)
+    protected override string ToString(LociPresetStruct status)
         => status.Title.StripColorTags();
 
     protected override int UpdateCurrentSelected(int currentSelected)
     {
-        if (Current?.GUID == _current)
+        if (Current.GUID == _current)
             return currentSelected;
 
         CurrentSelectionIdx = Items.IndexOf(i => i.GUID == _current);
-        Current = CurrentSelectionIdx >= 0 ? Items[CurrentSelectionIdx] : null;
+        Current = CurrentSelectionIdx >= 0 ? Items[CurrentSelectionIdx] : default;
         return CurrentSelectionIdx;
     }
 
@@ -67,21 +64,21 @@ public sealed class SavedPresetsCombo : CkFilterComboCache<LociPreset>
 
         var ret = ImGui.Selectable($"##{myPreset.Title}", selected, ImGuiSelectableFlags.None, size);
 
-        if (_manager.SavedStatuses.Count > 0)
+        if (LociData.Cache.Statuses.Count > 0)
         {
             ImGui.SameLine(titleSpace);
             for (int i = 0; i < myPreset.Statuses.Count; i++)
             {
                 var status = myPreset.Statuses[i];
                 // Maybe save on drawtime by doing internal referencing here or something.
-                if (_manager.SavedStatuses.FirstOrDefault(s => s.GUID == status) is not { } info)
+                if (LociData.Cache.Statuses.TryGetValue(status, out var info))
                 {
                     ImGui.SameLine(0, (_iconSize.X + ImUtf8.ItemInnerSpacing.X));
                     continue;
                 }
 
-                LociIcon.Draw((uint)info.IconID, info.Stacks, _iconSize);
-                LociEx.AttachTooltip(info, _manager);
+                LociIcon.Draw(info.IconID, info.Stacks, _iconSize);
+                SundouleiaEx.AttachTooltip(info, LociData.Cache);
 
                 if (i < myPreset.Statuses.Count)
                     ImUtf8.SameLineInner();

@@ -2,6 +2,8 @@ using CkCommons;
 using Dalamud.Plugin.Services;
 using Glamourer.Api.Enums;
 using Glamourer.Api.IpcSubscribers;
+using LociApi.Helpers;
+using LociApi.Ipc;
 using Penumbra.Api.Enums;
 using Penumbra.Api.IpcSubscribers;
 using Sundouleia.Interop;
@@ -21,6 +23,8 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
     private readonly ClientUpdateService _updater;
     private readonly ClientDistributor _distributor;
 
+    private readonly EventSubscriber<nint> ManagerChanged;
+
     public ClientUpdateHandler(ILogger<ClientUpdateHandler> logger, SundouleiaMediator mediator,
         IpcManager ipc, CharaWatcher watcher, ClientUpdateService updater,
         ClientDistributor distributor)
@@ -38,12 +42,12 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _ipc.Penumbra.OnModSettingsChanged = ModSettingChanged.Subscriber(Svc.PluginInterface, OnModSettingChanged);
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
         _ipc.Glamourer.OnStateChanged.Enable();
-        _ipc.CustomizePlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
+        _ipc.CPlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
         _ipc.Heels.OnOffsetUpdate.Subscribe(OnHeelsOffsetUpdate);
         _ipc.Honorific.OnTitleChange.Subscribe(OnHonorificUpdate);
         _ipc.PetNames.OnNicknamesChanged.Subscribe(OnPetNamesUpdate);
+        ManagerChanged = LociApi.Ipc.ManagerChanged.Subscriber(Svc.PluginInterface, OnLociUpdate);
 
-        IpcProviderLoci.OnSMModifiedCalled += OnLociUpdate;
         Svc.Framework.Update += OnUpdateTick;
     }
 
@@ -54,12 +58,12 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _ipc.Penumbra.OnModSettingsChanged?.Dispose();
         _ipc.Glamourer.OnStateChanged?.Disable();
         _ipc.Glamourer.OnStateChanged?.Dispose();
-        _ipc.CustomizePlus.OnProfileUpdate.Unsubscribe(OnCPlusProfileUpdate);
+        _ipc.CPlus.OnProfileUpdate.Unsubscribe(OnCPlusProfileUpdate);
         _ipc.Heels.OnOffsetUpdate.Unsubscribe(OnHeelsOffsetUpdate);
         _ipc.Honorific.OnTitleChange.Unsubscribe(OnHonorificUpdate);
         _ipc.PetNames.OnNicknamesChanged.Unsubscribe(OnPetNamesUpdate);
         Svc.Framework.Update -= OnUpdateTick;
-        IpcProviderLoci.OnSMModifiedCalled -= OnLociUpdate;
+        ManagerChanged.Dispose();
     }
 
 

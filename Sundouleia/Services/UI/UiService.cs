@@ -1,7 +1,6 @@
 using CkCommons;
 using Dalamud.Interface.Windowing;
 using Sundouleia.Gui;
-using Sundouleia.Gui.Loci;
 using Sundouleia.Gui.MainWindow;
 using Sundouleia.Gui.Profiles;
 using Sundouleia.PlayerClient;
@@ -119,11 +118,8 @@ public sealed class UiService : DisposableMediatorSubscriberBase
     ///</summary>
     public void ToggleMainUi()
     {
-        // Treat main UI as Loci UI if not logged in.
-        if (!PlayerData.IsLoggedIn || !PlayerData.Available)
-            Mediator.Publish(new UiToggleMessage(typeof(LociUI)));
         // Otherwise open the Main UI only if valid for setup. Otherwise open the intro UI
-        else if (_config.HasValidSetup() && _accountConfig.IsConfigValid())
+        if (_config.HasValidSetup() && _accountConfig.IsConfigValid())
             Mediator.Publish(new UiToggleMessage(typeof(MainUI)));
         else
             Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));

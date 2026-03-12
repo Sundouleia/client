@@ -229,7 +229,6 @@ namespace Sundouleia.Localization
         // Outline the tabs for each settings section and the sub-classes of their translations.
         public readonly string TabGeneral = Loc.Localize("Settings_TabsGeneral", "General");
         public readonly string TabPreferences = Loc.Localize("Settings_TabsPreferences", "Preferences");
-        public readonly string TabLoci = Loc.Localize("Settings_TabsLoci", "Loci");
         public readonly string TabAccounts = Loc.Localize("Settings_TabsAccounts", "My Account");
         public readonly string TabSmaStorage = Loc.Localize("Settings_TagSmaStorage", "My SMA Files");
         public readonly string TabStorage = Loc.Localize("Settings_TabsStorage", "Storage");

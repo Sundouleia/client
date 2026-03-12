@@ -29,7 +29,7 @@ public class ConfigStorage
     // Tab Selection Memory
     public MainMenuTabs.SelectedTab CurMainUiTab { get; set; } = MainMenuTabs.SelectedTab.BasicWhitelist;
     public SundesmoTabs.SelectedTab CurInteractionsTab { get; set; } = SundesmoTabs.SelectedTab.Interactions;
-    public LociTabs.SelectedTab CurLociTab { get; set; } = LociTabs.SelectedTab.Statuses;
+
     // General
     public bool OpenUiOnStartup { get; set; } = true;
     public bool ShowContextMenus { get; set; } = true;

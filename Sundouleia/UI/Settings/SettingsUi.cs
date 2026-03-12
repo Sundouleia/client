@@ -10,12 +10,10 @@ using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using OtterGui;
 using OtterGui.Text;
-using Sundouleia.Gui.Loci;
 using Sundouleia.Interop;
 using Sundouleia.Localization;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
-using Sundouleia.Services.Configs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.WebAPI;
@@ -29,20 +27,18 @@ public class SettingsUi : WindowMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly MainConfig _config;
-    private readonly LociSettings _lociSettings;
     private readonly ProfilesTab _accountsTab;
     private readonly DebugTab _debugTab;
     private readonly UiDataStorageShared _storageShared;
     private readonly DtrService _dtr;
 
     public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, 
-        MainHub hub, MainConfig config, LociSettings lociSettings, ProfilesTab accounts,
-        DebugTab debug, UiDataStorageShared dataStorage, DtrService dtr)
+        MainHub hub, MainConfig config, ProfilesTab accounts, DebugTab debug, 
+        UiDataStorageShared dataStorage, DtrService dtr)
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;
         _config = config;
-        _lociSettings = lociSettings;
         _accountsTab = accounts;
         _debugTab = debug;
         _storageShared = dataStorage;
@@ -135,11 +131,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     DrawPrefsNotify();
                     ImGui.EndTabItem();
                 }
-            }
-            if (ImGui.BeginTabItem(CkLoc.Settings.TabLoci))
-            {
-                _lociSettings.DrawSettings();
-                ImGui.EndTabItem();
             }
 
             if (ImGui.BeginTabItem(CkLoc.Settings.TabAccounts))

@@ -174,6 +174,11 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         ImGui.Text(dataCache.CPlusState[OwnedObject.Player]);
 
         ImGui.TableNextColumn();
+        ImGui.Text("LociData");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.Loci[OwnedObject.Player]);
+
+        ImGui.TableNextColumn();
         ImGui.Text("ModManips");
         ImGui.TableNextColumn();
         ImGui.Text(dataCache.ModManips);
@@ -187,11 +192,6 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         ImGui.Text("TitleData");
         ImGui.TableNextColumn();
         ImGui.Text(dataCache.TitleData);
-
-        ImGui.TableNextColumn();
-        ImGui.Text("LociData");
-        ImGui.TableNextColumn();
-        ImGui.Text(dataCache.Loci);
 
         ImGui.TableNextColumn();
         ImGui.Text("PetNames");
@@ -220,6 +220,11 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         ImGui.Text("CPlus");
         ImGui.TableNextColumn();
         ImGui.Text(dataCache.CPlusState[obj]);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("Loci");
+        ImGui.TableNextColumn();
+        ImGui.Text(dataCache.Loci[obj]);
     }
 
     private void DrawWatcherInternals()

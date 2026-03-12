@@ -30,7 +30,6 @@ public class DebugTab
             LoggerType.UIManagement, LoggerType.Textures, LoggerType.DtrBar, LoggerType.Profiles, 
             LoggerType.Mediator, LoggerType.Combos ]),
         ("SundouleiaHub", [ LoggerType.ApiCore, LoggerType.Callbacks, LoggerType.HubFactory, LoggerType.Health, LoggerType.JwtTokens ]),
-        ("Loci", [ LoggerType.LociMemory, LoggerType.LociProcessors, LoggerType.LociData, LoggerType.LociIpc, LoggerType.LociSheVfx ]),
         ("SMA Files", [ LoggerType.SmaManagment, LoggerType.SmaHandling, LoggerType.SmaGpose, LoggerType.SmaTransfer, LoggerType.SmaImportExport]),
     };
 

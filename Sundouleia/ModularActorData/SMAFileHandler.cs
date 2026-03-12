@@ -87,7 +87,7 @@ public class SMAFileHandler : IDisposable
         // Set remaining header data using filecaches and other retrievals.
         headerData.GlamourState = await _ipc.Glamourer.GetClientState().ConfigureAwait(false);
         if (actor is OwnedObject.Player)
-            headerData.CPlusData = await _ipc.CustomizePlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
+            headerData.CPlusData = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
 
         // Gather up the ModFile and FileSwaps for the appearance.
         CollectModdedReferences(headerData, curState);

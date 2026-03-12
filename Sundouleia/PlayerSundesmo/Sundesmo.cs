@@ -92,7 +92,7 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     public PairPerms    PairPerms   => UserPair.Perms;
 
     // Shared LociData. Fresh / empty if not shared.
-    public LociData SharedData { get; private set; } = new();
+    public LociContainer SharedData { get; private set; } = new();
 
     // Internal Helpers
     public bool IsReloading { get; private set; } = false;
@@ -136,7 +136,7 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     public string GetNickAliasOrUid()
         => _nicks.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
 
-    public void SetLociData(LociData newData)
+    public void SetLociData(LociContainer newData)
         => SharedData = newData;
 
     public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)

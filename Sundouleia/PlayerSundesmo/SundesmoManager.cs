@@ -354,7 +354,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     #endregion Manager Helpers
 
     #region Updates    
-    public void ReceiveLociData(UserData target, LociData newLociData)
+    public void ReceiveLociData(UserData target, LociContainer newLociData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
@@ -363,7 +363,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         sundesmo.SetLociData(newLociData);
     }
 
-    public void ReceiveLociStatuses(UserData target, List<LociStatusInfo> newStatuses)
+    public void ReceiveLociStatuses(UserData target, List<LociStatusStruct> newStatuses)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
@@ -371,7 +371,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         sundesmo.SharedData.SetStatuses(newStatuses);
     }
 
-    public void ReceiveLociPresets(UserData target, List<LociPresetInfo> newPresets)
+    public void ReceiveLociPresets(UserData target, List<LociPresetStruct> newPresets)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
@@ -379,24 +379,28 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         sundesmo.SharedData.SetPresets(newPresets);
     }
 
-    public void ReceiveLociStatusUpdate(UserData target, LociStatusInfo status, bool deleted)
+    public void ReceiveLociStatusUpdate(UserData target, LociStatusStruct status, bool deleted)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
         Logger.LogTrace($"Received loci status single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         
-        if (deleted) sundesmo.SharedData.Statuses.Remove(status.GUID);
-        else sundesmo.SharedData.TryUpdateStatus(status);
+        if (deleted)
+            sundesmo.SharedData.Statuses.Remove(status.GUID);
+        else
+            sundesmo.SharedData.Statuses[status.GUID] = status;
     }
 
-    public void ReceiveLociPresetUpdate(UserData target, LociPresetInfo preset, bool deleted)
+    public void ReceiveLociPresetUpdate(UserData target, LociPresetStruct preset, bool deleted)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
         Logger.LogTrace($"Received loci preset single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
 
-        if (deleted) sundesmo.SharedData.Presets.Remove(preset.GUID);
-        else sundesmo.SharedData.TryUpdatePreset(preset);
+        if (deleted)
+            sundesmo.SharedData.Presets.Remove(preset.GUID);
+        else
+            sundesmo.SharedData.Presets[preset.GUID] = preset;
     }
 
     // Should happen only on initial loads.

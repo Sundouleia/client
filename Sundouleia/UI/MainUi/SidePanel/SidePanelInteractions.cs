@@ -36,7 +36,6 @@ public class SidePanelInteractions
     private readonly ILogger<SidePanelInteractions> _logger;
     private readonly SundouleiaMediator _mediator;
     private readonly MainHub _hub;
-    private readonly LociManager _loci;
     private readonly SundesmoManager _sundesmos;
     private readonly RadarManager _radar;
     private readonly SidePanelService _service;
@@ -45,13 +44,12 @@ public class SidePanelInteractions
     private Dictionary<SIID, string> _timespanCache = new();
 
     public SidePanelInteractions(ILogger<SidePanelInteractions> logger,
-        SundouleiaMediator mediator, MainHub hub, LociManager loci, 
-        SundesmoManager sundesmos, RadarManager radar, SidePanelService service)
+        SundouleiaMediator mediator, MainHub hub, SundesmoManager sundesmos, 
+        RadarManager radar, SidePanelService service)
     {
         _logger = logger;
         _mediator = mediator;
         _hub = hub;
-        _loci = loci;
         _sundesmos = sundesmos;
         _radar = radar;
         _service = service;
@@ -264,8 +262,8 @@ public class SidePanelInteractions
 
     private void DrawApplyOwnLociData(InteractionsCache cache, Sundesmo s, string dispName, float width)
     {
-        var hasStatuses = _loci.SavedStatuses.Count > 0;
-        var hasPresets = _loci.SavedPresets.Count > 0;
+        var hasStatuses = LociData.Cache.Statuses.Count > 0;
+        var hasPresets = LociData.Cache.Presets.Count > 0;
         var isAllowed = s.PairPerms.LociAccess.HasAny(LociAccess.AllowOther);
 
         var statusTxt = hasStatuses ? $"Apply a status to {dispName}" : $"No statuses to apply";

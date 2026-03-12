@@ -129,7 +129,7 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
 
         Logger.LogDebug($"SMA ({entry.Data.Name}) Applying CustomizePlus Data.");
         if (!string.IsNullOrEmpty(entry.Data.CPlusData))
-            entry.CplusProfile = await _ipc.CustomizePlus.ApplyTempProfile(entry, objIdx).ConfigureAwait(false);
+            entry.CplusProfile = await _ipc.CPlus.ApplyTempProfile(entry, objIdx).ConfigureAwait(false);
 
         // Finally Redraw the actor.
         Logger.LogInformation($"SMA ({entry.Data.Name}) Finished application, redrawing actor.");
@@ -152,7 +152,7 @@ public class GPoseHandler : DisposableMediatorSubscriberBase
         if (attached.CplusProfile != null)
         {
             Logger.LogInformation($"Reverting CustomizePlus for actor {attached.Name}.");
-            await _ipc.CustomizePlus.RevertTempProfile(attached.CplusProfile).ConfigureAwait(false);
+            await _ipc.CPlus.RevertTempProfile(attached.CplusProfile).ConfigureAwait(false);
         }
         // Remove their association to the collection.
 

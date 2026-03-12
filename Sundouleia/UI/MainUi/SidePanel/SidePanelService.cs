@@ -41,18 +41,16 @@ public class InteractionsCache : ISidePanelCache
     // Stored internally for regenerators.
     private readonly ILogger _log;
     private readonly MainHub _hub;
-    private readonly LociManager _loci;
 
     private OpenedInteraction _curOpened = OpenedInteraction.None;
-    public InteractionsCache(ILogger log, MainHub hub, LociManager loci, Sundesmo sundesmo)
+    public InteractionsCache(ILogger log, MainHub hub, Sundesmo sundesmo)
     {
         _log = log;
         _hub = hub;
-        _loci = loci;
 
         Sundesmo    = sundesmo;
-        OwnStatuses = new OwnStatusCombo(log, hub, loci, Sundesmo, 1.3f);
-        OwnPresets  = new OwnPresetCombo(log, hub, loci, Sundesmo, 1.3f);
+        OwnStatuses = new OwnStatusCombo(log, hub, Sundesmo, 1.3f);
+        OwnPresets  = new OwnPresetCombo(log, hub, Sundesmo, 1.3f);
         Statuses    = new SundesmoStatusCombo(log, hub, Sundesmo, 1.3f);
         Presets     = new SundesmoPresetCombo(log, hub, Sundesmo, 1.3f);
         Remover     = new SundesmoStatusCombo(log, hub, Sundesmo, 1.3f, () =>
@@ -84,8 +82,8 @@ public class InteractionsCache : ISidePanelCache
     public void UpdateSundesmo(Sundesmo sundesmo)
     {
         Sundesmo    = sundesmo;
-        OwnStatuses = new OwnStatusCombo(_log, _hub, _loci, Sundesmo, 1.3f);
-        OwnPresets  = new OwnPresetCombo(_log, _hub, _loci, Sundesmo, 1.3f);
+        OwnStatuses = new OwnStatusCombo(_log, _hub, Sundesmo, 1.3f);
+        OwnPresets  = new OwnPresetCombo(_log, _hub, Sundesmo, 1.3f);
         Statuses    = new SundesmoStatusCombo(_log, _hub, Sundesmo, 1.3f);
         Presets     = new SundesmoPresetCombo(_log, _hub, Sundesmo, 1.3f);
         Remover     = new SundesmoStatusCombo(_log, _hub, Sundesmo, 1.3f, () =>
@@ -234,15 +232,13 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly FolderConfig _config;
-    private readonly LociManager _loci;
     private readonly SundesmoManager _sundesmos;
     public SidePanelService(ILogger<SidePanelService> logger, SundouleiaMediator mediator,
-        MainHub hub, FolderConfig config, LociManager loci, SundesmoManager sundesmos)
+        MainHub hub, FolderConfig config, SundesmoManager sundesmos)
         : base(logger, mediator)
     {
         _hub = hub;
         _config = config;
-        _loci = loci;
         _sundesmos = sundesmos;
 
         Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearDisplay());
@@ -335,7 +331,7 @@ public sealed class SidePanelService : DisposableMediatorSubscriberBase
         // Was displaying something else, so make sure we update and open.
         else
         {
-            DisplayCache = new InteractionsCache(Logger, _hub, _loci, sundesmo);
+            DisplayCache = new InteractionsCache(Logger, _hub, sundesmo);
         }
     }
 

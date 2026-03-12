@@ -6,11 +6,12 @@ using OtterGui.Text;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data;
 using SundouleiaAPI.Hub;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class SundesmoPresetCombo : LociComboBase<LociPresetInfo>
+public sealed class SundesmoPresetCombo : LociComboBase<LociPresetStruct>
 {
     private int _maxPresetCount => _sundesmo.SharedData.PresetList.Max(x => x.Statuses.Count);
     private float _iconWithPadding => IconSize.X + ImGui.GetStyle().ItemInnerSpacing.X;
@@ -21,7 +22,7 @@ public sealed class SundesmoPresetCombo : LociComboBase<LociPresetInfo>
 
     protected override bool DisableCondition()
         => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.LociAccess.HasAny(LociAccess.AllowOwn);
-    protected override string ToString(LociPresetInfo obj)
+    protected override string ToString(LociPresetStruct obj)
         => obj.Title.StripColorTags();
 
     public bool DrawPresets(string id, float width, string buttonTT)
@@ -54,8 +55,8 @@ public sealed class SundesmoPresetCombo : LociComboBase<LociPresetInfo>
                     continue;
                 }
 
-                LociIcon.Draw((uint)info.IconID, info.Stacks, IconSize);
-                info.AttachTooltip(_sundesmo.SharedData.StatusList, _sundesmo.SharedData.PresetList);
+                LociIcon.Draw(info.IconID, info.Stacks, IconSize);
+                info.AttachTooltip(_sundesmo.SharedData);
 
                 if (i + 1 < lociPreset.Statuses.Count)
                     ImUtf8.SameLineInner();
@@ -70,17 +71,17 @@ public sealed class SundesmoPresetCombo : LociComboBase<LociPresetInfo>
         return ret;
     }
 
-    protected override bool CanDoAction(LociPresetInfo item)
+    protected override bool CanDoAction(LociPresetStruct item)
     {
-        var toCheck = new List<LociStatusInfo>(item.Statuses.Count);
+        var toCheck = new List<LociStatusStruct>(item.Statuses.Count);
         foreach (var guid in item.Statuses)
             if (_sundesmo.SharedData.Statuses.TryGetValue(guid, out var info))
                 toCheck.Add(info);
 
-        return LociEx.CanApply(_sundesmo.PairPerms, toCheck);
+        return SundouleiaEx.CanApply(_sundesmo.PairPerms, toCheck);
     }
 
-    protected override void OnApplyButton(LociPresetInfo item)
+    protected override void OnApplyButton(LociPresetStruct item)
     {
         UiService.SetUITask(async () =>
         {
