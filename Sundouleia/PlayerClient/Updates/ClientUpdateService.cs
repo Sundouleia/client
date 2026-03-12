@@ -99,7 +99,8 @@ public sealed class ClientUpdateService : DisposableMediatorSubscriberBase
         if (_allPendingUpdates.HasAny(IpcKind.Heels))       return 750;
         if (_allPendingUpdates.HasAny(IpcKind.CPlus))       return 750;
         if (_allPendingUpdates.HasAny(IpcKind.Honorific))   return 500;
-        if (_allPendingUpdates.HasAny(IpcKind.Loci))     return 250;
+        if (_allPendingUpdates.HasAny(IpcKind.Loci))        return 250;
+        if (_allPendingUpdates.HasAny(IpcKind.Moodles))     return 250;
         if (_allPendingUpdates.HasAny(IpcKind.ModManips))   return 250;
         if (_allPendingUpdates.HasAny(IpcKind.PetNames))    return 150;
         return 1500;

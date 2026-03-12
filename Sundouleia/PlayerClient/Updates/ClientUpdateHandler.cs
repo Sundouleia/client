@@ -179,18 +179,18 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _updater.AddPendingUpdate(type, IpcKind.CPlus);
     }
 
+    private void OnLociUpdate(nint address)
+    {
+        if (!_watcher.WatchedTypes.TryGetValue(address, out OwnedObject type))
+            return;
+        _updater.AddPendingUpdate(type, IpcKind.Loci);
+    }
+
     private void OnHeelsOffsetUpdate(string newOffset)
     {
         if (_watcher.WatchedPlayerAddr == IntPtr.Zero)
             return;
         _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Heels);
-    }
-
-    private void OnLociUpdate(nint playerAddr)
-    {
-        if (playerAddr != _watcher.WatchedPlayerAddr)
-            return;
-        _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Loci);
     }
 
     private void OnHonorificUpdate(string newTitle)
