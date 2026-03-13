@@ -87,6 +87,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Mediator.Subscribe<LociReady>(this, async _ =>
         {
             if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
+            if (!IsRendered) return;
             await TryRegisterLoci().ConfigureAwait(false);
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Loci]))
                 await ApplyLoci().ConfigureAwait(false);
