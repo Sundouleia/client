@@ -176,7 +176,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         ImGui.TableNextColumn();
         ImGui.Text("LociData");
         ImGui.TableNextColumn();
-        ImGui.Text(dataCache.Loci[OwnedObject.Player]);
+        ImGui.Text(dataCache.LociState[OwnedObject.Player]);
 
         ImGui.TableNextColumn();
         ImGui.Text("ModManips");
@@ -224,7 +224,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         ImGui.TableNextColumn();
         ImGui.Text("Loci");
         ImGui.TableNextColumn();
-        ImGui.Text(dataCache.Loci[obj]);
+        ImGui.Text(dataCache.LociState[obj]);
     }
 
     private void DrawWatcherInternals()

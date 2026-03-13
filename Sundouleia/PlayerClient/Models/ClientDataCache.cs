@@ -16,7 +16,7 @@ public class ClientDataCache
     // Can be accessed by multiple tasks concurrently.
     public ConcurrentDictionary<OwnedObject, string> GlamourerState { get; set; } = [];
     public ConcurrentDictionary<OwnedObject, string> CPlusState { get; set; } = [];
-    public ConcurrentDictionary<OwnedObject, string> Loci { get; set; } = [];
+    public ConcurrentDictionary<OwnedObject, string> LociState { get; set; } = [];
 
     public string ModManips     { get; set; } = string.Empty;
     public string HeelsOffset   { get; set; } = string.Empty;
@@ -40,7 +40,7 @@ public class ClientDataCache
             [OwnedObject.Companion] = string.Empty,
             [OwnedObject.Pet] = string.Empty
         };
-        Loci = new ConcurrentDictionary<OwnedObject, string>
+        LociState = new ConcurrentDictionary<OwnedObject, string>
         {
             [OwnedObject.Player] = string.Empty,
             [OwnedObject.MinionOrMount] = string.Empty,
@@ -54,10 +54,12 @@ public class ClientDataCache
         // Deep-copy the HashSet<ModdedFile> values.
         GlamourerState = new ConcurrentDictionary<OwnedObject, string>(other.GlamourerState);
         CPlusState = new ConcurrentDictionary<OwnedObject, string>(other.CPlusState);
+        LociState = new ConcurrentDictionary<OwnedObject, string>(other.LociState);
+
         ModManips = other.ModManips;
         HeelsOffset = other.HeelsOffset;
-        Loci = other.Loci;
         TitleData = other.TitleData;
+        Moodles = other.Moodles;
         PetNames = other.PetNames;
     }
 
@@ -75,28 +77,30 @@ public class ClientDataCache
             {
                 GlamourState = GlamourerState[OwnedObject.Player],
                 CPlusState = CPlusState[OwnedObject.Player],
-                Loci = Loci[OwnedObject.Player],
+                Loci = LociState[OwnedObject.Player],
                 ModManips = ModManips,
                 HeelsOffset = HeelsOffset,
                 TitleData = TitleData,
                 PetNicks = PetNames
             },
-            MinionMountChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus)
+            MinionMountChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.Loci)
             {
                 GlamourState = GlamourerState[OwnedObject.MinionOrMount],
-                CPlusState = CPlusState[OwnedObject.MinionOrMount]
+                CPlusState = CPlusState[OwnedObject.MinionOrMount],
+                Loci = LociState[OwnedObject.MinionOrMount]
             },
             // No loci support yet..
-            PetChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus)
+            PetChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.Loci)
             {
                 GlamourState = GlamourerState[OwnedObject.Pet],
-                CPlusState = CPlusState[OwnedObject.Pet]
+                CPlusState = CPlusState[OwnedObject.Pet],
+                Loci = LociState[OwnedObject.Pet]
             },
             CompanionChanges = new IpcDataUpdate(IpcKind.Glamourer | IpcKind.CPlus | IpcKind.Loci)
             {
                 GlamourState = GlamourerState[OwnedObject.Companion],
                 CPlusState = CPlusState[OwnedObject.Companion],
-                Loci = Loci[OwnedObject.Companion]
+                Loci = LociState[OwnedObject.Companion]
             }
         };
     }
@@ -170,9 +174,10 @@ public class ClientDataCache
         {
             case IpcKind.Glamourer: GlamourerState[obj] = data; break;
             case IpcKind.CPlus:     CPlusState[obj] = data;     break;
-            case IpcKind.Loci:      Loci[obj] = data;           break;
+            case IpcKind.Loci:      LociState[obj] = data;           break;
             case IpcKind.ModManips: ModManips = data;           break;
             case IpcKind.Heels:     HeelsOffset = data;         break;
+            case IpcKind.Moodles:   Moodles = data;             break;
             case IpcKind.Honorific: TitleData = data;           break;
             case IpcKind.PetNames:  PetNames = data;            break;
         }
@@ -184,10 +189,11 @@ public class ClientDataCache
         {
             IpcKind.Glamourer => GlamourerState[obj] != data,
             IpcKind.CPlus => CPlusState[obj] != data,
-            IpcKind.Loci => Loci[obj] != data,
+            IpcKind.Loci => LociState[obj] != data,
             IpcKind.ModManips => ModManips != data,
             IpcKind.Heels => HeelsOffset != data,
             IpcKind.Honorific => TitleData != data,
+            IpcKind.Moodles => Moodles != data,
             IpcKind.PetNames => PetNames != data,
             _ => false
         };
@@ -219,6 +225,11 @@ public class ClientDataCache
             TitleData = other.TitleData;
             playerBuilder.WithTitle(TitleData);
         }
+        if (Moodles != other.Moodles)
+        {
+            Moodles = other.Moodles;
+            playerBuilder.WithMoodles(Moodles);
+        }
         if (PetNames != other.PetNames)
         {
             PetNames = other.PetNames;
@@ -249,15 +260,15 @@ public class ClientDataCache
                     case OwnedObject.Companion: companionBuilder.WithCPlus(CPlusState[obj]); break;
                 }
             }
-            if (Loci[obj] != other.Loci[obj])
+            if (LociState[obj] != other.LociState[obj])
             {
-                Loci[obj] = other.Loci[obj];
+                LociState[obj] = other.LociState[obj];
                 switch (obj)
                 {
-                    case OwnedObject.Player: playerBuilder.WithLoci(Loci[obj]); break;
-                    case OwnedObject.MinionOrMount: minionMountBuilder.WithLoci(Loci[obj]); break;
-                    case OwnedObject.Pet: petBuilder.WithLoci(Loci[obj]); break;
-                    case OwnedObject.Companion: companionBuilder.WithLoci(Loci[obj]); break;
+                    case OwnedObject.Player: playerBuilder.WithLoci(LociState[obj]); break;
+                    case OwnedObject.MinionOrMount: minionMountBuilder.WithLoci(LociState[obj]); break;
+                    case OwnedObject.Pet: petBuilder.WithLoci(LociState[obj]); break;
+                    case OwnedObject.Companion: companionBuilder.WithLoci(LociState[obj]); break;
                 }
             }
         }

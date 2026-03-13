@@ -141,14 +141,17 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     private async Task ReInitializeInternal()
     {
         // If they are online and have alterations, reapply them. Otherwise, exit.
+        await TryRegisterLoci().ConfigureAwait(false);
+
         if (!Sundesmo.IsOnline || !_hasAlterations)
+            return;
+
+        // Skip if in streamer mode.
+        if (_config.ConnectionKind is ConnectionKind.StreamerMode)
             return;
 
         // Await until we know the player has absolutely finished loading in.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
-        // Assign Sundesmo as monitored in Loci
-        if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
-            _lociRegistered = true;
 
         Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
         await ReapplyAlterations().ConfigureAwait(false);

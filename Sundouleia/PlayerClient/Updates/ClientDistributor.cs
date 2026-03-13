@@ -150,16 +150,25 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             _updater.LatestData.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
             _updater.LatestData.GlamourerState[OwnedObject.Player] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.CPlusState[OwnedObject.Player] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
-            _updater.LatestData.Loci[OwnedObject.Player] = await _ipc.Loci.GetOwnManagerStr().ConfigureAwait(false);
+            _updater.LatestData.LociState[OwnedObject.Player] = await _ipc.Loci.GetOwnManagerStr().ConfigureAwait(false);
             _updater.LatestData.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
+            // Minion/Mount
             _updater.LatestData.GlamourerState[OwnedObject.MinionOrMount] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.CPlusState[OwnedObject.MinionOrMount] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.LociState[OwnedObject.MinionOrMount] = await _ipc.Loci.GetActorSMStr(_watcher.WatchedMinionMountAddr).ConfigureAwait(false);
+
+            // Pet (Carbuncle)
             _updater.LatestData.GlamourerState[OwnedObject.Pet] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.CPlusState[OwnedObject.Pet] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedPetAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.LociState[OwnedObject.Pet] = await _ipc.Loci.GetActorSMStr(_watcher.WatchedPetAddr).ConfigureAwait(false);
+
+            // Companion (Chocobo)
             _updater.LatestData.GlamourerState[OwnedObject.Companion] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.CPlusState[OwnedObject.Companion] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedCompanionAddr).ConfigureAwait(false) ?? string.Empty;
+            _updater.LatestData.LociState[OwnedObject.Companion] = await _ipc.Loci.GetActorSMStr(_watcher.WatchedCompanionAddr).ConfigureAwait(false);
+
             // Cache mods.
             var moddedState = await _moddedState.CollectModdedState(CancellationToken.None).ConfigureAwait(false);
             Logger.LogDebug($"(ReloadAndSendCache) Collected modded state. [{moddedState.AllFiles.Count} Mod Files]", LoggerType.DataDistributor);
@@ -426,7 +435,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     {
         if (toUpdate.HasAny(IpcKind.Glamourer)) data.GlamourerState[obj] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.CPlus)) data.CPlusState[obj] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.FromOwned(obj)).ConfigureAwait(false) ?? string.Empty;
-        if (toUpdate.HasAny(IpcKind.Loci)) data.Loci[obj] = await _ipc.Loci.GetActorSMStr(_watcher.FromOwned(obj)).ConfigureAwait(false);
+        if (toUpdate.HasAny(IpcKind.Loci)) data.LociState[obj] = await _ipc.Loci.GetActorSMStr(_watcher.FromOwned(obj)).ConfigureAwait(false);
 
         if (obj is not OwnedObject.Player) return;
 
