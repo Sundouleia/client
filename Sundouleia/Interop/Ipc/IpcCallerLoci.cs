@@ -1,3 +1,4 @@
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using LociApi.Enums;
 using LociApi.Helpers;
 using LociApi.Ipc;
@@ -19,6 +20,7 @@ public sealed class IpcCallerLoci : IIpcCaller
 
     // API Registry
     private readonly RegisterByPtr Register;
+    private readonly RegisterByName RegisterName;
     private readonly UnregisterByPtr Unregister;
     private readonly UnregisterByName UnregisterName;
     private readonly UnregisterAll UnregisterAll;
@@ -52,8 +54,11 @@ public sealed class IpcCallerLoci : IIpcCaller
 
     // API Events (Later)
 
+    private readonly ILogger<IpcCallerLoci> _logger;
+
     public IpcCallerLoci(ILogger<IpcCallerLoci> logger, SundouleiaMediator mediator)
     {
+        _logger = logger;
         // Base
         ApiVersion = new ApiVersion(Svc.PluginInterface);
         IsEnabled = new IsEnabled(Svc.PluginInterface);
@@ -61,20 +66,21 @@ public sealed class IpcCallerLoci : IIpcCaller
         {
             APIAvailable = true;
             FeaturesEnabled = IsEnabled.Invoke();
-            logger.LogDebug("Loci Enabled!", LoggerType.IpcLoci);
+            _logger.LogDebug("Loci Enabled!", LoggerType.IpcLoci);
             mediator.Publish(new LociReady());
         });
         Disposed = LociApi.Ipc.Disposed.Subscriber(Svc.PluginInterface, () =>
         {
             APIAvailable = false;
             FeaturesEnabled = false;
-            logger.LogDebug("Loci Disabled!", LoggerType.IpcLoci);
+            _logger.LogDebug("Loci Disabled!", LoggerType.IpcLoci);
             mediator.Publish(new LociDisposed());
         });
         EnabledChanged = EnabledStateChanged.Subscriber(Svc.PluginInterface, state => FeaturesEnabled = state);
 
         // Registry
         Register = new RegisterByPtr(Svc.PluginInterface);
+        RegisterName = new RegisterByName(Svc.PluginInterface);
         Unregister = new UnregisterByPtr(Svc.PluginInterface);
         UnregisterName = new UnregisterByName(Svc.PluginInterface);
         UnregisterAll = new UnregisterAll(Svc.PluginInterface);
@@ -137,7 +143,30 @@ public sealed class IpcCallerLoci : IIpcCaller
     public async Task<bool> RegisterActor(nint address)
     {
         if (!APIAvailable) return false;
-        return await Svc.Framework.RunOnFrameworkThread(() => Register.Invoke(address, SUNDOULEIA_TAG)).ConfigureAwait(false) is LociApiEc.Success;
+        var res = await Svc.Framework.RunOnFrameworkThread(() => Register.Invoke(address, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        if (res is not (LociApiEc.Success or LociApiEc.NoChange))
+            _logger.LogWarning($"Loci Failed to register Actor {address} with Loci! Error: {res}");
+        return res is (LociApiEc.Success or LociApiEc.NoChange);
+    }
+
+    /// <inheritdoc cref="LociApi.Ipc.RegisterByName"/>
+    public async Task<bool> RegisterPlayer(string playerNameWorld)
+    {
+        if (!APIAvailable) return false;
+        var res = await Svc.Framework.RunOnFrameworkThread(() => RegisterName.Invoke(playerNameWorld, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        if (res is not (LociApiEc.Success or LociApiEc.NoChange))
+            _logger.LogWarning($"Loci Failed to register Player {playerNameWorld} with Loci! Error: {res}");
+        return res is (LociApiEc.Success or LociApiEc.NoChange);
+    }
+
+    /// <inheritdoc cref="LociApi.Ipc.RegisterByName"/>
+    public async Task<bool> RegisterBuddy(string playerName, string buddyName)
+    {
+        if (!APIAvailable) return false;
+        var res = await Svc.Framework.RunOnFrameworkThread(() => RegisterName.Invoke(playerName, buddyName, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        if (res is not (LociApiEc.Success or LociApiEc.NoChange))
+            _logger.LogWarning($"Loci Failed to register Buddy {buddyName} of Player {playerName} with Loci! Error: {res}");
+        return res is (LociApiEc.Success or LociApiEc.NoChange);
     }
 
     /// <inheritdoc cref="LociApi.Ipc.UnregisterByPtr"/>
@@ -151,14 +180,18 @@ public sealed class IpcCallerLoci : IIpcCaller
     public async Task UnregisterPlayer(string playerNameWorld)
     {
         if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => UnregisterName.Invoke(playerNameWorld, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        var res = await Svc.Framework.RunOnFrameworkThread(() => UnregisterName.Invoke(playerNameWorld, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        if (res is not (LociApiEc.Success or LociApiEc.NoChange))
+            _logger.LogWarning($"Loci Failed to unregister Player {playerNameWorld} with Loci! Error: {res}");
     }
 
     /// <inheritdoc cref="LociApi.Ipc.UnregisterByName"/>
     public async Task UnregisterBuddy(string playerName, string buddyName)
     {
         if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => UnregisterName.Invoke(playerName, buddyName, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        var res = await Svc.Framework.RunOnFrameworkThread(() => UnregisterName.Invoke(playerName, buddyName, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        if (res is not (LociApiEc.Success or LociApiEc.NoChange))
+            _logger.LogWarning($"Loci Failed to unregister Buddy {buddyName} of Player {playerName} with Loci! Error: {res}");
     }
 
     /// <inheritdoc cref="LociApi.Ipc.UnregisterAll"/>

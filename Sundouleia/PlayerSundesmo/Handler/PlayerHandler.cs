@@ -87,9 +87,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         Mediator.Subscribe<LociReady>(this, async _ =>
         {
             if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
-            if (!IsRendered) return;
-            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
-                _lociRegistered = true;
+            await TryRegisterLoci().ConfigureAwait(false);
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Loci]))
                 await ApplyLoci().ConfigureAwait(false);
         });
@@ -183,6 +181,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             // Create/Assign this ObjectIdx to the Penumbra Temp Collection if necessary.
             await TryCreateAssignTempCollection().ConfigureAwait(false);
+            await TryRegisterLoci().ConfigureAwait(false);
             // If they are online and have alterations, reapply them. Otherwise, exit.
             if (!Sundesmo.IsOnline || (!_hasAlterations))
             {
@@ -193,15 +192,15 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             // Skip if in streamer mode.
             if (_config.ConnectionKind is ConnectionKind.StreamerMode)
                 return;
-
             // Await until we know the player has absolutely finished loading in.
             await WaitUntilValidDrawObject().ConfigureAwait(false);
-            // Assign Sundesmo as monitored in Loci
-            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
-                _lociRegistered = true;
 
             Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
             await ReapplyAlterationsInternal().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"ReInitializeInternal for {NameString}({Sundesmo.GetNickAliasOrUid()}) failed unexpectedly.", LoggerType.PairHandler);
         }
         finally
         {
@@ -242,6 +241,16 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             await _ipc.Penumbra.AssignSundesmoCollection(_tempCollection, ObjIndex).ConfigureAwait(false);
     }
 
+    private async Task TryRegisterLoci()
+    {
+        if (_lociRegistered)
+            return;
+        else if (!IsRendered && await _ipc.Loci.RegisterPlayer(NameString).ConfigureAwait(false))
+            _lociRegistered = true;
+        else if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
+            _lociRegistered = true;
+    }
+
     // Faze out as we move to watcher.
     private async Task WaitUntilValidDrawObject(CancellationToken timeoutToken = default)
     {
@@ -272,14 +281,14 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
     #region Altaration Control
 
-    /// <inheritdoc cref="RevertAlterations(string, nint, ushort, CancellationToken)"/>
+    /// <inheritdoc cref="RevertAlterations(string, string, nint, ushort, CancellationToken)"/>
     public async Task  RevertAlterations(CancellationToken ct = default)
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
         {
             // Revert penumbra collection and customize+ data if set.
-            await RevertAssignedAlterations();
+            await RevertAssignedAlterations(NameWithWorld);
 
             // If not visible, skip all but GlamourerByName, since they won't be valid.
             if (!IsRendered)
@@ -288,8 +297,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                 if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                     await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
                 // release by name if possible
-                if (_lociRegistered)
-                    await _ipc.Loci.ClearPlayerSM(NameWithWorld).ConfigureAwait(false);
+                await _ipc.Loci.ClearPlayerSM(NameWithWorld).ConfigureAwait(false);
                 return;
             }
 
@@ -323,13 +331,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     ///     Reverts the rendered alterations on a player.<br/>
     ///     <b>This does not delete the alteration data. </b>
     /// </summary>
-    private async Task RevertAlterations(string name, IntPtr address, ushort objIdx, CancellationToken token)
+    private async Task RevertAlterations(string name, string nameWorld, IntPtr address, ushort objIdx, CancellationToken token)
     {
         await _dataLock.WaitAsync().ConfigureAwait(false);
         try
         {
             // Revert penumbra collection and customize+ data if set.
-            await RevertAssignedAlterations();
+            await RevertAssignedAlterations(nameWorld);
              
             // If not visible, skip all but GlamourerByName, since they won't be valid.
             // Additionally, outside of the framework unloading, one of the conditions where an address
@@ -338,9 +346,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             {
                 // Revert glamourer by name if possible.
                 if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
-                    await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
-                if (_lociRegistered)
-                    await _ipc.Loci.ClearPlayerSM(NameWithWorld).ConfigureAwait(false);
+                    await _ipc.Glamourer.ReleaseByName(name).ConfigureAwait(false);
+                // Bomb loci
+                await _ipc.Loci.ClearPlayerSM(nameWorld).ConfigureAwait(false);
                 return;
             }
 
@@ -371,7 +379,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     ///     Revert alterations that entrusted us with an ID, that dont require other actor info. <para/>
     ///     <b>Currently Penumbra and Customize+</b>
     /// </summary>
-    private async Task RevertAssignedAlterations()
+    private async Task RevertAssignedAlterations(string nameStr)
     {
         if (_tempProfile != Guid.Empty)
         {
@@ -380,13 +388,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         }
         if (_tempCollection != Guid.Empty)
         {
-            Logger.LogTrace($"Removing {NameString}(({Sundesmo.GetNickAliasOrUid()})'s temporary collection.", LoggerType.PairHandler);
+            Logger.LogTrace($"Removing {nameStr}(({Sundesmo.GetNickAliasOrUid()})'s temporary collection.", LoggerType.PairHandler);
             await _ipc.Penumbra.RemoveSundesmoCollection(_tempCollection).ConfigureAwait(false);
             _tempCollection = Guid.Empty;
         }
         if (_lociRegistered)
         {
-            await _ipc.Loci.UnregisterPlayer(NameString).ConfigureAwait(false);
+            await _ipc.Loci.UnregisterPlayer(nameStr).ConfigureAwait(false);
             _lociRegistered = false;
         }
     }
@@ -972,11 +980,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     private async Task ApplyLoci()
     {
         if (!_lociRegistered)
-        {
-            // Could cause some confusion (due to clearing alterations), but should work for the most part.
             if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
                 _lociRegistered = true;
-        }
+
         // Then set by ptr
         await _ipc.Loci.SetActorSM(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
     }
@@ -1036,6 +1042,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         var nickAliasOrUid = Sundesmo.GetNickAliasOrUid();
         var name = NameString;
+        var nameWorld = NameWithWorld;
 
         // Process off the disposal thread. (Avoids deadlocking on plugin shutdown)
         // Everything in here, if it errors, should not crash the game as it is fire and forget.
@@ -1044,7 +1051,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             try
             {
                 // Revert assigned alterations regardless of the conditional state.
-                await RevertAssignedAlterations();
+                await RevertAssignedAlterations(nameWorld);
 
                 // If we are not zoning and not in a cutscene, run the revert with a 30s timeout.
                 if (!PlayerData.IsZoning && !PlayerData.InCutscene)
@@ -1052,7 +1059,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
                     Logger.LogDebug($"{name}(({nickAliasOrUid}) is rendered, reverting by address/index.", LoggerType.PairHandler);
                     using var timeoutCTS = new CancellationTokenSource();
                     timeoutCTS.CancelAfter(TimeSpan.FromSeconds(30));
-                    await RevertAlterations(name, addr, objIdx, timeoutCTS.Token);
+                    await RevertAlterations(name, nameWorld, addr, objIdx, timeoutCTS.Token);
                 }
 
                 // Make sure we aren't leaving the semaphore hanging
@@ -1082,6 +1089,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
     {
         using var node = ImRaii.TreeNode($"Player Alterations##{Sundesmo.UserData.UID}-alterations-player");
         if (!node) return;
+
+        CkGui.TextFrameAligned("LociRegistered:");
+        CkGui.BoolIcon(_lociRegistered, true);
 
         DebugAppliedMods();
         if (_appearanceData is not null)

@@ -338,6 +338,7 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     public async Task RevertRenderedAlterations()
     {
         Logger.LogDebug($"Reverting alterations for [{PlayerName}] ({GetNickAliasOrUid()}).", UserData.AliasOrUID);
+
         await _player.RevertAlterations().ConfigureAwait(false);
         await _mountMinion.RevertAlterations().ConfigureAwait(false);
         await _pet.RevertAlterations().ConfigureAwait(false);

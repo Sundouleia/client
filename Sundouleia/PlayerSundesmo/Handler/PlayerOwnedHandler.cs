@@ -63,8 +63,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         {
             if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
             if (!IsRendered) return;
-            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
-                _lociRegistered = true;
+            await TryRegisterLoci().ConfigureAwait(false);
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Loci]))
                 await ApplyLoci().ConfigureAwait(false);
         });
@@ -177,6 +176,16 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         }
     }
 
+    private async Task TryRegisterLoci()
+    {
+        if (_lociRegistered)
+            return;
+        else if (!IsRendered && await _ipc.Loci.RegisterBuddy(Sundesmo.PlayerName, NameString).ConfigureAwait(false))
+            _lociRegistered = true;
+        else if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
+            _lociRegistered = true;
+    }
+
     /// <summary>
     ///     There are conditions where an object can be rendered / created, but not drawable, or currently bring drawn. <para />
     ///     This mainly occurs on login or when transferring between zones, but can also occur during redraws and such.
@@ -201,7 +210,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         try
         {
             // Revert penumbra collection and customize+ data if set.
-            await RevertAssignedAlterations();
+            await RevertAssignedAlterations(Sundesmo.PlayerName, NameString);
 
             // If not visible, skip all but GlamourerByName, since they won't be valid.
             if (!IsRendered)
@@ -210,8 +219,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
                 if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                     await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
                 // release by name if possible
-                if (_lociRegistered)
-                    await _ipc.Loci.ClearBuddySM(Sundesmo.PlayerName, NameString).ConfigureAwait(false);
+                await _ipc.Loci.ClearBuddySM(Sundesmo.PlayerName, NameString).ConfigureAwait(false);
                 return;
             }
 
@@ -227,7 +235,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         }
         catch (AccessViolationException)
         { }
-        catch (Exception ex)
+        catch (Exception)
         { }
     }
 
@@ -235,33 +243,32 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     ///     Reverts the rendered alterations on the Sundesmo-owned object. <br/>
     ///     <b>This does not delete the alteration data. </b>
     /// </summary>
-    private async Task RevertAlterations(string name, IntPtr address, ushort objIdx, CancellationToken ct = default)
+    private async Task RevertAlterations(string ownerName, string buddyName, IntPtr address, ushort objIdx, CancellationToken ct = default)
     {
         // Revert the customize+ alterations that do not require actor info.
-        await RevertAssignedAlterations().ConfigureAwait(false);
+        await RevertAssignedAlterations(ownerName, buddyName).ConfigureAwait(false);
 
         // Revert glamourer based on the rendered state.
         if (address == IntPtr.Zero)
         {
             // Revert glamourer by name if possible.
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
-                await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
-            if (_lociRegistered)
-                await _ipc.Loci.ClearBuddySM(Sundesmo.PlayerName, name).ConfigureAwait(false);
+                await _ipc.Glamourer.ReleaseByName(buddyName).ConfigureAwait(false);
+            // Bomb them
+            await _ipc.Loci.ClearBuddySM(ownerName, buddyName).ConfigureAwait(false);
             return;
         }
 
         // Otherwise clear normally.
         await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
         await _ipc.Loci.ClearActorSM(address).ConfigureAwait(false);
-        // Otherwise do nothing.
     }
 
     /// <summary>
     ///     Revert alterations that entrusted us with an ID, and dont require actor info. <para/>
     ///     <b>Currently only Customize+</b>
     /// </summary>
-    private async Task RevertAssignedAlterations()
+    private async Task RevertAssignedAlterations(string playerName, string buddyName)
     {
         if (_tempProfile != Guid.Empty)
         {
@@ -270,7 +277,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         }
         if (_lociRegistered)
         {
-            await _ipc.Loci.UnregisterBuddy(Sundesmo.PlayerName, NameString).ConfigureAwait(false);
+            await _ipc.Loci.UnregisterBuddy(playerName, buddyName).ConfigureAwait(false);
             _lociRegistered = false;
         }
     }
@@ -442,11 +449,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     private async Task ApplyLoci()
     {
         if (!_lociRegistered)
-        {
-            // Could cause some confusion (due to clearing alterations), but should work for the most part.
             if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
                 _lociRegistered = true;
-        }
         // Then set by ptr
         await _ipc.Loci.SetActorSM(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
     }
@@ -463,6 +467,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
         IntPtr addr = IsRendered ? Address : IntPtr.Zero;
         ushort objIdx = IsRendered ? ObjIndex : (ushort)0;
+        string ownerName = Sundesmo.PlayerName;
+        string name = NameString;
 
         // Stop any actively running tasks.
         _runtimeCTS.SafeCancel();
@@ -484,10 +490,9 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         _ = Task.Run(async () =>
         {
             var nickAliasOrUid = Sundesmo.GetNickAliasOrUid();
-            var name = NameString;
             try
             {
-                await RevertAlterations().ConfigureAwait(false);
+                await RevertAlterations(ownerName, name, addr, objIdx).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
