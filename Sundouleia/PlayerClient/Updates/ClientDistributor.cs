@@ -443,6 +443,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         if (toUpdate.HasAny(IpcKind.ModManips)) data.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Heels)) data.HeelsOffset = await _ipc.Heels.GetClientOffset().ConfigureAwait(false) ?? string.Empty;
         if (toUpdate.HasAny(IpcKind.Honorific)) data.TitleData = await _ipc.Honorific.GetTitle().ConfigureAwait(false) ?? string.Empty;
+        if (toUpdate.HasAny(IpcKind.Moodles)) data.Moodles = await _ipc.Moodles.GetOwnManager().ConfigureAwait(false);
         if (toUpdate.HasAny(IpcKind.PetNames)) data.PetNames = _ipc.PetNames.GetPetNicknames() ?? string.Empty;
     }
 
@@ -456,6 +457,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             IpcKind.Loci => await _ipc.Loci.GetActorSMStr(_watcher.FromOwned(obj)).ConfigureAwait(false),
             IpcKind.Heels => await _ipc.Heels.GetClientOffset().ConfigureAwait(false),
             IpcKind.Honorific => await _ipc.Honorific.GetTitle().ConfigureAwait(false),
+            IpcKind.Moodles => await _ipc.Moodles.GetOwnManager().ConfigureAwait(false),
             IpcKind.PetNames => _ipc.PetNames.GetPetNicknames(),
             _ => string.Empty,
         };

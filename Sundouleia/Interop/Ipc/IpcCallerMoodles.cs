@@ -15,7 +15,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
 
     public readonly ICallGateSubscriber<nint, object> ManagedModified;
 
-    private readonly ICallGateSubscriber<nint, string> GetManagerByPtr;
+    private readonly ICallGateSubscriber<string> GetManager;
     private readonly ICallGateSubscriber<nint, string, object> SetManagerByPtr;
     private readonly ICallGateSubscriber<nint, object> ClearManagerByPtr;
 
@@ -27,7 +27,7 @@ public sealed class IpcCallerMoodles : IIpcCaller
 
         ApiVersion = Svc.PluginInterface.GetIpcSubscriber<int>("Moodles.Version");
         ManagedModified = Svc.PluginInterface.GetIpcSubscriber<nint, object>("Moodles.StatusManagerModified");
-        GetManagerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, string>("Moodles.GetStatusManagerByPtrV2");
+        GetManager = Svc.PluginInterface.GetIpcSubscriber<string>("Moodles.GetClientStatusManagerV2");
         SetManagerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, string, object>("Moodles.SetStatusManagerByPtrV2");
         ClearManagerByPtr = Svc.PluginInterface.GetIpcSubscriber<nint, object>("Moodles.ClearStatusManagerByPtrV2");
         CheckAPI();
@@ -56,10 +56,10 @@ public sealed class IpcCallerMoodles : IIpcCaller
     public void Dispose()
     { }
 
-    public async Task<string> GetManager(nint address)
+    public async Task<string> GetOwnManager()
     {
         if (!APIAvailable) return string.Empty;
-        return await Svc.Framework.RunOnFrameworkThread(() => GetManagerByPtr.InvokeFunc(address) ?? string.Empty).ConfigureAwait(false);
+        return await Svc.Framework.RunOnFrameworkThread(() => GetManager.InvokeFunc() ?? string.Empty).ConfigureAwait(false);
     }
 
     public async Task SetManager(nint address, string dataString)

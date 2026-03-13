@@ -45,6 +45,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _ipc.CPlus.OnProfileUpdate.Subscribe(OnCPlusProfileUpdate);
         _ipc.Heels.OnOffsetUpdate.Subscribe(OnHeelsOffsetUpdate);
         _ipc.Honorific.OnTitleChange.Subscribe(OnHonorificUpdate);
+        _ipc.Moodles.ManagedModified.Subscribe(OnMoodlesChanged);
         _ipc.PetNames.OnNicknamesChanged.Subscribe(OnPetNamesUpdate);
         ManagerChanged = LociApi.Ipc.ManagerChanged.Subscriber(Svc.PluginInterface, OnLociUpdate);
 
@@ -61,6 +62,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _ipc.CPlus.OnProfileUpdate.Unsubscribe(OnCPlusProfileUpdate);
         _ipc.Heels.OnOffsetUpdate.Unsubscribe(OnHeelsOffsetUpdate);
         _ipc.Honorific.OnTitleChange.Unsubscribe(OnHonorificUpdate);
+        _ipc.Moodles.ManagedModified.Unsubscribe(OnMoodlesChanged);
         _ipc.PetNames.OnNicknamesChanged.Unsubscribe(OnPetNamesUpdate);
         Svc.Framework.Update -= OnUpdateTick;
         ManagerChanged.Dispose();
@@ -198,6 +200,13 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         if (_watcher.WatchedPlayerAddr == IntPtr.Zero)
             return;
         _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Honorific);
+    }
+
+    private void OnMoodlesChanged(nint address)
+    {
+        if (_watcher.WatchedPlayerAddr != address)
+            return;
+        _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Moodles);
     }
 
     private void OnPetNamesUpdate(string data)

@@ -356,11 +356,12 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             }
 
             // We can care about parallel execution here if we really want to but i dont care atm.
-            await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
             await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
+            await _ipc.Loci.ClearActorSM(address).ConfigureAwait(false);
             await _ipc.Heels.RestoreUserOffset(objIdx).ConfigureAwait(false);
             await _ipc.Honorific.ClearTitleAsync(objIdx).ConfigureAwait(false);
-            await _ipc.Loci.ClearActorSM(address).ConfigureAwait(false);
+            await _ipc.Moodles.ClearManager(address).ConfigureAwait(false);
+            await _ipc.PetNames.ClearPetNamesByIdx(objIdx).ConfigureAwait(false);
 
             _ipc.Penumbra.RedrawGameObject(objIdx);
         }
@@ -908,11 +909,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         var toApply = new List<Task>();
 
         if (changes.HasAny(IpcKind.Glamourer))  toApply.Add(ApplyGlamourer());
-        if (changes.HasAny(IpcKind.Heels))      toApply.Add(ApplyHeels());
         if (changes.HasAny(IpcKind.CPlus))      toApply.Add(ApplyCPlus());
-        if (changes.HasAny(IpcKind.Honorific))  toApply.Add(ApplyHonorific());
         if (changes.HasAny(IpcKind.Loci))       toApply.Add(ApplyLoci());
+
         if (changes.HasAny(IpcKind.ModManips))  toApply.Add(ApplyModManips());
+        if (changes.HasAny(IpcKind.Heels))      toApply.Add(ApplyHeels());
+        if (changes.HasAny(IpcKind.Honorific))  toApply.Add(ApplyHonorific());
+        if (changes.HasAny(IpcKind.Moodles))    toApply.Add(ApplyMoodles());
         if (changes.HasAny(IpcKind.PetNames))   toApply.Add(ApplyPetNames());
 
         await Task.WhenAll(toApply).ConfigureAwait(false);
@@ -935,13 +938,14 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         // Apply change.
         var task = kind switch
         {
-            IpcKind.Glamourer => ApplyGlamourer(),
-            IpcKind.Heels => ApplyHeels(),
-            IpcKind.CPlus => ApplyCPlus(),
-            IpcKind.Honorific => ApplyHonorific(),
-            IpcKind.Loci => ApplyLoci(),
-            IpcKind.ModManips => ApplyModManips(),
-            IpcKind.PetNames => ApplyPetNames(),
+            IpcKind.Glamourer   => ApplyGlamourer(),
+            IpcKind.CPlus       => ApplyCPlus(),
+            IpcKind.Loci        => ApplyLoci(),
+            IpcKind.ModManips   => ApplyModManips(),
+            IpcKind.Heels       => ApplyHeels(),
+            IpcKind.Honorific   => ApplyHonorific(),
+            IpcKind.Moodles     => ApplyMoodles(),
+            IpcKind.PetNames    => ApplyPetNames(),
             _ => Task.CompletedTask
         };
         await task.ConfigureAwait(false);
@@ -961,12 +965,13 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         var toApply = new List<Task>();
         
         if (!string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.Glamourer])) toApply.Add(ApplyGlamourer());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Heels]))     toApply.Add(ApplyHeels());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))     toApply.Add(ApplyCPlus());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Honorific])) toApply.Add(ApplyHonorific());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Loci]))      toApply.Add(ApplyLoci());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.ModManips])) toApply.Add(ApplyModManips());
-        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.PetNames]))  toApply.Add(ApplyPetNames());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.CPlus]))      toApply.Add(ApplyCPlus());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Loci]))       toApply.Add(ApplyLoci());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.ModManips]))  toApply.Add(ApplyModManips());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Heels]))      toApply.Add(ApplyHeels());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Honorific]))  toApply.Add(ApplyHonorific());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.Moodles]))    toApply.Add(ApplyMoodles());
+        if (!string.IsNullOrEmpty(_appearanceData.Data[IpcKind.PetNames]))   toApply.Add(ApplyPetNames());
         
         // Run in parallel.
         await Task.WhenAll(toApply).ConfigureAwait(false);
@@ -988,6 +993,22 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
 
         // Then set by ptr
         await _ipc.Loci.SetActorSM(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
+    }
+
+    private async Task ApplyMoodles()
+    {
+        // If we recieved and are applying a MoodlesDataString, and Loci is not running, attempt normal moodle application.
+        if (!IpcCallerLoci.APIAvailable)
+        {
+            await _ipc.Moodles.SetManager(Address, _appearanceData!.Data[IpcKind.Moodles]).ConfigureAwait(false);
+        }
+        // Otherwise, loci is available. If this actor has no LociString, then they only have moodles, and we only have Loci.
+        // As such, convert the data to Loci through the API and apply it via Loci.
+        else if (string.IsNullOrEmpty(_appearanceData!.Data[IpcKind.Loci]))
+        {
+            var lociData = _ipc.Loci.ConvertToLociData(_appearanceData.Data[IpcKind.Moodles]);
+            await _ipc.Loci.SetActorSM(Address, lociData).ConfigureAwait(false);
+        }
     }
 
     private Task ApplyPetNames()
