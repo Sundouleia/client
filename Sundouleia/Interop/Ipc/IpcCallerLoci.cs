@@ -41,7 +41,7 @@ public sealed class IpcCallerLoci : IIpcCaller
     private readonly GetStatusInfoList GetAllStatuseTuples;
     private readonly ApplyStatus ApplyStatusById;
     private readonly ApplyStatuses ApplyStatusByIds;
-    private readonly ApplyStatusInfo ApplyStatusTuple;      // Can only be done on client.
+    private readonly ApplyStatusInfo ApplyStatusTuple;
     private readonly ApplyStatusInfos ApplyStatusTuples;
     private readonly RemoveStatus RemoveStatus;
     private readonly RemoveStatuses RemoveStatuses;
@@ -164,8 +164,6 @@ public sealed class IpcCallerLoci : IIpcCaller
     {
         if (!APIAvailable) return false;
         var res = await Svc.Framework.RunOnFrameworkThread(() => RegisterName.Invoke(playerName, buddyName, SUNDOULEIA_TAG)).ConfigureAwait(false);
-        if (res is not (LociApiEc.Success or LociApiEc.NoChange))
-            _logger.LogWarning($"Loci Failed to register Buddy {buddyName} of Player {playerName} with Loci! Error: {res}");
         return res is (LociApiEc.Success or LociApiEc.NoChange);
     }
 
@@ -189,16 +187,9 @@ public sealed class IpcCallerLoci : IIpcCaller
     public async Task UnregisterBuddy(string playerName, string buddyName)
     {
         if (!APIAvailable) return;
-        var res = await Svc.Framework.RunOnFrameworkThread(() => UnregisterName.Invoke(playerName, buddyName, SUNDOULEIA_TAG)).ConfigureAwait(false);
+        var res = await Svc.Framework.RunOnFrameworkThread(() => UnregisterName.Invoke(playerName, buddyName, SUNDOULEIA_TAG, true)).ConfigureAwait(false);
         if (res is not (LociApiEc.Success or LociApiEc.NoChange))
             _logger.LogWarning($"Loci Failed to unregister Buddy {buddyName} of Player {playerName} with Loci! Error: {res}");
-    }
-
-    /// <inheritdoc cref="LociApi.Ipc.UnregisterAll"/>
-    public async Task HailMerryUnregister()
-    {
-        if (!APIAvailable) return;
-        await Svc.Framework.RunOnFrameworkThread(() => UnregisterAll.Invoke(SUNDOULEIA_TAG)).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="LociApi.Ipc.GetManager"/>

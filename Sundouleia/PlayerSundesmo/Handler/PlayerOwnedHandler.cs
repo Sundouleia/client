@@ -41,7 +41,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     // Internal Cache
     private unsafe GameObject* _gameObject = null;
     private Guid _tempProfile = Guid.Empty;
-    private bool _lociRegistered = false;
+    private bool _tagRegistered = false;
     private IpcDataCache? _appearanceData = new();
 
     private bool _hasAlterations => _appearanceData is not null;
@@ -64,8 +64,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             if (_config.ConnectionKind is ConnectionKind.StreamerMode) return;
             if (!IsRendered) return;
             // Re-Register
-            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
-                _lociRegistered = true;
+            if (await _ipc.Loci.RegisterBuddy(Sundesmo.PlayerName, NameString).ConfigureAwait(false))
+                _tagRegistered = true;
             // Reapply
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Loci]))
                 await ApplyLoci().ConfigureAwait(false);
@@ -141,7 +141,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
     private async Task ReInitializeInternal()
     {
         // If they are online and have alterations, reapply them. Otherwise, exit.
-        await TryRegisterLoci().ConfigureAwait(false);
+        if (await _ipc.Loci.RegisterBuddy(Sundesmo.PlayerName, NameString).ConfigureAwait(false))
+            _tagRegistered = true;
 
         if (!Sundesmo.IsOnline || !_hasAlterations)
             return;
@@ -153,7 +154,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         // Await until we know the player has absolutely finished loading in.
         await WaitUntilValidDrawObject().ConfigureAwait(false);
 
-        Logger.LogDebug($"[{Sundesmo.GetNickAliasOrUid()}] is fully loaded, reapplying alterations.", LoggerType.PairHandler);
+        Logger.LogDebug($"({Sundesmo.GetNickAliasOrUid()})'s {ObjectType} is fully loaded, reapplying alterations.", LoggerType.PairHandler);
         await ReapplyAlterations().ConfigureAwait(false);
     }
 
@@ -168,6 +169,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
         // Clear the GameData.
         _gameObject = null;
         Logger.LogDebug($"Marking {Sundesmo.GetNickAliasOrUid()}'s {ObjectType} as unrendered @ [{address:X}]", LoggerType.PairHandler);
+        // Perform an immidiate revert of alterations.
+        RevertAlterations().ConfigureAwait(false);
     }
 
     private async Task WaitUntilValidDrawObject(CancellationToken timeoutToken = default)
@@ -180,16 +183,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
                 return;
             await Task.Delay(100).ConfigureAwait(false);
         }
-    }
-
-    private async Task TryRegisterLoci()
-    {
-        if (_lociRegistered)
-            return;
-        else if (!IsRendered && await _ipc.Loci.RegisterBuddy(Sundesmo.PlayerName, NameString).ConfigureAwait(false))
-            _lociRegistered = true;
-        else if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
-            _lociRegistered = true;
     }
 
     /// <summary>
@@ -210,7 +203,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
     #region Altaration Control
 
-    /// <inheritdoc cref="RevertAlterations(string, ushort?, CancellationToken)"/>
+    /// <inheritdoc cref="RevertAlterations(string, IntPtr, ushort, CancellationToken)"/>
     public async Task RevertAlterations(CancellationToken ct = default)
     {
         try
@@ -224,8 +217,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
                 // Revert glamourer by name if possible.
                 if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                     await _ipc.Glamourer.ReleaseByName(NameString).ConfigureAwait(false);
-                // release by name if possible
-                await _ipc.Loci.ClearBuddySM(Sundesmo.PlayerName, NameString).ConfigureAwait(false);
                 return;
             }
 
@@ -237,7 +228,6 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
             // We can care about parallel execution here if we really want to but i dont care atm.
             await _ipc.Glamourer.ReleaseActor(ObjIndex).ConfigureAwait(false);
-            await _ipc.Loci.ClearActorSM(Address).ConfigureAwait(false);
         }
         catch (AccessViolationException)
         { }
@@ -260,14 +250,11 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             // Revert glamourer by name if possible.
             if (!string.IsNullOrEmpty(_appearanceData?.Data[IpcKind.Glamourer]))
                 await _ipc.Glamourer.ReleaseByName(buddyName).ConfigureAwait(false);
-            // Bomb them
-            await _ipc.Loci.ClearBuddySM(ownerName, buddyName).ConfigureAwait(false);
             return;
         }
 
         // Otherwise clear normally.
         await _ipc.Glamourer.ReleaseActor(objIdx).ConfigureAwait(false);
-        await _ipc.Loci.ClearActorSM(address).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -281,10 +268,10 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
             await _ipc.CPlus.RevertTempProfile(_tempProfile).ConfigureAwait(false);
             _tempProfile = Guid.Empty;
         }
-        if (_lociRegistered)
+        if (_tagRegistered)
         {
             await _ipc.Loci.UnregisterBuddy(playerName, buddyName).ConfigureAwait(false);
-            _lociRegistered = false;
+            _tagRegistered = false;
         }
     }
 
@@ -299,7 +286,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
         _appearanceData = null;
         _tempProfile = Guid.Empty;
-        _lociRegistered = false;
+        _tagRegistered = false;
     }
 
     public async Task UpdateAndApplyIpc(IpcDataUpdate ipcChanges, bool isInitialData)
@@ -454,9 +441,8 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
 
     private async Task ApplyLoci()
     {
-        if (!_lociRegistered)
-            if (await _ipc.Loci.RegisterActor(Address).ConfigureAwait(false))
-                _lociRegistered = true;
+        if (!_tagRegistered && await _ipc.Loci.RegisterBuddy(Sundesmo.PlayerName, NameString).ConfigureAwait(false))
+            _tagRegistered = true;
         // Then set by ptr
         await _ipc.Loci.SetActorSM(Address, _appearanceData!.Data[IpcKind.Loci]).ConfigureAwait(false);
     }
@@ -509,7 +495,7 @@ public class PlayerOwnedHandler : DisposableMediatorSubscriberBase
                 // Clear internal data.
                 _appearanceData = null;
                 _tempProfile = Guid.Empty;
-                _lociRegistered = false;
+                _tagRegistered = false;
                 NameString = string.Empty;
                 unsafe { _gameObject = null; }
             }
