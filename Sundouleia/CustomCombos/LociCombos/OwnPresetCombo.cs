@@ -1,3 +1,4 @@
+using CkCommons.Gui;
 using CkCommons.Helpers;
 using CkCommons.RichText;
 using CkCommons.Textures;
@@ -12,7 +13,7 @@ using SundouleiaAPI.Hub;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class OwnPresetCombo : LociComboBase<LociPresetStruct>
+public sealed class OwnPresetCombo : LociComboBase<LociPresetInfo>
 {
     private int _maxPresetCount => LociData.Cache.PresetList.Max(x => x.Statuses.Count);
     private float _iconWithPadding => IconSize.X + ImUtf8.ItemInnerSpacing.X;
@@ -23,7 +24,7 @@ public sealed class OwnPresetCombo : LociComboBase<LociPresetStruct>
     protected override bool DisableCondition()
         => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.LociAccess.HasAny(LociAccess.AllowOther);
 
-    protected override string ToString(LociPresetStruct LociPreset)
+    protected override string ToString(LociPresetInfo LociPreset)
         => LociPreset.Title.StripColorTags();
 
     public bool DrawApplyPresets(string id, float width, string buttonTT)
@@ -44,14 +45,13 @@ public sealed class OwnPresetCombo : LociComboBase<LociPresetStruct>
         using var _ = Fonts.Default150Percent.Push();
 
         var ret = ImGui.Selectable($"##{lociPreset.Title}", selected, ImGuiSelectableFlags.None, size);
-
         if (lociPreset.Statuses.Count > 0)
         {
             ImGui.SameLine(titleSpace);
             for (int i = 0; i < lociPreset.Statuses.Count; i++)
             {
                 var status = lociPreset.Statuses[i];
-                if (LociData.Cache.Statuses.TryGetValue(status, out var info))
+                if (!LociData.Cache.Statuses.TryGetValue(status, out var info))
                 {
                     ImGui.SameLine(0, _iconWithPadding);
                     continue;
@@ -74,7 +74,7 @@ public sealed class OwnPresetCombo : LociComboBase<LociPresetStruct>
     }
 
     // We can technically optimize this to send the preset tuples themselves, but whatever.
-    protected override bool CanDoAction(LociPresetStruct item)
+    protected override bool CanDoAction(LociPresetInfo item)
     {
         var ids = item.Statuses.ToHashSet();
         var toCheck = LociData.Cache.StatusList.Where(s => ids.Contains(s.GUID));
@@ -82,16 +82,19 @@ public sealed class OwnPresetCombo : LociComboBase<LociPresetStruct>
     }
 
     // We can technically optimize this to send the preset tuples themselves, but whatever.
-    protected override void OnApplyButton(LociPresetStruct item)
+    protected override void OnApplyButton(LociPresetInfo item)
     {
         if (!CanDoAction(item))
             return;
 
         UiService.SetUITask(async () =>
         {
-            var ids = item.Statuses.ToHashSet();
-            var toSend = LociData.Cache.StatusList.Where(s => ids.Contains(s.GUID));
-            var res = await _hub.UserApplyLociStatusTuples(new(_sundesmo.UserData, toSend));
+            var statuses = new List<LociStatusStruct>();
+            foreach (var guid in item.Statuses)
+                if (LociData.Cache.Statuses.TryGetValue(guid, out var s))
+                    statuses.Add(s.ToStruct());
+
+            var res = await _hub.UserApplyLociStatusTuples(new(_sundesmo.UserData, statuses));
             if (res.ErrorCode is not SundouleiaApiEc.Success)
                 Log.LogWarning($"Failed to apply loci preset {item.Title} on {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
         });

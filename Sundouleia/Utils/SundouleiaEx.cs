@@ -9,6 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using LociApi.Enums;
+using Sundouleia.Interop.Helpers;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
 using Sundouleia.WebAPI;
@@ -255,7 +256,7 @@ public static class SundouleiaEx
         };
     }
 
-    public static void AttachTooltip(this LociStatusStruct item, LociContainer data)
+    public static void AttachTooltip(this LociStatusInfo item, LociContainer data)
     {
         if (!ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             return;

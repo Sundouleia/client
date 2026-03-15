@@ -1,10 +1,13 @@
+using CkCommons;
 using CkCommons.Gui;
+using CkCommons.Textures;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using OtterGui;
+using Sundouleia.Interop.Helpers;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
@@ -92,7 +95,7 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     public PairPerms    PairPerms   => UserPair.Perms;
 
     // Shared LociData. Fresh / empty if not shared.
-    public LociContainer SharedData { get; private set; } = new();
+    public LociContainer SharedLociData { get; internal set; } = new();
 
     // Internal Helpers
     public bool IsReloading { get; private set; } = false;
@@ -136,8 +139,8 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     public string GetNickAliasOrUid()
         => _nicks.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
 
-    public void SetLociData(LociContainer newData)
-        => SharedData = newData;
+    public void SetLociData(LociContainerData newData)
+        => SharedLociData = new(newData);
 
     public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
@@ -427,6 +430,46 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     }
 
     // ----- Debuggers -----
+    public void DrawLociDebug()
+    {
+        var dispName = GetNickAliasOrUid();
+        using var nodeMain = ImRaii.TreeNode($"{dispName}'s Loci Data");
+        if (!nodeMain) return;
+
+        CkGui.ColorTextCentered($"Active Statuses: {SharedLociData.DataInfo.Count()}", ImGuiColors.ParsedGold);
+        LociHelpers.DrawTuplesFramed($"DataInfo-{dispName}", SharedLociData.DataInfoList, ImGui.GetContentRegionAvail().X, CkStyle.ChildRoundingLarge(), LociIcon.SizeFramed);
+
+
+        CkGui.ColorTextCentered($"Stored Statuses: {SharedLociData.StatusList.Count()}", ImGuiColors.ParsedGold);
+        LociHelpers.DrawTuplesFramed($"StatusList-{dispName}", SharedLociData.StatusList, ImGui.GetContentRegionAvail().X, CkStyle.ChildRoundingLarge(), LociIcon.SizeFramed, 2);
+
+        DrawLociPresetTable(dispName);
+    }
+
+    private void DrawLociPresetTable(string dispName)
+    {
+        using var nodeMain = ImRaii.TreeNode($"{dispName}'s Stored Preset Data");
+        if (!nodeMain) return;
+
+        using (var t = ImRaii.Table($"PresetTable-{dispName}", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.SizingFixedFit))
+        {
+            if (!t) return;
+            ImGui.TableSetupColumn("Preset Title");
+            ImGui.TableSetupColumn("Statuses");
+            ImGui.TableHeadersRow();
+            foreach (var preset in SharedLociData.PresetList)
+            {
+                ImGui.TableNextColumn();
+                ImGui.Text(preset.Title);
+                ImGui.TableNextColumn();
+                var statuses = preset.Statuses.Select(s => SharedLociData.Statuses.GetValueOrDefault(s)).Where(x => x.GUID != Guid.Empty);
+                LociHelpers.DrawTuples(statuses.ToList(), ImGui.GetContentRegionAvail().X, LociIcon.SizeFramed);
+            }
+
+        }
+    }
+
+
     public void DrawRenderDebug()
     {
         using var node = ImRaii.TreeNode($"Visible Info##{UserData.UID}-visible");

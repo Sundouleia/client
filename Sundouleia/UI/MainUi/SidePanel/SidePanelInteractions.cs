@@ -298,8 +298,8 @@ public class SidePanelInteractions
 
     private void DrawApplyOtherLociData(InteractionsCache cache, Sundesmo s, string dispName, float width)
     {
-        var hasStatuses = s.SharedData.Statuses.Count > 0;
-        var hasPresets = s.SharedData.Presets.Count > 0;
+        var hasStatuses = s.SharedLociData.Statuses.Count > 0;
+        var hasPresets = s.SharedLociData.Presets.Count > 0;
         var isAllowed = s.PairPerms.LociAccess.HasAny(LociAccess.AllowOwn);
 
         var statusTxt = hasStatuses ? $"Apply a status from {dispName}'s list" : "No statuses to apply.";

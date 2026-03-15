@@ -1008,6 +1008,9 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
         {
             var lociData = _ipc.Loci.ConvertToLociData(_appearanceData.Data[IpcKind.Moodles]);
             await _ipc.Loci.SetActorSM(Address, lociData).ConfigureAwait(false);
+            // Update the DataInfo tuple after
+            var tupleData = await _ipc.Loci.GetActorSMInfo(Address).ConfigureAwait(false);
+            Sundesmo.SharedLociData.SetDataInfo(tupleData);
         }
     }
 

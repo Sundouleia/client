@@ -56,9 +56,9 @@ public class InteractionsCache : ISidePanelCache
         Remover     = new SundesmoStatusCombo(log, hub, Sundesmo, 1.3f, () =>
         {
             if (Sundesmo.PairPerms.LociAccess.HasAny(LociAccess.RemoveAny))
-                return [.. Sundesmo.SharedData.DataInfoList.OrderBy(x => x.Title)];
+                return [.. Sundesmo.SharedLociData.DataInfoList.OrderBy(x => x.Title)];
             else if (Sundesmo.PairPerms.LociAccess.HasAny(LociAccess.RemoveApplied))
-                return [.. Sundesmo.SharedData.DataInfoList.Where(x => x.Applier == PlayerData.NameWithWorld).OrderBy(x => x.Title)];
+                return [.. Sundesmo.SharedLociData.DataInfoList.Where(x => x.Applier == PlayerData.NameWithWorld).OrderBy(x => x.Title)];
             else
                 return [];
         });
@@ -89,9 +89,9 @@ public class InteractionsCache : ISidePanelCache
         Remover     = new SundesmoStatusCombo(_log, _hub, Sundesmo, 1.3f, () =>
         {
             if (Sundesmo.PairPerms.LociAccess.HasAny(LociAccess.RemoveAny))
-                return [.. Sundesmo.SharedData.DataInfoList.OrderBy(x => x.Title)];
+                return [.. Sundesmo.SharedLociData.DataInfoList.OrderBy(x => x.Title)];
             else if (Sundesmo.PairPerms.LociAccess.HasAny(LociAccess.RemoveApplied))
-                return [.. Sundesmo.SharedData.DataInfoList.Where(x => x.Applier == PlayerData.NameWithWorld).OrderBy(x => x.Title)];
+                return [.. Sundesmo.SharedLociData.DataInfoList.Where(x => x.Applier == PlayerData.NameWithWorld).OrderBy(x => x.Title)];
             else
                 return [];
         });

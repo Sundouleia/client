@@ -12,20 +12,20 @@ using SundouleiaAPI.Hub;
 namespace Sundouleia.CustomCombos;
 
 // Could maybe split between an applier and remover but idk.
-public sealed class SundesmoStatusCombo : LociComboBase<LociStatusStruct>
+public sealed class SundesmoStatusCombo : LociComboBase<LociStatusInfo>
 {
     public SundesmoStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale)
-        : base(log, hub, sundesmo, scale, () => [ .. sundesmo.SharedData.Statuses.Values.OrderBy(x => x.Title)])
+        : base(log, hub, sundesmo, scale, () => [ .. sundesmo.SharedLociData.Statuses.Values.OrderBy(x => x.Title)])
     { }
 
-    public SundesmoStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale, Func<IReadOnlyList<LociStatusStruct>> generator)
+    public SundesmoStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale, Func<IReadOnlyList<LociStatusInfo>> generator)
         : base(log, hub, sundesmo, scale, generator)
     { }
 
     protected override bool DisableCondition()
         => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.LociAccess.HasAny(LociAccess.AllowOwn);
 
-    protected override string ToString(LociStatusStruct obj)
+    protected override string ToString(LociStatusInfo obj)
         => obj.Title.StripColorTags();
 
     public bool DrawStatuses(string id, float width, bool isApplying, string buttonTT)
@@ -48,7 +48,7 @@ public sealed class SundesmoStatusCombo : LociComboBase<LociStatusStruct>
 
         ImGui.SameLine(titleSpace);
         LociIcon.Draw(myStatus.IconID, myStatus.Stacks, IconSize);
-        myStatus.AttachTooltip(_sundesmo.SharedData);
+        myStatus.AttachTooltip(_sundesmo.SharedLociData);
 
         ImGui.SameLine(ImUtf8.ItemInnerSpacing.X);
         var adjust = (size.Y - ImUtf8.TextHeight) * 0.5f;
@@ -58,10 +58,10 @@ public sealed class SundesmoStatusCombo : LociComboBase<LociStatusStruct>
         return ret;
     }
 
-    protected override bool CanDoAction(LociStatusStruct item)
+    protected override bool CanDoAction(LociStatusInfo item)
         => SundouleiaEx.CanApply(_sundesmo.PairPerms, [ item ]);
 
-    protected override void OnApplyButton(LociStatusStruct item)
+    protected override void OnApplyButton(LociStatusInfo item)
     {
         UiService.SetUITask(async () =>
         {
@@ -71,7 +71,7 @@ public sealed class SundesmoStatusCombo : LociComboBase<LociStatusStruct>
         });
     }
 
-    protected override void OnRemoveButton(LociStatusStruct item)
+    protected override void OnRemoveButton(LociStatusInfo item)
     {
         UiService.SetUITask(async () =>
         {

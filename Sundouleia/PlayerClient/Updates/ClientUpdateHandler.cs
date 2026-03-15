@@ -2,6 +2,7 @@ using CkCommons;
 using Dalamud.Plugin.Services;
 using Glamourer.Api.Enums;
 using Glamourer.Api.IpcSubscribers;
+using LociApi.Enums;
 using LociApi.Helpers;
 using LociApi.Ipc;
 using Penumbra.Api.Enums;
@@ -23,7 +24,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
     private readonly ClientUpdateService _updater;
     private readonly ClientDistributor _distributor;
 
-    private readonly EventSubscriber<nint> ManagerChanged;
+    private readonly EventSubscriber<nint, ManagerChangeType> ManagerChanged;
 
     public ClientUpdateHandler(ILogger<ClientUpdateHandler> logger, SundouleiaMediator mediator,
         IpcManager ipc, CharaWatcher watcher, ClientUpdateService updater,
@@ -195,7 +196,7 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         _updater.AddPendingUpdate(type, IpcKind.CPlus);
     }
 
-    private void OnLociUpdate(nint address)
+    private void OnLociUpdate(nint address, ManagerChangeType _)
     {
         if (!_watcher.WatchedTypes.TryGetValue(address, out OwnedObject type))
             return;

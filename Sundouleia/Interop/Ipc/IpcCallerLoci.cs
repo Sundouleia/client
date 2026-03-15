@@ -129,7 +129,7 @@ public sealed class IpcCallerLoci : IIpcCaller
         try
         {
             var version = ApiVersion.Invoke();
-            APIAvailable = (version.Item1 == 1 && version.Item2 >= 0);
+            APIAvailable = (version.Item1 == 2 && version.Item2 >= 0);
         }
         catch
         {

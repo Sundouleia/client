@@ -1,4 +1,9 @@
+using CkCommons.Raii;
+using CkCommons.Textures;
+using Dalamud.Bindings.ImGui;
 using LociApi.Enums;
+using OtterGui.Text;
+using Sundouleia.PlayerClient;
 using SundouleiaAPI.Data;
 
 namespace Sundouleia;
@@ -65,4 +70,39 @@ public static class LociHelpers
             presetStruct.ApplicationType,
             presetStruct.Title,
             presetStruct.Description);
+
+    public static void DrawTuplesFramed(string id, IEnumerable<LociStatusInfo> statuses, float width, float rounding, Vector2? iconSize = null, int rows = 1)
+    {
+        var size = iconSize ?? LociIcon.Size;
+        using (CkRaii.FramedChildPaddedW($"##{id}-LociRowDrawn", width, LociIcon.GetRowHeight(size.Y, rows), ImGui.GetColorU32(ImGuiCol.FrameBgHovered), SundCol.Gold.Uint(), rounding))
+            DrawTuples(statuses, width, size, rows);
+    }
+
+    public static void DrawTuples(IEnumerable<LociStatusInfo> statuses, float width, Vector2? iconSize = null, int rows = 1)
+    {
+        var size = iconSize ?? LociIcon.Size;
+        var padding = ImGui.GetStyle().ItemInnerSpacing.X;
+        var iconsPerRow = MathF.Floor((width - padding) / (size.X + padding));
+
+        int row = 0, col = 0;
+        foreach (var status in statuses)
+        {
+            if (status.IconID is 0)
+                continue;
+
+            LociIcon.Draw(status.IconID, status.Stacks, size);
+            SundouleiaEx.AttachTooltip(status, LociData.Cache);
+
+            if (++col >= iconsPerRow)
+            {
+                col = 0;
+                if (++row >= rows)
+                    break;
+            }
+            else
+            {
+                ImUtf8.SameLineInner();
+            }
+        }
+    }
 }

@@ -90,7 +90,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         try
         {
             Logger.LogDebug($"Pushing LociData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-            await _hub.UserPushLociData(new(trustedUsers, LociData.Cache));
+            await _hub.UserPushLociData(new(trustedUsers, LociData.Cache.ToDto()));
         }
         catch (Exception ex)
         {
@@ -98,14 +98,14 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task PushLociStatusUpdate(List<UserData> trustedUsers, LociStatusStruct status, bool wasDeleted)
+    public async Task PushLociStatusUpdate(List<UserData> trustedUsers, LociStatusInfo status, bool wasDeleted)
     {
         if (!MainHub.IsConnectionDataSynced)
             return;
         try
         {
             Logger.LogTrace($"Pushing StatusUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-            await _hub.UserPushStatusModified(new(trustedUsers, status, wasDeleted));
+            await _hub.UserPushStatusModified(new(trustedUsers, status.ToStruct(), wasDeleted));
         }
         catch (Exception ex)
         {
@@ -113,14 +113,14 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task PushLociPresetUpdate(List<UserData> trustedUsers, LociPresetStruct preset, bool wasDeleted)
+    public async Task PushLociPresetUpdate(List<UserData> trustedUsers, LociPresetInfo preset, bool wasDeleted)
     {
         if (!MainHub.IsConnectionDataSynced)
             return;
         try
         {
             Logger.LogTrace($"Pushing PresetUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
-            await _hub.UserPushPresetModified(new(trustedUsers, preset, wasDeleted));
+            await _hub.UserPushPresetModified(new(trustedUsers, preset.ToStruct(), wasDeleted));
         }
         catch (Exception ex)
         {

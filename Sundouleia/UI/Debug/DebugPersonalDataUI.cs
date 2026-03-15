@@ -98,6 +98,8 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
         if (!node) return;
 
         DrawSundesmoInfo(sundesmo);
+
+        sundesmo.DrawLociDebug();
         sundesmo.DrawRenderDebug(); 
         
         DrawGlobalPermissions(sundesmo);

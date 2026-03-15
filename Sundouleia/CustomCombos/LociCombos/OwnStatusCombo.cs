@@ -12,7 +12,7 @@ using SundouleiaAPI.Hub;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class OwnStatusCombo : LociComboBase<LociStatusStruct>
+public sealed class OwnStatusCombo : LociComboBase<LociStatusInfo>
 {
     public OwnStatusCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale)
         : base(log, hub, sundesmo, scale, () => [.. LociData.Cache.StatusList.OrderBy(x => x.Title)])
@@ -22,7 +22,7 @@ public sealed class OwnStatusCombo : LociComboBase<LociStatusStruct>
     protected override bool DisableCondition()
         => Guid.Empty.Equals(Current.GUID) || !_sundesmo.PairPerms.LociAccess.HasAny(LociAccess.AllowOther);
 
-    protected override string ToString(LociStatusStruct obj)
+    protected override string ToString(LociStatusInfo obj)
         => obj.Title.StripColorTags();
 
     public bool DrawApplyStatuses(string id, float width, string buttonTT)
@@ -63,14 +63,14 @@ public sealed class OwnStatusCombo : LociComboBase<LociStatusStruct>
         return ret;
     }
 
-    protected override bool CanDoAction(LociStatusStruct item)
+    protected override bool CanDoAction(LociStatusInfo item)
         => SundouleiaEx.CanApply(_sundesmo.PairPerms, [ item ]);
 
-    protected override void OnApplyButton(LociStatusStruct item)
+    protected override void OnApplyButton(LociStatusInfo item)
     {
         UiService.SetUITask(async () =>
         {
-            var res = await _hub.UserApplyLociStatusTuples(new(_sundesmo.UserData, [item]));
+            var res = await _hub.UserApplyLociStatusTuples(new(_sundesmo.UserData, [item.ToStruct()]));
             if (res.ErrorCode is not SundouleiaApiEc.Success)
                 Log.LogWarning($"Failed to apply status {item.Title} on {_sundesmo.GetNickAliasOrUid()}: [{res.ErrorCode}]");
         });

@@ -354,7 +354,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     #endregion Manager Helpers
 
     #region Updates    
-    public void ReceiveLociData(UserData target, LociContainer newLociData)
+    public void ReceiveLociData(UserData target, LociContainerData newLociData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
@@ -368,7 +368,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
         Logger.LogTrace($"Received loci status update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
-        sundesmo.SharedData.SetStatuses(newStatuses);
+        sundesmo.SharedLociData.SetStatuses(newStatuses);
     }
 
     public void ReceiveLociPresets(UserData target, List<LociPresetStruct> newPresets)
@@ -376,7 +376,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
             throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
         Logger.LogTrace($"Received loci preset update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
-        sundesmo.SharedData.SetPresets(newPresets);
+        sundesmo.SharedLociData.SetPresets(newPresets);
     }
 
     public void ReceiveLociStatusUpdate(UserData target, LociStatusStruct status, bool deleted)
@@ -386,9 +386,9 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         Logger.LogTrace($"Received loci status single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         
         if (deleted)
-            sundesmo.SharedData.Statuses.Remove(status.GUID);
+            sundesmo.SharedLociData.Statuses.Remove(status.GUID);
         else
-            sundesmo.SharedData.Statuses[status.GUID] = status;
+            sundesmo.SharedLociData.Statuses[status.GUID] = status.ToTuple();
     }
 
     public void ReceiveLociPresetUpdate(UserData target, LociPresetStruct preset, bool deleted)
@@ -398,9 +398,9 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         Logger.LogTrace($"Received loci preset single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
 
         if (deleted)
-            sundesmo.SharedData.Presets.Remove(preset.GUID);
+            sundesmo.SharedLociData.Presets.Remove(preset.GUID);
         else
-            sundesmo.SharedData.Presets[preset.GUID] = preset;
+            sundesmo.SharedLociData.Presets[preset.GUID] = preset.ToTuple();
     }
 
     // Should happen only on initial loads.
@@ -492,8 +492,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
                 // Clear Shared Info if cleared.
                 if (!sundesmo.PairPerms.ShareOwnLociData)
                 {
-                    sundesmo.SharedData.Statuses.Clear();
-                    sundesmo.SharedData.Presets.Clear();
+                    sundesmo.SharedLociData.Statuses.Clear();
+                    sundesmo.SharedLociData.Presets.Clear();
                 }
                 break;
 
@@ -505,8 +505,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         // Clear Locis if share perms was turned off.
         if (permName == nameof(PairPerms.ShareOwnLociData) && !sundesmo.PairPerms.ShareOwnLociData)
         {
-            sundesmo.SharedData.Statuses.Clear();
-            sundesmo.SharedData.Presets.Clear();
+            sundesmo.SharedLociData.Statuses.Clear();
+            sundesmo.SharedLociData.Presets.Clear();
         }
     }
 
@@ -532,8 +532,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         {
             if (!sundesmo.PairPerms.ShareOwnLociData)
             {
-                sundesmo.SharedData.Statuses.Clear();
-                sundesmo.SharedData.Presets.Clear();
+                sundesmo.SharedLociData.Statuses.Clear();
+                sundesmo.SharedLociData.Presets.Clear();
             }
         }
         else if (changes.ContainsKey(nameof(PairPerms.LociAccess)) || changes.ContainsKey(nameof(PairPerms.MaxLociTime)))
@@ -561,8 +561,8 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
         {
             if (!sundesmo.PairPerms.ShareOwnLociData)
             {
-                sundesmo.SharedData.Statuses.Clear();
-                sundesmo.SharedData.Presets.Clear();
+                sundesmo.SharedLociData.Statuses.Clear();
+                sundesmo.SharedLociData.Presets.Clear();
             }
         }
         else if (prevPerms.LociAccess != sundesmo.PairPerms.LociAccess

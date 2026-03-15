@@ -1,10 +1,13 @@
 using CkCommons.Gui;
+using CkCommons.Textures;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using OtterGui.Text;
+using Sundouleia.Interop;
 using Sundouleia.ModFiles;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
@@ -43,6 +46,9 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
+        if (ImGui.CollapsingHeader("Loci Data"))
+            DrawLociData();
+
         if (ImGui.CollapsingHeader("Data Distributor"))
             DrawDataDistributor();
 
@@ -71,6 +77,22 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                 ImGui.TableNextRow();
             }
         }
+    }
+
+    private unsafe void DrawLociData()
+    {
+        ImGui.Text("Loci IPC Status:");
+        CkGui.ColorTextInline(IpcCallerLoci.APIAvailable ? "Available" : "Unavailable", ImGuiColors.ParsedOrange);
+
+        ImUtf8.TextFrameAligned($"Active Loci: {LociData.Cache.DataInfo.Count()}");
+        if (LociData.Cache.DataInfo.Count > 0)
+        {
+            ImGui.SameLine();
+            LociHelpers.DrawTuples(LociData.Cache.DataInfoList.ToList(), ImGui.GetContentRegionAvail().X, LociIcon.SizeFramed);
+        }
+
+        ImGui.Text($"Total Statuses: {LociData.Cache.StatusList.Count()}");
+        ImGui.Text($"Total Presets: {LociData.Cache.PresetList.Count()}");
     }
 
     private void DrawDataDistributor()

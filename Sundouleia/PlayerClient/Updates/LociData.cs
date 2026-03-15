@@ -1,7 +1,9 @@
 using CkCommons;
-using LociApi.Ipc;
+using LociApi.Enums;
 using LociApi.Helpers;
+using LociApi.Ipc;
 using Sundouleia.Interop;
+using Sundouleia.Interop.Helpers;
 using Sundouleia.Pairs;
 using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
@@ -16,6 +18,7 @@ public class LociData : DisposableMediatorSubscriberBase
     private readonly ClientDistributor _distributor;
 
     // Events to listen to and set in the initializer
+    private readonly EventSubscriber<nint, ManagerChangeType> ManagerModified;
     private readonly EventSubscriber<nint, string, List<LociStatusInfo>> ApplyToTargetSent;
     private readonly EventSubscriber<Guid, bool> StatusUpdated;
     private readonly EventSubscriber<Guid, bool> PresetUpdated;
@@ -27,6 +30,7 @@ public class LociData : DisposableMediatorSubscriberBase
         _sundesmos = sundesmos;
         _distributor = distributor;
 
+        ManagerModified = LociApi.Ipc.ManagerChanged.Subscriber(Svc.PluginInterface, OnManagerModified);
         StatusUpdated = LociApi.Ipc.StatusUpdated.Subscriber(Svc.PluginInterface, OnStatusUpdated);
         PresetUpdated = LociApi.Ipc.PresetUpdated.Subscriber(Svc.PluginInterface, OnPresetUpdated);
         ApplyToTargetSent = LociApi.Ipc.ApplyToTargetSent.Subscriber(Svc.PluginInterface, OnApplyToTarget);
@@ -43,6 +47,7 @@ public class LociData : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+        ManagerModified.Dispose();
         StatusUpdated.Dispose();
         PresetUpdated.Dispose();
         ApplyToTargetSent.Dispose();
@@ -54,17 +59,34 @@ public class LociData : DisposableMediatorSubscriberBase
         await _distributor.PushLociData([sundesmo.UserData]).ConfigureAwait(false);
     }
 
-    public async void OnLociReady()
+    private async void OnLociReady()
     {
         Logger.LogDebug("Loci ready, pushing to all trusted pairs", LoggerType.IpcLoci);
         var dataInfo = await _loci.GetOwnManagerInfo().ConfigureAwait(false);
         var statuses = await _loci.GetStatusInfos().ConfigureAwait(false);
         var presets = await _loci.GetPresetInfos().ConfigureAwait(false);
-        Cache.SetDataInfo(dataInfo.Select(di => di.ToStruct()));
-        Cache.SetStatuses(statuses.Select(s => s.ToStruct()));
-        Cache.SetPresets(presets.Select(p => p.ToStruct()));
+        Cache.SetDataInfo(dataInfo);
+        Cache.SetStatuses(statuses);
+        Cache.SetPresets(presets);
         var trusted = _sundesmos.DirectPairs.Where(x => x.IsRendered && x.OwnPerms.ShareOwnLociData).Select(p => p.UserData).ToList();
         await _distributor.PushLociData(trusted);
+    }
+
+    private async void OnManagerModified(nint actorAddr, ManagerChangeType changeType)
+    {
+        if (PlayerData.IsZoning || !PlayerData.Available)
+            return;
+
+        // get the updated info.
+        var newInfo = await _loci.GetActorSMInfo(actorAddr).ConfigureAwait(false);
+
+        // If it was us, update our cache, otherwise, update the sundesmos dataInfo list.
+        if (actorAddr == PlayerData.Address)
+            Cache.SetDataInfo(newInfo);
+        // Update the sundesmo's DataInfo if valid.
+        // (Can easily expand this to support pets through mediator, btw)
+        else if (_sundesmos.DirectPairs.FirstOrDefault(x => x.PlayerAddress == actorAddr) is { } match)
+            match.SharedLociData.SetDataInfo(newInfo);
     }
 
     public async void OnStatusUpdated(Guid id, bool wasDeleted)
@@ -75,7 +97,7 @@ public class LociData : DisposableMediatorSubscriberBase
         if (wasDeleted)
             Cache.Statuses.Remove(id);
         else
-            Cache.Statuses[id] = (await _loci.GetStatusInfo(id).ConfigureAwait(false)).ToStruct();
+            Cache.Statuses[id] = await _loci.GetStatusInfo(id).ConfigureAwait(false);
 
         // push the update.
         var toPush = wasDeleted ? new() : Cache.Statuses[id];
@@ -91,21 +113,12 @@ public class LociData : DisposableMediatorSubscriberBase
         if (wasDeleted)
             Cache.Presets.Remove(id);
         else
-            Cache.Presets[id] = (await _loci.GetPresetInfo(id).ConfigureAwait(false)).ToStruct();
+            Cache.Presets[id] = await _loci.GetPresetInfo(id).ConfigureAwait(false);
 
         // push the update.
         var toPush = wasDeleted ? new() : Cache.Presets[id];
         var trusted = _sundesmos.DirectPairs.Where(x => x.IsRendered && x.OwnPerms.ShareOwnLociData).Select(p => p.UserData).ToList();
         await _distributor.PushLociPresetUpdate(trusted, toPush, wasDeleted);
-    }
-
-    public async void OnPresetModified(LociPresetInfo preset, bool wasDeleted)
-    {
-        if (PlayerData.IsZoning || !PlayerData.Available)
-            return;
-        // push the update.
-        var trusted = _sundesmos.DirectPairs.Where(x => x.IsRendered && x.OwnPerms.ShareOwnLociData).Select(p => p.UserData).ToList();
-        await _distributor.PushLociPresetUpdate(trusted, preset.ToStruct(), wasDeleted);
     }
 
     private async void OnApplyToTarget(nint targetAddr, string targetHost, List<LociStatusInfo> data)

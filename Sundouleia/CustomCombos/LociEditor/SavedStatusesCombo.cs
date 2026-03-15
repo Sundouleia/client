@@ -7,24 +7,22 @@ using OtterGui.Extensions;
 using OtterGui.Text;
 using Sundouleia.PlayerClient;
 using Sundouleia.Services;
-using SundouleiaAPI.Data;
-using TerraFX.Interop.Windows;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class SavedStatusesCombo : CkFilterComboCache<LociStatusStruct>
+public sealed class SavedStatusesCombo : CkFilterComboCache<LociStatusInfo>
 {   
     private Guid _current;
     private static Vector2 _iconSize => LociIcon.Size;
 
-    public SavedStatusesCombo(ILogger log, Func<IReadOnlyList<LociStatusStruct>> generator) : base(generator, log)
+    public SavedStatusesCombo(ILogger log, Func<IReadOnlyList<LociStatusInfo>> generator) : base(generator, log)
     {
         _current = Guid.Empty;
         SearchByParts = true;
     }
 
     public string HintText { get; set; } = "Status to Chain... (Optional)";
-    protected override string ToString(LociStatusStruct status)
+    protected override string ToString(LociStatusInfo status)
         => status.Title.StripColorTags();
 
     protected override int UpdateCurrentSelected(int currentSelected)

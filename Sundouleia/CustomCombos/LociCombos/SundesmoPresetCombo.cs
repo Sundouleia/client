@@ -11,18 +11,18 @@ using SundouleiaAPI.Hub;
 
 namespace Sundouleia.CustomCombos;
 
-public sealed class SundesmoPresetCombo : LociComboBase<LociPresetStruct>
+public sealed class SundesmoPresetCombo : LociComboBase<LociPresetInfo>
 {
-    private int _maxPresetCount => _sundesmo.SharedData.PresetList.Max(x => x.Statuses.Count);
+    private int _maxPresetCount => _sundesmo.SharedLociData.PresetList.Max(x => x.Statuses.Count);
     private float _iconWithPadding => IconSize.X + ImGui.GetStyle().ItemInnerSpacing.X;
 
     public SundesmoPresetCombo(ILogger log, MainHub hub, Sundesmo sundesmo, float scale)
-        : base(log, hub, sundesmo, scale, () => [.. sundesmo.SharedData.PresetList.OrderBy(x => x.Title)])
+        : base(log, hub, sundesmo, scale, () => [.. sundesmo.SharedLociData.PresetList.OrderBy(x => x.Title)])
     { }
 
     protected override bool DisableCondition()
         => Current.GUID == Guid.Empty || !_sundesmo.PairPerms.LociAccess.HasAny(LociAccess.AllowOwn);
-    protected override string ToString(LociPresetStruct obj)
+    protected override string ToString(LociPresetInfo obj)
         => obj.Title.StripColorTags();
 
     public bool DrawPresets(string id, float width, string buttonTT)
@@ -49,14 +49,14 @@ public sealed class SundesmoPresetCombo : LociComboBase<LociPresetStruct>
             for (int i = 0; i < lociPreset.Statuses.Count; i++)
             {
                 var status = lociPreset.Statuses[i];
-                if (!_sundesmo.SharedData.Statuses.TryGetValue(status, out var info))
+                if (!_sundesmo.SharedLociData.Statuses.TryGetValue(status, out var info))
                 {
                     ImGui.SameLine(0, _iconWithPadding);
                     continue;
                 }
 
                 LociIcon.Draw(info.IconID, info.Stacks, IconSize);
-                info.AttachTooltip(_sundesmo.SharedData);
+                info.AttachTooltip(_sundesmo.SharedLociData);
 
                 if (i + 1 < lociPreset.Statuses.Count)
                     ImUtf8.SameLineInner();
@@ -71,17 +71,17 @@ public sealed class SundesmoPresetCombo : LociComboBase<LociPresetStruct>
         return ret;
     }
 
-    protected override bool CanDoAction(LociPresetStruct item)
+    protected override bool CanDoAction(LociPresetInfo item)
     {
         var toCheck = new List<LociStatusStruct>(item.Statuses.Count);
         foreach (var guid in item.Statuses)
-            if (_sundesmo.SharedData.Statuses.TryGetValue(guid, out var info))
-                toCheck.Add(info);
+            if (_sundesmo.SharedLociData.Statuses.TryGetValue(guid, out var info))
+                toCheck.Add(info.ToStruct());
 
         return SundouleiaEx.CanApply(_sundesmo.PairPerms, toCheck);
     }
 
-    protected override void OnApplyButton(LociPresetStruct item)
+    protected override void OnApplyButton(LociPresetInfo item)
     {
         UiService.SetUITask(async () =>
         {
