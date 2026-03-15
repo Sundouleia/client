@@ -120,14 +120,22 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
     {
         if (!_watcher.WatchedTypes.Values.Contains(ownedObj))
             return;
-        _updater.AddPendingUpdate(ownedObj, IpcKind.Mods);
+        // Because our updater funnels all mod changes into a full CollectModdedState,
+        // we can safely force this update to the player, and not care about what object type it is.
+        // In the end the update will only be either mods or visuals.
+        // if we ever wanted to change this down the line, this is a good starting point to work off.
+        _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Mods);
     }
 
     private void OnTransientResourceLoaded(OwnedObject ownedObj)
     {
         if (!_watcher.WatchedTypes.Values.Contains(ownedObj))
             return;
-        _updater.AddPendingUpdate(ownedObj, IpcKind.Mods);
+        // Because our updater funnels all mod changes into a full CollectModdedState,
+        // we can safely force this update to the player, and not care about what object type it is.
+        // In the end the update will only be either mods or visuals.
+        // if we ever wanted to change this down the line, this is a good starting point to work off.
+        _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Mods);
     }
 
     /// <summary>
@@ -148,9 +156,15 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
         if (change is (ModSettingChange.EnableState | ModSettingChange.Setting) && _watcher.WatchedPlayerAddr != IntPtr.Zero)
         {
             Logger.LogTrace($"OnModSettingChange: [Change: {change}] [Collection: {collectionId}] [ModDir: {modDir}] [Inherited: {inherited}]", LoggerType.IpcPenumbra);
-            foreach (var (addr, type) in _watcher.WatchedTypes)
-                _updater.AddPendingUpdate(type, IpcKind.Mods);
-            // Could make this for all owned objects but whatever.
+            //foreach (var (addr, type) in _watcher.WatchedTypes)
+            //    _updater.AddPendingUpdate(type, IpcKind.Mods);
+
+            // Because our updater funnels all mod changes into a full CollectModdedState,
+            // we can safely force this update to the player, and not care about what object type it is.
+            // In the end the update will only be either mods or visuals.
+            // if we ever wanted to change this down the line, this is a good starting point to work off.
+            _updater.AddPendingUpdate(OwnedObject.Player, IpcKind.Mods); 
+            
         }
 
         // If the change was an edited state change, then our mod manipulation string was modified.

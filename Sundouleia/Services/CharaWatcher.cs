@@ -9,6 +9,7 @@ using Sundouleia.Pairs;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using static Sundouleia.DrawSystem.SorterExtensions;
 
 namespace Sundouleia.Watchers;
@@ -21,6 +22,8 @@ namespace Sundouleia.Watchers;
 /// </summary>
 public unsafe class CharaWatcher : IHostedService
 {
+    internal static readonly HashSet<ObjectKind> ValidKinds = [ ObjectKind.Pc, ObjectKind.BattleNpc, ObjectKind.Companion, ObjectKind.Mount, ObjectKind.Ornament ];
+
     internal Hook<Character.Delegates.OnInitialize> OnCharaInitializeHook;
     internal Hook<Character.Delegates.Dtor> OnCharaDestroyHook;
     internal Hook<Character.Delegates.Terminate> OnCharaTerminateHook;
@@ -229,7 +232,7 @@ public unsafe class CharaWatcher : IHostedService
 
             Character* chara = (Character*)obj;
             // this is confusing because sometimes these can be either?
-            if (chara->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
+            if (ValidKinds.Contains(chara->GetObjectKind()))
                 NewCharacterRendered(chara);
         }
 
@@ -245,7 +248,7 @@ public unsafe class CharaWatcher : IHostedService
 
                 Character* chara = (Character*)obj;
                 // Look into further maybe, idk.
-                if (chara->GetObjectKind() is (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
+                if (ValidKinds.Contains(chara->GetObjectKind()))
                     NewCharacterRendered(chara);
             }
         }
@@ -260,7 +263,7 @@ public unsafe class CharaWatcher : IHostedService
     {
         var address = (nint)chara;
         // Do not track if not a valid object type. (Maybe move to after gpose actor adding)
-        if (chara->GetObjectKind() is not (ObjectKind.Pc or ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Mount))
+        if (!ValidKinds.Contains(chara->GetObjectKind()))
             return;
         // For GPose actors.
         if (TryAddGPoseActor(chara))
