@@ -147,6 +147,8 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         // Update the latest data.
         await _updater.RunOnDataUpdateSlim(async () =>
         {
+            Logger.LogDebug($"Current addresses: Player: 0x{_watcher.WatchedPlayerAddr:X}, Minion/Mount: 0x{_watcher.WatchedMinionMountAddr:X}, Pet: 0x{_watcher.WatchedPetAddr:X}, Companion: 0x{_watcher.WatchedCompanionAddr:X}");
+
             _updater.LatestData.ModManips = _ipc.Penumbra.GetMetaManipulationsString() ?? string.Empty;
             _updater.LatestData.GlamourerState[OwnedObject.Player] = await _ipc.Glamourer.GetBase64StateByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;
             _updater.LatestData.CPlusState[OwnedObject.Player] = await _ipc.CPlus.GetActiveProfileByPtr(_watcher.WatchedPlayerAddr).ConfigureAwait(false) ?? string.Empty;

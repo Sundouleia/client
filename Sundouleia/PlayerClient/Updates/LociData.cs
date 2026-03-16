@@ -38,6 +38,7 @@ public class LociData : DisposableMediatorSubscriberBase
         if (IpcCallerLoci.APIAvailable)
             OnLociReady();
 
+        Mediator.Subscribe<LociReady>(this, _ => OnLociReady());
         Mediator.Subscribe<LociSharePermChanged>(this, _ => LociDataSharePermsUpdate(_.Sundesmo));
     }
 

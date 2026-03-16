@@ -39,6 +39,11 @@ public sealed class ClientUpdateHandler : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<TransientResourceLoaded>(this, _ => OnTransientResourceLoaded(_.Object));
         Mediator.Subscribe<ModelRelatedResourceLoaded>(this, _ => OnModelRelatedResourceLoaded(_.Object));
+        Mediator.Subscribe<LociReady>(this, _ =>
+        {
+            foreach (var (addr, type) in _watcher.WatchedTypes)
+                _updater.AddPendingUpdate(type, IpcKind.Loci);
+        });
 
         _ipc.Penumbra.OnModSettingsChanged = ModSettingChanged.Subscriber(Svc.PluginInterface, OnModSettingChanged);
         _ipc.Glamourer.OnStateChanged = StateChangedWithType.Subscriber(Svc.PluginInterface, OnGlamourerUpdate);
