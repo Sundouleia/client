@@ -75,7 +75,7 @@ public class SidePanelGroups
         }
         if (ImGui.IsItemClicked())
             _previewOpen = !_previewOpen;
-        CkGui.AttachToolTip("Click to toggle open and closed states");
+        CkGui.AttachTooltip("Click to toggle open and closed states");
 
         if (!_previewOpen)
             return;
@@ -129,7 +129,7 @@ public class SidePanelGroups
         var tmpName = cache.NewFolderName;
         if (ImGui.InputTextWithHint("##NewGroupLabel", "Folder Name..", ref tmpName, 40))
             cache.NewFolderName = tmpName;
-        CkGui.AttachToolTip("Set the name of the Folder.");
+        CkGui.AttachTooltip("Set the name of the Folder.");
     }
 
     public void DrawCreator(NewGroupCache cache, float width)
@@ -153,14 +153,14 @@ public class SidePanelGroups
         ImUtf8.SameLineInner();
         if (_icons.Draw("IconSelector", cache.NewGroup.Icon, 10))
             cache.NewGroup.Icon = _icons.Current;
-        CkGui.AttachToolTip("Edit the icon for your group.");
+        CkGui.AttachTooltip("Edit the icon for your group.");
 
         ImUtf8.SameLineInner();
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
         var tmpName = cache.NewGroup.Label;
         if (ImGui.InputTextWithHint("##NewGroupLabel", "Group Name..", ref tmpName, 40))
             cache.NewGroup.Label = tmpName;
-        CkGui.AttachToolTip("Set the name of the Group.");
+        CkGui.AttachTooltip("Set the name of the Group.");
 
         ImGui.Separator();
         CkGui.FontText("Stylization", Fonts.Default150Percent);
@@ -222,7 +222,7 @@ public class SidePanelGroups
             _groups.Save();
             cache.UpdateStyle();
         }
-        CkGui.AttachToolTip("Edit the icon for your group.");
+        CkGui.AttachTooltip("Edit the icon for your group.");
 
         ImUtf8.SameLineInner();
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
@@ -230,7 +230,7 @@ public class SidePanelGroups
         ImGui.InputTextWithHint("##NewGroupLabel", "Group Name..", ref tmpName, 30);
         if (ImGui.IsItemDeactivatedAfterEdit())
             cache.TryRenameNode(_groups, tmpName);
-        CkGui.AttachToolTip("Set the name of the Group.");
+        CkGui.AttachTooltip("Set the name of the Group.");
 
         ImGui.Separator();
         CkGui.FontText("Stylization", Fonts.Default150Percent);
@@ -290,7 +290,7 @@ public class SidePanelGroups
             _groups.LinkToGroup(_sundesmos.GetVisible().Select(s => s.UID), cache.GroupInEditor);
             _mediator.Publish(new FolderUpdateGroup(cache.GroupInEditor.Label));
         }
-        CkGui.AttachToolTip("Add all visible sundesmos nearby.");
+        CkGui.AttachTooltip("Add all visible sundesmos nearby.");
 
         ImUtf8.SameLineInner();
         if (_usersCombo.Draw(cache.GroupInEditor, ImGui.GetContentRegionAvail().X))
@@ -321,7 +321,7 @@ public class SidePanelGroups
             CkGui.IconTextAligned(icon, color);
             ImGui.SameLine();
             DrawSundesmoName(leaf);
-            CkGui.AttachToolTip($"UID: {leaf.Data.UserData.UID}");
+            CkGui.AttachTooltip($"UID: {leaf.Data.UserData.UID}");
 
             ImGui.SameLine(widthInner - CkGui.IconButtonSize(FAI.Minus).X);
             if (CkGui.IconButton(FAI.Minus, id: leaf.Data.UserData.UID, inPopup: true))
@@ -329,7 +329,7 @@ public class SidePanelGroups
                 _groups.UnlinkFromGroup(leaf.Data.UserData.UID, cache.GroupInEditor);
                 _mediator.Publish(new FolderUpdateGroup(cache.GroupInEditor.Label));
             }
-            CkGui.AttachToolTip($"Remove from Selection");
+            CkGui.AttachTooltip($"Remove from Selection");
             ImGui.TableNextRow();
         }
         
@@ -341,13 +341,13 @@ public class SidePanelGroups
             var dispName = string.Empty;
             // If we should be showing the uid, then set the display name to it.
             if (cache.ShownUIDs.Contains(s))
-                dispName = s.Data.UserData.AliasOrUID;
+                dispName = s.Data.UserData.DisplayName;
             else
             {
                 // Set it to the display name.
                 dispName = s.Data.GetDisplayName();
                 // Update mono to be disabled if the display name is not the alias/uid.
-                useMono = s.Data.UserData.AliasOrUID.Equals(dispName, StringComparison.Ordinal);
+                useMono = s.Data.UserData.DisplayName.Equals(dispName, StringComparison.Ordinal);
             }
 
             // Display the name.
@@ -361,7 +361,7 @@ public class SidePanelGroups
         var iconCol = ImGui.ColorConvertU32ToFloat4(group.IconColor);
         if (ImGui.ColorEdit4("Icon", ref iconCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
             onChange?.Invoke(ImGui.ColorConvertFloat4ToU32(iconCol));
-        CkGui.AttachToolTip("Change the color of the folder icon.");
+        CkGui.AttachTooltip("Change the color of the folder icon.");
     }
 
     private void DrawLabelStyle(SundesmoGroup group, float width, Action<uint> onChange)
@@ -369,7 +369,7 @@ public class SidePanelGroups
         var labelCol = ImGui.ColorConvertU32ToFloat4(group.LabelColor);
         if (ImGui.ColorEdit4("Label", ref labelCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
             onChange?.Invoke(ImGui.ColorConvertFloat4ToU32(labelCol));
-        CkGui.AttachToolTip("Change the color of the folder label.");
+        CkGui.AttachTooltip("Change the color of the folder label.");
     }
 
     private void DrawBorderStyle(SundesmoGroup group, float width, Action<uint> onChange)
@@ -377,7 +377,7 @@ public class SidePanelGroups
         var borderCol = ImGui.ColorConvertU32ToFloat4(group.BorderColor);
         if (ImGui.ColorEdit4("Border", ref borderCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
             onChange?.Invoke(ImGui.ColorConvertFloat4ToU32(borderCol));
-        CkGui.AttachToolTip("Change the color of the folder border.");
+        CkGui.AttachTooltip("Change the color of the folder border.");
     }
 
     private void DrawGradientStyle(SundesmoGroup group, float width, Action<uint> onChange)
@@ -385,7 +385,7 @@ public class SidePanelGroups
         var gradCol = ImGui.ColorConvertU32ToFloat4(group.GradientColor);
         if (ImGui.ColorEdit4("Gradient", ref gradCol, ImGuiColorEditFlags.AlphaPreviewHalf | ImGuiColorEditFlags.NoInputs))
             onChange?.Invoke(ImGui.ColorConvertFloat4ToU32(gradCol));
-        CkGui.AttachToolTip("Change the color of the folder gradient when expanded.");
+        CkGui.AttachTooltip("Change the color of the folder gradient when expanded.");
     }
 
     private void DrawOfflineFlag(SundesmoGroup group, float width, Action<bool> onChange)
@@ -399,7 +399,7 @@ public class SidePanelGroups
             if (ImGui.Checkbox("##showOffline", ref showOffline))
                 onChange?.Invoke(showOffline);
         }
-        CkGui.AttachToolTip("Show offline pairs in this folder.");
+        CkGui.AttachTooltip("Show offline pairs in this folder.");
     }
 
     private void DrawLocationFlag(SundesmoGroup group, float width, Action? onChange = null)
@@ -409,7 +409,7 @@ public class SidePanelGroups
             CkGui.FramedIconText(FAI.Bullseye);
             CkGui.TextFrameAlignedInline("Linked Location");
         }
-        CkGui.AttachToolTip("Visible pairs you see in this scope are added to the group automatically.");
+        CkGui.AttachTooltip("Visible pairs you see in this scope are added to the group automatically.");
 
         ImUtf8.SameLineInner();
         var comboW = ImGui.GetContentRegionAvail().X - ImUtf8.ItemInnerSpacing.X - CkGui.IconButtonSize(FAI.MapPin).X;
@@ -427,7 +427,7 @@ public class SidePanelGroups
             group.AreaBound = false;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("The scope required for a valid match.");
+        CkGui.AttachTooltip("The scope required for a valid match.");
 
         ImUtf8.SameLineInner();
         if (CkGui.IconButton(FAI.MapPin))
@@ -437,7 +437,7 @@ public class SidePanelGroups
             group.Scope = group.Location.IsInHousing ? LocationScope.HousingPlot : LocationScope.Territory;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("Set to current location.");
+        CkGui.AttachTooltip("Set to current location.");
         
         // Attempt to draw the location area.
         DrawGroupLocation(group, width, onChange);
@@ -503,7 +503,7 @@ public class SidePanelGroups
             group.Location.DataCenterId = byte.MaxValue;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("The DataCenter required for a match.");
+        CkGui.AttachTooltip("The DataCenter required for a match.");
     }
 
     private void DCWorldRow(SundesmoGroup group, float rowWidth, Action? onChange = null)
@@ -521,7 +521,7 @@ public class SidePanelGroups
             group.Location.DataCenterId = byte.MaxValue;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("The DataCenter required for a match.");
+        CkGui.AttachTooltip("The DataCenter required for a match.");
 
         ImUtf8.SameLineInner();
         if (_worlds.Draw(group.Location.WorldId, halfW))
@@ -534,7 +534,7 @@ public class SidePanelGroups
             group.Location.WorldId = ushort.MaxValue;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("The World required for a match.");
+        CkGui.AttachTooltip("The World required for a match.");
     }
 
     private void IntendedUseRow(SundesmoGroup group, float rowWidth, Action? onChange = null)
@@ -547,7 +547,7 @@ public class SidePanelGroups
             group.Location.IntendedUse = newUse;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("The required Related Content Area to match.");
+        CkGui.AttachTooltip("The required Related Content Area to match.");
     }
 
     private void TerritoryRow(SundesmoGroup group, float rowWidth, Action? onChange = null)
@@ -564,7 +564,7 @@ public class SidePanelGroups
             group.Location.TerritoryId = ushort.MaxValue;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("The required zone to match.");
+        CkGui.AttachTooltip("The required zone to match.");
     }
 
     private void DistrictRow(SundesmoGroup group, float rowWidth, Action? onChange = null)
@@ -579,7 +579,7 @@ public class SidePanelGroups
             group.Location.Plot = 0;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("The Housing District to match.");
+        CkGui.AttachTooltip("The Housing District to match.");
     }
 
     private void DistrictWardRow(SundesmoGroup group, float rowWidth, Action? onChange = null)
@@ -596,7 +596,7 @@ public class SidePanelGroups
             group.Location.Plot = 0;
             onChange?.Invoke();
         }
-        CkGui.AttachToolTip("The Housing District to match.");
+        CkGui.AttachTooltip("The Housing District to match.");
 
         ImUtf8.SameLineInner();
         var ward = (sbyte)(group.Location.Ward + 1);
@@ -605,7 +605,7 @@ public class SidePanelGroups
             group.Location.Ward = (sbyte)(ward - 1);
         if (ImGui.IsItemDeactivatedAfterEdit())
             onChange?.Invoke();
-        CkGui.AttachToolTip("The Ward to match.");
+        CkGui.AttachTooltip("The Ward to match.");
     }
 
     private void PlotRow(SundesmoGroup group, float rowWidth, Action? onChange = null)
@@ -618,7 +618,7 @@ public class SidePanelGroups
             group.Location.Plot = (sbyte)(plot - 1);
         if (ImGui.IsItemDeactivatedAfterEdit())
             onChange?.Invoke();
-        CkGui.AttachToolTip($"The plot.");
+        CkGui.AttachTooltip($"The plot.");
     }
     #endregion Location
 

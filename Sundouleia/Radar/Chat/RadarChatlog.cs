@@ -19,14 +19,34 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.Services.Tutorial;
 using Sundouleia.WebAPI;
+using SundouleiaAPI.Data;
+using SundouleiaAPI.Data.Permissions;
 using SundouleiaAPI.Network;
 using System.Globalization;
 
 namespace Sundouleia.Radar.Chat;
 
-// Rework heavily later how this is formatted. It should become more of a factory like implementation over a limited scope.
-// Logs should n ot be loaded unless manually requested. This allows the outcome where chats can be instanced.
-public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, IDisposable
+// Maybe remove chatId from here, idk.
+public record SundChatMessage(UserData Sender, string Name, string Message)
+    : CkChatMessage(Name, Message, DateTime.UtcNow)
+{
+    public override string UID => Sender.UID ?? base.UID;
+    public CkVanityTier Tier => Sender.Tier;
+    public uint Color => Sender.Color;
+    public uint Glow => Sender.GlowColor;
+}
+
+public record RadarChatMessage(string MsgId, UserData Sender, string Name, string Message, DateTime TimestampUTC)
+    : CkChatMessage(Name, Message, TimestampUTC)
+{
+    public override string UID => Sender.UID ?? base.UID;
+    public CkVanityTier Tier => Sender.Tier;
+    public uint Color => Sender.Color;
+    public uint Glow => Sender.GlowColor;
+}
+
+// Revised radar chat should draw with its own IDs and formatting scales.
+public class RadarChatLog : CkChatlog<RadarChatMessage>, IMediatorSubscriber, IDisposable
 {
     private static RichTextFilter AllowedTypes = RichTextFilter.Emotes;
 
@@ -34,46 +54,29 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     private readonly MainHub _hub;
     private readonly MainMenuTabs _tabMenu;
     private readonly SundesmoManager _sundesmos;
-    private readonly LocationSvc _service;
     private readonly TutorialService _guides;
+    public SundouleiaMediator Mediator { get; }
 
     // Private variables that are used by internal methods.
+    private bool _welcomeLogShown = false;
     private bool _emoteSelectionOpened = false;
-    private unsafe bool _isInside => HousingManager.Instance()->IsInside();
 
-    // Allow a circular buffer of 1k messages.
+    // TODO: Remove the base label, and enforce an ID to be passed in when drawing for uniqueness instead.
     public RadarChatLog(ILogger<RadarChatLog> logger, SundouleiaMediator mediator, MainHub hub,
-        MainMenuTabs tabs, SundesmoManager sundesmos, LocationSvc service, TutorialService guides) 
-        : base(0, "Radar Chat", 1000)
+        MainMenuTabs tabs, SundesmoManager sundesmos, TutorialService guides) 
+        : base(0, "Radar Chat", 500)
     {
         _logger = logger;
         Mediator = mediator;
         _hub = hub;
         _tabMenu = tabs;
         _sundesmos = sundesmos;
-        _service = service;
         _guides = guides;
 
-        Mediator.Subscribe<NewRadarChatMessage>(this, msg => AddNetworkMessage(msg.Message, msg.FromSelf));
-        Mediator.Subscribe<MainWindowTabChangeMessage>(this, msg =>
-        {
-            if (msg.NewTab is MainMenuTabs.SelectedTab.RadarChat)
-            {
-                ShouldScrollToBottom = true;
-                unreadSinceScroll = 0;
-                NewMsgCount = 0;
-                NewCorbyMsg = false;
-            }
-        });
-        Mediator.Subscribe<TerritoryChanged>(this, msg => ChangeChatLog(msg.PrevTerritory, msg.NewTerritory));
-
-        // Should just end up null or something empty.
-        LoadTerritoryChatLog(LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId);
+        // Have calls here to load in the chat log history or clear it or and what not.
+        Mediator.Subscribe<NewRadarChatMessage>(this, msg => AddNetworkMessage(msg.Message));
     }
 
-    public SundouleiaMediator Mediator { get; }
-
-    // Config options cant stop the corby >:3
     public static bool AccessBlocked => ChatBlocked || NotVerified;
     public static bool ChatBlocked => !MainHub.Reputation.ChatUsage;
     public static bool NotVerified => !MainHub.Reputation.IsVerified;
@@ -83,36 +86,69 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
     void IDisposable.Dispose()
     {
         Mediator.UnsubscribeAll(this);
-        // Save the chat log prior to disposal.
-        SaveChatLog(LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId);
         GC.SuppressFinalize(this);
     }
 
-    private static string GetRecentFile(ushort worldId, ushort zoneId)
+    public void CreateOrReinitChatlog(List<LoggedRadarChatMessage> initialMessages)
     {
-        var cfgName = $"{worldId}-{zoneId}-recent-chat.log";
-        return Path.Combine(ConfigFileProvider.ChatDirectory, cfgName);
+        // If there are currently any messages, clear them out.
+        if (Messages.Count() > 0)
+        {
+            Messages.Clear();
+            unreadSinceScroll = 0;
+        }
+
+        // Append all initial messages
+        foreach (var msg in initialMessages)
+        {
+            // Do the internal message handling voodoo here (Do later)
+            // Maybe have some internal helper function for message parse conversion.
+            // Messages.PushBack(msg);
+        }
+
+        // If we have now shown the welcome message, do that.
+        if (!_welcomeLogShown)
+        {
+            try
+            {
+                AddMessage(new(Guid.NewGuid().ToString("N"), new("System"), "System",
+                    $"[color=grey2]Welcome to {LocationSvc.Current.TerritoryName}'s Radar Chat! Your Name displays as " +
+                    $"[color=yellow]{MainHub.OwnUserData.AnonName}[/color] to others! Feel free to say hi![/color][line]",
+                    DateTime.UtcNow));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to add default welcome message: {ex}");
+            }
+        }
     }
 
+    // Maybe edit later
     public void SetDisabledStates(bool content, bool input)
     {
         disableContent = content;
         disableInput = input;
     }
 
+    // Maybe edit later
     public void SetAutoScroll (bool newState)
         => DoAutoScroll = newState;
 
-    protected override string ToTooltip(RadarCkChatMessage message)
+    // Maybe edit later
+    protected override string ToTooltip(RadarChatMessage message)
         => $"Sent @ {message.Timestamp.ToString("T", CultureInfo.CurrentCulture)}" +
         "--NL----COL--[Middle-Click]--COL-- Open Profile";
 
-    private void AddNetworkMessage(RadarChatMessage message, bool fromSelf)
+    // Perform logic for a received RadarChatMessage
+    private void AddNetworkMessage(LoggedRadarChatMessage loggedMsg)
     {
-        // 1) Filter out blocked users here.
+        // 1) Filter out blocked users here. (Do this server level? Not sure really.
+        // Might be more benificial to cache clientside.
 
+        var fromSelf = loggedMsg.Sender.UID == MainHub.UID;
 
-        // 2) Update the chat contents.
+        // 2) Update the chat contents. (find some other way to do this later)
+        // Can also use logic here to handle stuff like mentions, and other notions.
         if (_tabMenu.TabSelection is not MainMenuTabs.SelectedTab.RadarChat)
             NewMsgCount++;
         else
@@ -121,21 +157,21 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
             NewCorbyMsg = false;
         }
 
-        // 3) Initial assumption of the sender name.
-        var finalName = message.Sender.AnonName; // "Anon.User-XXXX"
+        var finalName = loggedMsg.Sender.AnonName; // "Anon.User-XXXX"
         // 4) Adjust sender name based on special conditions.
-        if (message.Sender.Tier is CkVanityTier.ShopKeeper)
+        if (loggedMsg.Sender.Tier is CkVanityTier.ShopKeeper)
             finalName = $"Cordy";
-        else if (_sundesmos.GetUserOrDefault(message.Sender) is { } sundesmo)
-            finalName = $"{sundesmo.GetNickAliasOrUid()} ({message.Sender.UID[..4]})";
+        else if (_sundesmos.GetUserOrDefault(loggedMsg.Sender) is { } sundesmo)
+            finalName = $"{sundesmo.GetNickAliasOrUid()} ({loggedMsg.Sender.UID[..4]})";
         else if (fromSelf)
-            finalName = $"{message.Sender.AliasOrUID} ({message.Sender.UID[..4]})";
+            finalName = $"{loggedMsg.Sender.DisplayName} ({loggedMsg.Sender.UID[..4]})";
         
         // Construct the network message to the RadarCkChatMessage format.
-        AddMessage(new RadarCkChatMessage(message.Sender, finalName, message.Message));
+        AddMessage(new RadarChatMessage(loggedMsg.MsgId, loggedMsg.Sender, finalName, loggedMsg.Message, loggedMsg.TimeSentUTC));
     }
 
-    protected override void AddMessage(RadarCkChatMessage newMsg)
+    // Fix this later!
+    protected override void AddMessage(RadarChatMessage newMsg)
     {
         // Cordy is special girl :3
         if (newMsg.Tier is CkVanityTier.ShopKeeper)
@@ -210,21 +246,21 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
             if (CkGui.IconButton(FAI.Heart, disabled: disableInput))
                 _emoteSelectionOpened = !_emoteSelectionOpened;
         }
-        CkGui.AttachToolTip($"Toggles Quick-Emote selection.", disableInput);
+        CkGui.AttachTooltip($"Toggles Quick-Emote selection.", disableInput);
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatEmotes, MainUI.LastPos, MainUI.LastSize);
 
         // Toggle AutoScroll functionality
         ImUtf8.SameLineInner();
         if (CkGui.IconButton(scrollIcon, disabled: disableInput))
             DoAutoScroll = !DoAutoScroll;
-        CkGui.AttachToolTip($"Toggles AutoScroll (Current: {(DoAutoScroll ? "Enabled" : "Disabled")})");
+        CkGui.AttachTooltip($"Toggles AutoScroll (Current: {(DoAutoScroll ? "Enabled" : "Disabled")})");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ChatScroll, MainUI.LastPos, MainUI.LastSize);
 
         // draw the popout button
         ImUtf8.SameLineInner();
         if (CkGui.IconButton(FAI.Expand, disabled: disableInput || !ImGui.GetIO().KeyShift))
             Mediator.Publish(new UiToggleMessage(typeof(RadarChatPopoutUI)));
-        CkGui.AttachToolTip("Open a Popout of the Radar Chat!--SEP--Hold SHIFT to activate!");
+        CkGui.AttachTooltip("Open a Popout of the Radar Chat!--SEP--Hold SHIFT to activate!");
     }
 
     protected override void DrawPostChatLog(Vector2 inputPosMin)
@@ -285,11 +321,11 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         }
     }
 
-    protected override void OnMiddleClick(RadarCkChatMessage message)
+    protected override void OnMiddleClick(RadarChatMessage message)
     {
         if (disableContent) return;
         if (message.UID == "System") return;
-        Mediator.Publish(new ProfileOpenMessage(message.UserData));
+        Mediator.Publish(new ProfileOpenMessage(message.Sender));
     }
 
     protected override void OnSendMessage(string message)
@@ -297,8 +333,8 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
         shouldFocusChatInput = true;
         if (string.IsNullOrWhiteSpace(previewMessage))
             return;
-        // Send message to the server
-        _hub.RadarChatMessage(new(MainHub.OwnUserData, LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId, previewMessage)).ConfigureAwait(false);
+        // Send message to the server (Ensure we pull our flags here properly and such
+        _hub.RadarSendChat(new SentRadarMessage(MainHub.OwnUserData, previewMessage, RadarChatFlags.None)).ConfigureAwait(false);
         // Clear preview
         previewMessage = string.Empty;
     }
@@ -327,168 +363,32 @@ public class RadarChatLog : CkChatlog<RadarCkChatMessage>, IMediatorSubscriber, 
                 ClosePopupAndResetMsg();
                 return;
             }
-        CkGui.AttachToolTip(ctrlHeld ? $"Hides messages from {LastInteractedMsg.Name} until plugin reload/restart." : "Must be holding CTRL to select.");
+        CkGui.AttachTooltip(ctrlHeld ? $"Hides messages from {LastInteractedMsg.Name} until plugin reload/restart." : "Must be holding CTRL to select.");
 
         // Permanent Blocking.
         using (ImRaii.Disabled(disableBlock))
             if (ImGui.Selectable("Block User") && !isOwnMsg && !isSystemMsg)
             {
-                UiService.SetUITask(async () => await _hub.UserBlock(new(LastInteractedMsg.UserData)));
+                UiService.SetUITask(async () => await _hub.UserBlock(new(LastInteractedMsg.Sender)));
                 ClosePopupAndResetMsg();
                 return;
             }
-        CkGui.AttachToolTip(shiftHeld ? $"Blocks {LastInteractedMsg.Name} permanently. (Currently not implemented)" : "Must be holding CTRL+SHIFT to select.");
+        CkGui.AttachTooltip(shiftHeld ? $"Blocks {LastInteractedMsg.Name} permanently. (Currently not implemented)" : "Must be holding CTRL+SHIFT to select.");
 
         // Chat Reporting
         using (ImRaii.Disabled(disableBlock))
             if (ImGui.Selectable("Report Chat Behavior") && !isOwnMsg && !isSystemMsg)
             {
-                Mediator.Publish(new OpenReportUIMessage(LastInteractedMsg!.UserData, ReportKind.Chat));
+                Mediator.Publish(new OpenReportUIMessage(LastInteractedMsg!.Sender, ReportKind.Chat));
                 ClosePopupAndResetMsg();
                 return;
             }
-        CkGui.AttachToolTip(shiftHeld ? $"Report {LastInteractedMsg!.Name}'s chat behavior." : "Must be holding CTRL+SHIFT to select.");
+        CkGui.AttachTooltip(shiftHeld ? $"Report {LastInteractedMsg!.Name}'s chat behavior." : "Must be holding CTRL+SHIFT to select.");
     }
 
     private void ClosePopupAndResetMsg()
     {
         LastInteractedMsg = null;
         ImGui.CloseCurrentPopup();
-    }
-
-    public string GetRecentChatForReport()
-    {
-        if (_isInside)
-            return string.Empty;
-
-        var toSave = Messages.TakeLast(100).ToList();
-        var logToSave = new SerializableChatLog(LocationSvc.Current.WorldId, LocationSvc.Current.TerritoryId, TimeCreated, toSave);
-        try
-        {
-            var json = JsonConvert.SerializeObject(logToSave);
-            var compressed = json.Compress(6);
-            return Convert.ToBase64String(compressed);
-        }
-        catch (Bagagwa ex)
-        {
-            _logger.LogError($"Failed to compress chat log: {ex}");
-            return string.Empty;
-        }
-    }
-
-    private void SaveChatLog(ushort worldId, ushort zoneId)
-    {
-        if (worldId == 0 || zoneId == 0 || _isInside)
-            return;
-
-        // Capture up to the last 500 messages
-        var messagesToSave = Messages.TakeLast(500).ToList();
-        var logToSave = new SerializableChatLog(worldId, zoneId, TimeCreated, messagesToSave);
-
-        // Serialize the item to JSON
-        try
-        {
-            var json = JsonConvert.SerializeObject(logToSave);
-            var compressed = json.Compress(6);
-            var base64ChatLogData = Convert.ToBase64String(compressed);
-            File.WriteAllText(GetRecentFile(worldId, zoneId), base64ChatLogData);
-        }
-        catch (DirectoryNotFoundException) { /* Swallow */ }
-        catch (FileNotFoundException) { /* Swallow */ }
-        catch (Bagagwa ex)
-        {
-            _logger.LogError($"Failed to compress chat log: {ex}");
-        }
-    }
-
-    private void ChangeChatLog(ushort prevLoc, ushort newLoc)
-    {
-        // Save the current chat log first.
-        SaveChatLog(LocationSvc.Current.WorldId, prevLoc);
-        // Clear the current chat log.
-        Messages.Clear();
-        UserColors.Clear();
-        unreadSinceScroll = 0;
-        NewMsgCount = 0;
-        NewCorbyMsg = false;
-        // Load the new territory chat log.
-        LoadTerritoryChatLog(LocationSvc.Current.WorldId, newLoc);
-    }
-
-    public void LoadTerritoryChatLog(ushort worldId, ushort zoneId)
-    {
-        if (worldId == 0 || zoneId == 0 || _isInside)
-            return;
-
-        var recentFile = GetRecentFile(worldId, zoneId);
-        // if the file does not exist, return
-        if (!File.Exists(recentFile))
-        {
-            AddDefaultWelcomeWithLog("Chat log file does not exist.");
-            return;
-        }
-
-        // Maybe it exists, but we are not in the same territory. If that is the case we should add the welcome message and return.
-        // TODO: handle this.
-        // Attempt Deserialization.
-        var savedChatlog = new SerializableChatLog();
-        try
-        {
-            var base64logFile = File.ReadAllText(recentFile);
-            var bytes = Convert.FromBase64String(base64logFile);
-            var version = bytes[0];
-            version = bytes.DecompressToString(out var decompressed);
-            savedChatlog = JsonConvert.DeserializeObject<SerializableChatLog>(decompressed);
-
-            // if any user datas are null, throw an exception.
-            if (savedChatlog.Messages.Any(m => m.UserData is null))
-                throw new Exception("One or more user datas are null in the chat log.");
-        }
-        catch (DirectoryNotFoundException) { /* Swallow */ }
-        catch (FileNotFoundException) { /* Swallow */ }
-        catch (Bagagwa ex)
-        {
-            AddDefaultWelcomeWithLog("Failed to decompress chat log: " + ex);
-            return;
-        }
-
-        // Do not restore if on a different day than the recovered log.
-        if (savedChatlog.DateStarted.DayOfYear != DateTime.Now.DayOfYear)
-        {
-            AddDefaultWelcomeWithLog("Chat log is from a different day. Not restoring.");
-            return;
-        }
-
-        // print out all messages:
-        foreach (var msg in savedChatlog.Messages)
-        {
-            // Cordy is special girl :3
-            if (msg.Tier is CkVanityTier.ShopKeeper)
-                UserColors[msg.UID] = SundCol.ShopKeeperColor.Vec4();
-            else
-                AssignSenderColor(msg);
-
-            Messages.PushBack(msg);
-            unreadSinceScroll++;
-        }
-
-        _logger.LogInformation($"Loaded {savedChatlog.Messages.Count} messages from the chat log.", LoggerType.RadarChat);
-
-        // On Failed Loads
-        void AddDefaultWelcomeWithLog(string logMessage)
-        {
-            try
-            {
-                // Maybe replace with territory intended use later or something.
-                _logger.LogWarning(logMessage);
-                AddMessage(new(new("System"), "System",
-                    $"[color=grey2]Welcome to {LocationSvc.Current.TerritoryName}'s Radar Chat! Your Name displays as " +
-                    $"[color=yellow]{MainHub.OwnUserData.AnonName}[/color] to others! Feel free to say hi![/color][line]"));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning($"Failed to add default welcome message: {ex}");
-            }
-        }
     }
 }

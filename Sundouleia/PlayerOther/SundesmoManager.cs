@@ -6,6 +6,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar;
 using Sundouleia.Services.Mediator;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Data.Comparer;
@@ -200,7 +201,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     {
         // Attempt to get the sundesmo via the UserData.
         if (!_allSundesmos.TryGetValue(dto.User, out var sundesmo))
-            throw new InvalidOperationException($"No user found [{dto.User.AliasOrUID}]\n" +
+            throw new InvalidOperationException($"No user found [{dto.User.DisplayName}]\n" +
                 $"Existing Users were: [{string.Join(",",_allSundesmos.Keys.Select(k => k.UID))}]");
 
         // They were found, so refresh any existing profile data.
@@ -220,7 +221,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
             // Do not show if we limit it to nicked pairs and there is no nickname.
             if (!(_config.Current.NotifyLimitToNickedPairs && string.IsNullOrEmpty(nick)))
             {
-                var msg = !string.IsNullOrEmpty(nick) ? $"{nick} ({dto.User.AliasOrUID}) is now online" : $"{dto.User.AliasOrUID} is now online";
+                var msg = !string.IsNullOrEmpty(nick) ? $"{nick} ({dto.User.DisplayName}) is now online" : $"{dto.User.DisplayName} is now online";
                 Mediator.Publish(new NotificationMessage("Sundesmo Online", msg, NotificationType.Info, TimeSpan.FromSeconds(2)));
             }
         }
@@ -232,6 +233,31 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     }
 
     /// <summary>
+    ///   Updates the Alias or Supporter data for a user. <para />
+    ///   To ensure a proper update, both the key in the pairDict and 
+    ///   the userData in the UserPair of the Sundesmo must be updated.
+    /// </summary>
+    public void UpdateVanityData(UserData target)
+    {
+        // This will work since they should have the same UID. If not, throw exception.
+        if (!_allSundesmos.TryGetValue(target, out var sundesmo))
+            throw new InvalidOperationException($"No user found [{target.DisplayName}]");
+
+        Logger.LogTrace($"Updating {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()})'s vanity data", LoggerType.PairManagement);
+        // Capture the old dictionary key
+        var keyToRemove = sundesmo.UserData;
+
+        // Update the userData, then remove the old key and update it to the new value.
+        sundesmo.UpdateUserData(target);
+        _allSundesmos.TryRemove(keyToRemove, out _);
+        _allSundesmos[target] = sundesmo;
+        // Bomb the profile to refresh it
+        Mediator.Publish(new ClearProfileDataMessage(keyToRemove));
+        // Update userdata in lazy list
+        RecreateLazy();
+    }
+
+    /// <summary>
     ///     Marks a user as reloading. Implying they are shutting down the plugin or performing an interaction
     ///     that clears their sundesmos information. <para />
     ///     Useful to help us identify when a sundesmo is in need of a full data update or not.
@@ -239,7 +265,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void MarkSundesmoForUnload(UserData user)
     {
         if (!_allSundesmos.TryGetValue(user, out var sundesmo))
-            throw new InvalidOperationException($"No user found [{user.AliasOrUID}]");
+            throw new InvalidOperationException($"No user found [{user.DisplayName}]");
         
         Logger.LogTrace($"Marked {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()}) as reloading", LoggerType.PairManagement);
         sundesmo.MarkForUnload();
@@ -252,7 +278,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void MarkSundesmoOffline(UserData user)
     {
         if (!_allSundesmos.TryGetValue(user, out var sundesmo))
-            throw new InvalidOperationException($"No user found [{user.AliasOrUID}]");
+            throw new InvalidOperationException($"No user found [{user.DisplayName}]");
         
         Logger.LogTrace($"Marked {sundesmo.PlayerName}({sundesmo.GetNickAliasOrUid()}) as offline", LoggerType.PairManagement);
         Mediator.Publish(new ClearProfileDataMessage(sundesmo.UserData));
@@ -336,7 +362,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     /// </summary>
     public bool TryGetNickAliasOrUid(string uid, [NotNullWhen(true)] out string? nickAliasUid)
     {
-        nickAliasUid = _nicks.GetNicknameForUid(uid) ?? _allSundesmos.Keys.FirstOrDefault(p => p.UID == uid)?.AliasOrUID;
+        nickAliasUid = _nicks.GetNicknameForUid(uid) ?? _allSundesmos.Keys.FirstOrDefault(p => p.UID == uid)?.DisplayName;
         return !string.IsNullOrWhiteSpace(nickAliasUid);
     }
 
@@ -357,7 +383,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveLociData(UserData target, LociContainerData newLociData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         Logger.LogTrace($"Received loci update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         sundesmo.SetLociData(newLociData);
@@ -366,7 +392,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveLociStatuses(UserData target, List<LociStatusStruct> newStatuses)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
         Logger.LogTrace($"Received loci status update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         sundesmo.SharedLociData.SetStatuses(newStatuses);
     }
@@ -374,7 +400,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveLociPresets(UserData target, List<LociPresetStruct> newPresets)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
         Logger.LogTrace($"Received loci preset update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         sundesmo.SharedLociData.SetPresets(newPresets);
     }
@@ -382,7 +408,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveLociStatusUpdate(UserData target, LociStatusStruct status, bool deleted)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
         Logger.LogTrace($"Received loci status single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
         
         if (deleted)
@@ -394,7 +420,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveLociPresetUpdate(UserData target, LociPresetStruct preset, bool deleted)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
         Logger.LogTrace($"Received loci preset single update for {sundesmo.GetNickAliasOrUid()}!", LoggerType.Callbacks);
 
         if (deleted)
@@ -407,7 +433,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveIpcUpdateFull(UserData target, NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod and appearance data!", LoggerType.Callbacks);
         sundesmo.SetFullDataChanges(newModData, newIpc, isInitialData).ConfigureAwait(false);
@@ -417,7 +443,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveIpcUpdateMods(UserData target, NewModUpdates newModData, string manipString)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         Logger.LogTrace($"Received update for {sundesmo.GetNickAliasOrUid()}'s mod data!", LoggerType.Callbacks);
         sundesmo.SetModChanges(newModData, manipString);
@@ -427,7 +453,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveIpcUpdateOther(UserData target, VisualUpdate newIpc)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s appearance data updated!", LoggerType.Callbacks);
         sundesmo.SetIpcChanges(newIpc);
@@ -437,7 +463,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void ReceiveIpcUpdateSingle(UserData target, OwnedObject relatedObject, IpcKind type, string newData)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         Logger.LogTrace($"{sundesmo.GetNickAliasOrUid()}'s [{relatedObject}] updated its [{type}] data!", LoggerType.Callbacks);
         sundesmo.SetIpcChanges(relatedObject, type, newData);
@@ -447,7 +473,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void PermChangeGlobal(UserData target, string permName, object newValue)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         // Fail if the change could not be properly set.
         if (!PropertyChanger.TrySetProperty(sundesmo.PairGlobals, permName, newValue, out var finalVal) || finalVal is null)
@@ -460,7 +486,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void PermChangeGlobal(UserData target, GlobalPerms newGlobals)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         // cache prev globals and update them.
         var prevGlobals = sundesmo.PairGlobals with { };
@@ -473,7 +499,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void PermChangeUnique(UserData target, string permName, object newValue)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         if (!PropertyChanger.TrySetProperty(sundesmo.PairPerms, permName, newValue, out var finalVal) || finalVal is null)
             throw new InvalidOperationException($"Failed to set property '{permName}' on {sundesmo.GetNickAliasOrUid()} with value '{newValue}'");
@@ -513,7 +539,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void PermChangeUnique(UserData target, Dictionary<string, object> changes)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         foreach (var (permName, newValue) in changes)
         {
@@ -545,7 +571,7 @@ public sealed class SundesmoManager : DisposableMediatorSubscriberBase
     public void PermChangeUnique(UserData target, PairPerms newPerms)
     {
         if (!_allSundesmos.TryGetValue(target, out var sundesmo))
-            throw new InvalidOperationException($"User [{target.AliasOrUID}] not found.");
+            throw new InvalidOperationException($"User [{target.DisplayName}] not found.");
 
         // cache prev state and update them.
         var prevPerms = sundesmo.PairPerms with { };

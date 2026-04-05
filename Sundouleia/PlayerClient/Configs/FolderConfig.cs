@@ -75,7 +75,7 @@ public class FolderConfig : IHybridSavable
     public DateTime LastWriteTimeUTC { get; private set; } = DateTime.MinValue;
     public int ConfigVersion => 1;
     public HybridSaveType SaveType => HybridSaveType.Json;
-    public string GetFileName(ConfigFileProvider files, out bool upa) => (upa = false, files.SundesmoGroups).Item2;
+    public string GetFileName(ConfigFileProvider files, out bool upa) => (upa = true, files.SundesmoGroups).Item2;
     public void WriteToStream(StreamWriter writer) => throw new NotImplementedException();
     public string JsonSerialize()
     {
@@ -96,6 +96,13 @@ public class FolderConfig : IHybridSavable
     public void Load()
     {
         var file = _saver.FileNames.SundesmoGroups;
+        // Skip load if the UniqueProfileUid is not established yet.
+        if (!_saver.FileNames.HasValidProfileConfigs)
+        {
+            _logger.LogInformation($"HasValidProfileConfigs is false, skipping load for: {file}");
+            return;
+        }
+
         _logger.LogInformation("Loading in Config for file: " + file);
         if (!File.Exists(file))
         {

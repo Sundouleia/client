@@ -38,10 +38,14 @@ public class FavoritesConfig : IHybridSavable
     public void Load()
     {
         var file = _saver.FileNames.Favorites;
-        _logger.LogInformation($"Loading Config file: {file}");
+        _logger.LogInformation($"Loading FavoritesConfig file: {file}");
         if (!File.Exists(file))
         {
-            _logger.LogWarning($"No Config found at {file}");
+            _logger.LogWarning($"FavoritesConfig file not found: {file}");
+            SundesmoUids.Clear();
+            Statuses.Clear();
+            Presets.Clear();
+            IconIDs.Clear();
             _saver.Save(this);
             return;
         }

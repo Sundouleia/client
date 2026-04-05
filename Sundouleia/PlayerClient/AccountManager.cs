@@ -50,27 +50,12 @@ public class AccountManager
     public void Save()
         => _config.Save();
 
-    public void UpdateFileProviderForConnection(ConnectionResponse response)
-    {
-        _logger.LogDebug($"Setting FileProvider ProfileUID to {response.User.UID}");
-        var isProfileDifferent = _fileProvider.CurrentProfileUID != response.User.UID;
-        _fileProvider.UpdateConfigs(response.User.UID);
-
-        // Inform mediator that the profile switched if it did.
-        if (isProfileDifferent)
-        {
-            _logger.LogDebug($"Logged into new ProfileUID: {response.User.UID}");
-            _folderConfig.Load(); // Saves folder config for the new UID, making a new one if none exist.
-            _ddsGroups.LoadData(); // Ensures the profile spesific groups load in for the new UID.
-        }        
-    }
-
     // If any profiles, and a player 
     public bool HasValidAccount()
-        => HasValidProfile() && TrackedPlayers.Any(kvp => kvp.Value.LinkedProfile is not null);
+        => HasAnyProfile() && TrackedPlayers.Any(kvp => kvp.Value.LinkedProfile is not null);
 
     // If any profiles exist.
-    public bool HasValidProfile()
+    public bool HasAnyProfile()
         => Profiles.Count is not 0;
 
     public bool CharaIsTracked()

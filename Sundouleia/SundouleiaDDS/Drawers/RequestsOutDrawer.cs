@@ -128,7 +128,7 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
             var toAdd = ((IDynamicFolder<RequestEntry>)folder).Children.Where(x => x.Data.SentFromWorld(curWorld));
             Selector.SelectMultiple(toAdd);
         }
-        CkGui.AttachToolTip("Select requests sent from your current world.");
+        CkGui.AttachTooltip("Select requests sent from your current world.");
 
         currentRightSide -= byAreaSize;
         ImGui.SameLine(currentRightSide);
@@ -140,7 +140,7 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
             var toAdd = ((IDynamicFolder<RequestEntry>)folder).Children.Where(x => x.Data.SentFromCurrentArea(curWorld, curTerritory));
             Selector.SelectMultiple(toAdd);
         }
-        CkGui.AttachToolTip("Select requests sent from your current area.");
+        CkGui.AttachTooltip("Select requests sent from your current area.");
 
         return currentRightSide;
     }
@@ -162,7 +162,7 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
         if (ImGui.InvisibleButton($"{leaf.FullPath}-hoverspace", new Vector2(rightSide - posX, region.Y)))
             HandleLeftClick(leaf, flags);
         HandleDetections(leaf, flags);
-        CkGui.AttachToolTip(ToolTip, ImGuiColors.DalamudOrange);
+        CkGui.AttachTooltip(ToolTip, ImGuiColors.DalamudOrange);
 
         // Bounce back and draw out the name.
         ImGui.SameLine(posX);
@@ -177,7 +177,7 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
             CkGui.FramedHoverIconText(FAI.CommentDots, ImGuiColors.TankBlue.ToUint());
         else
             CkGui.FramedIconText(FAI.CommentDots, ImGui.GetColorU32(ImGuiCol.TextDisabled));
-        CkGui.AttachToolTip($"--COL--Attached Message:--COL----SEP--{entry.Message}", !entry.HasMessage, ImGuiColors.ParsedGold);
+        CkGui.AttachTooltip($"--COL--Attached Message:--COL----SEP--{entry.Message}", !entry.HasMessage, ImGuiColors.ParsedGold);
     }
 
     // Draw out the responder entry.
@@ -193,13 +193,13 @@ public class RequestsOutDrawer : DynamicDrawer<RequestEntry>
         ImGui.SameLine(endX);
         // Display the time remaining.
         CkGui.ColorTextFrameAligned(timeTxt, ImGuiColors.ParsedGrey);
-        CkGui.AttachToolTip("Time left until the request expires.");
+        CkGui.AttachTooltip("Time left until the request expires.");
 
         ImUtf8.SameLineInner();
         using (ImRaii.PushColor(ImGuiCol.Text, CkCol.TriStateCross.Uint()))
             if (CkGui.IconButton(FAI.Times, null, leaf.Name, UiService.DisableUI, true))
                 CancelRequest(leaf.Data);
-        CkGui.AttachToolTip("Cancel this pending request.");
+        CkGui.AttachTooltip("Cancel this pending request.");
         return endX;
     }
 

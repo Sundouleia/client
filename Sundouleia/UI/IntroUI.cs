@@ -59,8 +59,38 @@ public class IntroUi : WindowMediatorSubscriberBase
         Flags = WFlags.NoScrollbar | WFlags.NoResize;
 
         Mediator.Subscribe<IntoFinishedMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) =>
+        {
+            IsOpen = true;
+            GetFurthestPage();
+        });
 
+        GetFurthestPage();
+    }
+
+    protected override void PreDrawInternal()
+    {
+        if (!ThemePushed)
+        {
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 12f);
+            ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, ImGui.GetColorU32(ImGuiCol.TitleBg));
+            ImGui.PushStyleColor(ImGuiCol.TitleBgActive, ImGui.GetColorU32(ImGuiCol.TitleBg));
+            ThemePushed = true;
+        }
+    }
+
+    protected override void PostDrawInternal()
+    {
+        if (ThemePushed)
+        {
+            ImGui.PopStyleVar();
+            ImGui.PopStyleColor(2);
+            ThemePushed = false;
+        }
+    }
+
+    private void GetFurthestPage()
+    {
         // Make initial page assumptions.
         if (!_config.Current.AcknowledgementUnderstood)
         {
@@ -82,27 +112,6 @@ public class IntroUi : WindowMediatorSubscriberBase
         {
             _currentPage = IntroUiPage.Initialized;
             _furthestPage = IntroUiPage.Initialized;
-        }
-    }
-
-    protected override void PreDrawInternal()
-    {
-        if (!ThemePushed)
-        {
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 12f);
-            ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, ImGui.GetColorU32(ImGuiCol.TitleBg));
-            ImGui.PushStyleColor(ImGuiCol.TitleBgActive, ImGui.GetColorU32(ImGuiCol.TitleBg));
-            ThemePushed = true;
-        }
-    }
-
-    protected override void PostDrawInternal()
-    {
-        if (ThemePushed)
-        {
-            ImGui.PopStyleVar();
-            ImGui.PopStyleColor(2);
-            ThemePushed = false;
         }
     }
 
@@ -456,7 +465,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
         CkGui.SeparatorSpaced();
         CkGui.TextWrapped("Sundouleia stands on its own codebase, UI library, authentication system, object management, and secure file sharing. " +
-            "It’s designed for scalability, stability, and to honor Ottermandias, DarkArchon, and the health of the XIV community.");
+            "It’s designed for scalability, stability, and long-term community health.");
     }
 
     // Understanding Sundouleia Privacy & Usage Transparency
@@ -582,7 +591,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
     private void DrawNewAccountGeneration()
     {
-        var hasAnyProfile = _accounts.HasValidProfile();
+        var hasAnyProfile = _accounts.HasAnyProfile();
         var generateWidth = CkGui.IconTextButtonSize(FAI.IdCardAlt, "Create Account (One-Time Use!)");
         var recoveryKeyInUse = !string.IsNullOrWhiteSpace(_recoveryKey);
 
@@ -640,10 +649,10 @@ public class IntroUi : WindowMediatorSubscriberBase
         ImGui.InputTextWithHint("##RefRecoveryKey", "Existing Account Key / Recovered Account Key..", ref _recoveryKey, 64);
         ImUtf8.SameLineInner();
 
-        var blockButton = string.IsNullOrWhiteSpace(_recoveryKey) || _recoveryKey.Length != 64 || _accounts.HasValidProfile() || UiService.DisableUI;
+        var blockButton = string.IsNullOrWhiteSpace(_recoveryKey) || _recoveryKey.Length != 64 || _accounts.HasAnyProfile() || UiService.DisableUI;
         if (CkGui.IconTextButton(FAI.Wrench, "Login with Key", disabled: blockButton))
             TryLoginWithExistingKeyAsync();
-        CkGui.AttachToolTip("--COL--THIS WILL CREATE YOUR PRIMARY ACCOUNT. ENSURE YOUR KEY IS CORRECT.--COL--", ImGuiColors.DalamudRed);
+        CkGui.AttachTooltip("--COL--THIS WILL CREATE YOUR PRIMARY ACCOUNT. ENSURE YOUR KEY IS CORRECT.--COL--", ImGuiColors.DalamudRed);
     }
 
     private async Task TryConnectForInitialization()
@@ -671,7 +680,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         {
             try
             {
-                if (_accounts.HasValidProfile())
+                if (_accounts.HasAnyProfile())
                     throw new InvalidOperationException("Cannot recover account when a valid profile already exists!");
                 // Set the new profile to add using the key.
                 var newProfile = new AccountProfile()

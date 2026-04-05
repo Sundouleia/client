@@ -7,7 +7,7 @@ using Sundouleia.Services.Mediator;
 
 namespace Sundouleia.DrawSystem;
 
-public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSubscriber, IDisposable, IHybridSavable
+public sealed class RadarDrawSystem : DynamicDrawSystem<RadarPublicUser>, IMediatorSubscriber, IDisposable, IHybridSavable
 {
     private readonly ILogger<RadarDrawSystem> _logger;
     private readonly RadarManager _radar;
@@ -41,7 +41,7 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
         CollectionUpdated -= OnCollectionUpdate;
     }
 
-    private void OnChange(DDSChange type, IDynamicNode<RadarUser> obj, IDynamicCollection<RadarUser>? _, IDynamicCollection<RadarUser>? __)
+    private void OnChange(DDSChange type, IDynamicNode<RadarPublicUser> obj, IDynamicCollection<RadarPublicUser>? _, IDynamicCollection<RadarPublicUser>? __)
     {
         if (type is not (DDSChange.FullReloadStarting or DDSChange.FullReloadFinished))
         {
@@ -50,7 +50,7 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
         }
     }
 
-    private void OnCollectionUpdate(CollectionUpdate kind, IDynamicCollection<RadarUser> collection, IEnumerable<DynamicLeaf<RadarUser>>? _)
+    private void OnCollectionUpdate(CollectionUpdate kind, IDynamicCollection<RadarPublicUser> collection, IEnumerable<DynamicLeaf<RadarPublicUser>>? _)
     {
         if (kind is CollectionUpdate.OpenStateChange)
             _hybridSaver.Save(this);
@@ -82,11 +82,11 @@ public sealed class RadarDrawSystem : DynamicDrawSystem<RadarUser>, IMediatorSub
         return diff;
     }
 
-    private bool TryAddFolder(FAI icon, string name, Func<IReadOnlyList<RadarUser>> gen)
+    private bool TryAddFolder(FAI icon, string name, Func<IReadOnlyList<RadarPublicUser>> gen)
         => AddFolder(new RadarFolder(root, idCounter + 1u, icon, name, gen, [ByName]));
 
     // Sort Helpers.
-    private static readonly ISortMethod<DynamicLeaf<RadarUser>> ByName = new SorterExtensions.RadarName();
+    private static readonly ISortMethod<DynamicLeaf<RadarPublicUser>> ByName = new SorterExtensions.RadarName();
 
     // HybridSavable
     public int ConfigVersion => 0;

@@ -36,7 +36,7 @@ public sealed class SundesmoForGroupCombo : CkFilterComboCache<Sundesmo>, IMedia
         if (_drawnGroup.LinkedUids.Contains(Items[globalIndex].UserData.UID))
             return false;
 
-        return Items[globalIndex].UserData.AliasOrUID.Contains(filter, StringComparison.OrdinalIgnoreCase)
+        return Items[globalIndex].UserData.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase)
         || (Items[globalIndex].GetNickname()?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false)
         || (Items[globalIndex].PlayerName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
     }

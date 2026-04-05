@@ -37,11 +37,13 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
 
     private readonly SundouleiaMediator _mediator;
     private readonly MainConfig _config;
+    private readonly ChatConfig _chatConfig;
     private readonly RequestsManager _requests;
-    public MainMenuTabs(SundouleiaMediator mediator, MainConfig config, RequestsManager requests, TutorialService guides)
+    public MainMenuTabs(SundouleiaMediator mediator, MainConfig config, ChatConfig chatConfig, RequestsManager requests, TutorialService guides)
     {
         _mediator = mediator;
         _config = config;
+        _chatConfig = chatConfig;
         _requests = requests;
         TabSelection = _config.Current.CurMainUiTab;
 
@@ -114,7 +116,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
                     ImGui.GetColorU32(ImGuiCol.Separator), 2f);
             }
 
-            if (tab.TargetTab is SelectedTab.Requests && _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Bubble))
+            if (tab.TargetTab is SelectedTab.Requests && _config.Current.RequestNotifiers.HasAny(AlertKind.Bubble))
             {
                 if (_requests.Incoming.Count > 0)
                 {
@@ -124,7 +126,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
                 }
             }
             // For Radar Chat.
-            else if (tab.TargetTab is SelectedTab.RadarChat && _config.Current.RadarShowUnreadBubble)
+            else if (tab.TargetTab is SelectedTab.RadarChat && _chatConfig.Current.UnreadBubble)
             {
                 if (RadarChatLog.NewMsgCount > 0)
                 {
@@ -135,7 +137,7 @@ public class MainMenuTabs : IconTabBar<MainMenuTabs.SelectedTab>
                 }
             }
         }
-        CkGui.AttachToolTip(tab.Tooltip);
+        CkGui.AttachTooltip(tab.Tooltip);
 
         // invoke action if we should.
         tab.CustomAction?.Invoke();

@@ -37,10 +37,11 @@ public class NicksConfig : IHybridSavable
     public void Load()
     {
         var file = _saver.FileNames.NicknameConfig;
-        _logger.LogInformation("Loading in Config for file: " + file);
+        _logger.LogInformation($"Loading NicknamesConfig for: {file}");
         if (!File.Exists(file))
         {
-            _logger.LogWarning("Config file not found for: " + file);
+            _logger.LogWarning($"NicknamesConfig not found: {file}");
+            Current = new NicksStorage();
             _saver.Save(this);
             return;
         }

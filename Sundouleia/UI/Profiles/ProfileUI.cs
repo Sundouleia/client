@@ -68,7 +68,7 @@ public class ProfileUI : WindowMediatorSubscriberBase
 
         // obtain the profile for this userPair.
         var toDraw = _service.GetProfile(User);
-        var dispName = ShowFullUID ? User.AliasOrUID : User.AnonName;
+        var dispName = ShowFullUID ? User.DisplayName : User.AnonName;
         // Always show full UID in dev build.
 #if DEBUG
         dispName = User.UID;

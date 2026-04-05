@@ -111,7 +111,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
             // move down to the newline and draw the buttons for adding and removing images
             if (CkGui.IconTextButton(FAI.FileUpload, "Upload new profile picture", width))
                 HandleFileDialog();
-            CkGui.AttachToolTip("Select and upload a new profile picture");
+            CkGui.AttachTooltip("Select and upload a new profile picture");
             _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfileImageEditor, ImGui.GetWindowPos(), ImGui.GetWindowSize(),
                 () => _mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor), ToggleType.Hide)));
 
@@ -124,7 +124,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
                 _useCompressedImage = false;
                 UiService.SetUITask(async () => await _hub.UserUpdateProfilePicture(new(string.Empty)));
             }
-            CkGui.AttachToolTip("Clear your currently uploaded profile picture--SEP--Must be holding SHIFT to clear.");
+            CkGui.AttachTooltip("Clear your currently uploaded profile picture--SEP--Must be holding SHIFT to clear.");
 
             // show file dialog error if we had one.
             if (_showFileDialogError)
@@ -258,7 +258,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
                 if (ImGui.SliderFloat("Rotation", ref _rotationAngle, 0.0f, 360.0f, "%.2f"))
                     if (rotationRef != _rotationAngle)
                         UpdateCroppedImagePreview();
-                CkGui.AttachToolTip("DOES NOT WORK YET!");
+                CkGui.AttachTooltip("DOES NOT WORK YET!");
 
                 // Add zoom slider
                 var zoomRef = _zoomFactor;
@@ -280,7 +280,7 @@ public class ProfileAvatarEditor : WindowMediatorSubscriberBase
             // draw the compress & upload.
             if (CkGui.IconTextButton(FAI.Compress, "Compress"))
                 CompressImage();
-            CkGui.AttachToolTip("Shrinks the image to a 512x512 ratio for better performance");
+            CkGui.AttachTooltip("Shrinks the image to a 512x512 ratio for better performance");
 
             ImGui.SameLine();
 

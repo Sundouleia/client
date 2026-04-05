@@ -67,18 +67,27 @@ public sealed class GroupsDrawSystem : DynamicDrawSystem<Sundesmo>, IMediatorSub
 
     public void LoadData()
     {
+        var file = _hybridSaver.FileNames.DDS_Groups;
+        // Skip load if the UniqueProfileUid is not established yet.
+        if (!_hybridSaver.FileNames.HasValidProfileConfigs)
+        {
+            _logger.LogInformation($"HasValidProfileConfigs is false, skipping load for: {file}");
+            EnsureAllFolders([]);
+            return;
+        }
+
         // Handles loading, folder assignment, and setting opened states all in one.
-        if (LoadFile(new FileInfo(_hybridSaver.FileNames.DDS_Groups)))
+        if (LoadFile(new FileInfo(file)))
         {
             _logger.LogWarning("Loaded GroupDrawSystem from file.");
             _hybridSaver.Save(this);
         }
         // If the file does not exist for the user, we need to create a fresh one.
-        else if (!File.Exists(_hybridSaver.FileNames.DDS_Groups))
+        else if (!File.Exists(file))
         {
             _logger.LogInformation("No existing GroupDrawSystem file found, creating new one.");
             // Ensure all folders exist as per the current groups.
-            EnsureAllFolders(new Dictionary<string, string>());
+            EnsureAllFolders([]);
             _hybridSaver.Save(this);
         }
     }

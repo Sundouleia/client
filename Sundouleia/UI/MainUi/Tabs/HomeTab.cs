@@ -71,7 +71,7 @@ public class HomeTab
         using (CkRaii.Child("##AccountInfo", new Vector2(left, ProfileSize.Y)))
         {
             CkGui.FontText(MainHub.DisplayName, Fonts.UidFont);
-            CkGui.AttachToolTip("Your Profile's Alias / UID.");
+            CkGui.AttachTooltip("Your Profile's Alias / UID.");
             CkGui.CopyableDisplayText(MainHub.DisplayName);
             // Line Splitter.
             var pos = ImGui.GetCursorScreenPos();
@@ -80,7 +80,7 @@ public class HomeTab
             ImGui.Dummy(lineSize);
 
             ProfileInfoRow(FAI.IdBadge, MainHub.UID, string.Empty);
-            CkGui.AttachToolTip("Your Profile's UID.");
+            CkGui.AttachTooltip("Your Profile's UID.");
             CkGui.CopyableDisplayText(MainHub.UID);
             _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.YourUID, MainUI.LastPos, MainUI.LastSize);
 
@@ -113,7 +113,7 @@ public class HomeTab
             ImGui.SetCursorScreenPos(EditBorderPos);
             if (ImGui.InvisibleButton("##EditProfileButton", EditBorderSize))
                 _mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI)));
-            CkGui.AttachToolTip("Open and Customize your Profile!");
+            CkGui.AttachTooltip("Open and Customize your Profile!");
             _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfileEditing, MainUI.LastPos, MainUI.LastSize, () => _mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI), ToggleType.Show)));
 
             var bgCol = ImGui.IsItemHovered() ? 0xFF444444 : 0xFF000000;
@@ -132,7 +132,7 @@ public class HomeTab
             CkGui.IconTextAligned(icon);
             CkGui.TextFrameAlignedInline(text);
         }
-        CkGui.AttachToolTip(tooltip);
+        CkGui.AttachTooltip(tooltip);
     }
 
     private void DrawMenuOptions()
@@ -159,7 +159,7 @@ public class HomeTab
         {
             if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
-            CkGui.AttachToolTip("Inspect data of owned actors!");
+            CkGui.AttachTooltip("Inspect data of owned actors!");
 
             var noSMA = true;
 #if DEBUG
@@ -168,18 +168,18 @@ public class HomeTab
 
             if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", buttonWidth, noSMA))
                 _mediator.Publish(new UiToggleMessage(typeof(SMAManagerUI)));
-            CkGui.AttachToolTip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
+            CkGui.AttachTooltip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
 
             if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", buttonWidth, noSMA))
                 _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
-            CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
+            CkGui.AttachTooltip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
                 "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
 
             if (CkGui.FancyButton(FAI.Trophy, "Achievements", buttonWidth, true))
             {
                 // Something.
             }
-            CkGui.AttachToolTip("View Achievement Progress & Rewards.--SEP--Still WIP, Coming in future updates.");
+            CkGui.AttachTooltip("View Achievement Progress & Rewards.--SEP--Still WIP, Coming in future updates.");
 
         }
         ImUtf8.SameLineInner();
@@ -187,22 +187,22 @@ public class HomeTab
         {
             if (CkGui.FancyButton(FAI.Cog, "Open Settings", buttonWidth, false))
                 _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
-            CkGui.AttachToolTip("Opens the Settings UI.");
+            CkGui.AttachTooltip("Opens the Settings UI.");
             _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ConfigSettings, MainUI.LastPos, MainUI.LastSize);
 
             if (CkGui.FancyButton(FAI.Wrench, "Open Config", buttonWidth, false))
             {
-                try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.SundouleiaDirectory, UseShellExecute = true }); }
+                try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.ConfigDirectory, UseShellExecute = true }); }
                 catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
             }
-            CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
+            CkGui.AttachTooltip("Opens the Config Folder.--NL--(Useful for debugging)");
 
             if (CkGui.FancyButton(FAI.Coffee, "Support Sundouleia", buttonWidth, false))
             {
                 try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/cw/Sundouleia", UseShellExecute = true }); }
                 catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Patreon link. {e.Message}"); }
             }
-            CkGui.AttachToolTip("If you like my work, you can toss any support here ♥");            
+            CkGui.AttachTooltip("If you like my work, you can toss any support here ♥");            
         }
     }
 
@@ -210,7 +210,7 @@ public class HomeTab
     {
         if (CkGui.FancyButton(FAI.MagnifyingGlassChart, "Actor Analyzer", region.X, false))
             _mediator.Publish(new UiToggleMessage(typeof(ActorOptimizerUI)));
-        CkGui.AttachToolTip("Inspect data of owned actors!");
+        CkGui.AttachTooltip("Inspect data of owned actors!");
 
         var noSMA = true;
 #if DEBUG
@@ -218,37 +218,37 @@ public class HomeTab
 #endif
         if (CkGui.FancyButton(FAI.FolderTree, "SMA Manager", region.X, noSMA))
             _mediator.Publish(new UiToggleMessage(typeof(SMAManagerUI)));
-        CkGui.AttachToolTip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
+        CkGui.AttachTooltip("Organize and manage --COL--Sundouleia Modular Actor--COL-- files.", ImGuiColors.DalamudOrange);
 
         if (CkGui.FancyButton(FAI.FileExport, "SMA Creator", region.X, noSMA))
             _mediator.Publish(new UiToggleMessage(typeof(SMACreatorUI)));
-        CkGui.AttachToolTip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
+        CkGui.AttachTooltip("Create (Sundouleia Modular Actor) Base, Outfit, Item, & ItemPack files." +
             "--SEP----COL--For Privacy (forced customization), porting MCDF's is not supported.--COL--", ImGuiColors.DalamudOrange);
 
         if (CkGui.FancyButton(FAI.Trophy, "Achievements", region.X, true))
         {
             // Something.
         }
-        CkGui.AttachToolTip("View Achievement Progress & Rewards.--SEP--Still WIP, Coming in future updates.");
+        CkGui.AttachTooltip("View Achievement Progress & Rewards.--SEP--Still WIP, Coming in future updates.");
 
         if (CkGui.FancyButton(FAI.Cog, "Open Settings", region.X, false))
             _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
-        CkGui.AttachToolTip("Opens the Settings UI.");
+        CkGui.AttachTooltip("Opens the Settings UI.");
 
 
         if (CkGui.FancyButton(FAI.Wrench, "Open Config", region.X, false))
         {
-            try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.SundouleiaDirectory, UseShellExecute = true }); }
+            try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.ConfigDirectory, UseShellExecute = true }); }
             catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
         }
-        CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
+        CkGui.AttachTooltip("Opens the Config Folder.--NL--(Useful for debugging)");
 
         if (CkGui.FancyButton(FAI.Coffee, "Support Sundouleia", region.X, false))
         {
             try { Process.Start(new ProcessStartInfo { FileName = "https://www.patreon.com/cw/Sundouleia", UseShellExecute = true }); }
             catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the Patreon link. {e.Message}"); }
         }
-        CkGui.AttachToolTip("If you like my work, you can toss any support here ♥");
+        CkGui.AttachTooltip("If you like my work, you can toss any support here ♥");
 
     }
 }

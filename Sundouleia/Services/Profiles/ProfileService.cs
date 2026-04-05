@@ -56,7 +56,7 @@ public class ProfileService : MediatorSubscriberBase
         // We must return a valid profile for the requested UserData.
         // If the profile is not cached, assign a default profile to the passed in UserData,
         // And run a task that fetches their profile data from the hub and applies it to that profile.
-        Logger.LogTrace($"[ProfileCache Not Found]: {userData.AliasOrUID}, assigning loading Profile.", LoggerType.Profiles);
+        Logger.LogTrace($"[ProfileCache Not Found]: {userData.DisplayName}, assigning loading Profile.", LoggerType.Profiles);
         _profiles[userData] = _factory.CreateProfileData();
         _ = Task.Run(() => GetProfileFromService(userData));
         return _profiles[userData]; 
@@ -70,7 +70,7 @@ public class ProfileService : MediatorSubscriberBase
         if (!_profiles.TryGetValue(userData, out var profile))
             return;
 
-        Logger.LogDebug($"Removing ProfileCache for {userData.AliasOrUID}.", LoggerType.Profiles);
+        Logger.LogDebug($"Removing ProfileCache for {userData.DisplayName}.", LoggerType.Profiles);
         // Free up the rented image data, then remove from the cache.
         profile.Dispose();
         _profiles.TryRemove(userData, out _);
@@ -107,7 +107,7 @@ public class ProfileService : MediatorSubscriberBase
         catch (Bagagwa ex)
         {
             // log the failure and set default data.
-            Logger.LogWarning($"Failed to get {{{data.AliasOrUID}}}'s profile data! Reason: {ex}");
+            Logger.LogWarning($"Failed to get {{{data.DisplayName}}}'s profile data! Reason: {ex}");
             _profiles[data].Info = new ProfileContent();
             _profiles[data].ProfileAvatar = string.Empty;
         }

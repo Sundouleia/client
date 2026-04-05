@@ -73,7 +73,7 @@ public partial class UiDataStorageShared
 
         if (CkGui.IconButton(FAI.Folder))
             OpenSmaStorageDialog();
-        CkGui.AttachToolTip("Open file dialog to choose a directory.");
+        CkGui.AttachTooltip("Open file dialog to choose a directory.");
 
         ImUtf8.SameLineInner();
         // Display the directory in a readonly input text so that we can open the file dailog for selection.
@@ -118,7 +118,7 @@ public partial class UiDataStorageShared
         // Draw out the folder icon first, prior to drawing out the file storage.
         if (CkGui.IconButton(FAI.Folder, disabled: _isMonitoring))
             OpenFileCacheDialog();
-        CkGui.AttachToolTip(_isMonitoring ? "Must stop monitoring the cache folder before changing it." : "Open file dialog to choose a directory.");
+        CkGui.AttachTooltip(_isMonitoring ? "Must stop monitoring the cache folder before changing it." : "Open file dialog to choose a directory.");
 
         ImUtf8.SameLineInner();
         // Display the directory in a readonly input text so that we can open the file dailog for selection.
@@ -139,7 +139,7 @@ public partial class UiDataStorageShared
             else
                 Svc.Toasts.ShowError($"Failed to Auto-Generate Cache Directory");
         }
-        CkGui.AttachToolTip("Automatically creates a SundouleiaCache folder in the same directory that your PenumbraCache is in.");
+        CkGui.AttachTooltip("Automatically creates a SundouleiaCache folder in the same directory that your PenumbraCache is in.");
 
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.FolderPlus, "At Drive Root", disabled: _isMonitoring || CachePresetRootDirExists()))
@@ -155,7 +155,7 @@ public partial class UiDataStorageShared
             else
                 Svc.Toasts.ShowError($"Failed to Auto-Generate Cache Directory");
         }
-        CkGui.AttachToolTip($"Automatically creates a SundouleiaCache folder at your drive root {{{_rootPath}}}");
+        CkGui.AttachTooltip($"Automatically creates a SundouleiaCache folder at your drive root {{{_rootPath}}}");
 
         // Slider for storage size.
         using (ImRaii.Disabled(!_config.HasValidCacheFolderSetup()))
@@ -168,7 +168,7 @@ public partial class UiDataStorageShared
                 _config.Save();
             }
         }
-        CkGui.AttachToolTip("Storage is governed by Sundouleia, and clears itself upon reaching capacity, " +
+        CkGui.AttachTooltip("Storage is governed by Sundouleia, and clears itself upon reaching capacity, " +
             "or after a file has not been accessed for 6 weeks.");
 
         // Below, if the path validation is not success, display the error text.
@@ -186,7 +186,7 @@ public partial class UiDataStorageShared
         // Go to top right to draw out help text.
         ImGui.SetCursorScreenPos(topLeftPos + new Vector2(_.InnerRegion.X - ImUtf8.FrameHeight, 0));
         CkGui.FramedHoverIconText(FAI.QuestionCircle, ImGuiColors.TankBlue.ToUint(), ImGui.GetColorU32(ImGuiCol.TextDisabled));
-        CkGui.AttachToolTip("Sundouleia's Cache is --COL--self-regulated--COL-- for downloaded mod files." +
+        CkGui.AttachTooltip("Sundouleia's Cache is --COL--self-regulated--COL-- for downloaded mod files." +
             "--NL--It helps improve performance when loading mods and reduces download requirements." +
             "--SEP--Cleans are ran regularily to remove any files unused for 6+ weeks to keep things tidy!", SundCol.Silver.Vec4());
     }
@@ -249,13 +249,13 @@ public partial class UiDataStorageShared
             if (allWatchersValid)
                 _monitor.InvokeScan();
         }
-        CkGui.AttachToolTip("Restarts the penumbra watcher and invokes a full scan over both directories if both are valid." +
+        CkGui.AttachTooltip("Restarts the penumbra watcher and invokes a full scan over both directories if both are valid." +
             "--NL--If the button remains present after clicking it, consult /xllog for errors");
 
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.StopCircle, "Stop", disabled: _penumbraWatcher.Watcher is null || !KeyMonitor.CtrlPressed(), id: "penMonitorStop"))
             _penumbraWatcher.StopMonitoring();
-        CkGui.AttachToolTip("Halts monitoring Penumbra Storage. While disabled, files will not sync.--NL--Hold CTRL to enable this button" +
+        CkGui.AttachTooltip("Halts monitoring Penumbra Storage. While disabled, files will not sync.--NL--Hold CTRL to enable this button" +
             "--SEP----COL--Unless you are changing cache folders, do not stop monitoring!--COL--", ImGuiColors.DalamudRed);
     }
 
@@ -268,12 +268,12 @@ public partial class UiDataStorageShared
             if (allWatchersValid)
                 _monitor.InvokeScan();
         }
-        CkGui.AttachToolTip("Restarts the Sundouleia watcher and invokes a full scan over both directories if both are valid." +
+        CkGui.AttachTooltip("Restarts the Sundouleia watcher and invokes a full scan over both directories if both are valid." +
             "--NL--If the button remains present after clicking it, consult /xllog for errors");
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.StopCircle, "Stop", disabled: _mainWatcher.Watcher is null || !KeyMonitor.CtrlPressed(), id: "mainMonitorStop"))
             _mainWatcher.StopMonitoring();
-        CkGui.AttachToolTip("Halts monitoring Sundouleia Storage. While disabled, files will not sync.--NL--Hold CTRL to enable this button" +
+        CkGui.AttachTooltip("Halts monitoring Sundouleia Storage. While disabled, files will not sync.--NL--Hold CTRL to enable this button" +
             "--SEP----COL--Unless you are changing cache folders, do not stop monitoring!--COL--", ImGuiColors.DalamudRed);
     }
 
@@ -304,7 +304,7 @@ public partial class UiDataStorageShared
                 _config.Current.CompactCache = useCompactor;
                 _config.Save();
             }
-        CkGui.AttachToolTip("Sundouleia's File Compactor helps compress any downloaded mod files by a large amount." +
+        CkGui.AttachTooltip("Sundouleia's File Compactor helps compress any downloaded mod files by a large amount." +
             "--NL----COL--It might incur a minor penalty on loading files on a slow CPU.--COL--" +
             "--NL--It is recommended to leave it enabled to save on space.", ImGuiColors.DalamudYellow);
 
@@ -322,7 +322,7 @@ public partial class UiDataStorageShared
                         _monitor.RecalculateFileCacheSize(CancellationToken.None);
                     });
                 }
-                CkGui.AttachToolTip("Run compression on all files in the Sundouleia Cache." +
+                CkGui.AttachTooltip("Run compression on all files in the Sundouleia Cache." +
                     "--NL--This doesn't need to be ran if the file compactor is kept active!");
 
                 ImGui.SameLine();
@@ -334,7 +334,7 @@ public partial class UiDataStorageShared
                         _monitor.RecalculateFileCacheSize(CancellationToken.None);
                     });
                 }
-                CkGui.AttachToolTip("Runs a decompression across all Sundouleia Cache files.");
+                CkGui.AttachTooltip("Runs a decompression across all Sundouleia Cache files.");
             }
         }
         else
@@ -445,7 +445,7 @@ public partial class UiDataStorageShared
                 _config.Current.SMAExportFolder = path;
                 _config.Save();
             }
-        }, ConfigFileProvider.SundouleiaDirectory, true);
+        }, ConfigFileProvider.ConfigDirectory, true);
     }
 
     private void OpenFileCacheDialog()

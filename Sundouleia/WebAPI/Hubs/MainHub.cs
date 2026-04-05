@@ -20,10 +20,9 @@ namespace Sundouleia.WebAPI;
 /// </summary>
 public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubClient, IHostedService
 {
-    public const string MAIN_SERVER_NAME = "Sundouleia Main";
-    public const string MAIN_SERVER_URI = "wss://sundouleia.kinkporium.studio";
-
+    private readonly MainConfig _config;
     private readonly FolderConfig _folders;
+    private readonly ConfigDirector _configDirector;
     private readonly AccountManager _accounts;
     private readonly HubFactory _hubFactory;
     private readonly TokenProvider _tokenProvider;
@@ -52,6 +51,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public MainHub(ILogger<MainHub> logger,
         SundouleiaMediator mediator,
         FolderConfig folders,
+        ConfigDirector configDirector,
         AccountManager accounts,
         HubFactory hubFactory,
         TokenProvider tokenProvider,
@@ -62,6 +62,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         : base(logger, mediator)
     {
         _folders = folders;
+        _configDirector = configDirector;
         _accounts = accounts;
         _hubFactory = hubFactory;
         _tokenProvider = tokenProvider;
@@ -103,7 +104,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     public static string AuthFailureMessage { get; private set; } = string.Empty;
     public static int OnlineUsers => _serverInfo?.OnlineUsers ?? 0;
     public static UserData OwnUserData => ConnectionResponse!.User;
-    public static string DisplayName => ConnectionResponse?.User.AliasOrUID ?? string.Empty;
+    public static string DisplayName => ConnectionResponse?.User.DisplayName ?? string.Empty;
     public static string UID => ConnectionResponse?.User.UID ?? string.Empty;
     // See how to update this later.
     public static GlobalPerms GlobalPerms => ConnectionResponse?.GlobalPerms ?? new();
@@ -205,7 +206,6 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         OnPairLociPresetsUpdate(dto => _ = Callback_PairLociPresetsUpdate(dto));
         OnPairLociStatusModified(dto => _ = Callback_PairLociStatusModified(dto));
         OnPairLociPresetModified(dto => _ = Callback_PairLociPresetModified(dto));
-
         OnApplyLociDataById(dto => _ = Callback_ApplyLociDataById(dto));
         OnApplyLociStatus(dto => _ = Callback_ApplyLociStatus(dto));
         OnRemoveLociData(dto => _ = Callback_RemoveLociData(dto));
@@ -220,13 +220,19 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         OnChangeUniquePerms(dto => _ = Callback_ChangeUniquePerms(dto));
         OnChangeAllUnique(dto => _ = Callback_ChangeAllUnique(dto));
 
+        OnRadarChatMessage(dto => _ = Callback_RadarChatMessage(dto));
+        OnRadarChatAddUpdateUser(dto => _ = Callback_RadarChatAddUpdateUser(dto));
         OnRadarAddUpdateUser(dto => _ = Callback_RadarAddUpdateUser(dto));
         OnRadarRemoveUser(dto => _ = Callback_RadarRemoveUser(dto));
-        OnRadarChat(dto => _ = Callback_RadarChat(dto));
+        OnRadarGroupAddUpdateUser(dto => _ = Callback_RadarGroupAddUpdateUser(dto));
+        OnRadarGroupRemoveUser(dto => _ = Callback_RadarGroupRemoveUser(dto));
+        
+        OnChatMsgReceived(dto => _ = Callback_ChatMsgReceived(dto));
 
         OnUserIsUnloading(dto => _ = Callback_UserIsUnloading(dto));
         OnUserOffline(dto => _ = Callback_UserOffline(dto));
         OnUserOnline(dto => _ = Callback_UserOnline(dto));
+        OnUserVanityUpdate(dto => _ = Callback_UserVanityUpdate(dto));
         OnProfileUpdated(dto => _ = Callback_ProfileUpdated(dto));
         OnShowVerification(dto => _ = Callback_ShowVerification(dto));
 
@@ -262,7 +268,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
     {
         var allSundesmo = await UserGetAllPairs().ConfigureAwait(false);
         _sundesmos.AddSundesmos(allSundesmo);
-        Logger.LogDebug($"Initial Sundesmos Loaded: [{string.Join(", ", allSundesmo.Select(x => x.User.AliasOrUID))}]", LoggerType.ApiCore);
+        Logger.LogDebug($"Initial Sundesmos Loaded: [{string.Join(", ", allSundesmo.Select(x => x.User.DisplayName))}]", LoggerType.ApiCore);
     }
 
     /// <summary>
@@ -275,7 +281,7 @@ public partial class MainHub : DisposableMediatorSubscriberBase, ISundouleiaHubC
         foreach (var entry in onlineUsers)
             _sundesmos.MarkSundesmoOnline(entry, false);
 
-        Logger.LogDebug($"Online Users: [{string.Join(", ", onlineUsers.Select(x => x.User.AliasOrUID))}]", LoggerType.ApiCore);
+        Logger.LogDebug($"Online Users: [{string.Join(", ", onlineUsers.Select(x => x.User.DisplayName))}]", LoggerType.ApiCore);
     }
 
     /// <summary>

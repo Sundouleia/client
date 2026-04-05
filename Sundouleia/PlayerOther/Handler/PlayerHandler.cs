@@ -1152,7 +1152,7 @@ public class PlayerHandler : DisposableMediatorSubscriberBase
             {
                 ImGui.TableNextColumn();
                 CkGui.HoverIconText(FAI.Hashtag, ImGuiColors.DalamudViolet.ToUint());
-                CkGui.AttachToolTip(hash);
+                CkGui.AttachTooltip(hash);
                 ImGui.TableNextColumn();
                 ImGui.Text(string.Join("\n", mod.GamePaths));
             }

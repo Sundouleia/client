@@ -13,6 +13,7 @@ using Sundouleia.Services.Mediator;
 using Sundouleia.Services.Textures;
 using Sundouleia.WebAPI;
 using SundouleiaAPI.Data;
+using SundouleiaAPI.Network;
 
 namespace Sundouleia.Gui.Components;
 
@@ -29,6 +30,8 @@ internal class ReportPopupHandler : IPopupHandler
     private string _reportedDisplayName = "User-XXX";
     private ReportKind _reportType = ReportKind.Profile;
     private string _reportReason = DEFAULT_REASON;
+    private string _reportedChatId = string.Empty;
+    private string _reportedMsgId = string.Empty;
 
     public ReportPopupHandler(MainHub hub, SundesmoManager pairs, ProfileService profiles, RadarChatLog radarChat)
     {
@@ -97,7 +100,7 @@ internal class ReportPopupHandler : IPopupHandler
             ImGui.SetCursorScreenPos(descPos + borderSize);
             var desc = profile.Info.Description;
             DrawLimitedDescription(desc, ImGuiColors.DalamudWhite, new Vector2(230, 185));
-            CkGui.AttachToolTip("The Description being Reported");
+            CkGui.AttachTooltip("The Description being Reported");
 
             ImGui.SetCursorScreenPos(pfpBorderPos);
             ImGui.Dummy((descPos + descSize) - pfpBorderPos);
@@ -167,11 +170,12 @@ internal class ReportPopupHandler : IPopupHandler
                             _ = _hub.UserReportProfile(new(_reportedUser, reason));
                             break;
                         case ReportKind.Chat:
-                            var compressedData = _radarChat.GetRecentChatForReport();
-                            if (string.IsNullOrEmpty(compressedData))
+                            if (_reportedChatId.Length is 0 || _reportedMsgId.Length is 0)
                                 return;
-                            // Otherwise, create the dto to send.
-                            _ = _hub.UserReportChat(new(_reportedUser, LocationSvc.Current.TerritoryId, LocationSvc.Current.WorldId, compressedData, reason));
+                            _ = _hub.UserReportChat(new(_reportedUser, new(SundChatKind.Radar, _reportedChatId), _reportedMsgId, reason));
+                            break;
+                        case ReportKind.Radar:
+                            Svc.Logger.Warning("Not yet implemented.");
                             break;
                         default:
                             // For all other cases, do nothing.
@@ -233,7 +237,7 @@ internal class ReportPopupHandler : IPopupHandler
         _reportedUser = msg.UserToReport;
         _reportType = msg.Kind;
         _reportedDisplayName = _sundesmos.DirectPairs.Any(x => x.UserData.UID == _reportedUser.UID)
-            ? _reportedUser.AliasOrUID : "User-" + _reportedUser.UID.Substring(_reportedUser.UID.Length - 4);
+            ? _reportedUser.DisplayName : "User-" + _reportedUser.UID.Substring(_reportedUser.UID.Length - 4);
         _reportReason = DEFAULT_REASON;
     }
 }

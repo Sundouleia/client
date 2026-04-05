@@ -89,7 +89,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         // Compile to sharable data
         try
         {
-            Logger.LogDebug($"Pushing LociData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+            Logger.LogDebug($"Pushing LociData to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.DisplayName))})", LoggerType.DataDistributor);
             await _hub.UserPushLociData(new(trustedUsers, LociData.Cache.ToDto()));
         }
         catch (Exception ex)
@@ -104,7 +104,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             return;
         try
         {
-            Logger.LogTrace($"Pushing StatusUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+            Logger.LogTrace($"Pushing StatusUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.DisplayName))})", LoggerType.DataDistributor);
             await _hub.UserPushStatusModified(new(trustedUsers, status.ToStruct(), wasDeleted));
         }
         catch (Exception ex)
@@ -119,7 +119,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
             return;
         try
         {
-            Logger.LogTrace($"Pushing PresetUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.AliasOrUID))})", LoggerType.DataDistributor);
+            Logger.LogTrace($"Pushing PresetUpdate to trustedUsers: ({string.Join(", ", trustedUsers.Select(v => v.DisplayName))})", LoggerType.DataDistributor);
             await _hub.UserPushPresetModified(new(trustedUsers, preset.ToStruct(), wasDeleted));
         }
         catch (Exception ex)
@@ -131,7 +131,7 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
     // Effectively a relay from our client's ApplyToTarget -> Over to the server telling the Sundesmo to apply it to themselves.
     public async Task PushLociApplyToTarget(UserData user, IEnumerable<LociStatusInfo> data)
     {
-        Logger.LogDebug($"Pushing ApplyLociStatus to: {user.AliasOrUID}", LoggerType.DataDistributor);
+        Logger.LogDebug($"Pushing ApplyLociStatus to: {user.DisplayName}", LoggerType.DataDistributor);
         var apiData = data.Select(s => s.ToStruct()).ToList();
         if (await _hub.UserApplyLociStatusTuples(new(user, apiData)).ConfigureAwait(false) is { } res && res.ErrorCode is not SundouleiaApiEc.Success)
             Logger.LogError($"Failed to push ApplyLociStatus to server. [{res.ErrorCode}]");
@@ -179,8 +179,8 @@ public sealed class ClientDistributor : DisposableMediatorSubscriberBase
         }).ConfigureAwait(false);
 
         // Then send off to all visible users.
-        Logger.LogDebug($"UID's in NewVisible are: {string.Join(", ", _updater.NewVisibleUsers.Select(x => x.AliasOrUID))}", LoggerType.DataDistributor);
-        Logger.LogDebug($"UID's in Limbo are: {string.Join(", ", _limbo.InLimbo.Select(x => x.AliasOrUID))}", LoggerType.DataDistributor);
+        Logger.LogDebug($"UID's in NewVisible are: {string.Join(", ", _updater.NewVisibleUsers.Select(x => x.DisplayName))}", LoggerType.DataDistributor);
+        Logger.LogDebug($"UID's in Limbo are: {string.Join(", ", _limbo.InLimbo.Select(x => x.DisplayName))}", LoggerType.DataDistributor);
         Logger.LogInformation($"(OnHubConnected) Distributing to visible.", LoggerType.DataDistributor);
         _updater.RefreshDistributionCTS();
         _updater.SetDistributionTask(async () =>

@@ -1,4 +1,5 @@
 using CkCommons.HybridSaver;
+using Sundouleia.PlayerClient;
 
 namespace Sundouleia;
 
@@ -7,140 +8,259 @@ public class ConfigFileProvider : IConfigFileProvider
 {
     private readonly ILogger<ConfigFileProvider> _logger;
     // Shared Config Directories
-    public static string AssemblyLocation       => Svc.PluginInterface.AssemblyLocation.FullName;
-    public static string AssemblyDirectoryName  => Svc.PluginInterface.AssemblyLocation.DirectoryName ?? string.Empty;
-    public static string AssemblyDirectory      => Svc.PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty;
-    public static string SundouleiaDirectory    => Svc.PluginInterface.ConfigDirectory.FullName;
-    public static string ChatDirectory      { get; private set; } = string.Empty;
-    public static string EventDirectory     { get; private set; } = string.Empty;
-    public static string FileSysDirectory   { get; private set; } = string.Empty;    
-    // Shared Configs
-    public readonly string MainConfig;
-    public readonly string LociConfig;
-    public readonly string OwnedSMAFilesConfig;
-    public readonly string RecentChatLog;
-    public readonly string Favorites;
-    public readonly string NicknameConfig;
-    public readonly string AccountConfig;
-    // Shared Sync-related Configs
+    public static string AssemblyLocation      => Svc.PluginInterface.AssemblyLocation.FullName;
+    public static string AssemblyDirectoryName => Svc.PluginInterface.AssemblyLocation.DirectoryName ?? string.Empty;
+    public static string AssemblyDirectory     => Svc.PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty;
+    public static string ConfigDirectory       => Svc.PluginInterface.ConfigDirectory.FullName;
+
+    // Universal Subdirectories
+    public static string ServerHubDirectory { get; private set; }
+    public static string FileSysDirectory   { get; private set; }
+    public static string EventDirectory     { get; private set; }
+
+    // Universal configs
+    public readonly string ChatConfig;
+    public readonly string ServerConfig;
+    public readonly string PerformanceConfig;
+    public readonly string FileCacheCsv;
     public readonly string TransientCache;
     public readonly string PlzNoCrashFriends;
     public readonly string LoadedResources;
-    public readonly string FileCacheCsv;
+    public readonly string OwnedSMAFilesConfig;
 
-    // Shared FileSystem Configs.
+    // Account-Authoritative Configs
+    public string MainConfig     { get; private set; }
+    public string AccountConfig  { get; private set; }
+    public string Favorites      { get; private set; }
+    public string NicknameConfig { get; private set; }
+
+    // Per Account-Profile Configs.
+    public string AccountProfileDirectory => Path.Combine(ServerHubDirectory, CurrentProfileUID ?? "NO_USER"); // Will fail bad profiles.
+    public string DDS_Groups => Path.Combine(AccountProfileDirectory, "dds-groups.json");
+    public string SundesmoGroups => Path.Combine(AccountProfileDirectory, "sundesmo-groups.json");
+
+    // DDS universal Configs
     public string DDS_Requests => Path.Combine(FileSysDirectory, "dds-requests.json");
     public string DDS_Whitelist => Path.Combine(FileSysDirectory, "dds-whitelist.json");
     public string DDS_Radar => Path.Combine(FileSysDirectory, "dds-radar.json");
-    public string CKFS_Statuses => Path.Combine(FileSysDirectory, "fs-statuses.json");
-    public string CKFS_Presets => Path.Combine(FileSysDirectory, "fs-presets.json");
-    // Maybe Maybe not? Unsure how I want to display this yet.
     public string DDS_MCDFData => Path.Combine(FileSysDirectory, "dds-mcdfdata.json");
 
-    // Per Account-Profile Configs.
-    public string DDS_Groups => Path.Combine(CurrentProfileDirectory, "dds-groups.json");
-    public string SundesmoGroups => Path.Combine(CurrentProfileDirectory, "sundesmo-groups.json"); // could merge this with favorites or something idk.
-
-    // Profile Helpers.
-    public string CurrentProfileDirectory => Path.Combine(SundouleiaDirectory, CurrentProfileUID ?? "InvalidFiles");
+    // Helpers
+    public bool IsOnMainServer => string.Equals(CurrentHubURI, ServerHubConfig.MAIN_SERVER_URI, StringComparison.Ordinal);
+    public string CurrentHubURI { get; private set; } = string.Empty;
     public string? CurrentProfileUID { get; private set; } = null;
+    public bool HasValidProfileConfigs => !string.IsNullOrEmpty(CurrentProfileUID);
 
-    // Previously profiles was determined by the logged in UID but now it is determined by the secret key IDX. 
-    // We will need to update how this is handled later.
     public ConfigFileProvider(ILogger<ConfigFileProvider> logger)
     {
         _logger = logger;
 
-        ChatDirectory = Path.Combine(SundouleiaDirectory, "chatData");
-        EventDirectory = Path.Combine(SundouleiaDirectory, "eventlog");
-        FileSysDirectory = Path.Combine(SundouleiaDirectory, "filesystem");
+        // Create the Universal configs.
+        ChatConfig = Path.Combine(ConfigDirectory, "chat.json");
+        ServerConfig = Path.Combine(ConfigDirectory, "connections.json");
+        PerformanceConfig = Path.Combine(ConfigDirectory, "performance.json");
+        FileCacheCsv = Path.Combine(ConfigDirectory, "filecache.csv");
+        TransientCache = Path.Combine(ConfigDirectory, "transientcache.json");
+        PlzNoCrashFriends = Path.Combine(ConfigDirectory, "plznocrashfriends.json");
+        LoadedResources = Path.Combine(ConfigDirectory, "loaded-resources.json");
+        OwnedSMAFilesConfig = Path.Combine(ConfigDirectory, "ownedsmafiles.json");
 
-        // Ensure directory existence.
-        if (!Directory.Exists(ChatDirectory)) Directory.CreateDirectory(ChatDirectory);
-        if (!Directory.Exists(EventDirectory)) Directory.CreateDirectory(EventDirectory);
-        if (!Directory.Exists(FileSysDirectory)) Directory.CreateDirectory(FileSysDirectory);
+        // Init the universal DDS configs.
+        FileSysDirectory = Path.Combine(ConfigDirectory, "filesystem");
+        Directory.CreateDirectory(FileSysDirectory);
 
-        // Configs.
-        MainConfig = Path.Combine(SundouleiaDirectory, "config.json");
-        LociConfig = Path.Combine(SundouleiaDirectory, "lociData.json");
-        OwnedSMAFilesConfig = Path.Combine(SundouleiaDirectory, "ownedsmafiles.json");
-        TransientCache = Path.Combine(SundouleiaDirectory, "transientcache.json");
-        PlzNoCrashFriends = Path.Combine(SundouleiaDirectory, "plznocrashfriends.json");
-        RecentChatLog = Path.Combine(SundouleiaDirectory, "chat-recent.json");
-        Favorites = Path.Combine(SundouleiaDirectory, "favorites.json");
-        LoadedResources = Path.Combine(SundouleiaDirectory, "loaded-resources.json");
-        FileCacheCsv = Path.Combine(SundouleiaDirectory, "filecache.csv");
-        NicknameConfig = Path.Combine(SundouleiaDirectory, "nicknames.json");
-        AccountConfig = Path.Combine(SundouleiaDirectory, "account.json");
-
-        // attempt to load in the UID if the config.json exists.
-        if (File.Exists(MainConfig))
+        if (File.Exists(ServerConfig))
         {
-            var json = File.ReadAllText(MainConfig);
-            var configJson = JObject.Parse(json);
-            CurrentProfileUID = configJson["Config"]!["LastUidLoggedIn"]?.Value<string>() ?? string.Empty;
-            // Set it is valid if the string is not empty.
-            HasValidProfileConfigs = !string.IsNullOrEmpty(CurrentProfileUID);
-            // Ensure the directory exists for this profile.
-            if (!Directory.Exists(CurrentProfileDirectory) && HasValidProfileConfigs)
-                Directory.CreateDirectory(CurrentProfileDirectory);
+            var json = JObject.Parse(File.ReadAllText(ServerConfig));
+            var lastUri = json["LastConnectedURI"]?.Value<string>() ?? ServerHubConfig.MAIN_SERVER_URI;
+            var lastUid = json["LastLoggedInUID"]?.Value<string>() ?? string.Empty;
 
-            _logger.LogInformation($"Loaded LastUidLoggedIn [{CurrentProfileUID}] from MainConfig.");
+            _logger.LogInformation($"Loaded LastConnectedURI [{lastUri}] and LastLoggedInUID [{lastUid}] from ServerConfig.");
+
+            SetAllFoldersAndPaths(lastUri, lastUid);
         }
-    }
-
-    // If this is not true, we should not be saving our configs anyways.
-    public bool HasValidProfileConfigs { get; private set; } = false;
-
-    public void ClearUidConfigs()
-    {
-        HasValidProfileConfigs = false;
-        UpdateUserUID(null);
-    }
-
-    // Updates the CurrentProfileDirectory to match the provided profile UID.
-    public void UpdateConfigs(string profileUID)
-    {
-        bool isDifferent = CurrentProfileUID != profileUID;
-        // If the profile UID changed, update latest in MainConfig and this provider.
-        if (isDifferent)
+        else
         {
-            _logger.LogInformation($"Updating Configs for Profile UID [{profileUID}]");
-            CurrentProfileUID = profileUID;
-            UpdateUserUID(profileUID);
-
-            // If the directory doesnt yet exist for this profile, create it.
-            if (!Directory.Exists(CurrentProfileDirectory))
-                Directory.CreateDirectory(CurrentProfileDirectory);
-
-            _logger.LogInformation("Configs Updated.");
-            HasValidProfileConfigs = !string.IsNullOrEmpty(profileUID);
+            SetFoldersAndPathsForHubUri(ServerHubConfig.MAIN_SERVER_URI);
         }
+
+        LogAllPaths();
     }
 
-    private void UpdateUserUID(string? uid)
+    public bool TryUpdateForServerUri(ServerHubConfig config, string newUri)
     {
-        var uidFilePath = Path.Combine(SundouleiaDirectory, "config.json");
-        if (!File.Exists(uidFilePath))
+        if (string.Equals(CurrentHubURI, newUri, StringComparison.Ordinal))
+        {
+            _logger.LogInformation($"Hub URI [{newUri}] is already set. No changes made.");
+            return false;
+        }
+
+        // Create or Update the nessisary directories.
+        SetFoldersAndPathsForHubUri(newUri);
+        SetFoldersAndPathsForHubProfile(null);
+        // Update the data and save.
+        config.LastJoinedUri = newUri;
+        config.LastLoggedInUID = string.Empty; // Clear profile on hub change to prevent bad paths.
+        config.Save();
+#if DEBUG
+        LogAllPaths();
+#endif
+        return true;
+    }
+
+    // This is the right structure
+    public bool TrySetProfileConfigs(ServerHubConfig config, string? profileUid)
+    {
+        if (CurrentProfileUID == profileUid)
+        {
+            _logger.LogInformation($"Profile UID [{profileUid}] is already set. No changes made.");
+            return false;
+        }
+
+        SetFoldersAndPathsForHubProfile(profileUid);
+        // Update the data and save.
+        config.LastLoggedInUID = profileUid ?? string.Empty;
+        config.Save();
+#if DEBUG
+        LogAllPaths();
+#endif
+        return true;
+    }
+
+    // Internals
+    private void SetAllFoldersAndPaths(string newUri, string? profileUid)
+    {
+        CurrentHubURI = newUri;
+        // Update hub directory
+        ServerHubDirectory = IsOnMainServer ? ConfigDirectory : Path.Combine(ConfigDirectory, GetHubFolderName(CurrentHubURI));
+        Directory.CreateDirectory(ServerHubDirectory);
+
+        // Update event directory
+        EventDirectory = Path.Combine(ServerHubDirectory, "eventlog");
+        Directory.CreateDirectory(EventDirectory);
+
+        // Update account-authoritative configs
+        MainConfig = Path.Combine(ServerHubDirectory, "config.json");
+        AccountConfig = Path.Combine(ServerHubDirectory, "account.json");
+        Favorites = Path.Combine(ServerHubDirectory, "favorites.json");
+        NicknameConfig = Path.Combine(ServerHubDirectory, "nicknames.json");
+
+        _logger.LogInformation($"Hub configs updated for URI [{CurrentHubURI}]");
+        SetFoldersAndPathsForHubProfile(profileUid);
+    }
+
+    private void SetFoldersAndPathsForHubUri(string newUri)
+    {
+        CurrentHubURI = newUri;
+        // Update hub directory
+        ServerHubDirectory = IsOnMainServer ? ConfigDirectory : Path.Combine(ConfigDirectory, GetHubFolderName(CurrentHubURI));
+        Directory.CreateDirectory(ServerHubDirectory);
+
+        // Update event directory
+        EventDirectory = Path.Combine(ServerHubDirectory, "eventlog");
+        Directory.CreateDirectory(EventDirectory);
+
+        // Update account-authoritative configs
+        MainConfig = Path.Combine(ServerHubDirectory, "config.json");
+        AccountConfig = Path.Combine(ServerHubDirectory, "account.json");
+        Favorites = Path.Combine(ServerHubDirectory, "favorites.json");
+        NicknameConfig = Path.Combine(ServerHubDirectory, "nicknames.json");
+
+        _logger.LogInformation($"Hub configs updated for URI [{CurrentHubURI}]");
+        SetFoldersAndPathsForHubProfile(null);
+
+    }
+
+    private void SetFoldersAndPathsForHubProfile(string? profileUid)
+    {
+        if (string.IsNullOrEmpty(profileUid))
+        {
+            CurrentProfileUID = null;
+            _logger.LogInformation("Cleared profile configs because UID is null or empty.");
             return;
-
-        var tempFilePath = uidFilePath + ".tmp";
-        using (var reader = new StreamReader(uidFilePath))
-        using (var writer = new StreamWriter(tempFilePath))
-        {
-            string? line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                if (line.Trim().StartsWith("\"LastUidLoggedIn\""))
-                {
-                    writer.WriteLine($"    \"LastUidLoggedIn\": \"{uid ?? ""}\",");
-                }
-                else
-                {
-                    writer.WriteLine(line);
-                }
-            }
         }
-        File.Move(tempFilePath, uidFilePath, true);
+
+        _logger.LogInformation($"Setting profile configs for UID [{profileUid}].");
+        CurrentProfileUID = profileUid;
+        // Create the directory for VALID directories.
+        if (!Directory.Exists(AccountProfileDirectory))
+        {
+            _logger.LogInformation($"Profile directory does not exist. Creating new one at [{AccountProfileDirectory}].");
+            Directory.CreateDirectory(AccountProfileDirectory);
+        }
+        _logger.LogInformation($"Profile configs updated. AccountProfileDirectory: [{AccountProfileDirectory}]");
+    }
+
+    public string GetHubFolderName(string uri)
+    {
+        if (uri == ServerHubConfig.MAIN_SERVER_URI)
+            return "_hub_main";
+        else if (uri == ServerHubConfig.DEV_SERVER_URI)
+            return "_hub_dev";
+
+        // Remove scheme prefix (wss:// or ws://)
+        string cleanUri = uri.Replace("wss://", "").Replace("ws://", "");
+
+        // Replace invalid filename chars with '_'
+        foreach (var c in Path.GetInvalidFileNameChars())
+            cleanUri = cleanUri.Replace(c, '_');
+
+        // Remove trailing underscores
+        cleanUri = cleanUri.TrimEnd('_');
+
+        // Add _hub_ prefix
+        return $"_hub_{cleanUri}";
+    }
+
+    public void LogAllPaths()
+    {
+        var logMessage = $@"
+            Loaded Paths:
+            ***********************
+            # Shared Config Directories
+            AssemblyLocation:       {AssemblyLocation}
+            AssemblyDirectoryName:  {AssemblyDirectoryName}
+            AssemblyDirectory:      {AssemblyDirectory}
+            ConfigDirectory:        {ConfigDirectory}
+
+            # Universal Subdirectories
+            FileSysDirectory:       {FileSysDirectory}
+            EventDirectory:         {EventDirectory}
+
+            # Universal Configs
+            ChatConfig:             {ChatConfig}
+            ServerConfig:           {ServerConfig}
+            PerformanceConfig:      {PerformanceConfig}
+            FileCacheCsv:           {FileCacheCsv}
+            TransientCache:         {TransientCache}
+            PlzNoCrashFriends:      {PlzNoCrashFriends}
+            LoadedResources:        {LoadedResources}
+            OwnedSMAFilesConfig:    {OwnedSMAFilesConfig}
+
+            # Account-Authoritative Configs
+            MainConfig:             {MainConfig}
+            AccountConfig:          {AccountConfig}
+            Favorites:              {Favorites}
+            NicknameConfig:         {NicknameConfig}
+
+            # Account-Profile Configs
+            DDS_Groups:             {DDS_Groups}
+            SundesmoGroups:         {SundesmoGroups}
+
+            # DDS Universal Configs
+            DDS_Requests:           {DDS_Requests}
+            DDS_Whitelist:          {DDS_Whitelist}
+            DDS_Radar:              {DDS_Radar}
+            DDS_MCDFData:           {DDS_MCDFData}
+
+            # Helpers
+            IsOnMainServer:         {IsOnMainServer}
+            CurrentHubURI:          {CurrentHubURI}
+            CurrentProfileUID:      {CurrentProfileUID}
+            ServerHubDirectory:     {ServerHubDirectory}
+            AccountProfileDirectory:{AccountProfileDirectory}
+            HasValidProfileConfigs: {HasValidProfileConfigs}
+            ***********************";
+        _logger.LogInformation(logMessage);
     }
 }

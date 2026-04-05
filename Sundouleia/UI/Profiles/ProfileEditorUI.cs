@@ -65,7 +65,7 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
         var publicRef = profile.Info.IsPublic;
         if (ImGui.Checkbox("Public", ref publicRef))
             profile.Info.IsPublic = publicRef;
-        CkGui.AttachToolTip("Makes your profile visible to anyone in radar interactions or radar chats. " +
+        CkGui.AttachTooltip("Makes your profile visible to anyone in radar interactions or radar chats. " +
             "--NL--Otherwise, only your pairs will see your profile.");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfilePublicity, ImGui.GetWindowPos(), ImGui.GetWindowSize());
 
@@ -73,13 +73,13 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
         var isNsfw = profile.Info.IsNSFW;
         if (ImGui.Checkbox("Is NSFW", ref isNsfw))
             profile.Info.IsNSFW = isNsfw;
-        CkGui.AttachToolTip("Your profile can be reported if the avatar or description is NSFW while this option is disabled." +
+        CkGui.AttachTooltip("Your profile can be reported if the avatar or description is NSFW while this option is disabled." +
             "--SEP--If it is checked, you can post NSFW content just fine.");
 
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.Edit, "Image Editor"))
             Mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor)));
-        CkGui.AttachToolTip("Open the Avatar Image Editor to customize your profile picture further!");
+        CkGui.AttachTooltip("Open the Avatar Image Editor to customize your profile picture further!");
 
         ImUtf8.SameLineInner();
         if (CkGui.IconButton(FAI.Save))
@@ -88,7 +88,7 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
                 if (await _hub.UserUpdateProfileContent(profile.Info) is { } res && res.ErrorCode is SundouleiaApiEc.Success)
                     Mediator.Publish(new ClearProfileDataMessage(MainHub.OwnUserData));
             });
-        CkGui.AttachToolTip("Updates your stored profile with latest information");
+        CkGui.AttachTooltip("Updates your stored profile with latest information");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfileSaving, ImGui.GetWindowPos(), ImGui.GetWindowSize(),
             () => Mediator.Publish(new UiToggleMessage(typeof(ProfileEditorUI), ToggleType.Hide)));
 
@@ -146,7 +146,7 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
             }
         }
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.CustomizingProfile, ImGui.GetWindowPos(), ImGui.GetWindowSize());
-        CkGui.AttachToolTip("Customization is WIP as we wait for any digital artists to help Sundouleia with asset creation!");
+        CkGui.AttachTooltip("Customization is WIP as we wait for any digital artists to help Sundouleia with asset creation!");
 
         // below this, we should draw out the description editor
         ImGui.AlignTextToFramePadding();
@@ -161,14 +161,14 @@ public class ProfileEditorUI : WindowMediatorSubscriberBase
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfileDescription, ImGui.GetWindowPos(), ImGui.GetWindowSize(),
             () => Mediator.Publish(new ProfileOpenMessage(MainHub.OwnUserData)));
         if (!MainHub.Reputation.ProfileEditing)
-            CkGui.AttachToolTip("You're Profile Customization Access has been Revoked!--SEP--You will not be able to edit your Profile Description!");
+            CkGui.AttachTooltip("You're Profile Customization Access has been Revoked!--SEP--You will not be able to edit your Profile Description!");
 
         // draw the plate preview buttons.
         var width = (ImGui.GetContentRegionAvail().X - ImGui.GetStyle().ItemSpacing.X) / 2;
 
         if (CkGui.IconTextButton(FAI.Expand, "Preview Profile", ImGui.GetContentRegionAvail().X))
             Mediator.Publish(new ProfileOpenMessage(MainHub.OwnUserData));
-        CkGui.AttachToolTip("Preview your profile in a separate window!");
+        CkGui.AttachTooltip("Preview your profile in a separate window!");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.ProfilePreview, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => {
             Mediator.Publish(new UiToggleMessage(typeof(ProfileAvatarEditor), ToggleType.Show));
             Mediator.Publish(new UiToggleMessage(typeof(ProfileUI), ToggleType.Hide));

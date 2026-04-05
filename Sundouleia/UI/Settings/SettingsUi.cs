@@ -1,9 +1,11 @@
 using CkCommons;
+using CkCommons.DrawSystem.Selector;
 using CkCommons.Gui;
 using CkCommons.Gui.Utility;
 using CkCommons.Helpers;
 using CkCommons.Raii;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
@@ -29,18 +31,20 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly MainConfig _config;
     private readonly ProfilesTab _accountsTab;
     private readonly DebugTab _debugTab;
+    private readonly ConfigDirector _configDirector;
     private readonly UiDataStorageShared _storageShared;
     private readonly DtrService _dtr;
 
     public SettingsUi(ILogger<SettingsUi> logger, SundouleiaMediator mediator, 
         MainHub hub, MainConfig config, ProfilesTab accounts, DebugTab debug, 
-        UiDataStorageShared dataStorage, DtrService dtr)
+        ConfigDirector configDirector, UiDataStorageShared dataStorage, DtrService dtr)
         : base(logger, mediator, "Sundouleia Settings")
     {
         _hub = hub;
         _config = config;
         _accountsTab = accounts;
         _debugTab = debug;
+        _configDirector = configDirector;
         _storageShared = dataStorage;
         _dtr = dtr;
 
@@ -67,40 +71,51 @@ public class SettingsUi : WindowMediatorSubscriberBase
     protected override void DrawInternal()
     {
         var minPos = ImGui.GetCursorPos();
-        var buttonPos = minPos + new Vector2(ImGui.GetContentRegionAvail().X - 150f, 0);
+        var buttonPos = minPos + new Vector2(ImGui.GetContentRegionAvail().X - 100f, 0);
         ImGui.Text(CkLoc.Settings.OptionalPlugins);
 
         ImGui.SameLine();
         CkGui.ColorTextBool("Penumbra", IpcCallerPenumbra.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerPenumbra.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+        CkGui.AttachTooltip(IpcCallerPenumbra.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
         CkGui.ColorTextBool("Glamourer", IpcCallerGlamourer.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerGlamourer.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+        CkGui.AttachTooltip(IpcCallerGlamourer.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
         CkGui.ColorTextBool("C+", IpcCallerCustomize.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerCustomize.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+        CkGui.AttachTooltip(IpcCallerCustomize.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
         CkGui.ColorTextBool("Heels", IpcCallerHeels.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerHeels.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+        CkGui.AttachTooltip(IpcCallerHeels.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
         CkGui.ColorTextBool("Honorific", IpcCallerHonorific.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerHonorific.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+        CkGui.AttachTooltip(IpcCallerHonorific.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
-        CkGui.ColorTextBool("Loci", IpcCallerLoci.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerLoci.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+        var hasMoodles = IpcCallerMoodles.APIAvailable;
+        var hasLoci = IpcCallerLoci.APIAvailable;
+        var hasEither = hasMoodles || hasLoci;
+        CkGui.ColorTextBool("Moodles", hasMoodles, ImGuiColors.HealerGreen, hasEither ? ImGuiColors.ParsedGrey : ImGuiColors.DalamudRed);
+        CkGui.AttachTooltip(IpcCallerMoodles.APIAvailable ? CkLoc.Settings.PluginValid : hasEither ? "Loci satisfies this dependancy." : CkLoc.Settings.PluginInvalid);
+
+        ImGui.SameLine(0, 0);
+        ImGui.TextUnformatted("/");
+        ImGui.SameLine(0, 0);
+        CkGui.ColorTextBool("Loci", hasLoci, ImGuiColors.HealerGreen, hasEither ? ImGuiColors.DalamudYellow : ImGuiColors.DalamudRed);
+        var noLociTT = "--COL--Moodles--COL-- is used for your custom status icon display plugin." +
+            "--SEP--This will work fine, however you will not be able to see other's Loci statuses.";
+        CkGui.AttachTooltip(IpcCallerLoci.APIAvailable ? CkLoc.Settings.PluginValid : hasEither ? noLociTT : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
         CkGui.ColorTextBool("PetNames", IpcCallerPetNames.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerPetNames.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+        CkGui.AttachTooltip(IpcCallerPetNames.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.SameLine();
         CkGui.ColorTextBool("Brio", IpcCallerBrio.APIAvailable);
-        CkGui.AttachToolTip(IpcCallerBrio.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
+        CkGui.AttachTooltip(IpcCallerBrio.APIAvailable ? CkLoc.Settings.PluginValid : CkLoc.Settings.PluginInvalid);
 
         ImGui.Text("Register account:");
 
@@ -132,6 +147,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     ImGui.EndTabItem();
                 }
             }
+
+#if DEBUG
+            if (ImGui.BeginTabItem("HubService Settings"))
+            {
+                DrawHubServiceSelector();
+                ImGui.EndTabItem();
+            }
+#endif
 
             if (ImGui.BeginTabItem(CkLoc.Settings.TabAccounts))
             {
@@ -173,12 +196,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ImGui.SetCursorPos(buttonPos);
         using (ImRaii.Group())
         {
-            if (CkGui.FancyButton(FAI.Folder, "Plugin Config", 150f, false))
+            if (CkGui.FancyButton(FAI.Folder, "Configs", 100f, false))
             {
-                try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.SundouleiaDirectory, UseShellExecute = true }); }
+                try { Process.Start(new ProcessStartInfo { FileName = ConfigFileProvider.ConfigDirectory, UseShellExecute = true }); }
                 catch (Bagagwa e) { Svc.Logger.Error($"Failed to open the config directory. {e.Message}"); }
             }
-            CkGui.AttachToolTip("Opens the Config Folder.--NL--(Useful for debugging)");
+            CkGui.AttachTooltip("Opens the Config Folder.--NL--(Useful for debugging)");
         }
     }
 
@@ -252,19 +275,19 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var animationsGlobal = MainHub.GlobalPerms.DefaultAllowAnimations;
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowAnimationsLabel, ref animationsGlobal, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowAnimations), animationsGlobal));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowAnimationsTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowAnimationsTT);
 
         ImGui.SameLine();
         var soundsGlobal = MainHub.GlobalPerms.DefaultAllowSounds;
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowSoundsLabel, ref soundsGlobal, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowSounds), soundsGlobal));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowSoundsTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowSoundsTT);
 
         ImGui.SameLine();
         var vfxGlobal = MainHub.GlobalPerms.DefaultAllowVfx;
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowVfxLabel, ref vfxGlobal, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultAllowVfx), vfxGlobal));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowVfxTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowVfxTT);
 
         var curShare = MainHub.GlobalPerms.DefaultShareOwnLociData;
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.ShareStatuses, ref curShare, UiService.DisableUI))
@@ -289,19 +312,19 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var curPos = curAccess.HasAny(LociAccess.Positive);
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowPosLociStatuses, ref curPos, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.Positive));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowPosLociStatusesTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowPosLociStatusesTT);
 
         ImGui.SameLine();
         var curNeg = curAccess.HasAny(LociAccess.Negative);
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowNegLociStatuses, ref curNeg, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.Negative));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowNegLociStatusesTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowNegLociStatusesTT);
 
         ImGui.SameLine();
         var curSpecial = curAccess.HasAny(LociAccess.Special);
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowSpecialLociStatuses, ref curSpecial, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.Special));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowSpecialLociStatusesTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowSpecialLociStatusesTT);
         ImGui.TableNextRow();
 
         // Loci Time
@@ -311,7 +334,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var refPermAccess = curAccess.HasAny(LociAccess.Permanent);
         if (ImGui.Checkbox(CkLoc.Settings.MainOptions.AllowPermanentLociStatuses, ref refPermAccess))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.Permanent));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowPermanentLociStatusesTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowPermanentLociStatusesTT);
 
         // Display inline, the icon input text field for setting a maximum duration, if we are not permanent.
         if (!refPermAccess)
@@ -328,7 +351,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 }
                 _timespanStrCache = null;
             }
-            CkGui.AttachToolTip($"The longest duration a timed loci can be applied to you.");
+            CkGui.AttachTooltip($"The longest duration a timed loci can be applied to you.");
         }
         ImGui.TableNextRow();
 
@@ -340,13 +363,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var canApplyOwn = curAccess.HasAny(LociAccess.AllowOwn);
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowOwnLociData, ref canApplyOwn, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.AllowOwn));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowOwnLociDataTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowOwnLociDataTT);
 
         ImGui.SameLine();
         var canApplyOthers = curAccess.HasAny(LociAccess.AllowOther);
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.AllowOtherLociData, ref canApplyOthers, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.AllowOther));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.AllowOtherLociDataTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.AllowOtherLociDataTT);
         ImGui.TableNextRow();
 
         // Removal
@@ -356,75 +379,75 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var canRemoveApplied = curAccess.HasAny(LociAccess.RemoveApplied);
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.RemoveAppliedLociStatuses, ref canRemoveApplied, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.RemoveApplied));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.RemoveAppliedLociStatusesTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.RemoveAppliedLociStatusesTT);
 
         ImGui.SameLine();
         var canRemoveAny = curAccess.HasAny(LociAccess.RemoveAny);
         if (CkGui.Checkbox(CkLoc.Settings.MainOptions.RemoveAnyLociStatuses, ref canRemoveAny, UiService.DisableUI))
             UiService.SetUITask(async () => await ChangeGlobalPerm(nameof(GlobalPerms.DefaultLociAccess), curAccess ^ LociAccess.RemoveAny));
-        CkGui.AttachToolTip(CkLoc.Settings.MainOptions.RemoveAnyLociStatusesTT);
+        CkGui.AttachTooltip(CkLoc.Settings.MainOptions.RemoveAnyLociStatusesTT);
     }
 
 
     private void DrawMainRadar()
     {
-        CkGui.FontText(CkLoc.Settings.MainOptions.HeaderRadar, Fonts.UidFont);
-        var enabled = _config.Current.RadarEnabled;
-        var sendPings = _config.Current.RadarSendPings;
-        var nearbyDtr = _config.Current.RadarNearbyDtr;
-        var joinChats = _config.Current.RadarJoinChats;
-        var showUnreadBubble = _config.Current.RadarShowUnreadBubble;
+        //CkGui.FontText(CkLoc.Settings.MainOptions.HeaderRadar, Fonts.UidFont);
+        //var enabled = _config.Current.RadarEnabled;
+        //var sendPings = _config.Current.RadarSendPings;
+        //var nearbyDtr = _config.Current.RadarNearbyDtr;
+        //var joinChats = _config.Current.RadarJoinChats;
+        //var showUnreadBubble = _config.Current.RadarShowUnreadBubble;
 
-        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarEnabledLabel, ref enabled))
-        {
-            _config.Current.RadarEnabled = enabled;
-            _config.Save();
-            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarEnabled)));
-        }
+        //if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarEnabledLabel, ref enabled))
+        //{
+        //    _config.Current.RadarEnabled = enabled;
+        //    _config.Save();
+        //    Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarEnabled)));
+        //}
 
-        using var _ = ImRaii.Disabled(!enabled);
+        //using var _ = ImRaii.Disabled(!enabled);
 
-        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarSendPingsLabel, ref sendPings))
-        {
-            _config.Current.RadarSendPings = sendPings;
-            _config.Save();
-            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarSendPings)));
-        }
-        ImUtf8.SameLineInner();
-        CkGui.FramedIconText(FAI.SatelliteDish);
-        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarSendPingsTT, true);
+        //if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarSendPingsLabel, ref sendPings))
+        //{
+        //    _config.Current.RadarSendPings = sendPings;
+        //    _config.Save();
+        //    Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarSendPings)));
+        //}
+        //ImUtf8.SameLineInner();
+        //CkGui.FramedIconText(FAI.SatelliteDish);
+        //CkGui.HelpText(CkLoc.Settings.MainOptions.RadarSendPingsTT, true);
 
-        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarNearbyDtrLabel, ref nearbyDtr))
-        {
-            _config.Current.RadarNearbyDtr = nearbyDtr;
-            _config.Save();
-            _dtr.RefreshEntries();
-            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarNearbyDtr)));
-        }
-        ImUtf8.SameLineInner();
-        CkGui.FramedIconText(FAI.PersonDressBurst);
-        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarNearbyDtrTT, true);
+        //if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarNearbyDtrLabel, ref nearbyDtr))
+        //{
+        //    _config.Current.RadarNearbyDtr = nearbyDtr;
+        //    _config.Save();
+        //    _dtr.RefreshEntries();
+        //    Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarNearbyDtr)));
+        //}
+        //ImUtf8.SameLineInner();
+        //CkGui.FramedIconText(FAI.PersonDressBurst);
+        //CkGui.HelpText(CkLoc.Settings.MainOptions.RadarNearbyDtrTT, true);
 
-        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarJoinChatsLabel, ref joinChats))
-        {
-            _config.Current.RadarJoinChats = joinChats;
-            _config.Save();
-            _dtr.RefreshEntries();
-            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarJoinChats)));
-        }
-        ImUtf8.SameLineInner();
-        CkGui.FramedIconText(FAI.CommentDots);
-        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarJoinChatsTT, true);
+        //if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarJoinChatsLabel, ref joinChats))
+        //{
+        //    _config.Current.RadarJoinChats = joinChats;
+        //    _config.Save();
+        //    _dtr.RefreshEntries();
+        //    Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarJoinChats)));
+        //}
+        //ImUtf8.SameLineInner();
+        //CkGui.FramedIconText(FAI.CommentDots);
+        //CkGui.HelpText(CkLoc.Settings.MainOptions.RadarJoinChatsTT, true);
 
-        if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleLabel, ref showUnreadBubble))
-        {
-            _config.Current.RadarShowUnreadBubble = showUnreadBubble;
-            _config.Save();
-            Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarShowUnreadBubble)));
-        }
-        ImUtf8.SameLineInner();
-        CkGui.FramedIconText(FAI.Bell);
-        CkGui.HelpText(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleTT, true);
+        //if (ImGui.Checkbox(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleLabel, ref showUnreadBubble))
+        //{
+        //    _config.Current.RadarShowUnreadBubble = showUnreadBubble;
+        //    _config.Save();
+        //    Mediator.Publish(new RadarConfigChanged(nameof(ConfigStorage.RadarShowUnreadBubble)));
+        //}
+        //ImUtf8.SameLineInner();
+        //CkGui.FramedIconText(FAI.Bell);
+        //CkGui.HelpText(CkLoc.Settings.MainOptions.RadarShowUnreadBubbleTT, true);
     }
 
     private void DrawPrefsDownloads()
@@ -444,7 +467,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _config.Save();
             Mediator.Publish(new DownloadLimitChangedMessage());
         }
-        CkGui.AttachToolTip(CkLoc.Settings.Preferences.DownloadLimitTT);
+        CkGui.AttachTooltip(CkLoc.Settings.Preferences.DownloadLimitTT);
 
         ImUtf8.SameLineInner();
         if (CkGuiUtils.EnumCombo("###SpeedType", 50 * ImGuiHelpers.GlobalScale, _config.Current.DownloadSpeedType, out var newType, s => s.ToName()))
@@ -453,7 +476,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _config.Save();
             Mediator.Publish(new DownloadLimitChangedMessage());
         }
-        CkGui.AttachToolTip(CkLoc.Settings.Preferences.DownloadSpeedTypeTT);
+        CkGui.AttachTooltip(CkLoc.Settings.Preferences.DownloadSpeedTypeTT);
 
         CkGui.FramedIconText(FAI.Download);
         CkGui.TextFrameAlignedInline(CkLoc.Settings.Preferences.MaxParallelDLsLabel);
@@ -511,7 +534,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     _config.Save();
                 }
             }
-            CkGui.AttachToolTip(CkLoc.Settings.Preferences.TransferBarWidthTT);
+            CkGui.AttachTooltip(CkLoc.Settings.Preferences.TransferBarWidthTT);
 
             CkGui.FrameSeparatorV();
 
@@ -526,7 +549,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     _config.Save();
                 }
             }
-            CkGui.AttachToolTip(CkLoc.Settings.Preferences.TransferBarHeightTT);
+            CkGui.AttachTooltip(CkLoc.Settings.Preferences.TransferBarHeightTT);
 
             CkGui.FrameSeparatorV();
 
@@ -542,20 +565,20 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawPrefsRequests()
     {
         CkGui.FontText("Requests", Fonts.UidFont);
-        var showBubbles = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Bubble);
-        var showDtr = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.DtrBar);
-        var sounds = _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Audio);
+        var showBubbles = _config.Current.RequestNotifiers.HasAny(AlertKind.Bubble);
+        var showDtr = _config.Current.RequestNotifiers.HasAny(AlertKind.DtrBar);
+        var sounds = _config.Current.RequestNotifiers.HasAny(AlertKind.Audio);
         
         if (ImGui.Checkbox("Show Total Incoming", ref showBubbles))
         {
-            _config.Current.RequestNotifiers ^= RequestAlertKind.Bubble;
+            _config.Current.RequestNotifiers ^= AlertKind.Bubble;
             _config.Save();
         }
         CkGui.HelpText("Displays the number of incoming requests along the MainUI TabBar.");
 
         if (ImGui.Checkbox("Show DTR Entry", ref showDtr))
         {
-            _config.Current.RequestNotifiers ^= RequestAlertKind.DtrBar;
+            _config.Current.RequestNotifiers ^= AlertKind.DtrBar;
             _config.Save();
             _dtr.RefreshEntries();
         }
@@ -563,7 +586,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         if (ImGui.Checkbox("Play Audio Alerts", ref sounds))
         {
-            _config.Current.RequestNotifiers ^= RequestAlertKind.Audio;
+            _config.Current.RequestNotifiers ^= AlertKind.Audio;
             _config.Save();
         }
         CkGui.HelpText("Use a In-Game or custom sound trigger after recieving a request");
@@ -583,7 +606,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 _config.UpdateAudio();
             }
         }
-        CkGui.AttachToolTip("The type of audio to be played.");
+        CkGui.AttachTooltip("The type of audio to be played.");
                 
         CkGui.FrameSeparatorV();
 
@@ -607,7 +630,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             UIGlobals.PlaySoundEffect((uint)newSound);
             _config.UpdateAudio();
         }
-        CkGui.AttachToolTip("The In-Game Audio to play when recieving a new request");
+        CkGui.AttachTooltip("The In-Game Audio to play when recieving a new request");
     }
 
     private void DrawCustomSound()
@@ -619,7 +642,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _config.Current.AlertVolume = volume;
             _config.UpdateAudio();
         }
-        CkGui.AttachToolTip("How loud the custom sound is in playback");
+        CkGui.AttachTooltip("How loud the custom sound is in playback");
 
         ImGui.SameLine();
         var path = _config.Current.AlertSoundPath;
@@ -638,7 +661,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _config.UpdateAudio();
             _config.Save();
         }
-        CkGui.AttachToolTip(soundInvalid ? "--COL--Sound Path Invalid!--COL--" : "The filepath to the custom audio file.", ImGuiColors.DalamudRed);
+        CkGui.AttachTooltip(soundInvalid ? "--COL--Sound Path Invalid!--COL--" : "The filepath to the custom audio file.", ImGuiColors.DalamudRed);
     }
 
     private void DrawPrefsNotify()
@@ -706,6 +729,71 @@ public class SettingsUi : WindowMediatorSubscriberBase
             "--NL----COL--Chat--COL-- prints Error notifications in chat" +
             "--NL----COL--Toast--COL-- shows Error toast notifications in the bottom right corner" +
             "--NL----COL--Both--COL-- shows chat as well as the toast notification", ImGuiColors.ParsedGold);
+    }
+
+    private string _customServerName = string.Empty;
+    private string _customServerUri = string.Empty;
+    private void DrawHubServiceSelector()
+    {
+        CkGui.FontText("Current ServiceHub Service Selector", Fonts.UidFont);
+        var hubs = ServerHubConfig.ServerHubs;
+        var current = ServerHubConfig.CurrentHub;
+
+        CkGui.FramedIconText(FAI.GlobeAsia);
+        CkGui.TextFrameAlignedInline($"{current.HubName}, URI:");
+        ImGui.SameLine();
+        CkGui.TagLabelTextFrameAligned(current.HubUri, ImGuiColors.ParsedGold.Darken(.5f), 3 * ImGuiHelpers.GlobalScale);
+
+        CkGui.FramedIconText(FAI.Hdd);
+        ImUtf8.SameLineInner();
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.5f);
+        using (var c = ImRaii.Combo("Select Service", current.HubName))
+        {
+            if (c)
+            {
+                for (int i = 0; i < hubs.Count; i++)
+                {
+                    var selected = hubs[i] == current;
+                    if (ImGui.Selectable($"{hubs[i].HubName} ({hubs[i].HubUri})", selected) && !selected)
+                    {
+                        _configDirector.SetHubIndex(i);
+                        UiService.SetUITask(async () => await _hub.Reconnect(DisconnectIntent.Reload).ConfigureAwait(false));
+                    }
+                }
+            }
+        }
+        if (ServerHubConfig.ChosenHubIndex >= 2)
+        {
+            // Change this later to let you remove the service while not connected to it and stuff.
+            ImGui.SameLine();
+            if (CkGui.IconTextButton(FAI.Trash, "Remove Service"))
+            {
+                if (!_configDirector.RemoveServerHub(ServerHubConfig.CurrentHub))
+                    return;
+                // Successful removal, reconnect.
+                UiService.SetUITask(async () => await _hub.Reconnect(DisconnectIntent.Reload).ConfigureAwait(false));
+            }
+        }
+
+        ImGui.Separator();
+        ImGui.SetNextItemWidth(250);
+        ImGui.InputText("Custom Service Name", ref _customServerName, 255);
+
+        ImGui.SetNextItemWidth(250);
+        ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
+        if (CkGui.IconTextButton(FAI.Plus, "Add Service"))
+        {
+            if (string.IsNullOrWhiteSpace(_customServerUri) || !Uri.IsWellFormedUriString(_customServerUri, UriKind.Absolute))
+                return;
+            // It is valid, so add the service.
+            var newService = new ServerHubInfo() { HubName = _customServerName, HubUri = _customServerUri };
+            if (!_configDirector.AddServerHub(newService))
+                return;
+
+            // Reset the input fields, and save the config.
+            _customServerName = string.Empty;
+            _customServerUri = string.Empty;
+        }
     }
 
     /// <summary>

@@ -144,7 +144,7 @@ internal class DataEventsUI : WindowMediatorSubscriberBase
             }
             ImGui.TextUnformatted(msg);
             if (!string.Equals(msg, ev.DataSummary, StringComparison.Ordinal))
-                CkGui.AttachToolTip(ev.DataSummary);
+                CkGui.AttachTooltip(ev.DataSummary);
         }
     }
 }

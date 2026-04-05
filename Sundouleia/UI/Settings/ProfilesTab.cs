@@ -33,6 +33,7 @@ public class ProfilesTab
     private readonly SundouleiaMediator _mediator;
     private readonly MainHub _hub;
     private readonly MainConfig _mainConfig;
+    private readonly ServerHubConfig _serverConfig;
     private readonly AccountManager _account;
     private readonly ProfileService _profiles;
     private readonly ConfigFileProvider _files;
@@ -40,13 +41,14 @@ public class ProfilesTab
     private readonly Queue<Action> _postDrawActions = new();
 
     public ProfilesTab(ILogger<ProfilesTab> logger, SundouleiaMediator mediator,
-        MainHub hub, MainConfig config, AccountManager account,
-        ProfileService profiles, ConfigFileProvider files)
+        MainHub hub, MainConfig config, ServerHubConfig serverConfig,
+        AccountManager account,ProfileService profiles, ConfigFileProvider files)
     {
         _logger = logger;
         _mediator = mediator;
         _hub = hub;
         _mainConfig = config;
+        _serverConfig = serverConfig;
         _account = account;
         _profiles = profiles;
         _files = files;
@@ -206,7 +208,7 @@ public class ProfilesTab
         // Draw the add and remove buttons below.
         if (CkGui.FancyButton(FAI.Plus, CkLoc.Settings.Accounts.AddProfile, listSize.X))
             _account.AddNewProfile();
-        CkGui.AttachToolTip(CkLoc.Settings.Accounts.AddProfileTT);
+        CkGui.AttachTooltip(CkLoc.Settings.Accounts.AddProfileTT);
 
         // Draw the remove button.
         if (CkGui.FancyButton(FAI.Minus, CkLoc.Settings.Accounts.RemoveProfile, listSize.X, (!ImGui.GetIO().KeyCtrl || !ImGui.GetIO().KeyShift)))
@@ -226,7 +228,7 @@ public class ProfilesTab
                 }
             }
         }
-        CkGui.AttachToolTip(CkLoc.Settings.Accounts.RemoveProfileTT);
+        CkGui.AttachTooltip(CkLoc.Settings.Accounts.RemoveProfileTT);
 
         // Fire if true.
         AccountDeletionPopup(_selected);
@@ -472,7 +474,7 @@ public class ProfilesTab
         ImGui.SetCursorPos(newPos);
         // Left aligned box, starting at the LeftStartY.
         DrawLinkedPlayers(profile, linkedWidth, shouldDrawLeftBox ? leftTopAvailH : rightTopAvailH);
-        CkGui.AttachToolTip("The Characters linked to this Profile.");
+        CkGui.AttachTooltip("The Characters linked to this Profile.");
         // Draw the line and lower area
         DrawOtherPlayers();
     }
@@ -497,10 +499,10 @@ public class ProfilesTab
         CkGui.TextFrameAlignedInline("UID:");
         var noUid = string.IsNullOrEmpty(profile.UserUID);
         CkGui.ColorTextFrameAlignedInline(noUid ? "Not Yet Assigned" : profile.UserUID, noUid ? ImGuiColors.DalamudRed : ImGuiColors.TankBlue);
-        CkGui.AttachToolTip("Once you successfully connect with the inserted secret key below, your UID will be set!");
+        CkGui.AttachTooltip("Once you successfully connect with the inserted secret key below, your UID will be set!");
 
         CkGui.FramedHoverIconText(FAI.Key, ImGuiColors.TankBlue.ToUint());
-        CkGui.AttachToolTip(CkLoc.Settings.Accounts.ProfileKey);
+        CkGui.AttachTooltip(CkLoc.Settings.Accounts.ProfileKey);
         if (ImGui.IsItemClicked())
             _showingKey = _showingKey == profile ? null : profile;
 
@@ -530,7 +532,7 @@ public class ProfilesTab
             var txt = showKey ? profile.Key : new string('*', Math.Clamp(profile.Key.Length, 0, 32));
             ImGuiInternal.RenderTextClipped(_wdl, txtRect.Min + _style.FramePadding, txtRect.Max - _style.FramePadding, txt, Vector2.Zero, txtSize, txtRect, true);
             ImGui.Dummy(txtSize);
-            CkGui.AttachToolTip(CkLoc.Settings.Accounts.CopyKeyTT);
+            CkGui.AttachTooltip(CkLoc.Settings.Accounts.CopyKeyTT);
             if (ImGui.IsItemClicked())
                 ImGui.SetClipboardText(profile.Key);
         }
@@ -539,14 +541,14 @@ public class ProfilesTab
         {
             ImGui.SameLine(width - ImUtf8.FrameHeight, 0);
             CkGui.FramedIconText(FAI.CheckCircle);
-            CkGui.AttachToolTip(CkLoc.Settings.Accounts.NoEditKeyTT);
+            CkGui.AttachTooltip(CkLoc.Settings.Accounts.NoEditKeyTT);
         }
         else
         {
             ImGui.SameLine(width - CkGui.IconButtonSize(FAI.PenSquare).X, 0);
             if (CkGui.IconButton(FAI.PenSquare, inPopup: true))
                 _editingSecretKey = showEditor ? null : profile;
-            CkGui.AttachToolTip(CkLoc.Settings.Accounts.EditKeyTT);
+            CkGui.AttachTooltip(CkLoc.Settings.Accounts.EditKeyTT);
         }
     }
     
@@ -636,7 +638,7 @@ public class ProfilesTab
                 // Draw the node.
                 DrawPlayerNode(player, totalWidth, nameSize.X, worldSize.X, clientPlayer == player, player.IsLinked());
                 AsDragDropSource(DRAGDROP_ADD_CHARA, player);
-                CkGui.AttachToolTip($"Linked to --COL--{player.LinkedProfile?.UserUID ?? "UNK"}--COL--", !player.IsLinked(), ImGuiColors.TankBlue);
+                CkGui.AttachTooltip($"Linked to --COL--{player.LinkedProfile?.UserUID ?? "UNK"}--COL--", !player.IsLinked(), ImGuiColors.TankBlue);
             }
         }
         // Define the child as a target for the removal area.
@@ -902,7 +904,7 @@ public class ProfilesTab
                 ImGui.CloseCurrentPopup();
             }
         }
-        CkGui.AttachToolTip("Must hold CTRL+SHIFT to select!");
+        CkGui.AttachTooltip("Must hold CTRL+SHIFT to select!");
 
         ImGui.SameLine();
         if (ImGui.Button(noButton))
@@ -927,8 +929,8 @@ public class ProfilesTab
             }
 
             // Update the last logged in UID.
-            _mainConfig.Current.LastUidLoggedIn = string.Empty;
-            _mainConfig.Save();
+            _serverConfig.LastLoggedInUID = string.Empty;
+            _serverConfig.Save();
 
             // Extract the UID's so that we know what folders to delete in our config. (If we want to, we could keep them as a backup, idk)
             var accountUids = MainHub.ConnectionResponse?.ActiveAccountUidList ?? [];
@@ -938,7 +940,7 @@ public class ProfilesTab
             // Delete the folders based off our profile type that was deleted.
             if (isMain)
             {
-                var toDelete = Directory.GetDirectories(ConfigFileProvider.SundouleiaDirectory)
+                var toDelete = Directory.GetDirectories(ConfigFileProvider.ConfigDirectory)
                     .Where(d => accountUids.Contains(d, StringComparer.OrdinalIgnoreCase))
                     .ToList();
 
@@ -947,20 +949,20 @@ public class ProfilesTab
 
                 _logger.LogInformation("Removed all deleted profile-related folders.");
                 // Cleanup the remaining UID's
-                _files.ClearUidConfigs();
+                _files.TrySetProfileConfigs(_serverConfig, null);
                 // Fully disconnect and switch back to the intro UI.
                 await _hub.Disconnect(ServerState.Disconnected, DisconnectIntent.Reload);
                 _mediator.Publish(new SwitchToIntroUiMessage());
             }
             else
             {
-                var toDelete = _files.CurrentProfileDirectory;
+                var toDelete = _files.AccountProfileDirectory;
                 if (Directory.Exists(toDelete))
                 {
                     _logger.LogDebug("Deleting Config Folder for removed profile.", LoggerType.ApiCore);
                     Directory.Delete(toDelete, true);
                 }
-                _files.ClearUidConfigs();
+                _files.TrySetProfileConfigs(_serverConfig, null);
                 await _hub.Reconnect(DisconnectIntent.Reload);
             }
         }

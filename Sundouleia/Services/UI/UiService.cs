@@ -60,6 +60,14 @@ public sealed class UiService : DisposableMediatorSubscriberBase
                 _windowSystem.AddWindow(window);
             }
         });
+
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, _ =>
+        {
+            // Close all other windows that are opened, as the intro screen should be the only one available.
+            var nonIntroWindows = _windowSystem.Windows.Where(w => w.GetType() != typeof(IntroUi)).ToList();
+            foreach (var window in nonIntroWindows)
+                window.IsOpen = false;
+        });
     }
 
     /// <summary>

@@ -3,6 +3,7 @@ using MessagePack.Resolvers;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Sundouleia.PlayerClient;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using SundouleiaAPI.Hub;
@@ -68,7 +69,7 @@ public class HubFactory : MediatorSubscriberBase
     private HubConnection BuildHubConnection(CancellationToken ct, string token = "")
     {
         Logger.LogDebug("Building new HubConnection", LoggerType.HubFactory);
-        var connectionURI = MainHub.MAIN_SERVER_URI + ISundouleiaHub.Path;
+        var connectionURI = ServerHubConfig.CurrentHubUri + ISundouleiaHub.Path;
 
         Logger.LogDebug($"Attempting to connect to URI: {connectionURI}", LoggerType.HubFactory);
         // create the instance, based on the hub type.

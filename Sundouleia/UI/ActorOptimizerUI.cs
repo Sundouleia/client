@@ -270,7 +270,7 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
                         _filterGamePath = string.Empty;
                     }
                 }
-                CkGui.AttachToolTip("--COL--Hold CTRL--COL-- to remove all game paths from the displayed list." +
+                CkGui.AttachTooltip("--COL--Hold CTRL--COL-- to remove all game paths from the displayed list." +
                     "--SEP--Animation & VFX data will be handled automatically.", ImGuiColors.DalamudOrange);
 
                 ImGuiHelpers.ScaledDummy(5);
@@ -313,7 +313,7 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
                             }
                             ImGui.TableNextColumn();
                             ImGui.TextUnformatted(entry);
-                            CkGui.AttachToolTip($"{entry}--SEP--Click to copy to clipboard");
+                            CkGui.AttachTooltip($"{entry}--SEP--Click to copy to clipboard");
                             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
                                 ImGui.SetClipboardText(entry);
 
@@ -321,14 +321,14 @@ public class ActorOptimizerUI : WindowMediatorSubscriberBase
                             if (hasFileResolve)
                             {
                                 ImGui.TextUnformatted(filePath ?? "Unk");
-                                CkGui.AttachToolTip($"{(filePath ?? "Unk")}--SEP--Click to copy to clipboard");
+                                CkGui.AttachTooltip($"{(filePath ?? "Unk")}--SEP--Click to copy to clipboard");
                                 if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
                                     ImGui.SetClipboardText(filePath);
                             }
                             else
                             {
                                 ImGui.TextUnformatted("-");
-                                CkGui.AttachToolTip("Resolve Game Paths to used File Paths to display the associated file paths.");
+                                CkGui.AttachTooltip("Resolve Game Paths to used File Paths to display the associated file paths.");
                             }
                         }
                     }

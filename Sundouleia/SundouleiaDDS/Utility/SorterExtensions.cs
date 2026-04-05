@@ -97,12 +97,12 @@ public static class SorterExtensions
         public Func<DynamicLeaf<Sundesmo>, IComparable?> KeySelector => l => l.Data.AlphabeticalSortKey();
     }
 
-    public struct RadarName : ISortMethod<DynamicLeaf<RadarUser>>
+    public struct RadarName : ISortMethod<DynamicLeaf<RadarPublicUser>>
     {
         public string Name => "Name";
         public FAI Icon => FAI.SortAlphaDown; // Maybe change.
         public string Tooltip => "Sort by name.";
-        public Func<DynamicLeaf<RadarUser>, IComparable?> KeySelector => l => l.Data.DisplayName;
+        public Func<DynamicLeaf<RadarPublicUser>, IComparable?> KeySelector => l => l.Data.DisplayName;
     }
 
     public struct ByRequestTime : ISortMethod<DynamicLeaf<RequestEntry>>

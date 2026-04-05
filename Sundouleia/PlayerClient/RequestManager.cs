@@ -55,7 +55,7 @@ public sealed class RequestsManager : DisposableMediatorSubscriberBase
         Logger.LogDebug($"Adding new request entry to manager.", LoggerType.PairManagement);
         _allRequests.Add(entry);
         // If we have it set to play sounds, play them if for us.
-        if (!entry.FromClient && _config.Current.RequestNotifiers.HasAny(RequestAlertKind.Audio))
+        if (!entry.FromClient && _config.Current.RequestNotifiers.HasAny(AlertKind.Audio))
             _config.StartSound();
         
         RecreateLazy();

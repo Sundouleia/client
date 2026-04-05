@@ -15,7 +15,7 @@ public partial class MainHub
 {
     #region Message / Info Callbacks
     /// <summary>
-    ///     Called when the server sends a message to the client.
+    ///   Called when the server sends a message to the client.
     /// </summary>
     public Task Callback_ServerMessage(MessageSeverity messageSeverity, string message)
     {
@@ -27,9 +27,9 @@ public partial class MainHub
 
         var (title, type) = messageSeverity switch
         {
-            MessageSeverity.Error => ($"Error from {MAIN_SERVER_NAME}", NotificationType.Error),
-            MessageSeverity.Warning => ($"Warning from {MAIN_SERVER_NAME}", NotificationType.Warning),
-            _ => ($"Info from {MAIN_SERVER_NAME}", NotificationType.Info),
+            MessageSeverity.Error => ($"Error from {ServerHubConfig.CurrentHubName}", NotificationType.Error),
+            MessageSeverity.Warning => ($"Warning from {ServerHubConfig.CurrentHubName}", NotificationType.Warning),
+            _ => ($"Info from {ServerHubConfig.CurrentHubName}", NotificationType.Info),
         };
 
         Mediator.Publish(new NotificationMessage(title, message, type, TimeSpan.FromSeconds(7.5)));
@@ -37,7 +37,7 @@ public partial class MainHub
     }
 
     /// <summary>
-    ///     Sometimes Corby just wants to do a little bullying.
+    ///   Sometimes Corby just wants to do a little bullying.
     /// </summary>
     public Task Callback_HardReconnectMessage(MessageSeverity messageSeverity, string message, ServerState newServerState)
     {
@@ -47,9 +47,9 @@ public partial class MainHub
         {
             var (title, type, duration) = messageSeverity switch
             {
-                MessageSeverity.Error => ($"Error from {MAIN_SERVER_NAME}", NotificationType.Error, 7.5),
-                MessageSeverity.Warning => ($"Warning from {MAIN_SERVER_NAME}", NotificationType.Warning, 7.5),
-                _ => ($"Info from {MAIN_SERVER_NAME}", NotificationType.Info, 5.0),
+                MessageSeverity.Error => ($"Error from {ServerHubConfig.CurrentHubName}", NotificationType.Error, 7.5),
+                MessageSeverity.Warning => ($"Warning from {ServerHubConfig.CurrentHubName}", NotificationType.Warning, 7.5),
+                _ => ($"Info from {ServerHubConfig.CurrentHubName}", NotificationType.Info, 5.0),
             };
             Mediator.Publish(new NotificationMessage(title, message, type, TimeSpan.FromSeconds(duration)));
         }
@@ -80,7 +80,7 @@ public partial class MainHub
     }
 
     /// <summary>
-    ///     Moderation tool for radar chats.
+    ///   Moderation tool for radar chats.
     /// </summary>
     public Task Callback_RadarUserFlagged(string flaggedUserUid)
     {
@@ -90,7 +90,7 @@ public partial class MainHub
     }
 
     /// <summary>
-    ///     Gets total online users.
+    ///   Gets total online users.
     /// </summary>
     public Task Callback_ServerInfo(ServerInfoResponse serverInfo)
     {
@@ -101,11 +101,11 @@ public partial class MainHub
 
     #region Pair/Request Callbacks
     /// <summary>
-    ///     To add a new pair (Sundesmo).
+    ///   To add a new pair (Sundesmo).
     /// </summary>
     public Task Callback_AddPair(UserPair dto)
     {
-        Logger.LogDebug($"Callback_AddPair: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_AddPair: {dto}", LoggerType.Callbacks);
         Generic.Safe(() =>
         {
             _sundesmos.AddSundesmo(dto);
@@ -115,11 +115,11 @@ public partial class MainHub
     }
 
     /// <summary>
-    ///     To remove a Sundesmo.
+    ///   To remove a Sundesmo.
     /// </summary>
     public Task Callback_RemovePair(UserDto dto)
     {
-        Logger.LogDebug($"Callback_RemovePair: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_RemovePair: {dto}", LoggerType.Callbacks);
         Generic.Safe(() =>
         {
             _sundesmos.RemoveSundesmo(dto);
@@ -129,36 +129,34 @@ public partial class MainHub
     }
 
     /// <summary>
-    ///     Change a temporary sundesmo to a permanent one.
+    ///   Change a temporary sundesmo to a permanent one.
     /// </summary>
     public Task Callback_PersistPair(UserDto dto)
     {
-        Logger.LogDebug($"Callback_UpdatePairToPermanent: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_UpdatePairToPermanent: {dto}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.UpdateToPermanent(dto));
         return Task.CompletedTask;
     }
 
     /// <summary>
-    ///     That there is a new pending request to add to the requests manager. <para />
-    ///     Note that request sent by ourselves is not returned here, this callback
-    ///     is only for requests sent by others. We can safely assume all requests 
-    ///     have us as the target.
+    ///   Occurs upon recieving a pair request from someone else.
     /// </summary>
+    /// <remarks> This is not called in responce to your own sent requests. </remarks>
     public Task Callback_AddRequest(SundesmoRequest dto)
     {
-        Logger.LogDebug($"Callback_AddPairRequest: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_AddPairRequest: {dto}", LoggerType.Callbacks);
         _requests.AddNewRequest(dto);
         _radar.RefreshUser(dto.User);
         return Task.CompletedTask;
     }
 
     /// <summary>
-    ///     Sent by server when another user canceled or rejected 
-    ///     a pending request you have sent. 
+    ///   When a pending request was rejected, or pending request was canceled.
     /// </summary>
+    /// <remarks> This is not called in responce to your own sent requests. </remarks>
     public Task Callback_RemoveRequest(SundesmoRequest dto)
     {
-        Logger.LogDebug($"Callback_RemoveRequest: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_RemoveRequest: {dto}", LoggerType.Callbacks);
         _requests.RemoveRequest(dto);
         _radar.RefreshUser(dto.User);
         return Task.CompletedTask;
@@ -166,76 +164,69 @@ public partial class MainHub
     #endregion Pair/Request Callbacks
 
     #region Moderation Callbacks
+    // Remove? Or Modify later. Currently in limbo state.
     public Task Callback_Blocked(UserDto dto)
-    {
-        Logger.LogDebug($"Callback_Blocked: {dto.User.AliasOrUID} has blocked you.", LoggerType.Callbacks);
-        // Do something here.
-        return Task.CompletedTask;
-    }
+        => Task.CompletedTask;
 
     public Task Callback_Unblocked(UserDto dto)
-    {
-        Logger.LogDebug($"Callback_Unblocked: {dto.User.AliasOrUID} has unblocked you.", LoggerType.Callbacks);
-        // Do something here.
-        return Task.CompletedTask;
-    }
+        => Task.CompletedTask;
     #endregion Moderation Callbacks
 
     #region Loci Callbacks
     public Task Callback_PairLociDataUpdated(LociDataUpdate dto)
     {
-        Logger.LogDebug($"Callback_PairLociDataUpdated: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_PairLociDataUpdated: {dto.User.DisplayName}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.ReceiveLociData(dto.User, dto.Data));
         return Task.CompletedTask;
     }
 
     public Task Callback_PairLociStatusesUpdate(LociStatusesUpdate dto)
     {
-        Logger.LogDebug($"Callback_PairLociStatusesUpdate: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_PairLociStatusesUpdate: {dto.User.DisplayName}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.ReceiveLociStatuses(dto.User, dto.Statuses));
         return Task.CompletedTask;
     }
 
     public Task Callback_PairLociPresetsUpdate(LociPresetsUpdate dto)
     {
-        Logger.LogDebug($"Callback_PairLociPresetsUpdate: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_PairLociPresetsUpdate: {dto.User.DisplayName}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.ReceiveLociPresets(dto.User, dto.Presets));
         return Task.CompletedTask;
     }
 
     public Task Callback_PairLociStatusModified(LociStatusModified dto)
     {
-        Logger.LogDebug($"Callback_PairLociStatusModified: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_PairLociStatusModified: {dto.User.DisplayName}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.ReceiveLociStatusUpdate(dto.User, dto.Status, dto.Deleted));
         return Task.CompletedTask;
     }
 
     public Task Callback_PairLociPresetModified(LociPresetModified dto)
     {
-        Logger.LogDebug($"Callback_PairLociPresetModified: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_PairLociPresetModified: {dto.User.DisplayName}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.ReceiveLociPresetUpdate(dto.User, dto.Preset, dto.Deleted));
         return Task.CompletedTask;
     }
     public async Task Callback_ApplyLociDataById(ApplyLociDataById dto)
     {
-        Logger.LogDebug($"Callback_ApplyLociDataById: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_ApplyLociDataById: {dto.User.DisplayName}", LoggerType.Callbacks);
         // Fail if not a valid pair or not rendered.
         if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
-            Logger.LogWarning($"Received ApplyLociDataById for an unpaired user: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received ApplyLociDataById for an unpaired user: {dto.User.DisplayName}");
         else if (!pair.IsRendered)
-            Logger.LogWarning($"Received ApplyLociDataById for a sundesmo not rendered: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received ApplyLociDataById for a sundesmo not rendered: {dto.User.DisplayName}");
         else
             await _ipc.Loci.ApplyStatus(dto.Ids.ToList()).ConfigureAwait(false);
     }
 
     public async Task Callback_ApplyLociStatus(ApplyLociStatus dto)
     {
-        Logger.LogDebug($"Callback_ApplyLociStatus: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_ApplyLociStatus: {dto.User.DisplayName}", LoggerType.Callbacks);
         // Fail if not a valid pair.
         if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
-            Logger.LogWarning($"Received ApplyLociStatus for an unpaired user: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received ApplyLociStatus for an unpaired user: {dto.User.DisplayName}");
         else if (!pair.IsRendered)
-            Logger.LogWarning($"Received ApplyLociStatus for a sundesmo not rendered: {dto.User.AliasOrUID}" );
+            Logger.LogWarning($"Received ApplyLociStatus for a sundesmo not rendered: {dto.User.DisplayName}" );
         else
         {
             Mediator.Publish(new EventMessage(new(pair.GetNickAliasOrUid(), pair.UserData.UID, DataEventType.LociDataApplied, "Applied by Pair.")));
@@ -245,12 +236,12 @@ public partial class MainHub
 
     public async Task Callback_RemoveLociData(RemoveLociData dto)
     {
-        Logger.LogDebug($"Callback_RemoveLociData: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_RemoveLociData: {dto.User.DisplayName}", LoggerType.Callbacks);
         // Fail if not a valid pair or not rendered.
         if (_sundesmos.GetUserOrDefault(dto.User) is not { } pair)
-            Logger.LogWarning($"Received RemoveLociData for an unpaired user: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received RemoveLociData for an unpaired user: {dto.User.DisplayName}");
         else if (!pair.IsRendered)
-            Logger.LogWarning($"Received RemoveLociData for a sundesmo not rendered: {dto.User.AliasOrUID}");
+            Logger.LogWarning($"Received RemoveLociData for a sundesmo not rendered: {dto.User.DisplayName}");
         else
             await _ipc.Loci.BombStatus(dto.Ids.ToList()).ConfigureAwait(false);
     }
@@ -264,14 +255,14 @@ public partial class MainHub
     /// </summary>
     public Task Callback_IpcUpdateFull(IpcUpdateFull dto)
     {
-        Logger.LogDebug($"Callback_IpcUpdateFull: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_IpcUpdateFull: {dto.User.DisplayName}", LoggerType.Callbacks);
         try
         {
             _sundesmos.ReceiveIpcUpdateFull(dto.User, dto.ModData, dto.IpcData, dto.IsInitialData);
         }
         catch (Bagagwa ex)
         {
-            Logger.LogError($"Error in Callback_IpcUpdateFull for {dto.User.AliasOrUID}: {ex}");
+            Logger.LogError($"Error in Callback_IpcUpdateFull for {dto.User.DisplayName}: {ex}");
         }
         return Task.CompletedTask;
     }
@@ -282,7 +273,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_IpcUpdateMods(IpcUpdateMods dto)
     {
-        Logger.LogDebug($"Callback_IpcUpdateMods: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_IpcUpdateMods: {dto.User.DisplayName}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.ReceiveIpcUpdateMods(dto.User, dto.ModData, dto.ManipString));
         return Task.CompletedTask;
     }
@@ -294,7 +285,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_IpcUpdateOther(IpcUpdateOther dto)
     {
-        Logger.LogDebug($"Callback_IpcUpdateOther: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_IpcUpdateOther: {dto.User.DisplayName}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.ReceiveIpcUpdateOther(dto.User, dto.IpcData));
         return Task.CompletedTask;
     }
@@ -305,7 +296,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_IpcUpdateSingle(IpcUpdateSingle dto)
     {
-        Logger.LogDebug($"Callback_IpcUpdateSingle: {dto.User.AliasOrUID}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_IpcUpdateSingle: {dto.User.DisplayName}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.ReceiveIpcUpdateSingle(dto.User, dto.ObjType, dto.Type, dto.NewData));
         return Task.CompletedTask;
     }
@@ -315,7 +306,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_ChangeGlobalPerm(ChangeGlobalPerm dto)
     {
-        Logger.LogDebug($"Callback_ChangeGlobalPerm: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_ChangeGlobalPerm: {dto}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.PermChangeGlobal(dto.User, dto.PermName, dto.NewValue));
         return Task.CompletedTask;
     }
@@ -325,7 +316,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_ChangeAllGlobal(ChangeAllGlobal dto)
     {
-        Logger.LogDebug($"Callback_ChangeAllGlobal: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_ChangeAllGlobal: {dto}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.PermChangeGlobal(dto.User, dto.NewPerms));
         return Task.CompletedTask;
     }
@@ -337,14 +328,14 @@ public partial class MainHub
     /// </summary>
     public Task Callback_ChangeUniquePerm(ChangeUniquePerm dto)
     {
-        Logger.LogDebug($"Callback_ChangeUniquePerm: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_ChangeUniquePerm: {dto}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.PermChangeUnique(dto.User, dto.PermName, dto.NewValue));
         return Task.CompletedTask;
     }
 
     public Task Callback_ChangeUniquePerms(ChangeUniquePerms dto)
     {
-        Logger.LogDebug($"Callback_ChangeUniquePerms: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_ChangeUniquePerms: {dto}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.PermChangeUnique(dto.User, dto.Changes));
         return Task.CompletedTask;
     }
@@ -354,50 +345,86 @@ public partial class MainHub
     /// </summary>
     public Task Callback_ChangeAllUnique(ChangeAllUnique dto)
     {
-        Logger.LogDebug($"Callback_ChangeAllUnique: {dto}", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_ChangeAllUnique: {dto}", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.PermChangeUnique(dto.User, dto.NewPerms));
         return Task.CompletedTask;
     }
     #endregion Data Update Callbacks
 
-    #region Radar Callbacks
+    #region Chat and Radar Callbacks
     /// <summary>
-    ///     Whenever another Sundouleia User has entered our current radar zone. <para />
-    ///     Can also fire upon them updating their user info, such as if they
-    ///     are sharing their ident for requests or not if already present.
+    ///   Aquire a validated message processed by the server for this RadarChat instance.
     /// </summary>
-    public Task Callback_RadarAddUpdateUser(OnlineUser dto)
+    public Task Callback_RadarChatMessage(LoggedRadarChatMessage dto)
     {
-        Logger.LogDebug($"Callback_RadarAddUpdateUser Called", LoggerType.Callbacks);
-        _radar.AddOrUpdateUser(dto, IntPtr.Zero);
+        // Do something here for appending it to the RadarChat Instance.
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    ///   Lets us know when a chat user updated their permissions. <para />
+    ///   Could also be used for joining the chat, but there isnt anything doing that currently (yet™).
+    /// </summary>
+    public Task Callback_RadarChatAddUpdateUser(RadarChatMember dto)
+    {
+        Logger.LogDebug($"Cb_RadarChatAddUpdateUser Called for: {dto.User.AnonName}", LoggerType.Callbacks);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///   Called when a user joins the Radar location we are currently in. (Or when permissions update)
+    /// </summary>
+    /// <remarks> Ensure the ident of the stored actor reflects the current ident passed by this call. </remarks>
+    public Task Callback_RadarAddUpdateUser(RadarMember dto)
+    {
+        Logger.LogDebug($"Cb_RadarAddUpdateUser Called for: {dto.User.AnonName}", LoggerType.Callbacks);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///   Called when another user leaves the Radar instance we are present in.
+    /// </summary>
     public Task Callback_RadarRemoveUser(UserDto dto)
     {
-        Logger.LogDebug($"Callback_RadarRemoveUser Called", LoggerType.Callbacks);
-        _radar.RemoveUser(dto.User);
+        Logger.LogDebug($"Cb_RadarUserFlagged Called for: {dto.User.AnonName}", LoggerType.Callbacks);
         return Task.CompletedTask;
     }
 
-    public Task Callback_RadarChat(RadarChatMessage dto)
+    /// <summary>
+    ///   Each World-Territory has an associated RadarGroup (not SanctionedGroup). <br/>
+    ///   This informs us when someone was added to the group, or updated their permissions in it.
+    /// </summary>
+    public Task Callback_RadarGroupAddUpdateUser(RadarGroupMember dto)
     {
-        // If for some ungodly reason we get this message from a different world / territory, ignore it.
-        if (dto.WorldId != LocationSvc.Current.WorldId || dto.TerritoryId != LocationSvc.Current.TerritoryId)
-        {
-            Logger.LogWarning($"Callback_RadarChat: Ignoring message from different world / zone. {dto.WorldId}/{dto.TerritoryId}", LoggerType.Callbacks);
-            return Task.CompletedTask;
-        }
-        Logger.LogDebug($"Callback_RadarChat Message Received", LoggerType.Callbacks);
-        Mediator.Publish(new NewRadarChatMessage(dto, dto.Sender == OwnUserData));
+        Logger.LogDebug($"Cb_RadarGroupAddUpdateUser Called for: {dto.User.AnonName}", LoggerType.Callbacks);
         return Task.CompletedTask;
     }
-    #endregion Radar Callbacks
+
+    /// <summary>
+    ///   Each World-Territory has an associated RadarGroup (not SanctionedGroup). <br/>
+    ///   This informs us when someone left the RadarGroup. <para />
+    /// </summary>
+    public Task Callback_RadarGroupRemoveUser(UserDto dto)
+    {
+        Logger.LogDebug($"Cb_RadarGroupRemoveUser Called for: {dto.User.AnonName}", LoggerType.Callbacks);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///   Sent from another chat participant in any active Non-RadarChat you are in. <para/>
+    ///   This includes chats attached to groups you own / are a part of, or SanctionedGroup chats. 
+    /// </summary>
+    public Task Callback_ChatMsgReceived(ReceivedChatMessage dto)
+    {
+        Logger.LogDebug($"Cb_ChatMessageReceived Called for: {dto.Sender.AnonName}", LoggerType.Callbacks);
+        return Task.CompletedTask;
+    }
+    #endregion Chat and Radar Callbacks
 
     #region Status Update Callbacks
     public Task Callback_UserIsUnloading(UserDto dto)
     {
-        Logger.LogDebug($"Callback_UserIsUnloading: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_UserIsUnloading: [{dto.User.DisplayName}]", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.MarkSundesmoForUnload(dto.User));
         return Task.CompletedTask;
     }
@@ -408,7 +435,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_UserOffline(UserDto dto)
     {
-        Logger.LogDebug($"Callback_UserOffline: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_UserOffline: [{dto.User.DisplayName}]", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.MarkSundesmoOffline(dto.User)) ;
         return Task.CompletedTask;
     }
@@ -418,8 +445,15 @@ public partial class MainHub
     /// </summary>
     public Task Callback_UserOnline(OnlineUser dto)
     {
-        Logger.LogDebug($"Callback_UserOnline: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_UserOnline: [{dto.User.DisplayName}]", LoggerType.Callbacks);
         Generic.Safe(() => _sundesmos.MarkSundesmoOnline(dto));
+        return Task.CompletedTask;
+    }
+
+    public Task Callback_UserVanityUpdate(UserDto dto)
+    {
+        Logger.LogDebug($"Cb_UserVanityUpdate: [{dto.User.DisplayName}]", LoggerType.Callbacks);
+        Generic.Safe(() => _sundesmos.UpdateVanityData(dto.User));
         return Task.CompletedTask;
     }
 
@@ -430,7 +464,7 @@ public partial class MainHub
     /// </summary>
     public Task Callback_ProfileUpdated(UserDto dto)
     {
-        Logger.LogDebug($"Callback_ProfileUpdated: [{dto.User.AliasOrUID}]", LoggerType.Callbacks);
+        Logger.LogDebug($"Cb_ProfileUpdated: [{dto.User.DisplayName}]", LoggerType.Callbacks);
         Mediator.Publish(new ClearProfileDataMessage(dto.User));
         return Task.CompletedTask;
     }
@@ -617,7 +651,19 @@ public partial class MainHub
         _hubConnection!.On(nameof(Callback_ChangeAllUnique), act);
     }
 
-    public void OnRadarAddUpdateUser(Action<OnlineUser> act)
+    public void OnRadarChatMessage(Action<LoggedRadarChatMessage> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_RadarChatMessage), act);
+    }
+
+    public void OnRadarChatAddUpdateUser(Action<RadarChatMember> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_RadarChatAddUpdateUser), act);
+    }
+
+    public void OnRadarAddUpdateUser(Action<RadarMember> act)
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_RadarAddUpdateUser), act);
@@ -629,10 +675,22 @@ public partial class MainHub
         _hubConnection!.On(nameof(Callback_RadarRemoveUser), act);
     }
 
-    public void OnRadarChat(Action<RadarChatMessage> act)
+    public void OnRadarGroupAddUpdateUser(Action<RadarGroupMember> act)
     {
         if (_apiHooksInitialized) return;
-        _hubConnection!.On(nameof(Callback_RadarChat), act);
+        _hubConnection!.On(nameof(Callback_RadarGroupAddUpdateUser), act);
+    }
+
+    public void OnRadarGroupRemoveUser(Action<UserDto> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_RadarGroupRemoveUser), act);
+    }
+
+    public void OnChatMsgReceived(Action<ReceivedChatMessage> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_ChatMsgReceived), act);
     }
 
     public void OnUserIsUnloading(Action<UserDto> act)
@@ -651,6 +709,12 @@ public partial class MainHub
     {
         if (_apiHooksInitialized) return;
         _hubConnection!.On(nameof(Callback_UserOnline), act);
+    }
+
+    public void OnUserVanityUpdate(Action<UserDto> act)
+    {
+        if (_apiHooksInitialized) return;
+        _hubConnection!.On(nameof(Callback_UserVanityUpdate), act);
     }
 
     public void OnProfileUpdated(Action<UserDto> act)

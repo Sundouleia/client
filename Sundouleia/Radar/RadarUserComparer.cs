@@ -1,6 +1,6 @@
 namespace Sundouleia.Radar;
 
-public class RadarUserComparer : IEqualityComparer<RadarUser>
+public class RadarUserComparer : IEqualityComparer<RadarPublicUser>
 {
     private static RadarUserComparer _instance = new();
 
@@ -9,13 +9,13 @@ public class RadarUserComparer : IEqualityComparer<RadarUser>
 
     public static RadarUserComparer Instance => _instance;
 
-    public bool Equals(RadarUser? x, RadarUser? y)
+    public bool Equals(RadarPublicUser? x, RadarPublicUser? y)
     {
         if (x is null || y is null) return false;
         return x.UID.Equals(y.UID, StringComparison.Ordinal);
     }
 
-    public int GetHashCode(RadarUser obj)
+    public int GetHashCode(RadarPublicUser obj)
     {
         return obj.UID.GetHashCode();
     }

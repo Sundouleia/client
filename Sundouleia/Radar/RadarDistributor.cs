@@ -1,6 +1,7 @@
 using CkCommons;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
+using Sundouleia.Radar.Chat;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
@@ -11,134 +12,149 @@ using SundouleiaAPI.Network;
 namespace Sundouleia.Services;
 
 /// <summary>
-///     Distributes RadarChanges.
+///   Distributes logic related to PublicRadar, RadarGroup, and RadarChat. <para />
+///   Updates on location change, can also be used to invoke manual updates.
 /// </summary>
 public class RadarDistributor : DisposableMediatorSubscriberBase
 {
     private readonly MainHub _hub;
     private readonly MainConfig _config;
+    private readonly ChatConfig _chatConfig;
+    private readonly RadarChatLog _radarChat;
     private readonly RadarManager _manager;
     private readonly CharaWatcher _watcher;
 
     public RadarDistributor(ILogger<RadarDistributor> logger, SundouleiaMediator mediator,
-        MainHub hub, MainConfig config, RadarManager manager, CharaWatcher watcher)
+        MainHub hub, MainConfig config, ChatConfig chatConfig, RadarChatLog chatlog,
+        RadarManager manager, CharaWatcher watcher)
         : base(logger, mediator)
     {
         _hub = hub;
         _config = config;
+        _chatConfig = chatConfig;
+        _radarChat = chatlog;
         _manager = manager;
         _watcher = watcher;
 
         Mediator.Subscribe<RadarConfigChanged>(this, _ => OnConfigChanged(_.OptionName));
-        Mediator.Subscribe<ConnectedMessage>(this, async _ =>
-        {
-            if (_config.Current.RadarEnabled && Svc.ClientState.IsLoggedIn)
-            {
-                await SundouleiaEx.WaitForPlayerLoading();
-                await JoinZoneAndAssignUsers(GetZoneUpdate()).ConfigureAwait(false);
-            }
-        });
-        Mediator.Subscribe<DisconnectedMessage>(this, _ => _manager.ClearUsers());
-        Mediator.Subscribe<TerritoryChanged>(this, _ => OnTerritoryChanged(_.PrevTerritory, _.NewTerritory));
-
-        // Listen for logout event to properly disconnect.
-        Svc.ClientState.Logout += OnLogout;
+        Mediator.Subscribe<ConnectedMessage>(this, _ => WaitAndUpdateRadarData());
+        Mediator.Subscribe<TerritoryChanged>(this, _ => UpdateRadarData(_.PrevTerritory, _.NewTerritory));
     }
 
-    protected override void Dispose(bool disposing)
+    private async void WaitAndUpdateRadarData()
     {
-        base.Dispose(disposing);
-        Svc.ClientState.Logout -= OnLogout;
-    }
-
-
-    private async void OnLogout(int type, int code)
-    {
-        if (!_config.Current.RadarEnabled)
+        if (!Svc.ClientState.IsLoggedIn)
             return;
-        Logger.LogInformation("User logged out, leaving radar zone and clearing users.", LoggerType.RadarData);
-        await Generic.Safe(_hub.RadarZoneLeave).ConfigureAwait(false);
-        _manager.ClearUsers();
-    }
-
-    private RadarZoneUpdate GetZoneUpdate()
-    {
-        var world = PlayerData.CurrentWorldId;
-        var zone = LocationSvc.Current.TerritoryId;
-        var joinChats = _config.Current.RadarJoinChats;
-        var hashedCID = _config.Current.RadarSendPings ? SundouleiaSecurity.GetClientIdentHashThreadSafe() : string.Empty;
-        return new(world, zone, joinChats, hashedCID);
-    }
-
-    private async void OnTerritoryChanged(ushort prevTerritory, ushort newTerritory)
-    {       
-        // If we do not want to send radar updates, then dont.
-        if (!_config.Current.RadarEnabled)
-            return;
-
-        Logger.LogInformation($"Territory changed from {prevTerritory} to {newTerritory}", LoggerType.RadarData);
-        // Leave the current radar zone, notifying all users of the disconnect.
-        await Generic.Safe(_hub.RadarZoneLeave).ConfigureAwait(false);
-        // Clear all current radar users from the manager.
-        _manager.ClearUsers();
-        // await for us to finish loading (not entirely necessary but nice to have)
+        // Wait for the player to load in, then update the radar data.
         await SundouleiaEx.WaitForPlayerLoading();
-        // Join the new zone and retrieve the zone information.
-        await JoinZoneAndAssignUsers(GetZoneUpdate()).ConfigureAwait(false);
+        UpdateRadarData(0, PlayerContent.TerritoryID);
     }
 
-    public async Task JoinZoneAndAssignUsers(RadarZoneUpdate info)
+    private async void UpdateRadarData(ushort prevTerritory, ushort newTerritory)
     {
+        // Ignore if nothing enabled.
+        if (!_config.Current.Radar && !_config.Current.RadarGroup && !_chatConfig.Current.RadarChat)
+            return;
+
+        if (!MainHub.IsConnectionDataSynced)
+            return;
+
         try
         {
-            var zoneInfo = await _hub.RadarZoneJoin(info).ConfigureAwait(false);
-            if (zoneInfo.ErrorCode is not SundouleiaApiEc.Success || zoneInfo.Value is null)
-            {
-                Logger.LogWarning($"Failed to join radar zone {LocationSvc.Current.TerritoryId} [{zoneInfo.ErrorCode}] [Users Null?: {zoneInfo.Value is null}]");
-                return;
-            }
+            var locMeta = LocationSvc.GetLocationMeta();
+            var doChat = _chatConfig.Current.RadarChat;
+            var doPublic = _config.Current.Radar;
+            var doGroup = _config.Current.RadarGroup;
+            // Otherwise, compile the DTO to send.
+            var zoneDto = new LocationUpdate(MainHub.OwnUserData, locMeta, doChat, doPublic, doGroup);
+            if (doChat) zoneDto.ChatFlags = _chatConfig.Current.ChatFlags;
+            if (doPublic) zoneDto.PublicFlags = _config.Current.RadarPerms;
+            if (doGroup) zoneDto.GroupFlags = _config.Current.RadarGroupPerms;
 
-            GameDataSvc.WorldData.TryGetValue(info.WorldId, out var worldName);
-            var territoryName = PlayerContent.TerritoryName;
-            Logger.LogInformation($"RadarZone [{worldName} | {territoryName} ({info.TerritoryId})] joined. There are {zoneInfo.Value.CurrentUsers.Count} other Sundesmos.", LoggerType.RadarData);
-            foreach (var radarUser in zoneInfo.Value.CurrentUsers.ToList())
-                _manager.AddOrUpdateUser(radarUser, IntPtr.Zero);
+            // Invoke the update to the server.
+            var updateResult = await _hub.UpdateLocation(zoneDto).ConfigureAwait(false);
+            if (updateResult.ErrorCode is not SundouleiaApiEc.Success)
+                Logger.LogWarning($"Failed to update radar location on territory change from {prevTerritory} to {newTerritory} [{updateResult.ErrorCode}].");
+            else
+                Logger.LogInformation($"Updated radar location on territory change from {prevTerritory} to {newTerritory}. Chat: {doChat} | Public: {doPublic} | Group: {doGroup}", LoggerType.RadarData);
+            
+            // Handle the updates based on what we got.
+
+            // Chat
+            _radarChat.CreateOrReinitChatlog(updateResult.Value!.ChatHistory);
+
+            // Public Radar
+            _manager.CreateOrReinitUsers(updateResult.Value!.RadarUsers);
+
+            // Group Radar
+            // _manager.UpdateGroupUsers(updateResult.Value!.RadarGroupUsers);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Exception occurred while joining radar zone.");
+            Logger.LogError(ex, $"Exception while updating radar data on territory change from {prevTerritory} to {newTerritory}.");
         }
+    }
+
+    public async Task UpdatePublicPermissions()
+    {
+
+    }
+
+    public async Task UpdateGroupPermissions()
+    {
+
+    }
+
+    public async Task UpdateChatPermissions()
+    {
+        // Would need to invoke the resulting change if so.
+    }
+
+    // Leaves the group as well
+    public async Task LeaveRadar()
+    {
+
+    }
+
+    public async Task LeaveRadarGroup()
+    {
+
+    }
+
+    public async Task LeaveChat()
+    {
+
     }
 
     // Config options related to radar state changed. Send update to server.
     private async void OnConfigChanged(string changedOption)
     {
-        if (!Svc.ClientState.IsLoggedIn) return;
+        //if (!Svc.ClientState.IsLoggedIn) return;
 
-        switch (changedOption)
-        {
-            case nameof(ConfigStorage.RadarEnabled):
-                if (_config.Current.RadarEnabled)
-                {
-                    Logger.LogDebug($"Radar enabled, joining current radar zone.", LoggerType.RadarData);
-                    await JoinZoneAndAssignUsers(GetZoneUpdate()).ConfigureAwait(false);
-                }
-                else
-                {
-                    Logger.LogDebug("Radar disabled, leaving current radar zone and clearing users.", LoggerType.RadarData);
-                    await _hub.RadarZoneLeave().ConfigureAwait(false);
-                    _manager.ClearUsers();
-                }
-                return;
+        //switch (changedOption)
+        //{
+        //    case nameof(ConfigStorage.RadarEnabled):
+        //        if (_config.Current.RadarEnabled)
+        //        {
+        //            Logger.LogDebug($"Radar enabled, joining current radar zone.", LoggerType.RadarData);
+        //            await JoinZoneAndAssignUsers(GetZoneUpdate()).ConfigureAwait(false);
+        //        }
+        //        else
+        //        {
+        //            Logger.LogDebug("Radar disabled, leaving current radar zone and clearing users.", LoggerType.RadarData);
+        //            await _hub.RadarZoneLeave().ConfigureAwait(false);
+        //            _manager.ClearUsers();
+        //        }
+        //        return;
 
-            case nameof(ConfigStorage.RadarJoinChats):
-            case nameof(ConfigStorage.RadarSendPings):
-                // Collect the radar state, and send the update to the server.
-                Logger.LogDebug("Config changed, sending radar update to server.", LoggerType.RadarData);
-                var joinChats = _config.Current.RadarJoinChats;
-                var hashedIdent = _config.Current.RadarSendPings ? SundouleiaSecurity.GetClientIdentHashThreadSafe() : string.Empty;
-                await _hub.RadarUpdateState(new(joinChats, hashedIdent)).ConfigureAwait(false);
-                return;
-        }
+        //    case nameof(ConfigStorage.RadarJoinChats):
+        //    case nameof(ConfigStorage.RadarSendPings):
+        //        // Collect the radar state, and send the update to the server.
+        //        Logger.LogDebug("Config changed, sending radar update to server.", LoggerType.RadarData);
+        //        var joinChats = _config.Current.RadarJoinChats;
+        //        var hashedIdent = _config.Current.RadarSendPings ? SundouleiaSecurity.GetClientIdentHashThreadSafe() : string.Empty;
+        //        await _hub.RadarUpdateState(new(joinChats, hashedIdent)).ConfigureAwait(false);
+        //        return;
+        //}
     }
 }

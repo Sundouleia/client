@@ -23,7 +23,7 @@ using SundouleiaAPI.Network;
 
 namespace Sundouleia.DrawSystem;
 
-public class RadarDrawer : DynamicDrawer<RadarUser>
+public class RadarDrawer : DynamicDrawer<RadarPublicUser>
 {
     // Not sure how we will define where the quick-send stuff goes, but we'll figure it out overtime.
     private static readonly string AwaitingResponseTT =
@@ -82,7 +82,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     {
         if (CkGui.IconButton(FAI.Cog, inPopup: !_cache.FilterConfigOpen))
             _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
-        CkGui.AttachToolTip("Configure radar defaults.");
+        CkGui.AttachTooltip("Configure radar defaults.");
     }
 
     private void DrawRadarConfig(float width)
@@ -108,7 +108,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
     }
     #endregion Search
 
-    protected override void DrawFolderBannerInner(IDynamicFolder<RadarUser> folder, Vector2 region, DynamicFlags flags)
+    protected override void DrawFolderBannerInner(IDynamicFolder<RadarPublicUser> folder, Vector2 region, DynamicFlags flags)
         => DrawFolderInner((RadarFolder)folder, region, flags);
 
     private void DrawFolderInner(RadarFolder folder, Vector2 region, DynamicFlags flags)
@@ -127,10 +127,10 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         CkGui.ColorTextFrameAlignedInline(folder.Name, folder.NameColor);
         // Total Context.
         CkGui.ColorTextFrameAlignedInline($"[{folder.TotalChildren}]", ImGuiColors.DalamudGrey2);
-        CkGui.AttachToolTip($"{folder.TotalChildren} total. --COL--({folder.Lurkers} lurkers)--COL--", ImGuiColors.DalamudGrey2);
+        CkGui.AttachTooltip($"{folder.TotalChildren} total. --COL--({folder.Lurkers} lurkers)--COL--", ImGuiColors.DalamudGrey2);
     }
 
-    protected override void DrawLeaf(IDynamicLeaf<RadarUser> leaf, DynamicFlags flags, bool selected)
+    protected override void DrawLeaf(IDynamicLeaf<RadarPublicUser> leaf, DynamicFlags flags, bool selected)
     {
         // Draw out the leaf, based on it's data type.
         if (leaf.Data.IsPaired)
@@ -139,7 +139,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             DrawUnpairedUser(leaf, flags, selected);
     }
 
-    private void DrawPairedUser(IDynamicLeaf<RadarUser> leaf, DynamicFlags flags, bool selected)
+    private void DrawPairedUser(IDynamicLeaf<RadarPublicUser> leaf, DynamicFlags flags, bool selected)
     {
         var size = new Vector2(CkGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImUtf8.FrameHeight);
         var bgCol = selected ? ImGui.GetColorU32(ImGuiCol.FrameBgHovered) : 0;
@@ -160,7 +160,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         CkGui.ColorTextFrameAlignedInline($"({leaf.Data.AnonTag})", ImGuiColors.DalamudGrey2);
     }
 
-    private void DrawUnpairedUser(IDynamicLeaf<RadarUser> leaf, DynamicFlags flags, bool selected)
+    private void DrawUnpairedUser(IDynamicLeaf<RadarPublicUser> leaf, DynamicFlags flags, bool selected)
     {
         bool drafting = _cache.NodeInDrafter == leaf;
         var height = drafting ? CkStyle.GetFrameRowsHeight(2) : ImUtf8.FrameHeight;
@@ -183,7 +183,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             HandleDetections(leaf, flags);
             // Attach a tooltip based on the node's state
             if (!leaf.Data.IsPaired)
-                CkGui.AttachToolTip(leaf.Data.InRequests ? AwaitingResponseTT : RequestableTT, ImGuiColors.DalamudOrange);
+                CkGui.AttachTooltip(leaf.Data.InRequests ? AwaitingResponseTT : RequestableTT, ImGuiColors.DalamudOrange);
 
             // Go back and draw the name.
             ImGui.SameLine(pos.X);
@@ -202,11 +202,11 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.CloudUploadAlt, "Send", disabled: UiService.DisableUI))
             SendRequest(leaf);
-        CkGui.AttachToolTip("Send a request with the attached message.");
+        CkGui.AttachTooltip("Send a request with the attached message.");
     }
 
     // We only ever do this for the unpaired leaves so it's ok to handle that logic here.
-    protected override void HandleLeftClick(IDynamicLeaf<RadarUser> node, DynamicFlags flags)
+    protected override void HandleLeftClick(IDynamicLeaf<RadarPublicUser> node, DynamicFlags flags)
     {
         if (!node.Data.CanSendRequests || _requests.ExistsFor(node.Data.UID))
             return;
@@ -229,7 +229,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
         }
     }
 
-    private unsafe bool DrawLeafIcon(RadarUser user)
+    private unsafe bool DrawLeafIcon(RadarPublicUser user)
     {
         using (ImRaii.Group())
         {
@@ -237,7 +237,7 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             if (user.IsValid)
             {
                 CkGui.IconText(FAI.Eye, ImGuiColors.ParsedGreen);
-                CkGui.AttachToolTip($"Nearby and Rendered / Visible!");
+                CkGui.AttachTooltip($"Nearby and Rendered / Visible!");
 #if DEBUG
                 if (ImGui.IsItemHovered())
                 {
@@ -253,13 +253,13 @@ public class RadarDrawer : DynamicDrawer<RadarUser>
             else
             {
                 CkGui.IconText(FAI.EyeSlash, ImGuiColors.DalamudRed);
-                CkGui.AttachToolTip($"Not Rendered, or Requesting is disabled. --COL--(Lurker)--COL--", ImGuiColors.DalamudGrey2);
+                CkGui.AttachTooltip($"Not Rendered, or Requesting is disabled. --COL--(Lurker)--COL--", ImGuiColors.DalamudGrey2);
             }
         }
         return ImGui.IsItemHovered();
     }
 
-    private void SendRequest(IDynamicLeaf<RadarUser> node)
+    private void SendRequest(IDynamicLeaf<RadarPublicUser> node)
     {
         UiService.SetUITask(async () =>
         {

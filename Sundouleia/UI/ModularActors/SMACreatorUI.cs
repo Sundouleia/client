@@ -64,7 +64,7 @@ public class SMACreatorUI : WindowMediatorSubscriberBase
 
         if (CkGuiUtils.EnumCombo("Owned Object To Export", 200f, _objToExport, out var newObj, Enum.GetValues<OwnedObject>()))
             _objToExport = newObj;
-        CkGui.AttachToolTip("Which of your owned objects will be exported.");
+        CkGui.AttachTooltip("Which of your owned objects will be exported.");
 
         CkGui.FramedIconText(FAI.Heading);
         ImUtf8.SameLineInner();

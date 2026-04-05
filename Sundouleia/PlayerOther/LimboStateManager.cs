@@ -5,7 +5,7 @@ using SundouleiaAPI.Data.Comparer;
 
 namespace Sundouleia.Pairs;
 
-internal record SundesmoInLimbo(Sundesmo Sundesmo, Task OnTimeout, CancellationTokenSource TimeoutCTS);
+internal record PairInLimbo(Sundesmo Sundesmo, Task OnTimeout, CancellationTokenSource TimeoutCTS);
 
 /// <summary>
 ///     Manages the limbo states of the client's Sundesmos. <para />
@@ -24,7 +24,7 @@ public sealed class LimboStateManager : DisposableMediatorSubscriberBase
     public const int TIMEOUT_SECONDS = 7;
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(TIMEOUT_SECONDS);
 
-    private ConcurrentDictionary<UserData, SundesmoInLimbo> _timeoutTasks = new(UserDataComparer.Instance);
+    private ConcurrentDictionary<UserData, PairInLimbo> _timeoutTasks = new(UserDataComparer.Instance);
 
     public LimboStateManager(ILogger<LimboStateManager> logger, SundouleiaMediator mediator)
         : base(logger, mediator)
@@ -96,7 +96,7 @@ public sealed class LimboStateManager : DisposableMediatorSubscriberBase
         }, cts.Token);
 
         // Update the dictionary for this sundesmo.
-        return _timeoutTasks.TryAdd(s.UserData, new SundesmoInLimbo(s, task, cts));
+        return _timeoutTasks.TryAdd(s.UserData, new PairInLimbo(s, task, cts));
     }
 
     public bool CancelLimbo(UserData user)

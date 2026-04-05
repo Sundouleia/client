@@ -88,7 +88,7 @@ public sealed class DtrService : DisposableMediatorSubscriberBase, IHostedServic
     private void OnRequestsUpdated()
     {
         requestsEntry.Shown = false;
-        if (!_config.Current.RequestNotifiers.HasAny(RequestAlertKind.DtrBar))
+        if (!_config.Current.RequestNotifiers.HasAny(AlertKind.DtrBar))
             return;
 
         if (!MainHub.IsConnectionDataSynced)
@@ -117,7 +117,7 @@ public sealed class DtrService : DisposableMediatorSubscriberBase, IHostedServic
     private void OnRadarUpdated()
     {
         radarEntry.Shown = false;
-        if (!_config.Current.RadarNearbyDtr)
+        if (!_config.Current.RadarDtr)
             return;
 
         if (!MainHub.IsConnectionDataSynced)

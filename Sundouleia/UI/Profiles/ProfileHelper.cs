@@ -248,7 +248,7 @@ public class ProfileHelper
         statsPos.X += StatIconSize.X + 2f;
         ImGui.SetCursorScreenPos(statsPos);
         CkGui.ColorText(createdDate, ImGuiColors.ParsedGold);
-        CkGui.AttachToolTip($"When {displayName} first joined Sundouleia.");
+        CkGui.AttachTooltip($"When {displayName} first joined Sundouleia.");
 
         statsPos.X += dateWidth + spacing;
         drawList.AddDalamudImage(CosmeticService.CoreTextures.Cache[CoreTexture.Achievement], statsPos, StatIconSize, ImGuiColors.ParsedGold);
@@ -256,7 +256,7 @@ public class ProfileHelper
         statsPos.X += StatIconSize.X + 2f;
         ImGui.SetCursorScreenPos(statsPos);
         CkGui.ColorText("0 / 0", ImGuiColors.ParsedGold);
-        CkGui.AttachToolTip($"The total achievements {displayName} has earned.");
+        CkGui.AttachTooltip($"The total achievements {displayName} has earned.");
 
         statsPos.X += achievementWidth + spacing;
         statsPos.Y += 2f;
@@ -276,7 +276,7 @@ public class ProfileHelper
                 _mediator.Publish(new OpenReportUIMessage(userData, ReportKind.Profile));
 
         }
-        CkGui.AttachToolTip($"Report {displayName}'s Profile" +
+        CkGui.AttachTooltip($"Report {displayName}'s Profile" +
             "--NL--Press CTRL+SHIFT to report." +
             "--SEP--(Opens Report Submission Window)");
     }

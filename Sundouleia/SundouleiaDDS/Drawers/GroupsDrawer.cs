@@ -96,12 +96,12 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
     {
         if (CkGui.IconTextButton(FAI.FolderPlus, "Group", null, true))
             _sidePanel.ForNewGroup((GroupsDrawSystem)DrawSystem);
-        CkGui.AttachToolTip("Create a new Group");
+        CkGui.AttachTooltip("Create a new Group");
 
         ImGui.SameLine(0, 0);
         if (CkGui.IconTextButton(FAI.FolderPlus, "Folder", null, true))
             _sidePanel.ForNewFolderGroup((GroupsDrawSystem)DrawSystem);
-        CkGui.AttachToolTip("Create a new Folder to catagorize your groups.");
+        CkGui.AttachTooltip("Create a new Folder to catagorize your groups.");
 
         ImGui.SameLine(0, 0);
         if (CkGui.IconButton(FAI.LayerGroup, inPopup: !_cache.FilterConfigOpen))
@@ -112,7 +112,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             else
                 _sidePanel.ClearDisplay();
         }
-        CkGui.AttachToolTip("Organizer Mode");
+        CkGui.AttachTooltip("Organizer Mode");
     }
     #endregion Search
 
@@ -189,7 +189,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             _cache.RenamingNode = null;
         // Helper tooltip.
-        CkGui.AttachToolTip("--COL--[ENTER]--COL-- To save" +
+        CkGui.AttachTooltip("--COL--[ENTER]--COL-- To save" +
             "--NL----COL--[R-CLICK]--COL-- Cancel edits.", ImGuiColors.DalamudOrange);
     }
 
@@ -236,7 +236,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         if (ImGui.InvisibleButton($"{Label}_node_{f.ID}", new(width - (isDragDrop ? 0 : rWidth), ImUtf8.FrameHeight)))
             HandleLeftClick(f, flags);
         HandleDetections(f, flags);
-        CkGui.AttachToolTip(FolderDDTooltip, IsDragging || !isDragDrop, ImGuiColors.DalamudOrange);
+        CkGui.AttachTooltip(FolderDDTooltip, IsDragging || !isDragDrop, ImGuiColors.DalamudOrange);
         
         // Back to the start, then draw.
         ImGui.SameLine(pos.X);
@@ -248,7 +248,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         CkGui.ColorTextFrameAlignedInline(f.Name, f.NameColor);
         // Total Context.
         CkGui.ColorTextFrameAlignedInline($"[{f.Online}]", ImGuiColors.DalamudGrey2);
-        CkGui.AttachToolTip($"{f.Online} online\n{f.TotalChildren} total");
+        CkGui.AttachTooltip($"{f.Online} online\n{f.TotalChildren} total");
         // Draw right options.
         if (!isDragDrop)
             DrawFolderOptions(f, _cache.GroupInEditor == f);
@@ -268,7 +268,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
             _groups.Save();
             f.ApplyLatestStyle();
         }
-        CkGui.AttachToolTip("Edit the icon for your group.");
+        CkGui.AttachTooltip("Edit the icon for your group.");
 
         ImGui.SameLine();
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - rWidth);
@@ -296,7 +296,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         }
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             _cache.RenamingNode = null;
-        CkGui.AttachToolTip("--COL--[ENTER]--COL-- To save" +
+        CkGui.AttachTooltip("--COL--[ENTER]--COL-- To save" +
             "--NL----COL--[R-CLICK]--COL-- Cancel edits.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
@@ -318,13 +318,13 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         ImGui.SameLine(currentRightSide);
         if (CkGui.IconButton(FAI.Edit, inPopup: !inEditor))
             _sidePanel.ForGroupEditor(folder, _cache);
-        CkGui.AttachToolTip("Edit Group");
+        CkGui.AttachTooltip("Edit Group");
 
         currentRightSide -= CkGui.IconButtonSize(FAI.Filter).X;
         ImGui.SameLine(currentRightSide);
         if (CkGui.IconButton(FAI.Filter, null, folder.ID.ToString(), false, !inFilterEditor))
             ImGui.OpenPopup($"{folder.ID}_filterEdit");
-        CkGui.AttachToolTip("Change sort order.--SEP----COL--[R-CLICK]--COL-- Clear Filters", ImGuiColors.DalamudOrange);
+        CkGui.AttachTooltip("Change sort order.--SEP----COL--[R-CLICK]--COL-- Clear Filters", ImGuiColors.DalamudOrange);
 
         // If right clicked, we should clear the folders filters and refresh.
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
@@ -391,7 +391,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
                 DrawSystem.Delete(node);
             });
         }
-        CkGui.AttachToolTip("Perminantly Delete this Group." +
+        CkGui.AttachTooltip("Perminantly Delete this Group." +
             "--SEP----COL--Must hold SHIFT to delete.--COL--", ImGuiColors.DalamudYellow);
     }
 
@@ -457,7 +457,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
                 ImGui.SameLine(cursorPos.X);
                 ImGui.SetCursorPosX(cursorPos.X - ImUtf8.FrameHeight - ImUtf8.ItemInnerSpacing.X);
                 ImGui.Image(wrap.Handle, new Vector2(ImUtf8.FrameHeight));
-                CkGui.AttachToolTip(Image.Tooltip);
+                CkGui.AttachTooltip(Image.Tooltip);
             }
         }
     }
@@ -486,7 +486,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         var icon = s.IsRendered ? FAI.Eye : FAI.User;
         var color = s.IsOnline ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         CkGui.IconTextAligned(icon, color);
-        CkGui.AttachToolTip(TooltipText(s));
+        CkGui.AttachTooltip(TooltipText(s));
         if (!flags.HasAny(DynamicFlags.DragDropLeaves) && s.IsRendered && ImGui.IsItemClicked())
             _mediator.Publish(new TargetSundesmoMessage(s));
 
@@ -533,7 +533,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             _cache.RenamingNode = null;
         // Helper tooltip.
-        CkGui.AttachToolTip("--COL--[ENTER]--COL-- To save" +
+        CkGui.AttachTooltip("--COL--[ENTER]--COL-- To save" +
             "--NL----COL--[R-CLICK]--COL-- Cancel edits.", ImGuiColors.DalamudOrange);
     }
 
@@ -551,7 +551,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
 
         // Push the monofont if we should show the UID, otherwise dont.
         DrawSundesmoName(leaf);
-        CkGui.AttachToolTip(Tooltip, ImGuiColors.DalamudOrange);
+        CkGui.AttachTooltip(Tooltip, ImGuiColors.DalamudOrange);
         if (isDragDrop)
             return;
         // Handle hover state.
@@ -622,7 +622,7 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
                 FilterCache.MarkForReload(groupFolder);
             }
         }
-        CkGui.AttachToolTip("Removes this Sundesmo from the Group.");
+        CkGui.AttachTooltip("Removes this Sundesmo from the Group.");
     }
 
     private void DrawSundesmoName(IDynamicLeaf<Sundesmo> s)
@@ -637,14 +637,14 @@ public class GroupsDrawer : DynamicDrawer<Sundesmo>
         if (_cache.ShowingUID.Contains(s))
         {
             // Mono Font is enabled.
-            dispName = s.Data.UserData.AliasOrUID;
+            dispName = s.Data.UserData.DisplayName;
         }
         else
         {
             // Set it to the display name.
             dispName = s.Data.GetDisplayName();
             // Update mono to be disabled if the display name is not the alias/uid.
-            useMono = s.Data.UserData.AliasOrUID.Equals(dispName, StringComparison.Ordinal);
+            useMono = s.Data.UserData.DisplayName.Equals(dispName, StringComparison.Ordinal);
         }
 
         // Display the name.

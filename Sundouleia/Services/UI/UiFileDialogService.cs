@@ -36,7 +36,7 @@ public sealed class UiFileDialogService : IDisposable
                 _manager.CustomSideBarItems.Add(($"{name}##{idx}", path, FontAwesomeIcon.Folder, -1));
 
         // Add The SundouleiaConfig Root.
-        _manager.CustomSideBarItems.Add(("Sundouleia", ConfigFileProvider.SundouleiaDirectory, FontAwesomeIcon.Key, 0));
+        _manager.CustomSideBarItems.Add(("Sundouleia", ConfigFileProvider.ConfigDirectory, FontAwesomeIcon.Key, 0));
     }
 
     public void OpenMultiFilePicker(string title, string filters, Action<bool, List<string>> callback, int selectionCountMax, string? startPath,

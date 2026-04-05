@@ -7,5 +7,5 @@ namespace Sundouleia;
 public static class FlagEx
 {
     public static bool HasAny(this RedrawKind flags, RedrawKind check) => (flags & check) != 0;
-    public static bool HasAny(this RequestAlertKind flags, RequestAlertKind check) => (flags & check) != 0;
+    public static bool HasAny(this AlertKind flags, AlertKind check) => (flags & check) != 0;
 }

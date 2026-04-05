@@ -211,7 +211,7 @@ public class MainUI : WindowMediatorSubscriberBase
             });
         }
         if (!string.IsNullOrEmpty(_uidToSentTo))
-            CkGui.AttachToolTip($"Send Pair Request to {_uidToSentTo}");
+            CkGui.AttachTooltip($"Send Pair Request to {_uidToSentTo}");
 
         // draw a attached message field as well if they want.
         ImGui.SetNextItemWidth(availableXWidth);
@@ -244,7 +244,7 @@ public class MainUI : WindowMediatorSubscriberBase
 
         if (DrawAddUser(winPtr, new Vector2(sideWidth, height), innerMinPos))
             _creatingRequest = !_creatingRequest;
-        CkGui.AttachToolTip("Add New User to Whitelist");
+        CkGui.AttachTooltip("Add New User to Whitelist");
         _guides.OpenTutorial(TutorialType.MainUi, StepsMainUi.AddingUsers, ImGui.GetWindowPos(), ImGui.GetWindowSize(), () => _creatingRequest = !_creatingRequest);
 
         ImGui.SetCursorScreenPos(innerMinPos + new Vector2(sideWidth, 0));
@@ -376,7 +376,7 @@ public class MainUI : WindowMediatorSubscriberBase
             _account.ConnectionKind = ConnectionKind.FullPause;
             _ = _hub.Disconnect(ServerState.Disconnected, DisconnectIntent.Normal);
         }
-        CkGui.AttachToolTip($"--COL--[Disconnected]--COL--" +
+        CkGui.AttachTooltip($"--COL--[Disconnected]--COL--" +
             $"--NL--Disconnected from Servers.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
@@ -387,7 +387,7 @@ public class MainUI : WindowMediatorSubscriberBase
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();
         }
-        CkGui.AttachToolTip($"--COL--[Try Out Mode]--COL--" +
+        CkGui.AttachTooltip($"--COL--[Try Out Mode]--COL--" +
             $"--NL--Changes you make aren't pushed to others, but you still see others normally.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
@@ -398,7 +398,7 @@ public class MainUI : WindowMediatorSubscriberBase
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();
         }
-        CkGui.AttachToolTip($"--COL--[Streamer Mode]--COL--" +
+        CkGui.AttachTooltip($"--COL--[Streamer Mode]--COL--" +
             $"--NL--Appearance is sent to others, but others remain vanilla.", ImGuiColors.DalamudOrange);
 
         ImGui.SameLine();
@@ -410,7 +410,7 @@ public class MainUI : WindowMediatorSubscriberBase
             if (MainHub.ServerStatus is (ServerState.Disconnected or ServerState.Offline))
                 _ = _hub.Connect();
         }
-        CkGui.AttachToolTip($"--COL--[Connected]--COL----NL--Normal/Default connection with the server.", ImGuiColors.DalamudOrange);
+        CkGui.AttachTooltip($"--COL--[Connected]--COL----NL--Normal/Default connection with the server.", ImGuiColors.DalamudOrange);
 
         bool DrawConnectionButton(ConnectionKind kind, FAI icon, uint color, Vector2 size, bool disabled)
         {

@@ -4,11 +4,11 @@ using Sundouleia.Radar;
 
 namespace Sundouleia.DrawSystem;
 
-public sealed class RadarFolder : DynamicFolder<RadarUser>
+public sealed class RadarFolder : DynamicFolder<RadarPublicUser>
 {
-    private Func<IReadOnlyList<RadarUser>> _generator;
-    public RadarFolder(DynamicFolderGroup<RadarUser> parent, uint id, FAI icon, string name,
-        Func<IReadOnlyList<RadarUser>> gen)
+    private Func<IReadOnlyList<RadarPublicUser>> _generator;
+    public RadarFolder(DynamicFolderGroup<RadarPublicUser> parent, uint id, FAI icon, string name,
+        Func<IReadOnlyList<RadarPublicUser>> gen)
         : base(parent, icon, name, id)
     {
         // Can set stylizations here.
@@ -17,8 +17,8 @@ public sealed class RadarFolder : DynamicFolder<RadarUser>
         _generator = gen;
     }
 
-    public RadarFolder(DynamicFolderGroup<RadarUser> parent, uint id, FAI icon, string name,
-        Func<IReadOnlyList<RadarUser>> generator, IReadOnlyList<ISortMethod<DynamicLeaf<RadarUser>>> sortSteps)
+    public RadarFolder(DynamicFolderGroup<RadarPublicUser> parent, uint id, FAI icon, string name,
+        Func<IReadOnlyList<RadarPublicUser>> generator, IReadOnlyList<ISortMethod<DynamicLeaf<RadarPublicUser>>> sortSteps)
         : base(parent, icon, name, id, new(sortSteps))
     {
         // Can set stylizations here.
@@ -29,6 +29,6 @@ public sealed class RadarFolder : DynamicFolder<RadarUser>
 
     public int Rendered => Children.Count(s => s.Data.IsValid);
     public int Lurkers => Children.Count(s => !s.Data.IsValid);
-    protected override IReadOnlyList<RadarUser> GetAllItems() => _generator();
-    protected override DynamicLeaf<RadarUser> ToLeaf(RadarUser item) => new(this, item.UID, item);
+    protected override IReadOnlyList<RadarPublicUser> GetAllItems() => _generator();
+    protected override DynamicLeaf<RadarPublicUser> ToLeaf(RadarPublicUser item) => new(this, item.UID, item);
 }

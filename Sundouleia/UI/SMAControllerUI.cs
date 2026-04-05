@@ -117,12 +117,12 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
                 $"\nCollectionID: {handledEntry.CollectionId}" +
                 $"\nCPlusID: {handledEntry.CplusProfile}" +
                 $"\nActorBase ID: {handledEntry.Data.Base.Id}";
-            CkGui.AttachToolTip(ttText);
+            CkGui.AttachTooltip(ttText);
 
             ImGui.SameLine();
             if (CkGui.IconTextButton(FAI.Undo, "Remove SMA Data", disabled: UiService.DisableUI || handledEntry is null))
                 _handler.DetachActor((nint)_selectedGPoseActor).ConfigureAwait(false);
-            CkGui.AttachToolTip("Revert the applied SMA Data, removing them from the handled list.");
+            CkGui.AttachTooltip("Revert the applied SMA Data, removing them from the handled list.");
         }
 
         ImGui.Separator();
@@ -135,16 +135,16 @@ public class SMAControllerUI : WindowMediatorSubscriberBase
         {
             _logger.LogInformation("Future addition!");
         }
-        CkGui.AttachToolTip("Retrieves the latest list of allowed data hashes for the selected SMA Base.");
+        CkGui.AttachTooltip("Retrieves the latest list of allowed data hashes for the selected SMA Base.");
 
         if (CkGui.IconTextButton(FAI.ArrowRight, "Apply to Target", disabled: UiService.DisableUI || _selectedSmad is null || !_handler.HasGPoseTarget))
             UiService.SetUITask(async () => await _handler.ApplySMAToGPoseTarget(selectedActor));
-        CkGui.AttachToolTip("Applies the selected ActorBase to GPose Target.");
+        CkGui.AttachTooltip("Applies the selected ActorBase to GPose Target.");
 
         ImGui.SameLine();
         if (CkGui.IconTextButton(FAI.Plus, "Spawn & Apply Data", disabled: UiService.DisableUI || _selectedSmad is null))
             UiService.SetUITask(async () => await _handler.SpawnAndApplySMAData(selectedActor));
-        CkGui.AttachToolTip("Applies the selected ActorBase to a spawned BrioActor.");
+        CkGui.AttachTooltip("Applies the selected ActorBase to a spawned BrioActor.");
 
         ImGui.Separator();
         foreach (var (path, replacement) in selectedActor.FileReplacements)

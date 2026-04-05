@@ -89,6 +89,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
         // If for some god awful reason we have horrible timing and our character happens to be zoning during this 6 hourly interval, wait.
         try
         {
+            // This should be revised as it prevents reconnecting while in gpose
             while (!PlayerData.Available && !token.IsCancellationRequested)
             {
                 Logger.LogDebug("Player not loaded in yet, waiting", LoggerType.ApiCore);
@@ -122,17 +123,17 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                     // var auth = secretKey.GetHash256(); // leaving out this because i took out double encryption to just single for now
 
                     // Set the token URI to the appropriate endpoint for secret key authentication
-                    tokenUri = AuthRoutes.AuthFullPath(new Uri(MainHub.MAIN_SERVER_URI
+                    tokenUri = AuthRoutes.AuthFullPath(new Uri(ServerHubConfig.CurrentHubUri
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                         .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
 
                     // Logger.LogTrace("Token URI: "+tokenUri, LoggerType.JwtTokens);
-                    result = await _httpClient.PostAsync(tokenUri, new FormUrlEncodedContent(new[]
-                    {
+                    result = await _httpClient.PostAsync(tokenUri, new FormUrlEncodedContent(
+                    [
                         new KeyValuePair<string, string>("charaIdent", await SundouleiaSecurity.GetClientIdentHash().ConfigureAwait(false)),
                         new KeyValuePair<string, string>("authKey", secretKey),
                         new KeyValuePair<string, string>("forceMain", forceMain),
-                    }), token).ConfigureAwait(false);
+                    ]), token).ConfigureAwait(false);
                 }
                 else if (identifier is LocalContentIDJwtIdentifier localContentIDIdentifier)
                 {
@@ -141,7 +142,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                     var localContentID = localContentIDIdentifier.LocalContentID;
 
                     // Set the token URI to the appropriate endpoint for local content ID authentication
-                    tokenUri = AuthRoutes.TempTokenFullPath(new Uri(MainHub.MAIN_SERVER_URI
+                    tokenUri = AuthRoutes.TempTokenFullPath(new Uri(ServerHubConfig.CurrentHubUri
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                         .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
 
@@ -164,7 +165,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
                 // set the token URI to SundouleiaAuth's full path, with the base URI being the
                 // server's current API URL, with https:// replaced with wss://
                 // (calling RenewTokenFullPath is different from AuthFullPath
-                tokenUri = AuthRoutes.RenewTokenFullPath(new Uri(MainHub.MAIN_SERVER_URI
+                tokenUri = AuthRoutes.RenewTokenFullPath(new Uri(ServerHubConfig.CurrentHubUri
                     .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                     .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
 
@@ -259,7 +260,7 @@ public sealed class TokenProvider : DisposableMediatorSubscriberBase
             }
 
             // get the remaining attributes.
-            var apiUrl = MainHub.MAIN_SERVER_URI;
+            var apiUrl = ServerHubConfig.CurrentHubUri;
             var charaHash = SundouleiaSecurity.GetClientIdentHash().GetAwaiter().GetResult();
             // Example logic to decide which identifier to use.
             if (!string.IsNullOrEmpty(secretKey))

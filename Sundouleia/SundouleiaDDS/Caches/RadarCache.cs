@@ -6,7 +6,7 @@ using Sundouleia.Radar;
 namespace Sundouleia.DrawSystem;
 
 // Cache for DDS's using RadarUsers.
-public class RadarCache(DynamicDrawSystem<RadarUser> parent) : DynamicFilterCache<RadarUser>(parent)
+public class RadarCache(DynamicDrawSystem<RadarPublicUser> parent) : DynamicFilterCache<RadarPublicUser>(parent)
 {
     /// <summary>
     ///     If the config options under the filter bar should show.
@@ -19,7 +19,7 @@ public class RadarCache(DynamicDrawSystem<RadarUser> parent) : DynamicFilterCach
     public IDynamicNode? NodeInDrafter;
 
     // Override for matching the search filter.
-    protected override bool IsVisible(IDynamicNode<RadarUser> node)
+    protected override bool IsVisible(IDynamicNode<RadarPublicUser> node)
     {
         if (node is RadarFolder radarFolder)
             return radarFolder.TotalChildren > 0;
@@ -27,7 +27,7 @@ public class RadarCache(DynamicDrawSystem<RadarUser> parent) : DynamicFilterCach
         if (Filter.Length is 0)
             return true;
 
-        if (node is DynamicLeaf<RadarUser> leaf)
+        if (node is DynamicLeaf<RadarPublicUser> leaf)
             return leaf.Data.MatchesFilter(Filter);
 
         return base.IsVisible(node);

@@ -50,7 +50,7 @@ public class RequestsGroupSelector : GroupMultiSelector
         ImGui.SameLine(_.InnerRegion.X - CkGui.IconButtonSize(FAI.Minus).X);
         if (CkGui.IconButton(FAI.Minus, id: $"dsl_{folder.ID}", inPopup: true))
             DeselectFolder(folder);
-        CkGui.AttachToolTip($"Remove from Selection");
+        CkGui.AttachTooltip($"Remove from Selection");
     }
 
     public void AddSelectedFolders(IEnumerable<GroupFolder> folders)

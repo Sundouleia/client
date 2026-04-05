@@ -8,6 +8,7 @@ using Lumina.Excel;
 using Lumina.Excel.Sheets;
 using OtterGui.Text;
 using Sundouleia.Services.Mediator;
+using SundouleiaAPI.Data;
 using LuminaWorld = Lumina.Excel.Sheets.World;
 
 namespace Sundouleia.Services;
@@ -173,6 +174,18 @@ public class LocationSvc : DisposableMediatorSubscriberBase
             _ => ResidentialArea.None,
         } : ResidentialArea.None;
 
+    public static unsafe LocationMeta GetLocationMeta()
+        => new LocationMeta()
+        {
+            DataCenterId = Current.DataCenterId,
+            WorldId = Current.WorldId,
+            IntendedUseId = (byte)Current.IntendedUse,
+            TerritoryId = Current.TerritoryId,
+            WardId = (byte)Current.Ward, // Always +1 the actual plot value. (0 == ward 1)
+            PlotOrDivisionId = (byte)(Current.Plot + 1), // Always +1 the actual plot value. (0 == plot 1)
+            RoomId = Current.IsIndoors ? (short)Current.ApartmentDivision : (short)-1,
+            HouseId = Current.IsInHousing ? HousingManager.Instance()->GetCurrentHouseId() : 0,
+        };
 
     public unsafe LocationEntry GetEntryForArea()
     {
@@ -273,13 +286,13 @@ public class LocationSvc : DisposableMediatorSubscriberBase
         ImGui.Text("World:");
         CkGui.ColorTextInline($"{entry.WorldName} ({entry.WorldId})", ImGuiColors.DalamudGrey);
 
-        ImGui.Text("Territory Intended Use:");
+        ImGui.Text("Intended Use:");
         CkGui.ColorTextInline($"{entry.IntendedUse} ({(byte)entry.IntendedUse})", ImGuiColors.DalamudGrey);
 
         ImGui.Text("Territory:");
         CkGui.ColorTextInline($"{entry.TerritoryName} ({entry.TerritoryId})", ImGuiColors.DalamudGrey);
 
-        ImGui.Text("In Housing District:");
+        ImGui.Text("Is HouseDist:");
         ImUtf8.SameLineInner();
         CkGui.ColorTextBool(entry.IsInHousing.ToString(), entry.IsInHousing);
         if (entry.IsInHousing)

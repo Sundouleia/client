@@ -1,3 +1,4 @@
+using CkCommons;
 using CkCommons.Gui;
 using CkCommons.Textures;
 using Dalamud.Bindings.ImGui;
@@ -6,6 +7,8 @@ using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.System.Framework;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using OtterGui.Text;
 using Sundouleia.Interop;
 using Sundouleia.ModFiles;
@@ -15,6 +18,7 @@ using Sundouleia.Services;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Utils;
 using Sundouleia.Watchers;
+using LuminaTerritoryType = Lumina.Excel.Sheets.TerritoryType;
 
 namespace Sundouleia.Gui;
 
@@ -77,6 +81,139 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
                 ImGui.TableNextRow();
             }
         }
+
+        ImGui.Separator();
+        DrawLiveLocation();
+    }
+
+    private unsafe void DrawLiveLocation()
+    {
+        try
+        {
+            var agentMap = AgentMap.Instance();
+            if (agentMap != null)
+            {
+                uint mapId = agentMap == null ? 0 : agentMap->CurrentMapId;
+                uint territoryId = agentMap == null ? 0 : agentMap->CurrentTerritoryId;
+                ImGui.Text("AgentMap MapID:");
+                CkGui.ColorTextInline($"{mapId}", ImGuiColors.DalamudGrey);
+
+                ImGui.Text("AgentMap TerritoryID:");
+                CkGui.ColorTextInline($"{territoryId}", ImGuiColors.DalamudGrey);
+            }
+
+            ImGui.Text("World:");
+            CkGui.ColorTextInline($"{PlayerData.CurrentWorldName} ({PlayerData.CurrentWorldId})", ImGuiColors.DalamudGrey);
+
+            ImGui.Text("Territory:");
+            CkGui.ColorTextInline($"{PlayerContent.GetTerritoryName(PlayerContent.TerritoryIdInstanced)} ({PlayerContent.TerritoryIdInstanced})", ImGuiColors.DalamudGrey);
+
+            ImGui.Text("Intended Use:");
+            CkGui.ColorTextInline($"{PlayerContent.TerritoryIntendedUse} ({(byte)PlayerContent.TerritoryIntendedUse})", ImGuiColors.DalamudGrey);
+
+
+            ImGui.Text("HouseType:");
+            var houseMgr = HousingManager.Instance();
+            var housingType = houseMgr->GetCurrentHousingTerritoryType();
+            CkGui.ColorTextInline($"{housingType} ({(ushort)housingType})", ImGuiColors.DalamudGrey);
+
+            ImGui.Text("Ward:");
+            CkGui.ColorTextInline($"{houseMgr->GetCurrentWard()}", ImGuiColors.DalamudViolet);
+
+            ImGui.Text("Plot:");
+            CkGui.ColorTextInline($"{houseMgr->GetCurrentPlot()}", ImGuiColors.DalamudViolet);
+
+            ImGui.Text("Has House Permissions:");
+            CkGui.BoolIcon(houseMgr->HasHousePermissions());
+
+            ImGui.Text("Is Outside:");
+            CkGui.BoolIcon(houseMgr->IsOutside());
+            CkGui.TextInline("/");
+            CkGui.TextInline("Is Inside:");
+            CkGui.BoolIcon(houseMgr->IsInside());
+
+            var houseData = houseMgr->IsOutside()
+                ? houseMgr->GetCurrentHouseId() : houseMgr->GetCurrentIndoorHouseId();
+            ImGui.Text("HouseID:");
+            CkGui.ColorTextInline(houseData.Id.ToString(), ImGuiColors.DalamudViolet);
+            using (ImRaii.PushIndent())
+            {
+                ImGui.Text("TerritoryType:");
+                CkGui.ColorTextInline($"{PlayerContent.GetTerritoryName(houseData.TerritoryTypeId)} ({houseData.TerritoryTypeId})", ImGuiColors.DalamudGrey);
+
+                ImGui.Text("WorldID:");
+                CkGui.ColorTextInline(houseData.WorldId.ToString(), ImGuiColors.DalamudGrey);
+
+                ImGui.Text("Ward:");
+                CkGui.ColorTextInline($"{houseData.WardIndex}", ImGuiColors.DalamudGrey);
+
+                ImGui.Text(houseData.IsApartment ? "ApartmentDivision:" : "Plot:");
+                CkGui.ColorTextInline($"{houseData.ApartmentDivision}", ImGuiColors.DalamudGrey);
+
+                ImGui.Text("IsApartment");
+                CkGui.BoolIcon(houseData.IsApartment);
+                if (houseData.IsApartment)
+                {
+                    CkGui.ColorTextInline($"Room #{houseData.RoomNumber}", ImGuiColors.DalamudGrey);
+                }
+            }
+
+            ImGui.Text("Personal Ownership Definitions:");
+            foreach (var type in Enum.GetValues<EstateType>())
+            {
+                var shared = type is EstateType.SharedEstate ? 0 : -1;
+                var ownedHouse = HousingManager.GetOwnedHouseId(type, shared);
+                CkGui.ColorText($"{type}:", ImGuiColors.DalamudViolet);
+                ImUtf8.SameLineInner();
+                ImGui.SetNextItemWidth(250);
+                ImGui.InputULong($"##{type}-owned-house-id", ref ownedHouse.Id, 10, flags: ImGuiInputTextFlags.ReadOnly);
+                CkGui.TextInline(" | ");
+                CkGui.TextInline("At Location:");
+                CkGui.BoolIcon(ownedHouse.Id == houseData.Id);
+            }
+
+            ImGui.Separator();
+            var fcInfo = Framework.Instance()->GetUIModule()->GetInfoModule()->GetInfoProxyFreeCompany();
+            if (fcInfo != null)
+            {
+                ImGui.Text($"FC ID: {fcInfo->Id}");
+                ImGui.Text($"FC HomeworldId: {fcInfo->HomeWorldId}");
+                ImGui.Text($"FC GrandCompany: {fcInfo->GrandCompany}");
+                ImGui.Text($"FC Rank: {fcInfo->Rank}");
+                ImGui.Text($"FC OnlineMembers: {fcInfo->OnlineMembers}");
+                ImGui.Text($"FC TotalMembers: {fcInfo->TotalMembers}");
+                ImGui.Text($"FC NameString: {fcInfo->NameString}");
+                ImGui.Text($"FC MasterString: {fcInfo->MasterString}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error drawing live location: {ex}");
+        }
+
+        if (ImGui.Button("Generator TerritoryData"))
+        {
+            var data = Svc.Data.GetExcelSheet<LuminaTerritoryType>(Svc.ClientState.ClientLanguage)!
+                .Where(t => t.RowId != 0 && t.TerritoryIntendedUse.RowId == 1 && !string.IsNullOrWhiteSpace(t.PlaceNameRegion.ValueNullable?.Name.ToString()))
+                .Select(t =>
+                {
+                    var placeRegion = t.PlaceNameRegion.ValueNullable!.Value;
+                    return new
+                    {
+                        Id = (ushort)t.RowId,
+                        RegionId = placeRegion.RowId,
+                        Region = placeRegion.Name.ToString(),
+                        Name = t.PlaceName.ValueNullable?.Name.ToString()
+                    };
+                })
+                .Where(x => x != null)
+                .ToDictionary(
+                    x => x!.Id,
+                    x => (x!.Region, x!.Name, x!.RegionId)
+                );
+            // output this as a copiable log message string.
+            Svc.Logger.Information("TerritoryData:\n " + string.Join("\n ", data.Select(x => $"{x.Key}: {x.Value}")));
+        }
     }
 
     private unsafe void DrawLociData()
@@ -106,13 +243,13 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         CkGui.IconText(_updater.Distributing ? FAI.Check : FAI.Times, _updater.Distributing ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
 
         ImGui.Text("NewVisibleUsers: ");
-        CkGui.ColorTextInline(string.Join(", ", _updater.NewVisibleUsers.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+        CkGui.ColorTextInline(string.Join(", ", _updater.NewVisibleUsers.Select(x => x.DisplayName)), ImGuiColors.DalamudViolet);
 
         ImGui.Text("InLimbo: ");
-        CkGui.ColorTextInline(string.Join(", ", _limboManager.InLimbo.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+        CkGui.ColorTextInline(string.Join(", ", _limboManager.InLimbo.Select(x => x.DisplayName)), ImGuiColors.DalamudViolet);
 
         ImGui.Text("For Update Push: ");
-        CkGui.ColorTextInline(string.Join(", ", _updater.UsersForUpdatePush.Select(x => x.AliasOrUID)), ImGuiColors.DalamudViolet);
+        CkGui.ColorTextInline(string.Join(", ", _updater.UsersForUpdatePush.Select(x => x.DisplayName)), ImGuiColors.DalamudViolet);
 
         using var node = ImRaii.TreeNode($"Distribution CharaDataCache##chara-data-cache-info");
         if (!node) return;
@@ -145,7 +282,7 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
             {
                 ImGui.TableNextColumn();
                 CkGui.HoverIconText(FAI.Hashtag, ImGuiColors.DalamudViolet.ToUint());
-                CkGui.AttachToolTip(hash);
+                CkGui.AttachTooltip(hash);
 
                 DrawIconBoolColumn(mod.IsFileSwap);
                 DrawIconBoolColumn(mod.HasFileReplacement);
@@ -254,7 +391,6 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         DrawCurrentOwned();
         DrawStatics();
         DrawRenderedCharas();
-        DrawRenderedCompanions();
     }
 
     private void DrawCurrentOwned()
@@ -512,52 +648,6 @@ public class DebugActiveStateUI : WindowMediatorSubscriberBase
         catch (Exception ex)
         {
             _logger.LogError($"Error drawing rendered charas: {ex}");
-        }
-    }
-
-    private unsafe void DrawRenderedCompanions()
-    {
-        using var _ = ImRaii.TreeNode("Rendered Companions##watcher-rendered-companions");
-        if (!_) return;
-
-        try
-        {
-            using (var t = ImRaii.Table($"##unowned-companions-rendered", 7, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
-            {
-                if (!t) return;
-                ImGui.TableSetupColumn("Name");
-                ImGui.TableSetupColumn("ObjIdx");
-                ImGui.TableSetupColumn("ObjKind");
-                ImGui.TableSetupColumn("Address");
-                ImGui.TableSetupColumn("EntityId");
-                ImGui.TableSetupColumn("ObjectId");
-                ImGui.TableSetupColumn("OwnerId");
-                ImGui.TableHeadersRow();
-
-                foreach (var addr in CharaWatcher.RenderedCompanions.ToList())
-                {
-                    Companion* obj = (Companion*)addr;
-                    ImGui.TableNextColumn();
-                    ImGui.Text(obj->NameString.ToString());
-                    ImGui.TableNextColumn();
-                    ImGui.Text(obj->ObjectIndex.ToString());
-                    ImGui.TableNextColumn();
-                    ImGui.Text(obj->ObjectKind.ToString());
-                    ImGui.TableNextColumn();
-                    CkGui.ColorText($"{addr:X}", ImGuiColors.TankBlue); 
-                    ImGui.TableNextColumn();
-                    ImGui.Text(obj->EntityId.ToString());
-                    ImGui.TableNextColumn();
-                    ImGui.Text(obj->GetGameObjectId().ObjectId.ToString());
-                    ImGui.TableNextColumn();
-                    ImGui.Text(obj->CompanionOwnerId.ToString());
-                }
-            }
-            ImGui.Separator();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error drawing rendered companions: {ex}");
         }
     }
 

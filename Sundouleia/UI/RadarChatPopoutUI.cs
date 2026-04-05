@@ -14,10 +14,10 @@ namespace Sundouleia.Gui;
 
 public class RadarChatPopoutUI : WindowMediatorSubscriberBase
 {
-    private readonly PopoutRadarChatlog _chat;
+    private readonly RadarChatLog _chat;
 
-    public RadarChatPopoutUI(ILogger<RadarChatPopoutUI> logger, SundouleiaMediator mediator, PopoutRadarChatlog chat) 
-        : base(logger, mediator, "Radar Chat Popout UI")
+    public RadarChatPopoutUI(ILogger<RadarChatPopoutUI> logger, SundouleiaMediator mediator, RadarChatLog chat) 
+        : base(logger, mediator, "RadarChat Popout")
     {
         _chat = chat;
 
@@ -54,7 +54,7 @@ public class RadarChatPopoutUI : WindowMediatorSubscriberBase
         using (ImRaii.Group())
             _chat.DrawChat(ImGui.GetContentRegionAvail());
         if (RadarChatLog.NotVerified)
-            CkGui.AttachToolTip("Cannot use chat, your account is not verified!");
+            CkGui.AttachTooltip("Cannot use chat, your account is not verified!");
 
         // If blocked, draw the warning.
         if (RadarChatLog.ChatBlocked)

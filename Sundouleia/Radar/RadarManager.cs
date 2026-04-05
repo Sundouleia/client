@@ -2,6 +2,7 @@ using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
 using Sundouleia.Pairs;
 using Sundouleia.PlayerClient;
+using Sundouleia.Radar.Factories;
 using Sundouleia.Services.Mediator;
 using Sundouleia.Watchers;
 using Sundouleia.WebAPI;
@@ -13,41 +14,42 @@ using System.Diagnostics.CodeAnalysis;
 namespace Sundouleia.Radar;
 
 /// <summary>
-///     Manages the current radar zone and all resolved, valid users. <para />
-///     identifies players valid for chatting and list display, with additional info.
+///   Manages the Public radar users for the current location.
+///   Updated by the radar distributor, and manged by callbacks.
 /// </summary>
 public sealed class RadarManager : DisposableMediatorSubscriberBase
 {
     private readonly MainConfig _config;
+    private readonly RadarFactory _radarFactory;
     private readonly RequestsManager _requests;
     private readonly SundesmoManager _sundesmos;
     private readonly CharaWatcher _watcher;
 
-    // Keep keyed UserData private, preventing unwanted access.
-    private ConcurrentDictionary<UserData, RadarUser> _allRadarUsers = new(UserDataComparer.Instance);
-    private Lazy<List<RadarUser>> _usersInternal;
+    // Keyed by UserData, ensure this info is private.
+    // private ConcurrentDictionary<UserData, RadarPublicUser> _ = new(UserDataComparer.Instance);
+    private ConcurrentDictionary<UserData, RadarPublicUser> _allPublicUsers = new(UserDataComparer.Instance);
+    private Lazy<List<RadarPublicUser>> _publicUsersInternal;
 
     public RadarManager(ILogger<RadarManager> logger, SundouleiaMediator mediator,
-        MainConfig config, RequestsManager requests, SundesmoManager sundesmos, 
-        CharaWatcher watcher)
+        MainConfig config, RadarFactory factory, RequestsManager requests, 
+        SundesmoManager sundesmos, CharaWatcher watcher)
         : base(logger, mediator)
     {
         _config = config;
+        _radarFactory = factory;
         _requests = requests;
         _sundesmos = sundesmos;
         _watcher = watcher;
 
-        _usersInternal = new Lazy<List<RadarUser>>(() => _allRadarUsers.Values.ToList());
+        _publicUsersInternal = new Lazy<List<RadarPublicUser>>(() => _allPublicUsers.Values.ToList());
 
-        Mediator.Subscribe<WatchedObjectCreated>(this, _ => OnObjectCreated(_.Address));
-        Mediator.Subscribe<WatchedObjectDestroyed>(this, _ => OnObjectDeleted(_.Address));
         Mediator.Subscribe<DisconnectedMessage>(this, _ => ClearUsers());
 
         Svc.ContextMenu.OnMenuOpened += OnRadarContextMenu;
     }
 
     // Expose the RadarUser, keeping the UserData private.
-    public List<RadarUser> RadarUsers => _usersInternal.Value;
+    public List<RadarPublicUser> RadarUsers => _publicUsersInternal.Value;
 
     protected override void Dispose(bool disposing)
     {
@@ -64,7 +66,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
 
         // Locate the user to display it in.
         Logger.LogTrace("Context menu opened, checking for radar user.", LoggerType.RadarManagement);
-        foreach (var (userData, radarUser) in _allRadarUsers)
+        foreach (var (userData, radarUser) in _allPublicUsers)
         {
             // If they are a pair, or in requests, skip.
             if (radarUser.IsPaired || radarUser.InRequests) continue;
@@ -118,14 +120,36 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     }
     #endregion Events
 
-    public bool ContainsUser(UserData user)
-        => _allRadarUsers.ContainsKey(user);
+    // Creates or re-initializes all radar users for the current area.
+    public void CreateOrReinitUsers(IEnumerable<RadarMember> userList)
+    {
+        var created = new List<string>();
+        var refreshed = new List<string>();
+        foreach (var user in userList)
+        {
+            if (_allPublicUsers.TryGetValue(user.User, out var existing))
+            {
+                // Dont do anything for the moment?
+                refreshed.Add(user.User.AnonName);
+            }
+            else
+            {
+                _allPublicUsers[user.User] = _radarFactory.Create(user);
+                created.Add(user.User.AnonName);
+            }
 
-    public bool IsUserRendered(UserData user)
-        => _allRadarUsers.TryGetValue(user, out var match) && match.IsValid;
+            // Maybe attempt an initial visibility check here, or add the check internally.
+        }
 
-    public bool TryGetUser(UserData user, [NotNullWhen(true)] out RadarUser? radarUser)
-        => _allRadarUsers.TryGetValue(user, out radarUser);
+        RecreateLazy();
+        if (created.Count > 0) Logger.LogDebug($"Created: {string.Join(", ", created)}", LoggerType.PairManagement);
+        if (refreshed.Count > 0) Logger.LogDebug($"Refreshed: {string.Join(", ", refreshed)}", LoggerType.PairManagement);
+    }
+
+    public void AddUpdateRadarUser(RadarMember radarUser)
+    {
+
+    }
 
     // Add a user, regardless of visibility.
     public void AddOrUpdateUser(OnlineUser user, IntPtr address)
@@ -133,31 +157,31 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
         if (user.User.UID == MainHub.UID)
             return; // Ignore Self.
 
-        // For Updates
-        Logger.LogDebug($"Updating {user.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
-        if (_allRadarUsers.TryGetValue(user.User, out var existing))
-        {
-            Logger.LogDebug($"Updating radar user {user.User.AnonName}.", LoggerType.RadarManagement);
-            existing.UpdateOnlineUser(user);
-        }
-        // For Adding
-        else
-        {
-            Logger.LogDebug($"Creating new radar user {user.User.AnonName}.", LoggerType.RadarManagement);
-            // Attempt to fetch their visibility if the address was zero in the call.
-            if (address == IntPtr.Zero && !string.IsNullOrEmpty(user.Ident))
-                _watcher.TryGetExisting(user.Ident, out address);
+        //// For Updates
+        //Logger.LogDebug($"Updating {user.User.AnonName} with address {address:X}.", LoggerType.RadarManagement);
+        //if (_allPublicUsers.TryGetValue(user.User, out var existing))
+        //{
+        //    Logger.LogDebug($"Updating radar user {user.User.AnonName}.", LoggerType.RadarManagement);
+        //    existing.UpdateOnlineUser(user);
+        //}
+        //// For Adding
+        //else
+        //{
+        //    Logger.LogDebug($"Creating new radar user {user.User.AnonName}.", LoggerType.RadarManagement);
+        //    // Attempt to fetch their visibility if the address was zero in the call.
+        //    if (address == IntPtr.Zero && !string.IsNullOrEmpty(user.Ident))
+        //        _watcher.TryGetExisting(user.Ident, out address);
 
-            // Attempt to add the user. If it was successful, try updating the sundesmo.
-            _allRadarUsers.TryAdd(user.User, new RadarUser(_sundesmos, _requests, user, address));
-        }
+        //    // Attempt to add the user. If it was successful, try updating the sundesmo.
+        //    _allPublicUsers.TryAdd(user.User, new RadarPublicUser(_sundesmos, _requests, user, address));
+        //}
         // Could have removed hashedIdent from the User, so we should remove them from the list.
         RecreateLazy();
     }
 
     public void UpdateVisibility(UserData user, IntPtr address)
     {
-        if (!_allRadarUsers.TryGetValue(user, out var existing))
+        if (!_allPublicUsers.TryGetValue(user, out var existing))
             return;
         // Update visibility.
         Logger.LogDebug($"(Radar) {existing.DisplayName} is now {(address != IntPtr.Zero ? "rendered" : "unrendered")}.", LoggerType.RadarManagement);
@@ -169,13 +193,13 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     public void RemoveUser(UserData user)
     {
         Logger.LogDebug($"(Radar) A user was removed.", LoggerType.RadarManagement);
-        _allRadarUsers.TryRemove(user, out _);
+        _allPublicUsers.TryRemove(user, out _);
         RecreateLazy();
     }
 
     public void RefreshUser(UserData user)
     {
-        if (!_allRadarUsers.TryGetValue(user, out var existing))
+        if (!_allPublicUsers.TryGetValue(user, out var existing))
             return;
         existing.RefreshSundesmo();
         RecreateLazy();
@@ -183,7 +207,7 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
 
     public void RefreshUsers()
     {
-        foreach (var radarUser in _allRadarUsers.Values)
+        foreach (var radarUser in _allPublicUsers.Values)
             radarUser.RefreshSundesmo();
         RecreateLazy();
     }
@@ -192,13 +216,13 @@ public sealed class RadarManager : DisposableMediatorSubscriberBase
     {
         Logger.LogDebug("Clearing all valid radar users.", LoggerType.RadarManagement);
         // Nothing to dispose of (yet), so just clear.
-        _allRadarUsers.Clear();
+        _allPublicUsers.Clear();
         RecreateLazy();
     }
 
     private void RecreateLazy(bool reorderOnly = false)
     {
-        _usersInternal = new Lazy<List<RadarUser>>(() => _allRadarUsers.Values.ToList());
+        _publicUsersInternal = new Lazy<List<RadarPublicUser>>(() => _allPublicUsers.Values.ToList());
         Mediator.Publish(new FolderUpdateRadar());
     }
 }

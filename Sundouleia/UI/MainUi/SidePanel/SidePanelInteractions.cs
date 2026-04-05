@@ -104,13 +104,13 @@ public class SidePanelInteractions
         var anims = s.PairPerms.AllowAnimations;
         var vfx = s.PairPerms.AllowVfx;
         CkGui.IconTextAligned(FAI.VolumeUp, sounds ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(sounds ? "can hear your modded SFX/Music." : "disabled your modded SFX/Music.")}");
+        CkGui.AttachTooltip($"{dispName} {(sounds ? "can hear your modded SFX/Music." : "disabled your modded SFX/Music.")}");
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.Running, anims ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(anims ? "can see your modded animations." : "disabled your modded animations.")}");
+        CkGui.AttachTooltip($"{dispName} {(anims ? "can see your modded animations." : "disabled your modded animations.")}");
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.PersonBurst, vfx ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(vfx ? "can see your modded VFX." : "disabled your modded VFX.")}");
+        CkGui.AttachTooltip($"{dispName} {(vfx ? "can see your modded VFX." : "disabled your modded VFX.")}");
 
         // Loci Row
         var iconsW = CkGui.IconsSize([FAI.TheaterMasks, FAI.SmileBeam, FAI.FrownOpen, FAI.WandMagicSparkles,
@@ -128,47 +128,47 @@ public class SidePanelInteractions
         var remApp = s.PairPerms.LociAccess.HasAny(LociAccess.RemoveApplied);
         var remAny = s.PairPerms.LociAccess.HasAny(LociAccess.RemoveAny);
         CkGui.IconTextAligned(FAI.TheaterMasks, sharing ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(sharing ? "is sharing Loci data with you." : "is not sharing Loci data with you.")}");
+        CkGui.AttachTooltip($"{dispName} {(sharing ? "is sharing Loci data with you." : "is not sharing Loci data with you.")}");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.SmileBeam, pos ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Positive statuses." : "prevents Positive statuses.")}");
+        CkGui.AttachTooltip($"{dispName} {(pos ? "allows Positive statuses." : "prevents Positive statuses.")}");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.FrownOpen, neg ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Negative statuses." : "prevents Negative statuses.")}");
+        CkGui.AttachTooltip($"{dispName} {(pos ? "allows Negative statuses." : "prevents Negative statuses.")}");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.WandMagicSparkles, spec ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip($"{dispName} {(pos ? "allows Special statuses." : "prevents Special statuses.")}");
+        CkGui.AttachTooltip($"{dispName} {(pos ? "allows Special statuses." : "prevents Special statuses.")}");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.PersonArrowUpFromLine, own ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip(pos ? $"You can apply {dispName}'s statuses." : $"Applying {dispName}'s statuses is forbidden.");
+        CkGui.AttachTooltip(pos ? $"You can apply {dispName}'s statuses." : $"Applying {dispName}'s statuses is forbidden.");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.PersonArrowDownToLine, other ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip(other ? $"You can apply your statuses" : "Applying your statuses is forbidden.");
+        CkGui.AttachTooltip(other ? $"You can apply your statuses" : "Applying your statuses is forbidden.");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.Stopwatch, s.PairPerms.MaxLociTime != TimeSpan.Zero ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip(s.PairPerms.MaxLociTime != TimeSpan.Zero ? $"{dispName}'s Max status time is: {s.PairPerms.MaxLociTime.ToTimeSpanStr()}." : "Cannot apply timed statuses.");
+        CkGui.AttachTooltip(s.PairPerms.MaxLociTime != TimeSpan.Zero ? $"{dispName}'s Max status time is: {s.PairPerms.MaxLociTime.ToTimeSpanStr()}." : "Cannot apply timed statuses.");
 
         ImUtf8.SameLineInner();
         CkGui.IconTextAligned(FAI.Infinity, perm ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-        CkGui.AttachToolTip(perm ? $"{dispName} allows Permanent statuses." : $"{dispName} prevents Permanent statuses.");
+        CkGui.AttachTooltip(perm ? $"{dispName} allows Permanent statuses." : $"{dispName} prevents Permanent statuses.");
 
         if (remAny)
         {
             ImUtf8.SameLineInner();
             CkGui.IconTextAligned(FAI.Eraser, remAny ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-            CkGui.AttachToolTip(remAny ? $"You can remove {dispName}'s statuses." : $"You cannot remove {dispName}'s statuses.");
+            CkGui.AttachTooltip(remAny ? $"You can remove {dispName}'s statuses." : $"You cannot remove {dispName}'s statuses.");
         }
         else
         {
             ImUtf8.SameLineInner();
             CkGui.IconTextAligned(FAI.Eraser, remApp ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed);
-            CkGui.AttachToolTip(remApp ? $"You can remove statuses applied by you." : $"You cannot remove {dispName}'s statuses.");
+            CkGui.AttachTooltip(remApp ? $"You can remove statuses applied by you." : $"You cannot remove {dispName}'s statuses.");
         }
 
     }
@@ -180,11 +180,11 @@ public class SidePanelInteractions
         {
             if (CkGui.IconTextButton(FAI.User, "Open Profile", width, true, UiService.DisableUI))
                 _mediator.Publish(new ProfileOpenMessage(s.UserData));
-            CkGui.AttachToolTip($"Opens {dispName}'s profile!");
+            CkGui.AttachTooltip($"Opens {dispName}'s profile!");
 
             if (CkGui.IconTextButton(FAI.ExclamationTriangle, $"Report {dispName}'s Profile", width, true, UiService.DisableUI))
                 _mediator.Publish(new OpenReportUIMessage(s.UserData, ReportKind.Profile));
-            CkGui.AttachToolTip($"Snapshot {dispName}'s Profile and make a report with its state.");
+            CkGui.AttachTooltip($"Snapshot {dispName}'s Profile and make a report with its state.");
         }
 
         // Pausing (Special due to inverted nature. If more occur in the future, add an invert logic bool to the draw perm row method.
@@ -210,7 +210,7 @@ public class SidePanelInteractions
             var autoDeleteText = $"Temp. Pairing Expires in --COL--{timeLeft.Days}d {timeLeft.Hours}h {timeLeft.Minutes}m--COL--";
             var ttStr = $"Makes a temporary pair permanent. --NL--{autoDeleteText}" +
                 $"{(blockButton ? "--SEP----COL--Only the user who accepted the request can use this.--COL--" : string.Empty)}";
-            CkGui.AttachToolTip(ttStr, color: ImGuiColors.DalamudYellow);
+            CkGui.AttachTooltip(ttStr, color: ImGuiColors.DalamudYellow);
         }
 
         if (CkGui.IconTextButton(FAI.Trash, $"Remove {dispName} from your Pairs", width, true, !KeyMonitor.CtrlPressed() || !KeyMonitor.ShiftPressed()))
@@ -227,7 +227,7 @@ public class SidePanelInteractions
                     _service.ClearDisplay();
                 }
             });
-        CkGui.AttachToolTip($"Must hold --COL--CTRL & SHIFT to remove.", color: ImGuiColors.DalamudRed);
+        CkGui.AttachTooltip($"Must hold --COL--CTRL & SHIFT to remove.", color: ImGuiColors.DalamudRed);
     }
 
     private void DrawPauseRow(Sundesmo s, string dispName, float width, bool isPaused)
@@ -246,7 +246,7 @@ public class SidePanelInteractions
                     _logger.LogInformation($"[OwnPermChange] Permission 'IsPaused' is now '{!isPaused}' for {s.GetNickAliasOrUid()}.");
             });
         }
-        CkGui.AttachToolTip(isPaused ? $"Unpause {dispName}, restoring their Modded Appearance" : $"Pause {dispName}, reverting them to game state.");
+        CkGui.AttachTooltip(isPaused ? $"Unpause {dispName}, restoring their Modded Appearance" : $"Pause {dispName}, reverting them to game state.");
         // Show the text overlay.
         ImGui.SetCursorScreenPos(pos);
 
@@ -274,7 +274,7 @@ public class SidePanelInteractions
         // Applying own locis
         if (CkGui.IconTextButton(FAI.UserPlus, statusTxt, width, true, !isAllowed || !hasStatuses))
             cache.ToggleInteraction(OpenedInteraction.ApplyOwnStatus);
-        CkGui.AttachToolTip(statusTT);
+        CkGui.AttachTooltip(statusTT);
 
         if (cache.OpenedInteraction is OpenedInteraction.ApplyOwnStatus)
         {
@@ -286,7 +286,7 @@ public class SidePanelInteractions
         // Applying own presets.
         if (CkGui.IconTextButton(FAI.FileCirclePlus, presetTxt, width, true, !isAllowed || !hasPresets))
             cache.ToggleInteraction(OpenedInteraction.ApplyOwnPreset);
-        CkGui.AttachToolTip(presetTT);
+        CkGui.AttachTooltip(presetTT);
 
         if (cache.OpenedInteraction is OpenedInteraction.ApplyOwnPreset)
         {
@@ -310,7 +310,7 @@ public class SidePanelInteractions
         // Applying sundesmo's locis
         if (CkGui.IconTextButton(FAI.UserPlus, statusTxt, width, true, !isAllowed || !hasStatuses))
             cache.ToggleInteraction(OpenedInteraction.ApplyOtherStatus);
-        CkGui.AttachToolTip(statusTT);
+        CkGui.AttachTooltip(statusTT);
 
         if (cache.OpenedInteraction is OpenedInteraction.ApplyOtherStatus)
         {
@@ -322,7 +322,7 @@ public class SidePanelInteractions
         // Applying sundesmo's presets.
         if (CkGui.IconTextButton(FAI.FileCirclePlus, presetTxt, width, true, !isAllowed || !hasPresets))
             cache.ToggleInteraction(OpenedInteraction.ApplyOtherPreset);
-        CkGui.AttachToolTip(presetTT);
+        CkGui.AttachTooltip(presetTT);
 
         if (cache.OpenedInteraction is OpenedInteraction.ApplyOtherPreset)
         {
@@ -340,7 +340,7 @@ public class SidePanelInteractions
 
         if (CkGui.IconTextButton(FAI.UserMinus, remText, width, true, !canRemove))
             cache.ToggleInteraction(OpenedInteraction.RemoveStatus);
-        CkGui.AttachToolTip(remTT);
+        CkGui.AttachTooltip(remTT);
 
         if (cache.OpenedInteraction is OpenedInteraction.RemoveStatus)
         {
@@ -371,7 +371,7 @@ public class SidePanelInteractions
             }
             _timespanCache.Remove(id);
         }
-        CkGui.AttachToolTip($"The Maximum Time {dispName} can apply a loci on you for.");
+        CkGui.AttachTooltip($"The Maximum Time {dispName} can apply a loci on you for.");
     }
 
     private void DrawPermInternal<T>(Sundesmo sundesmo, string dispName, float width, SIID id, string permName, bool current, Func<T> toNewState, Action? onChange = null)
@@ -397,7 +397,7 @@ public class SidePanelInteractions
 
         ImGui.SetCursorScreenPos(pos);
         PrintButtonRichText(txtData, dispName, current);
-        CkGui.AttachToolTip($"Toggle this preference for {dispName}.");
+        CkGui.AttachTooltip($"Toggle this preference for {dispName}.");
     }
 
     private void PrintButtonRichText(PermInfo pdp, string dispName, bool current)

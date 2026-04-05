@@ -99,7 +99,7 @@ public class BasicGroupCache(DynamicDrawSystem<Sundesmo> dds) : WhitelistCache(d
             return true;
 
         if (node is DynamicLeaf<Sundesmo> leaf)
-            return leaf.Data.UserData.AliasOrUID.Contains(Filter, StringComparison.OrdinalIgnoreCase)
+            return leaf.Data.UserData.DisplayName.Contains(Filter, StringComparison.OrdinalIgnoreCase)
                 || (leaf.Data.GetNickname()?.Contains(Filter, StringComparison.OrdinalIgnoreCase) ?? false)
                 || (leaf.Data.PlayerName?.Contains(Filter, StringComparison.OrdinalIgnoreCase) ?? false);
 

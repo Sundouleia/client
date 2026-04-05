@@ -74,7 +74,7 @@ public class RadarChatTab
             _chat.DrawChat(ImGui.GetContentRegionAvail());
         }
         if (RadarChatLog.NotVerified)
-            CkGui.AttachToolTip("Cannot use chat, your account is not verified!");
+            CkGui.AttachTooltip("Cannot use chat, your account is not verified!");
         // Attach tutorials.
     }
 

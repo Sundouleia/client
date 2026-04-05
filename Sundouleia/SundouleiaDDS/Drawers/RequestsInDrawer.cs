@@ -112,13 +112,13 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             {
                 ImGui.SameLine();
                 CkGui.IconTextAligned(FAI.Stopwatch, ImGuiColors.DalamudGrey2);
-                CkGui.AttachToolTip("A temporary pairing, that expires unless you make it permanent.");
+                CkGui.AttachTooltip("A temporary pairing, that expires unless you make it permanent.");
             }
 
             ImGui.SameLine(endX - minusX);
             if (CkGui.IconButton(FAI.Minus, null, leaf.Name, UiService.DisableUI, true))
                 Selector.Deselect(leaf);
-            CkGui.AttachToolTip("Remove from selection.");
+            CkGui.AttachTooltip("Remove from selection.");
         }
     }
 
@@ -201,7 +201,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             var toAdd = ((IDynamicFolder<RequestEntry>)folder).Children.Where(x => x.Data.SentFromWorld(curWorld));
             Selector.SelectMultiple(toAdd);
         }
-        CkGui.AttachToolTip("Select requests sent from your current world.");
+        CkGui.AttachTooltip("Select requests sent from your current world.");
 
         currentRightSide -= byAreaSize;
         ImGui.SameLine(currentRightSide);
@@ -213,7 +213,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             var toAdd = ((IDynamicFolder<RequestEntry>)folder).Children.Where(x => x.Data.SentFromCurrentArea(curWorld, curTerritory));
             Selector.SelectMultiple(toAdd);
         }
-        CkGui.AttachToolTip("Select requests sent from your current area.");
+        CkGui.AttachTooltip("Select requests sent from your current area.");
 
         return currentRightSide;
     }
@@ -237,7 +237,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
         if (ImGui.InvisibleButton($"{leaf.FullPath}-hoverspace", new Vector2(rightSide - posX, region.Y)))
             HandleLeftClick(leaf, flags);
         HandleDetections(leaf, flags);
-        CkGui.AttachToolTip(ToolTip, ImGuiColors.DalamudOrange);
+        CkGui.AttachTooltip(ToolTip, ImGuiColors.DalamudOrange);
 
         // Bounce back and draw out the name.
         ImGui.SameLine(posX);
@@ -252,7 +252,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             CkGui.FramedHoverIconText(FAI.CommentDots, ImGuiColors.TankBlue.ToUint());
         else
             CkGui.FramedIconText(FAI.CommentDots, ImGui.GetColorU32(ImGuiCol.TextDisabled));
-        CkGui.AttachToolTip($"--COL--Attached Message:--COL----SEP--{entry.Message}", !entry.HasMessage, ImGuiColors.ParsedGold);
+        CkGui.AttachTooltip($"--COL--Attached Message:--COL----SEP--{entry.Message}", !entry.HasMessage, ImGuiColors.ParsedGold);
     }
 
     // Draw out the responder entry.
@@ -285,7 +285,7 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
                     // Draw out the initial frame with a small outer boarder.
                     if (CkGui.IconButtonColored(overrideIcon, SundCol.Gold.Uint(), UiService.DisableUI))
                         AcceptRequest(leaf.Data, !leaf.Data.IsTemporaryRequest);
-                    CkGui.AttachToolTip($"Override pairing preference.--NL----COL--Accept {leaf.Data.SenderTag} as a " +
+                    CkGui.AttachTooltip($"Override pairing preference.--NL----COL--Accept {leaf.Data.SenderTag} as a " +
                         $"{(leaf.Data.IsTemporaryRequest ? "permanent" : "temporary")} pair.--COL--", ImGuiColors.DalamudOrange);
 
                     // Draw out the initial frame with a small outer boarder.
@@ -293,18 +293,18 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
                     var defaultIcon = leaf.Data.IsTemporaryRequest ? FAI.Clock : FAI.Check;
                     if (CkGui.IconButtonColored(defaultIcon, CkCol.TriStateCheck.Uint(), UiService.DisableUI))
                         AcceptRequest(leaf.Data, leaf.Data.IsTemporaryRequest);
-                    CkGui.AttachToolTip($"Accept this --COL--{(leaf.Data.IsTemporaryRequest ? "Temporary" : "Permanent")}--COL-- request.", ImGuiColors.DalamudOrange);
+                    CkGui.AttachTooltip($"Accept this --COL--{(leaf.Data.IsTemporaryRequest ? "Temporary" : "Permanent")}--COL-- request.", ImGuiColors.DalamudOrange);
 
                     ImUtf8.SameLineInner();
                     if (CkGui.IconButtonColored(FAI.Times, CkCol.TriStateCross.Uint(), UiService.DisableUI))
                         RejectRequest(leaf.Data);
-                    CkGui.AttachToolTip("Reject this request.");
+                    CkGui.AttachTooltip("Reject this request.");
                     ImUtf8.SameLineInner();
                 }
             }
 
             CkGui.FramedHoverIconText(FAI.Reply, uint.MaxValue);
-            CkGui.AttachToolTip("Open Quick-Responder");
+            CkGui.AttachTooltip("Open Quick-Responder");
         }
         // Should be if we hover anywhere in the area.
         if (ImGui.IsItemHovered())
@@ -316,14 +316,14 @@ public class RequestsInDrawer : DynamicDrawer<RequestEntry>
             endX -= (timeTxtWidth + spacing);
             ImGui.SameLine(endX);
             CkGui.ColorTextFrameAligned(timeTxt, ImGuiColors.ParsedGrey);
-            CkGui.AttachToolTip($"Time to respond to {leaf.Data.SenderTag}'s request.");
+            CkGui.AttachTooltip($"Time to respond to {leaf.Data.SenderTag}'s request.");
 
             if (leaf.Data.IsTemporaryRequest)
             {
                 endX -= (CkGui.IconButtonSize(FAI.History).X);
                 ImGui.SameLine(endX);
                 CkGui.IconTextAligned(FAI.History, ImGuiColors.TankBlue);
-                CkGui.AttachToolTip("This is a Temporary Request.");
+                CkGui.AttachTooltip("This is a Temporary Request.");
             }
 
         }

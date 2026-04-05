@@ -147,12 +147,12 @@ public class SidePanelUI : WindowMediatorSubscriberBase
 
         if (CkGui.IconTextButton(FAI.Plus, "In Area"))
             GroupSelector.AddSelectedFolders(_ddsGroups.GetAllInArea());
-        CkGui.AttachToolTip("Add Groups linked to this area.--NL--(All inner scopes are also included)");
+        CkGui.AttachTooltip("Add Groups linked to this area.--NL--(All inner scopes are also included)");
         
         ImUtf8.SameLineInner();
         if (CkGui.IconTextButton(FAI.Plus, "In World"))
             GroupSelector.AddSelectedFolders(_ddsGroups.GetAllInWorld());
-        CkGui.AttachToolTip("Add Groups linked to this world.--NL--(All inner scopes are also included)");
+        CkGui.AttachTooltip("Add Groups linked to this world.--NL--(All inner scopes are also included)");
         
         ImUtf8.SameLineInner();
         var comboWidth = ImGui.GetContentRegionAvail().X;
@@ -167,13 +167,13 @@ public class SidePanelUI : WindowMediatorSubscriberBase
         using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.HealerGreen))
             if (CkGui.IconTextButtonCentered(FAI.Check, "Accept All", halfW, disabled: UiService.DisableUI))
                 AcceptRequests(irc.Selected.Select(x => x.Data));
-        CkGui.AttachToolTip("Accept all selected requests.");
+        CkGui.AttachTooltip("Accept all selected requests.");
 
         ImUtf8.SameLineInner();
         using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DPSRed))
             if (CkGui.IconTextButtonCentered(FAI.Times, "Reject All", halfW, disabled: UiService.DisableUI))
                 RejectRequests(irc.Selected.Select(x => x.Data));
-        CkGui.AttachToolTip("Reject all selected requests.");
+        CkGui.AttachTooltip("Reject all selected requests.");
     }
 
     private void DrawInteractionsPanel(InteractionsCache ic)

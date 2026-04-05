@@ -47,7 +47,7 @@ public class DebugPersonalDataUI : WindowMediatorSubscriberBase
                 if (_searchValue.IsNullOrEmpty())
                     return true;
                 // Match for Alias, Uid, Nick, or PlayerName.
-                return p.UserData.AliasOrUID.Contains(_searchValue, StringComparison.OrdinalIgnoreCase)
+                return p.UserData.DisplayName.Contains(_searchValue, StringComparison.OrdinalIgnoreCase)
                     || (p.GetNickname()?.Contains(_searchValue, StringComparison.OrdinalIgnoreCase) ?? false)
                     || (p.PlayerName?.Contains(_searchValue, StringComparison.OrdinalIgnoreCase) ?? false);
             });

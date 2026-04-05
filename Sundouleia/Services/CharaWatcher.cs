@@ -49,7 +49,6 @@ public unsafe class CharaWatcher : IHostedService
 
     // A persistent static cache holding all rendered Character pointers.
     public static HashSet<nint> RenderedCharas { get; private set; } = new();
-    public static HashSet<nint> RenderedCompanions { get; private set; } = new(); // Unused ATM
     public static HashSet<nint> GPoseActors { get; private set; } = new();
 
     // Public, Accessible, Managed pointer address to Owned Object addresses
@@ -78,7 +77,6 @@ public unsafe class CharaWatcher : IHostedService
         OnCharaDestroyHook?.Dispose();
 
         RenderedCharas.Clear();
-        RenderedCompanions.Clear();
         WatchedTypes.Clear();
         return Task.CompletedTask;
     }
@@ -388,7 +386,7 @@ public unsafe class CharaWatcher : IHostedService
     {
         try { OnCharaInitializeHook!.OriginalDisposeSafe(chara); }
         catch (Exception e) { _logger.LogError($"Error: {e}"); }
-        Svc.Framework.Run(() => NewCharacterRendered(chara));
+        _ = Svc.Framework.Run(() => NewCharacterRendered(chara));
     }
 
     private unsafe void TerminateCharacter(Character* chara)

@@ -26,7 +26,7 @@ public partial class MainHub
             return;
         }
 
-        Logger.LogInformation($"Connection Approved, Creating with [{MAIN_SERVER_NAME}]", LoggerType.ApiCore);
+        Logger.LogInformation($"Connection Approved, Creating with [{ServerHubConfig.CurrentHubName}]", LoggerType.ApiCore);
         // if the current state was offline, change it to disconnected.
         if (ServerStatus is ServerState.Offline)
             ServerStatus = ServerState.Disconnected;
@@ -86,7 +86,7 @@ public partial class MainHub
                 await LoadOnlineSundesmos().ConfigureAwait(false);
                 await LoadRequests().ConfigureAwait(false);
                 // Load in all local data for the current profile.
-                _accounts.UpdateFileProviderForConnection(ConnectionResponse!);
+                _configDirector.UpdateFromHubResponse(ConnectionResponse!);
 
                 // once data is synchronized, update the serverStatus.
                 ServerStatus = ServerState.ConnectedDataSynced;
@@ -187,7 +187,7 @@ public partial class MainHub
             if (_hubConnection is not null)
             {
                 Logger.LogInformation("Instance disposed of in '_hubFactory', but still exists in MainHub.cs, " +
-                    $"clearing all other variables for [{MAIN_SERVER_NAME}]");
+                    $"clearing all other variables for [{ServerHubConfig.CurrentHubName}]");
                 // Clear the Health check so we stop pinging the server, set Initialized to false, publish a disconnect.
                 _apiHooksInitialized = false;
                 _hubHealthCTS?.Cancel();
@@ -502,7 +502,7 @@ public partial class MainHub
             // _achievements.HadUnhandledDisconnect(webException);
         }
 
-        Logger.LogWarning($"Connection to [{MAIN_SERVER_NAME}] Closed... Reconnecting. (Reason: {arg}");
+        Logger.LogWarning($"Connection to [{ServerHubConfig.CurrentHubName}] Closed... Reconnecting. (Reason: {arg}");
     }
 
     private async Task HubInstanceOnReconnected()

@@ -158,10 +158,12 @@ public class AccountConfig : IHybridSavable
     public void Load()
     {
         var file = _saver.FileNames.AccountConfig;
-        _logger.LogInformation("Loading in Config for file: " + file);
+        _logger.LogInformation($"Loading AccountConfig file: {file}");
         if (!File.Exists(file))
         {
-            _logger.LogWarning("Config file not found for: " + file);
+            _logger.LogWarning($"AccountConfig file not found. Setting empty data for: {file}");
+            ConnectionKind = ConnectionKind.Normal;
+            Current = new AccountStorage();
             _saver.Save(this);
             return;
         }

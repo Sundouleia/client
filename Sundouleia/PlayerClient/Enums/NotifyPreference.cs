@@ -1,7 +1,7 @@
 namespace Sundouleia.PlayerClient;
 
 [Flags]
-public enum RequestAlertKind
+public enum AlertKind
 {
     None    = 0 << 0,
     Bubble  = 1 << 0,

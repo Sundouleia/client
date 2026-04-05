@@ -137,10 +137,13 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
         => _nicks.GetNicknameForUid(UserData.UID);
     
     public string GetNickAliasOrUid()
-        => _nicks.TryGetNickname(UserData.UID, out var n) ? n : UserData.AliasOrUID;
+        => _nicks.TryGetNickname(UserData.UID, out var n) ? n : UserData.DisplayName;
 
     public void SetLociData(LociContainerData newData)
         => SharedLociData = new(newData);
+
+    internal void UpdateUserData(UserData newData)
+        => UserPair = UserPair with { User = newData };
 
     public async Task SetFullDataChanges(NewModUpdates newModData, VisualUpdate newIpc, bool isInitialData)
     {
@@ -340,7 +343,7 @@ public sealed class Sundesmo : DisposableMediatorSubscriberBase, IComparable<Sun
     /// </summary>
     public async Task RevertRenderedAlterations()
     {
-        Logger.LogDebug($"Reverting alterations for [{PlayerName}] ({GetNickAliasOrUid()}).", UserData.AliasOrUID);
+        Logger.LogDebug($"Reverting alterations for [{PlayerName}] ({GetNickAliasOrUid()}).", UserData.DisplayName);
 
         await _player.RevertAlterations().ConfigureAwait(false);
         await _mountMinion.RevertAlterations().ConfigureAwait(false);

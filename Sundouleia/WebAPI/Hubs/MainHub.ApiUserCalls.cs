@@ -66,6 +66,19 @@ public partial class MainHub
         return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserPushPresetModified), dto).ConfigureAwait(false);
     }
 
+    // -- Other Updates ---
+    public async Task<HubResponse> UserSetAlias(AliasUpdate dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserSetAlias), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> UserSetVanity(VanityUpdate dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserSetVanity), dto).ConfigureAwait(false);
+    }
+
     public async Task<HubResponse> UserUpdateProfileContent(ProfileContent dto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
@@ -244,30 +257,77 @@ public partial class MainHub
     }
 
 
-    // --- Radar Exchanges ---
-    public async Task<HubResponse<RadarZoneInfo>> RadarZoneJoin(RadarZoneUpdate dto)
-    {
-        if (!IsConnected) return HubResponseBuilder.AwDangIt<RadarZoneInfo>(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse<RadarZoneInfo>>(nameof(RadarZoneJoin), dto).ConfigureAwait(false);
-    }
-
-    public async Task<HubResponse> RadarZoneLeave()
-    {
-        // Maybe add some other safegaurd here
-        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarZoneLeave)).ConfigureAwait(false);
-    }
-
-    public async Task<HubResponse> RadarUpdateState(RadarState stateUpdate)
+    // --- Chat and Radar Exchanges ---
+    public async Task<HubResponse> UserSendChatDM(DirectChatMessage message)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarUpdateState), stateUpdate).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(UserSendChatDM), message).ConfigureAwait(false);
     }
 
-    public async Task<HubResponse> RadarChatMessage(RadarChatMessage dto)
+    public async Task<HubResponse<LocationUpdateResult>> UpdateLocation(LocationUpdate dto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<LocationUpdateResult>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<LocationUpdateResult>>(nameof(UpdateLocation), dto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse<List<LoggedRadarChatMessage>>> RadarChatJoin(RadarChatMember joinDto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<List<LoggedRadarChatMessage>>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<List<LoggedRadarChatMessage>>>(nameof(RadarChatJoin), joinDto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> RadarChatPermissionChange(RadarChatMember updateDto)
     {
         if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
-        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarChatMessage), dto).ConfigureAwait(false);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarChatPermissionChange), updateDto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> RadarSendChat(SentRadarMessage messageDto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarSendChat), messageDto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> RadarChatLeave()
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarChatLeave)).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse<List<RadarMember>>> RadarAreaJoin(RadarMember joinDto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<List<RadarMember>>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<List<RadarMember>>>(nameof(RadarAreaJoin), joinDto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> RadarAreaPermissionChange(RadarMember updateDto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarAreaPermissionChange), updateDto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> RadarAreaLeave()
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarAreaLeave)).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse<List<RadarGroupMember>>> RadarGroupJoin(RadarGroupMember joinDto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt<List<RadarGroupMember>>(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse<List<RadarGroupMember>>>(nameof(RadarGroupJoin), joinDto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> RadarGroupPermissionChange(RadarGroupMember updateDto)
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarGroupPermissionChange), updateDto).ConfigureAwait(false);
+    }
+
+    public async Task<HubResponse> RadarGroupLeave()
+    {
+        if (!IsConnected) return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NetworkError);
+        return await _hubConnection!.InvokeAsync<HubResponse>(nameof(RadarGroupLeave)).ConfigureAwait(false);
     }
 
     // --- SMA File Sharing ---

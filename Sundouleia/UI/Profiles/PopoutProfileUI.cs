@@ -71,7 +71,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             return;
         // obtain the profile for this userPair.
         var toDraw = _service.GetProfile(User);
-        var dispName = User.AliasOrUID;
+        var dispName = User.DisplayName;
 
         var wdl = ImGui.GetWindowDrawList();
         _drawHelper.RectMin = wdl.GetClipRectMin();

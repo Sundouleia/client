@@ -203,10 +203,7 @@ public sealed class IpcCallerLoci : IIpcCaller
     public async Task<string> GetActorSMStr(nint actorAddr)
     {
         if (!APIAvailable) return string.Empty;
-        var (ec, res) = await Svc.Framework.RunOnFrameworkThread(() => GetManagerByPtr.Invoke(actorAddr)).ConfigureAwait(false);
-        if (ec != LociApiEc.Success)
-            _logger.LogWarning($"Loci Failed to get Status Manager string for Actor {actorAddr}! Error: {ec}");
-        return res ?? string.Empty;
+        return await Svc.Framework.RunOnFrameworkThread(() => GetManagerByPtr.Invoke(actorAddr).Item2 ?? string.Empty).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="LociApi.Ipc.GetManagerInfo"/>

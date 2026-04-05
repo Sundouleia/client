@@ -6,13 +6,13 @@ using NAudio.Wave;
 using Sundouleia.Gui.Components;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
+using SundouleiaAPI.Data.Permissions;
 
 namespace Sundouleia.PlayerClient;
 
 public class ConfigStorage
 {
     public Version? LastRunVersion { get; set; } = null;
-    public string LastUidLoggedIn { get; set; } = ""; // This eventually wont madder once we index via keys instead of UID's
 
     // used for detecting if in first install.
     public bool AcknowledgementUnderstood { get; set; } = false;
@@ -21,8 +21,10 @@ public class ConfigStorage
     // File Info
     public bool InitialScanComplete { get; set; } = false;
     public string CacheFolder { get; set; } = string.Empty;
+    public string RadarCacheFolder { get; set; } = string.Empty; // Explicitly for the RadarCache data. (May make a subfolder)
     public bool CompactCache { get; set; } = true;
     public double MaxCacheInGiB { get; set; } = 20;
+    public double MaxRadarCacheInGiB { get; set; } = 10;
     public string CacheScanComplete { get; set; } = string.Empty;
     [JsonIgnore] public string SMACacheFolder => Path.Combine(CacheFolder, Constants.SMAFolderName);
 
@@ -37,12 +39,12 @@ public class ConfigStorage
     public float ProfileDelay { get; set; } = 1.5f;
     public bool AllowNSFW { get; set; } = false;
 
-    // General - Radar
-    public bool RadarEnabled { get; set; } = true;
-    public bool RadarSendPings { get; set; } = true; // If others can send you requests vis context menus.
-    public bool RadarJoinChats { get; set; } = true;
-    public bool RadarNearbyDtr { get; set; } = true;
-    public bool RadarShowUnreadBubble { get; set; } = true;
+    // General - Radar (Public and Groups until we can figure something out)
+    public bool Radar { get; set; } = true;
+    public RadarFlags RadarPerms { get; set; } = RadarFlags.AllowRequests | RadarFlags.UseDisplayName;
+    public bool RadarDtr { get; set; } = false;
+    public bool RadarGroup { get; set; } = true;
+    public RadarGroupFlags RadarGroupPerms { get; set; } = RadarGroupFlags.RestrictAllowancesToPairs | RadarGroupFlags.UseDisplayName;
 
     // General - Sundouleia Modular Actor Files (Holds close relation with stored fileData...)
     public string SMAExportFolder { get; set; } = string.Empty;
@@ -59,7 +61,7 @@ public class ConfigStorage
     public int TransferBarWidth { get; set; } = 250;
 
     // Preferences - Requests
-    public RequestAlertKind RequestNotifiers { get; set; } = RequestAlertKind.Bubble;
+    public AlertKind RequestNotifiers { get; set; } = AlertKind.Bubble;
     public string AlertSoundPath { get; set; } = string.Empty;
     public float AlertVolume { get; set; } = 0.5f;
     public Sounds AlertGameSoundbyte { get; set; } = Sounds.Sound02;
@@ -73,18 +75,6 @@ public class ConfigStorage
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
-
-    // Loci
-    public bool LociEnabled { get; set; } = true;
-    public bool LociSheVfxEnabled { get; set; } = true; // Enable SHE Status application
-    public bool LociSheVfxRestricted { get; set; } = true; // Restricted to party, friends, and nearby only.
-    public bool LociFlyText { get; set; } = true;
-    public int LociFlyTextLimit { get; set; } = 10; // Within 5-20
-    public bool LociOffInDuty { get; set; } = false;
-    public bool LociOffInCombat { get; set; } = false;
-    public int LociIconSelectorHeight { get; set; } = 33;
-    public bool LociAllowEsuna { get; set; } = true;
-    public bool LociOthersCanEsuna { get; set; } = true;
 }
 
 public class MainConfig : IHybridSavable, IDisposable
@@ -140,7 +130,10 @@ public class MainConfig : IHybridSavable, IDisposable
         _logger.LogInformation("Loading in Config for file: " + file);
         if (!File.Exists(file))
         {
-            _logger.LogWarning("Config file not found for: " + file);
+            _logger.LogWarning($"MainConfig file not found: {file}");
+            Current = new ConfigStorage();
+            LogLevel = LogLevel.Trace;
+            LoggerFilters = LoggerType.Recommended;
             _saver.Save(this);
             return;
         }
@@ -184,7 +177,7 @@ public class MainConfig : IHybridSavable, IDisposable
 
     public bool StartSound()
     {
-        if (!Current.RequestNotifiers.HasAny(RequestAlertKind.Audio))
+        if (!Current.RequestNotifiers.HasAny(AlertKind.Audio))
             return false;
 
         if (Current.AlertIsCustomSound)
@@ -197,7 +190,7 @@ public class MainConfig : IHybridSavable, IDisposable
     public void UpdateAudio()
     {
         // Dispose the audio if no longer valid.
-        if (!(Current.RequestNotifiers.HasAny(RequestAlertKind.Audio) && Current.AlertIsCustomSound))
+        if (!(Current.RequestNotifiers.HasAny(AlertKind.Audio) && Current.AlertIsCustomSound))
         {
             DisposeAudio();
             return;
@@ -233,20 +226,4 @@ public class MainConfig : IHybridSavable, IDisposable
         _audioEvent!.Play();
         return true;
     }
-
-    // Loci assistance.
-    public bool CanLociModifyUI()
-    {
-        if (!Current.LociEnabled)
-            return false;
-
-        if (!Current.LociOffInDuty && Svc.Condition[ConditionFlag.BoundByDuty] || Svc.Condition[ConditionFlag.BoundByDuty56] || Svc.ClientState.IsPvP)
-            return false;
-
-        if (!Current.LociOffInCombat && Svc.Condition[ConditionFlag.InCombat])
-            return false;
-        // Otherwise, valid!
-        return true;
-    }
-
 }

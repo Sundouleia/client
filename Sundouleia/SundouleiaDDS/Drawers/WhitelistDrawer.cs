@@ -92,7 +92,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         {
             if (CkGui.IconTextButton(FAI.Cog, "Settings", isInPopup: !_cache.FilterConfigOpen))
                 _cache.FilterConfigOpen = !_cache.FilterConfigOpen;
-            CkGui.AttachToolTip("Configure preferences for default folders.");
+            CkGui.AttachTooltip("Configure preferences for default folders.");
         }
     }
 
@@ -158,7 +158,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         CkGui.ColorTextFrameAlignedInline(folder.Name, folder.NameColor);
         // Total Context.
         CkGui.ColorTextFrameAlignedInline(folder.BracketText, ImGuiColors.DalamudGrey2);
-        CkGui.AttachToolTip(folder.BracketTooltip);
+        CkGui.AttachTooltip(folder.BracketTooltip);
     }
 
     #region SundesmoLeaf
@@ -184,7 +184,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
                 ImGui.SameLine(cursorPos.X);
                 ImGui.SetCursorPosX(cursorPos.X - ImUtf8.FrameHeight - ImUtf8.ItemInnerSpacing.X);
                 ImGui.Image(wrap.Handle, new Vector2(ImUtf8.FrameHeight));
-                CkGui.AttachToolTip(Image.Tooltip);
+                CkGui.AttachTooltip(Image.Tooltip);
             }
         }
     }
@@ -214,7 +214,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         var color = s.IsOnline ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         ImGui.AlignTextToFramePadding();
         CkGui.IconText(icon, color);
-        CkGui.AttachToolTip(TooltipText(s));
+        CkGui.AttachTooltip(TooltipText(s));
         if (!flags.HasAny(DynamicFlags.DragDropLeaves) && s.IsRendered && ImGui.IsItemClicked())
             _mediator.Publish(new TargetSundesmoMessage(s));
 
@@ -240,7 +240,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             ImGui.AlignTextToFramePadding();
             if (CkGui.IconButton(FAI.ChevronRight, inPopup: true))
                 _sidePanel.ForInteractions(leaf.Data);
-            CkGui.AttachToolTip("Toggle Interactions View");
+            CkGui.AttachTooltip("Toggle Interactions View");
         }
 
         // Now the favorites
@@ -271,7 +271,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             _cache.RenamingNode = null;
         // Helper tooltip.
-        CkGui.AttachToolTip("--COL--[ENTER]--COL-- To save" +
+        CkGui.AttachTooltip("--COL--[ENTER]--COL-- To save" +
             "--NL----COL--[R-CLICK]--COL-- Cancel edits.", ImGuiColors.DalamudOrange);
     }
 
@@ -289,7 +289,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
 
         // Push the monofont if we should show the UID, otherwise dont.
         DrawSundesmoName(leaf);
-        CkGui.AttachToolTip(Tooltip, ImGuiColors.DalamudOrange);
+        CkGui.AttachTooltip(Tooltip, ImGuiColors.DalamudOrange);
         // Handle hover state.
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.RectOnly | ImGuiHoveredFlags.NoNavOverride))
         {
@@ -315,14 +315,14 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
         if (_cache.ShowingUID.Contains(s))
         {
             // Mono Font is enabled.
-            dispName = s.Data.UserData.AliasOrUID;
+            dispName = s.Data.UserData.DisplayName;
         }
         else
         {
             // Set it to the display name.
             dispName = s.Data.GetDisplayName();
             // Update mono to be disabled if the display name is not the alias/uid.
-            useMono = s.Data.UserData.AliasOrUID.Equals(dispName, StringComparison.Ordinal);
+            useMono = s.Data.UserData.DisplayName.Equals(dispName, StringComparison.Ordinal);
         }
 
         // Display the name.
@@ -452,7 +452,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             // Update the folder structure to reflect this change.
             _drawSystem.UpdateVisibleFolderState(showVisible);
         }
-        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.ShowVisibleSeparateTT);
+        CkGui.AttachTooltip(CkLoc.Settings.GroupPrefs.ShowVisibleSeparateTT);
 
         var showOffline = _folders.Current.OfflineFolder;
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.ShowOfflineSeparateLabel, ref showOffline))
@@ -461,7 +461,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             _folders.Save();
             _drawSystem.UpdateOfflineFolderState(showOffline);
         }
-        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.ShowOfflineSeparateTT);
+        CkGui.AttachTooltip(CkLoc.Settings.GroupPrefs.ShowOfflineSeparateTT);
 
         var useFocusTarget = _folders.Current.TargetWithFocus;
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.FocusTargetLabel, ref useFocusTarget))
@@ -469,7 +469,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             _folders.Current.TargetWithFocus = useFocusTarget;
             _folders.Save();
         }
-        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.FocusTargetTT);
+        CkGui.AttachTooltip(CkLoc.Settings.GroupPrefs.FocusTargetTT);
 
         ImGui.TableNextColumn();
         var nickOverName = _folders.Current.NickOverPlayerName;
@@ -478,7 +478,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             _folders.Current.NickOverPlayerName = nickOverName;
             _folders.Save();
         }
-        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.PreferNicknamesTT);
+        CkGui.AttachTooltip(CkLoc.Settings.GroupPrefs.PreferNicknamesTT);
 
         var prioFavorites = _folders.Current.PrioritizeFavorites;
         var prioTemps = _folders.Current.PrioritizeTemps;
@@ -488,7 +488,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             _folders.Save();
             _drawSystem.UpdateFilters();
         }
-        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.PrioritizeFavoritesTT);
+        CkGui.AttachTooltip(CkLoc.Settings.GroupPrefs.PrioritizeFavoritesTT);
 
         if (ImGui.Checkbox(CkLoc.Settings.GroupPrefs.PrioritizeTempLabel, ref prioTemps))
         {
@@ -496,7 +496,7 @@ public sealed class WhitelistDrawer : DynamicDrawer<Sundesmo>
             _folders.Save();
             _drawSystem.UpdateFilters();
         }
-        CkGui.AttachToolTip(CkLoc.Settings.GroupPrefs.PrioritizeTempTT);
+        CkGui.AttachTooltip(CkLoc.Settings.GroupPrefs.PrioritizeTempTT);
     }
 
     private void ConvertUserToPermanent(IDynamicLeaf<Sundesmo> leaf)

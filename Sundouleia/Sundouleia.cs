@@ -18,6 +18,7 @@ using Sundouleia.Pairs.Factories;
 using Sundouleia.PlayerClient;
 using Sundouleia.Radar;
 using Sundouleia.Radar.Chat;
+using Sundouleia.Radar.Factories;
 using Sundouleia.Services;
 using Sundouleia.Services.Configs;
 using Sundouleia.Services.Events;
@@ -165,6 +166,7 @@ public static class SundouleiaServiceExtensions
         // Player User
         .AddSingleton<SundesmoFactory>()
         .AddSingleton<SundesmoHandlerFactory>()
+        .AddSingleton<RadarFactory>()
         .AddSingleton<SundesmoManager>()
         .AddSingleton<LimboStateManager>()
 
@@ -195,7 +197,6 @@ public static class SundouleiaServiceExtensions
 
         // UI (Probably mostly in Scoped)
         .AddSingleton<RadarChatLog>()
-        .AddSingleton<PopoutRadarChatlog>()
         .AddSingleton<MainMenuTabs>()
         .AddSingleton<WhitelistTabs>()
         .AddSingleton<SundesmoTabs>()
@@ -230,8 +231,10 @@ public static class SundouleiaServiceExtensions
     public static IServiceCollection AddSundouleiaConfigs(this IServiceCollection services)
     => services
         // Purely Client
+        .AddSingleton<ServerHubConfig>()
         .AddSingleton<AccountConfig>()
         .AddSingleton<MainConfig>()
+        .AddSingleton<ChatConfig>()
         .AddSingleton<FavoritesConfig>()
         .AddSingleton<FolderConfig>()
         .AddSingleton<ModularActorsConfig>()
@@ -248,6 +251,7 @@ public static class SundouleiaServiceExtensions
         // Managers / Savers
         .AddSingleton<GroupsManager>()
         .AddSingleton<AccountManager>()
+        .AddSingleton<ConfigDirector>()
         .AddSingleton<ConfigFileProvider>()
         .AddSingleton<HybridSaveService>();
 

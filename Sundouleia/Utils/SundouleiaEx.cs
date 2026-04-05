@@ -1,3 +1,4 @@
+using Brio.API;
 using CkCommons;
 using CkCommons.Gui;
 using CkCommons.RichText;
@@ -5,6 +6,7 @@ using CkCommons.Textures;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -26,14 +28,16 @@ public static class SundouleiaEx
     /// </summary>
     public static async Task WaitForPlayerLoading()
     {
+        // This is a bit flawed, as it fails to process PlayerData.Available in GPose because IsTargetable fails.
+        // We should do testing to see what conditional checks we can use to get around this, if possible.
         while (!await Svc.Framework.RunOnFrameworkThread(IsPlayerFullyLoaded).ConfigureAwait(false))
         {
             await Task.Delay(100).ConfigureAwait(false);
         }
     }
 
-    public static bool  IsPlayerFullyLoaded()
-        => PlayerData.Interactable && IsScreenReady();
+    public static bool IsPlayerFullyLoaded()
+        => PlayerData.Available && (PlayerData.Targetable || GameMain.IsInGPose()) && IsScreenReady();
 
     public static async Task WaitUntilFullyLoaded(IntPtr address, CancellationToken cts)
     {
@@ -118,7 +122,7 @@ public static class SundouleiaEx
             CkGui.FramedIconText(FAI.Star, col);
         else
             CkGui.IconText(FAI.Star, col);
-        CkGui.AttachToolTip((isFavorite ? "Remove" : "Add") + " from Favorites.");
+        CkGui.AttachTooltip((isFavorite ? "Remove" : "Add") + " from Favorites.");
 
         if (hovering && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
         {
@@ -140,7 +144,7 @@ public static class SundouleiaEx
             CkGui.FramedIconText(FAI.Star, col);
         else
             CkGui.IconText(FAI.Star, col);
-        CkGui.AttachToolTip((isFavorite ? "Remove" : "Add") + " from Favorites.");
+        CkGui.AttachTooltip((isFavorite ? "Remove" : "Add") + " from Favorites.");
 
         if (hovering && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
         {
@@ -162,7 +166,7 @@ public static class SundouleiaEx
             CkGui.FramedIconText(FAI.Star, col);
         else
             CkGui.IconText(FAI.Star, col);
-        CkGui.AttachToolTip((isFavorite ? "Remove" : "Add") + " from Favorites.");
+        CkGui.AttachTooltip((isFavorite ? "Remove" : "Add") + " from Favorites.");
 
         if (hovering && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
         {
@@ -189,7 +193,7 @@ public static class SundouleiaEx
         }
 
         CkGui.FramedIconText(FAI.History, col);
-        CkGui.AttachToolTip($"Your pairing with {sundesmo.GetDisplayName()} is Temporary." +
+        CkGui.AttachTooltip($"Your pairing with {sundesmo.GetDisplayName()} is Temporary." +
             $"--SEP----COL--[SHIFT + L-Click]--COL--Convert to permanent.", ImGuiColors.TankBlue);
 
         return hovering && shiftDown && ImGui.IsMouseReleased(ImGuiMouseButton.Left);
