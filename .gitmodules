@@ -19,9 +19,6 @@
 [submodule "Submodules/Penumbra.String"]
 	path = Submodules/Penumbra.String
 	url = https://github.com/Ottermandias/Penumbra.String.git
-[submodule "Submodules/Penumbra.GameData"]
-	path = Submodules/Penumbra.GameData
-	url = https://github.com/Ottermandias/Penumbra.GameData.git
 [submodule "Submodules/LociAPI"]
 	path = Submodules/LociAPI
 	url = https://github.com/CordeliaMist/Loci.Api.git
